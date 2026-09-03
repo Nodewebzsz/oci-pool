@@ -14,11 +14,11 @@ oci-dao/target/
 oci-ai/target/
 oci-message/target/
 oci-monitor/target/
-oci-start-mac/DerivedData/
-oci-start-mac/.build/
-oci-start-win/.build/
-oci-start-win/**/bin/
-oci-start-win/**/obj/
+oci-pool-mac/DerivedData/
+oci-pool-mac/.build/
+oci-pool-win/.build/
+oci-pool-win/**/bin/
+oci-pool-win/**/obj/
 *.pem
 *.key
 *.p12
