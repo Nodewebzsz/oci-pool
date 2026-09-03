@@ -5,7 +5,7 @@ import CoreGraphics
 
 let outDir = CommandLine.arguments.count > 1
     ? CommandLine.arguments[1]
-    : "OciStart/Assets.xcassets/AppIcon.appiconset"
+    : "OciPool/Assets.xcassets/AppIcon.appiconset"
 
 let sizes = [16, 32, 64, 128, 256, 512, 1024]
 

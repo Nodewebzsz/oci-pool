@@ -221,7 +221,7 @@
 		3576A9428E5AAA2E3DD48193 /* FeatureRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureRouter.swift; sourceTree = "<group>"; };
 		363DE138202C5833F517B46B /* MfaBackupModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MfaBackupModels.swift; sourceTree = "<group>"; };
 		3691286223625227D6DDD621 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		3917F9151E38DE2ED5DF761F /* OciStart.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = OciStart.entitlements; sourceTree = "<group>"; };
+		3917F9151E38DE2ED5DF761F /* OciPool.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = OciPool.entitlements; sourceTree = "<group>"; };
 		3B248667C71F81F738FA9F46 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		3B54547CAD4220609C80F72B /* MemoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoView.swift; sourceTree = "<group>"; };
 		3D47F9754F8BB4FEF752118B /* AiChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiChatViewModel.swift; sourceTree = "<group>"; };
@@ -657,7 +657,7 @@
 		964103D7A6D8C14E5C0BB922 = {
 			isa = PBXGroup;
 			children = (
-				9CB798917E12F9DCEB4F6877 /* OciStart */,
+				9CB798917E12F9DCEB4F6877 /* OciPool */,
 				5F45363432E59E5645FDD32A /* Products */,
 			);
 			indentWidth = 4;
@@ -689,12 +689,12 @@
 			path = Components;
 			sourceTree = "<group>";
 		};
-		9CB798917E12F9DCEB4F6877 /* OciStart */ = {
+		9CB798917E12F9DCEB4F6877 /* OciPool */ = {
 			isa = PBXGroup;
 			children = (
 				FB7975DB83637E09E80D84B9 /* Assets.xcassets */,
 				3691286223625227D6DDD621 /* Info.plist */,
-				3917F9151E38DE2ED5DF761F /* OciStart.entitlements */,
+				3917F9151E38DE2ED5DF761F /* OciPool.entitlements */,
 				BEBE6AF115FA51403E3F624F /* App */,
 				4889ECD4FA72FEC65B376742 /* Common */,
 				A0D6FA877E0216890C4C2620 /* Core */,
@@ -703,7 +703,7 @@
 				2C88A2FEE2EB2D4613EC6C54 /* Navigation */,
 				469FE513476665F297DD0222 /* Supporting */,
 			);
-			path = OciStart;
+			path = OciPool;
 			sourceTree = "<group>";
 		};
 		A0D6FA877E0216890C4C2620 /* Core */ = {
@@ -1118,14 +1118,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = OciStart/OciStart.entitlements;
+				CODE_SIGN_ENTITLEMENTS = OciPool/OciPool.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 9;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_HARDENED_RUNTIME = YES;
-				INFOPLIST_FILE = OciStart/Info.plist;
+				INFOPLIST_FILE = OciPool/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -1200,14 +1200,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = OciStart/OciStart.entitlements;
+				CODE_SIGN_ENTITLEMENTS = OciPool/OciPool.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 9;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_HARDENED_RUNTIME = YES;
-				INFOPLIST_FILE = OciStart/Info.plist;
+				INFOPLIST_FILE = OciPool/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

@@ -14,7 +14,7 @@ targets:
     platform: macOS
     deploymentTarget: "11.0"
     sources:
-      - path: OciStart
+      - path: OciPool
         createIntermediateGroups: true
         excludes:
           - "**/*.md"
@@ -38,7 +38,7 @@ targets:
           SWIFT_OPTIMIZATION_LEVEL: "-O"
           DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
     info:
-      path: OciStart/Info.plist
+      path: OciPool/Info.plist
       properties:
         CFBundleName: OciPool
         CFBundleDisplayName: OCI-POOL
@@ -52,7 +52,7 @@ targets:
           NSAllowsArbitraryLoads: true
         LSUIElement: false
     entitlements:
-      path: OciStart/OciStart.entitlements
+      path: OciPool/OciPool.entitlements
       properties:
         com.apple.security.app-sandbox: false
         com.apple.security.network.client: true

@@ -40,8 +40,8 @@ xcuserdata/
 # 本地进度 / 说明文档（勿提交）
 oci-pool-mac/README.md
 oci-pool-mac/PROGRESS.md
-oci-pool-mac/OciStart/Common/README.md
-oci-pool-mac/OciStart/Features/Tenants/README.md
+oci-pool-mac/OciPool/Common/README.md
+oci-pool-mac/OciPool/Features/Tenants/README.md
 
 # AI agent local plans / todos / lessons (private, not for remote)
 tasks/

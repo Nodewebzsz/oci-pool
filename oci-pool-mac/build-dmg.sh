@@ -68,7 +68,7 @@ read_oci_version() {
 
 bump_app_version() {
     local yml="$MAC_DIR/project.yml"
-    local plist="$MAC_DIR/OciStart/Info.plist"
+    local plist="$MAC_DIR/OciPool/Info.plist"
     if [ ! -f "$yml" ]; then
         echo "❌ 找不到 $yml"
         exit 1
@@ -443,7 +443,7 @@ echo "════════════════════════�
 echo " Step 2.5  生成应用图标"
 echo "══════════════════════════════════════════"
 cd "$MAC_DIR"
-swift generate-icon.swift "OciStart/Assets.xcassets/AppIcon.appiconset"
+swift generate-icon.swift "OciPool/Assets.xcassets/AppIcon.appiconset"
 
 # ────────────────────────── Step 3: xcodegen ─────────────────────────────
 echo ""
@@ -548,7 +548,7 @@ echo "✅ server.jar 已注入 ($(du -sh "$RESOURCES_DIR/server.jar" | cut -f1))
 # 注入后必须重签，否则 Finder 会提示「已损坏 / 打不开」
 echo ""
 echo "🔏  注入后重新 ad-hoc 签名…"
-ENTITLEMENTS_FILE="$MAC_DIR/OciStart/OciStart.entitlements"
+ENTITLEMENTS_FILE="$MAC_DIR/OciPool/OciPool.entitlements"
 RUNTIME_ENTS="$BUILD_DIR/runtime.entitlements"
 cat > "$RUNTIME_ENTS" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
