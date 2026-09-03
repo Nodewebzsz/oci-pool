@@ -48,6 +48,7 @@ jobs:
         with:
           name: mac-dmg
           path: oci-pool-mac/.build/OciPool-*.dmg
+          include-hidden-files: true
           if-no-files-found: error
 
   release:
@@ -63,7 +64,14 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
+          name: OCI-Pool ${{ github.ref_name }}
+          body: |
+            OCI-Pool ${{ github.ref_name }} 发布。
+
+            - macOS: `OciPool-*.dmg`（未公证，安装见 DMG 内“首次打开.command”）
+            - 服务端: `oci-pool-release.jar`
+
+            本仓库是 [doubleDimple/oci-start](https://github.com/doubleDimple/oci-start) 的二次开发分支；想体验原项目最新功能请前往上游。
           files: |
             artifacts/server-jar/oci-pool-release.jar
             artifacts/mac-dmg/*.dmg
-          generate_release_notes: true
