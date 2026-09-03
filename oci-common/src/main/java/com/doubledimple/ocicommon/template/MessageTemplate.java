@@ -9,7 +9,7 @@ import com.doubledimple.ocicommon.utils.DateTimeUtils;
 public class MessageTemplate {
 
 
-    public static final String COMMON_LINKS ="Github: [Oci-Pool](https://github.com/doubleDimple/oci-start)\n" +
+    public static final String COMMON_LINKS ="Github: [Oci-Pool](https://github.com/Nodewebzsz/oci-pool)\n" +
             "频道: [OCI_NOTIFY](https://t.me/OCI_NOTIFY)\n" +
             "交流群: [点击加入](https://t.me/+M7XhteVCMMU5ZDhh)";
     /**

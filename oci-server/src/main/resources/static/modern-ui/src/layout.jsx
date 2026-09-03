@@ -1136,9 +1136,9 @@ function UserMenuButton() {
           <div style={{ marginTop: 16, fontSize: 12, color: 'var(--fg-1)' }}>{tr('layout.9b601b')} <span className="mono" style={{ color: 'var(--accent)', fontWeight: 600 }}>v2.14.0</span></div>
           <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {[
-              { href: 'https://github.com/doubleDimple/oci-start', label: tr('layout.072ab5') },
+              { href: 'https://github.com/Nodewebzsz/oci-pool', label: tr('layout.072ab5') },
               { href: 'https://t.me/+M7XhteVCMMU5ZDhh', label: 'Telegram' },
-              { href: 'https://github.com/doubleDimple/oci-start/releases', label: tr('layout.23093b') },
+              { href: 'https://github.com/Nodewebzsz/oci-pool/releases', label: tr('layout.23093b') },
             ].map((l) => (
               <a key={l.label} href={l.href} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: 'var(--accent)', textDecoration: 'none', padding: '6px 12px', borderRadius: 6, background: 'var(--bg-2)', border: '1px solid var(--border)' }}>{l.label}</a>
             ))}

@@ -80,7 +80,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
     private static final String BTN_REFRESH = "🔄 刷新";
     private static final String BTN_BACK = "↩️ 返回";
 
-    private static final String URL_GITHUB = "https://github.com/doubleDimple/oci-start";
+    private static final String URL_GITHUB = "https://github.com/Nodewebzsz/oci-pool";
     private static final String URL_COMMUNITY = "https://t.me/+M7XhteVCMMU5ZDhh";
 
     private static final int PAGE_SIZE_TENANT = 10;
@@ -1190,7 +1190,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                 "▪️ 直接发送消息 — 与 AI 助手对话 🤖\n" +
                 DIVIDER_THIN + "\n" +
                 "⭐ <b>项目地址</b>\n" +
-                "<a href=\"" + URL_GITHUB + "\">github.com/doubleDimple/oci-start</a>\n" +
+                "<a href=\"" + URL_GITHUB + "\">github.com/Nodewebzsz/oci-pool</a>\n" +
                 DIVIDER_THIN + "\n" +
                 "💬 <b>交流群</b>\n" +
                 "<a href=\"" + URL_COMMUNITY + "\">点击加入 OCI-POOL 交流群</a>";

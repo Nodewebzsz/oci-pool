@@ -256,7 +256,7 @@ final class HeaderViewModel: ObservableObject {
     func executeDMGUpdate() async {
         guard version.needUpdate else { return }
         guard let remote = URL(string: version.dmgURL), !version.dmgURL.isEmpty else {
-            updatePhase = .failed("未找到 Mac 安装包（DMG）。请到 GitHub Releases 手动下载：\nhttps://github.com/doubleDimple/oci-start/releases")
+            updatePhase = .failed("未找到 Mac 安装包（DMG）。请到 GitHub Releases 手动下载：\nhttps://github.com/Nodewebzsz/oci-pool/releases")
             showUpdateProgress = true
             return
         }
@@ -291,7 +291,7 @@ final class HeaderViewModel: ObservableObject {
 
     /// Prefer latest release that ships a `.dmg` (scan recent pages).
     private func fetchLatestMacDMGRelease() async throws -> MacDMGRelease? {
-        guard let api = URL(string: "https://api.github.com/repos/doubleDimple/oci-start/releases?per_page=20") else {
+        guard let api = URL(string: "https://api.github.com/repos/Nodewebzsz/oci-pool/releases?per_page=20") else {
             throw APIError.invalidURL
         }
         var req = URLRequest(url: api)
@@ -378,7 +378,7 @@ final class HeaderViewModel: ObservableObject {
         return finalDest
     }
 
-    /// Same numeric compare as server `AppVersion` (v-5.7.89 vs 5.7.90).
+    /// Same numeric compare as server `AppVersion` (v-1.0.0 vs 1.0.1).
     static func compareVersion(_ left: String, _ right: String) -> Int {
         let l = normalizeVersion(left).split(separator: ".").map { parseVersionPart(String($0)) }
         let r = normalizeVersion(right).split(separator: ".").map { parseVersionPart(String($0)) }

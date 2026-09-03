@@ -43,7 +43,7 @@ mkdir -p "$BUILD_DIR" "$CACHE_DIR"
 # 不再独立维护 1.0.x。构建号仍每次 +1。
 # 环境变量：
 #   SKIP_VERSION_BUMP=1   不改版本号，沿用 project.yml
-#   VERSION=5.7.91        指定对外版本（覆盖 yml），构建号仍 +1
+#   VERSION=1.0.0        指定对外版本（覆盖 yml），构建号仍 +1
 APP_MARKETING_VERSION=""
 APP_BUILD_NUMBER=""
 
@@ -233,6 +233,11 @@ resolve_maven_jdk() {
             return 0
         fi
     done
+    # CI / 纯净环境：java_home 查不到时回退到 env JAVA_HOME（setup-java 会设置）
+    if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+        printf '%s' "$JAVA_HOME"
+        return 0
+    fi
     return 1
 }
 
@@ -726,7 +731,7 @@ echo "📦 环境变量:"
 echo "   SKIP_JLINK=1        跳过 jlink，仅删 man/demo/src"
 echo "   HOST_ARCH_ONLY=1    仅打包本机 CPU 架构的 JRE"
 echo "   SKIP_VERSION_BUMP=1 本次不改版本号"
-echo "   VERSION=5.7.91      指定对外版本（默认跟随 oci.version，构建号仍 +1）"
+echo "   VERSION=1.0.0      指定对外版本（默认跟随 oci.version，构建号仍 +1）"
 echo ""
 echo "🔏 可选：Developer ID + 公证后，对方可直接双击（需付费开发者账号）"
 echo "   详见 oci-pool-mac/README.md「签名与公证」"

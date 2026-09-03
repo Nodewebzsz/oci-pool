@@ -29,6 +29,8 @@
 
 > 💡 **原项目**:<https://github.com/doubleDimple/oci-start>
 
+> 📦 **本项目 Releases**:<https://github.com/Nodewebzsz/oci-pool/releases>
+
 ---
 
 ## 功能特性

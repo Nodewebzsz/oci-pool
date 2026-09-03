@@ -31,7 +31,7 @@ struct VersionCheckInfo: Equatable {
     var dmgURL: String = ""
     var dmgFileName: String = ""
 
-    /// Strip `v-` / `v` for UI (5.7.91, not v-5.7.91).
+    /// Strip `v-` / `v` for UI (1.0.0, not v-1.0.0).
     var currentDisplay: String {
         let d = Self.display(currentVersion)
         return d.isEmpty ? "1.0.0" : d

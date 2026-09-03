@@ -217,10 +217,10 @@
                 </div>
             </div>
             <div class="quick-links">
-                <a href="https://github.com/doubleDimple/oci-start/releases" target="_blank" class="ql-btn ql-primary">
+                <a href="https://github.com/Nodewebzsz/oci-pool/releases" target="_blank" class="ql-btn ql-primary">
                     <i class="fas fa-download"></i>${msg.get('index.version.btnCheck')}
                 </a>
-                <a href="https://github.com/doubleDimple/oci-start" target="_blank" class="ql-btn">
+                <a href="https://github.com/Nodewebzsz/oci-pool" target="_blank" class="ql-btn">
                     <i class="fab fa-github"></i>${msg.get('index.version.btnRepo')}
                 </a>
                 <a href="https://blogger.objboy.com/" target="_blank" class="ql-btn">

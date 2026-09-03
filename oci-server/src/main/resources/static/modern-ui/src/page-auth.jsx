@@ -1115,8 +1115,8 @@ function AuthPage({ onLogin, authView, onAuthViewChange }) {
           marginTop: 24,
           fontFamily: 'var(--font-mono)',
         }}>
-          v2.14.0 · MIT · <a href="https://github.com/doubleDimple/oci-start" target="_blank" rel="noopener"
-                              style={{ color: 'var(--fg-3)', textDecoration: 'none' }}>doubleDimple/oci-start</a>
+          v2.14.0 · MIT · <a href="https://github.com/Nodewebzsz/oci-pool" target="_blank" rel="noopener"
+                              style={{ color: 'var(--fg-3)', textDecoration: 'none' }}>Nodewebzsz/oci-pool</a>
         </div>
       </div>
     </div>

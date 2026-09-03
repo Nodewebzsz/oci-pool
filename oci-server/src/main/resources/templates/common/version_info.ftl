@@ -214,9 +214,9 @@
         </div>
 
         <div class="links-row">
-            <a href="https://github.com/doubleDimple/oci-start" target="_blank" class="btn-link-item"><i class="fab fa-github"></i><span>开源仓库</span></a>
+            <a href="https://github.com/Nodewebzsz/oci-pool" target="_blank" class="btn-link-item"><i class="fab fa-github"></i><span>开源仓库</span></a>
             <a href="https://t.me/+M7XhteVCMMU5ZDhh" target="_blank" class="btn-link-item"><i class="fab fa-telegram"></i><span>Telegram</span></a>
-            <a href="https://github.com/doubleDimple/oci-start/releases" target="_blank" class="btn-link-item"><i class="fas fa-file-code"></i><span>更新日志</span></a>
+            <a href="https://github.com/Nodewebzsz/oci-pool/releases" target="_blank" class="btn-link-item"><i class="fas fa-file-code"></i><span>更新日志</span></a>
         </div>
 
         <div class="donate-area">

@@ -518,9 +518,9 @@ private struct AboutSheet: View {
     @State private var zoomImage: NSImage?
 
     private let trc20 = "TMHTdWVm6ThvhihWqM1ViSDKMMsGcCBHtT"
-    private let githubURL = "https://github.com/doubleDimple/oci-start"
+    private let githubURL = "https://github.com/Nodewebzsz/oci-pool"
     private let telegramURL = "https://t.me/+M7XhteVCMMU5ZDhh"
-    private let releasesURL = "https://github.com/doubleDimple/oci-start/releases"
+    private let releasesURL = "https://github.com/Nodewebzsz/oci-pool/releases"
 
     private var currentVersion: String {
         header.version.currentDisplay

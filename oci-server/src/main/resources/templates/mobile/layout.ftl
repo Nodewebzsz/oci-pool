@@ -273,13 +273,13 @@
     </div>
     <!-- 外链 -->
     <div class="mob-about-links">
-        <a href="https://github.com/doubleDimple/oci-start" target="_blank" class="mob-about-link">
+        <a href="https://github.com/Nodewebzsz/oci-pool" target="_blank" class="mob-about-link">
             <i class="fab fa-github"></i> GitHub
         </a>
         <a href="https://t.me/+M7XhteVCMMU5ZDhh" target="_blank" class="mob-about-link">
             <i class="fab fa-telegram"></i> Telegram
         </a>
-        <a href="https://github.com/doubleDimple/oci-start/releases" target="_blank" class="mob-about-link">
+        <a href="https://github.com/Nodewebzsz/oci-pool/releases" target="_blank" class="mob-about-link">
             <i class="fas fa-scroll"></i> ${msg.get('mob.about.changelog')}
         </a>
     </div>

@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-server:
+    name: Build server JAR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+          cache: maven
+      - name: Package oci-server
+        run: mvn -B -pl oci-server -am package -DskipTests
+      - name: Upload server JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-jar
+          path: oci-server/target/oci-pool-release.jar
+          if-no-files-found: error
+
+  build-mac:
+    name: Build macOS DMG
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+      - name: Build DMG
+        working-directory: oci-pool-mac
+        run: |
+          chmod +x build-dmg.sh
+          ./build-dmg.sh
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-dmg
+          path: oci-pool-mac/.build/OciPool-*.dmg
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-server, build-mac]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/server-jar/oci-pool-release.jar
+            artifacts/mac-dmg/*.dmg
+          generate_release_notes: true

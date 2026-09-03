@@ -80,7 +80,7 @@ public class SystemScriptShell {
                 "        echo \"\"\n" +
                 "        echo \"Welcome to OCI-POOL\"\n" +
                 "        echo \"\"\n" +
-                "        echo \"Source code address: https://github.com/doubleDimple/oci-start\"\n" +
+                "        echo \"Source code address: https://github.com/Nodewebzsz/oci-pool\"\n" +
                 "      } | tee /etc/motd\n" +
                 "      \n" +
                 "      # OS-specific configurations\n" +
@@ -171,7 +171,7 @@ public class SystemScriptShell {
                 "\n" +
                 "Welcome to OCI-POOL\n" +
                 "\n" +
-                "Source code address: https://github.com/doubleDimple/oci-start\n" +
+                "Source code address: https://github.com/Nodewebzsz/oci-pool\n" +
                 "\n" +
                 "EOF\n" +
                 "\n" +

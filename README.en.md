@@ -29,6 +29,8 @@ This fork tracks upstream updates, but it is **not guaranteed to be fully featur
 
 > 💡 **Original project**: <https://github.com/doubleDimple/oci-start>
 
+> 📦 **This project Releases**: <https://github.com/Nodewebzsz/oci-pool/releases>
+
 ---
 
 ## Features

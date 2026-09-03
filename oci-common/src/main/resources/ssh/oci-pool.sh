@@ -455,7 +455,7 @@ update_latest() {
     fi
 
     # 使用原始的GitHub API获取版本信息
-    local api_url="https://api.github.com/repos/doubleDimple/oci-start/releases/latest"
+    local api_url="https://api.github.com/repos/Nodewebzsz/oci-pool/releases/latest"
 
     # 获取版本信息
     log_info "获取最新版本信息..."
