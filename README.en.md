@@ -116,8 +116,6 @@ mvn -pl oci-server -am package -DskipTests
 java -jar oci-server/target/oci-pool-release.jar
 ```
 
-> Users who prefer the upstream `oci-start.sh` installer (from `doubleDimple/shell-tools`) can keep using it; this repository recommends the bundled `deploy/` Docker Compose path.
-
 ---
 
 ## Configuration

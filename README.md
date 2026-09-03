@@ -116,8 +116,6 @@ mvn -pl oci-server -am package -DskipTests
 java -jar oci-server/target/oci-pool-release.jar
 ```
 
-> 沿用上游 `oci-start.sh`(来自 `doubleDimple/shell-tools`)脚本部署的用户,可继续使用上游脚本;本仓库以 `deploy/` Docker Compose 为推荐路径。
-
 ---
 
 ## 配置
