@@ -4,6 +4,8 @@
 
 **Drop-in React frontend for [doubleDimple/oci-start](https://github.com/doubleDimple/oci-start)** · [中文](#-中文) · [English](#-english)
 
+> **关于本项目**:本 Modern UI 是开源项目 [doubleDimple/oci-start](https://github.com/doubleDimple/oci-start) 的二次开发分支,不保证与原项目功能完全同步。想体验原项目**最新功能**,请前往原项目:<https://github.com/doubleDimple/oci-start>
+
 ---
 
 ## v4 changelog (相对 v2)
