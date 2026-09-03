@@ -1,0 +1,60 @@
+# Maven build output
+target/
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Runtime data
+data/
+logs/
+
+# Private keys
+*.pem
+*.key
+*.p12
+*.jks
+
+# ---------- oci-start-win (.NET / local build) ----------
+oci-start-win/.build/
+oci-start-win/**/bin/
+oci-start-win/**/obj/
+oci-start-win/**/*.user
+oci-start-win/**/*.suo
+*.msi
+
+# ---------- oci-start-mac (Xcode / local build) ----------
+# xcodegen / tool cache
+oci-start-mac/.build/
+# xcodebuild -derivedDataPath ./DerivedData（勿提交，体积巨大）
+oci-start-mac/DerivedData/
+# 其它本机 DerivedData / 通用 Xcode 缓存
+**/DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+# 打包产物
+*.dmg
+*.app/
+# 本地进度 / 说明文档（勿提交）
+oci-start-mac/README.md
+oci-start-mac/PROGRESS.md
+oci-start-mac/OciStart/Common/README.md
+oci-start-mac/OciStart/Features/Tenants/README.md
+
+# AI agent local plans / todos / lessons (private, not for remote)
+tasks/
+plan.md
+.plans/
+.grok/
+.superpowers/
+docs/superpowers/
+
+# Claude Code internals
+.claude/
+.claude/worktrees/
+
+# Claude project instructions (private, not for remote)
+CLAUDE.MD
+Claude.md

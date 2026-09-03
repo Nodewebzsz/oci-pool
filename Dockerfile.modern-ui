@@ -1,0 +1,30 @@
+# OCI Pool Manager (Modern UI fork) · multi-stage build
+FROM maven:3.9-eclipse-temurin-17 AS builder
+WORKDIR /build
+COPY pom.xml ./
+COPY oci-common/pom.xml    oci-common/
+COPY oci-server/pom.xml    oci-server/
+COPY oci-ai/pom.xml        oci-ai/
+COPY oci-dao/pom.xml       oci-dao/
+COPY oci-message/pom.xml   oci-message/
+COPY oci-monitor/pom.xml   oci-monitor/
+RUN mvn -B -q dependency:go-offline -DskipTests || true
+COPY oci-common/   oci-common/
+COPY oci-server/   oci-server/
+COPY oci-ai/       oci-ai/
+COPY oci-dao/      oci-dao/
+COPY oci-message/  oci-message/
+COPY oci-monitor/  oci-monitor/
+RUN mvn -B -pl oci-server -am package -DskipTests
+
+FROM eclipse-temurin:17-jre-jammy
+WORKDIR /oci-pool
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata curl && rm -rf /var/lib/apt/lists/* && mkdir -p /oci-pool/data /oci-pool/logs
+ENV SERVER_PORT=9856 DATA_PATH=/oci-pool/data LOG_HOME=/oci-pool/logs TZ=Asia/Shanghai \
+    JAVA_OPTS="-XX:+UseG1GC -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/oci-pool/logs"
+COPY --from=builder /build/oci-server/target/oci-pool-release.jar /oci-pool/oci-pool.jar
+EXPOSE 9856
+VOLUME ["/oci-pool/data", "/oci-pool/logs"]
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=60s \
+  CMD curl -sf http://127.0.0.1:9856/actuator/health >/dev/null || exit 1
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Duser.timezone=$TZ -DSERVER_PORT=$SERVER_PORT -DDATA_PATH=$DATA_PATH -DLOG_HOME=$LOG_HOME -jar oci-pool.jar"]

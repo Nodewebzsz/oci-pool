@@ -1,0 +1,5 @@
+# OCI Pool Manager · Modern UI — Nginx 统一入口反代
+# 把 nginx.conf 打进镜像,避免依赖宿主 bind-mount(Docker Desktop 文件共享限制),
+# 在任何机器上都可复现。
+FROM nginx:stable-alpine
+COPY nginx.conf /etc/nginx/conf.d/default.conf

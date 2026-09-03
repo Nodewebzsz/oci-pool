@@ -1,0 +1,27 @@
+# Build context hygiene (prebuilt-jar deploy)
+.git
+.github/
+.gitignore
+.superpowers/
+docs/superpowers/
+**/.idea/
+**/*.iml
+.DS_Store
+data/
+logs/
+oci-common/target/
+oci-dao/target/
+oci-ai/target/
+oci-message/target/
+oci-monitor/target/
+oci-start-mac/DerivedData/
+oci-start-mac/.build/
+oci-start-win/.build/
+oci-start-win/**/bin/
+oci-start-win/**/obj/
+*.pem
+*.key
+*.p12
+*.jks
+*.dmg
+*.app/

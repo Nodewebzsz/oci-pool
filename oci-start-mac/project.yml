@@ -1,0 +1,60 @@
+name: OciPool
+options:
+  bundleIdPrefix: com.nodewebzsz
+  deploymentTarget:
+    # Product support floor: macOS Big Sur 11.7.11+
+    macOS: "11.0"
+  createIntermediateGroups: true
+  indentWidth: 4
+  tabWidth: 4
+
+targets:
+  OciPool:
+    type: application
+    platform: macOS
+    deploymentTarget: "11.0"
+    sources:
+      - path: OciStart
+        createIntermediateGroups: true
+        excludes:
+          - "**/*.md"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.nodewebzsz.ocipool
+        MARKETING_VERSION: "5.7.91"
+        CURRENT_PROJECT_VERSION: "9"
+        SWIFT_VERSION: "5.5"
+        MACOSX_DEPLOYMENT_TARGET: "11.0"
+        ENABLE_HARDENED_RUNTIME: YES
+        PRODUCT_NAME: OciPool
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      configs:
+        Debug:
+          SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+          DEBUG_INFORMATION_FORMAT: dwarf
+        Release:
+          SWIFT_OPTIMIZATION_LEVEL: "-O"
+          DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
+    info:
+      path: OciStart/Info.plist
+      properties:
+        CFBundleName: OciPool
+        CFBundleDisplayName: OCI-POOL
+        CFBundleIdentifier: com.nodewebzsz.ocipool
+        CFBundleVersion: "9"
+        CFBundleShortVersionString: "5.7.91"
+        NSPrincipalClass: NSApplication
+        NSHighResolutionCapable: true
+        LSMinimumSystemVersion: "11.0"
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        LSUIElement: false
+    entitlements:
+      path: OciStart/OciStart.entitlements
+      properties:
+        com.apple.security.app-sandbox: false
+        com.apple.security.network.client: true
+        com.apple.security.keychain-access-groups:
+          - $(AppIdentifierPrefix)com.nodewebzsz.ocipool

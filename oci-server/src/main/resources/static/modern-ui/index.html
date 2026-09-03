@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>OCI-POOL Manager · 多租户池化管理平台</title>
+  <link rel="icon" type="image/svg+xml" href="/modern-ui/favicon.svg?v=2"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<style>
+  :root {
+    /* 通知浏览器整个页面为深色调 · 让原生表单控件(select 下拉、date/time picker 等)使用深色渲染 */
+    color-scheme: dark;
+    /* Dark default — cool slate */
+    --bg-0: oklch(0.14 0.010 240);
+    --bg-1: oklch(0.18 0.012 240);
+    --bg-2: oklch(0.22 0.014 240);
+    --bg-3: oklch(0.26 0.014 240);
+    --bg-4: oklch(0.30 0.014 240);
+    --border: oklch(0.28 0.014 240);
+    --border-strong: oklch(0.36 0.016 240);
+    --fg-0: oklch(0.98 0.005 240);
+    --fg-1: oklch(0.86 0.008 240);
+    --fg-2: oklch(0.66 0.010 240);
+    --fg-3: oklch(0.50 0.012 240);
+
+    /* Accents — vitality green primary, cyan/orange/red semantic */
+    --accent: oklch(0.72 0.16 155);          /* success/primary — green */
+    --accent-2: oklch(0.68 0.13 155);
+    --accent-soft: oklch(0.30 0.10 155);
+    --accent-fg: oklch(0.14 0.02 155);
+
+    --cyan: oklch(0.70 0.13 200);
+    --cyan-soft: oklch(0.30 0.09 200);
+
+    --orange: oklch(0.72 0.16 55);
+    --orange-soft: oklch(0.30 0.10 55);
+
+    --danger: oklch(0.66 0.19 25);
+    --danger-soft: oklch(0.30 0.11 25);
+
+    --info: oklch(0.68 0.13 260);
+    --info-soft: oklch(0.30 0.10 260);
+
+    --violet: oklch(0.70 0.15 305);
+    --violet-soft: oklch(0.30 0.11 305);
+
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.35);
+    --shadow-md: 0 6px 20px rgba(0,0,0,0.4);
+
+    --radius-sm: 5px;
+    --radius: 8px;
+    --radius-lg: 12px;
+
+    --font-sans: 'Inter', 'PingFang SC', 'Microsoft YaHei', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, 'Sarasa Mono SC', monospace;
+
+    --sidebar-w: 188px;
+    --sidebar-w-collapsed: 60px;
+    --topbar-h: 52px;
+  }
+
+  [data-theme="light"] {
+    color-scheme: light;
+    --bg-0: oklch(0.985 0.004 240);
+    --bg-1: oklch(1 0 0);
+    --bg-2: oklch(0.965 0.005 240);
+    --bg-3: oklch(0.94 0.007 240);
+    --bg-4: oklch(0.90 0.008 240);
+    --border: oklch(0.90 0.008 240);
+    --border-strong: oklch(0.82 0.010 240);
+    --fg-0: oklch(0.18 0.014 240);
+    --fg-1: oklch(0.32 0.014 240);
+    --fg-2: oklch(0.50 0.012 240);
+    --fg-3: oklch(0.62 0.010 240);
+    --accent-soft: oklch(0.93 0.06 155);
+    --cyan-soft: oklch(0.93 0.06 200);
+    --orange-soft: oklch(0.94 0.07 55);
+    --danger-soft: oklch(0.94 0.06 25);
+    --info-soft: oklch(0.94 0.06 260);
+    --violet-soft: oklch(0.94 0.07 305);
+    --shadow-sm: 0 1px 2px rgba(15,23,42,0.06);
+    --shadow-md: 0 4px 14px rgba(15,23,42,0.08);
+    --accent-fg: white;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-sans);
+    background: var(--bg-0);
+    color: var(--fg-1);
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  html, body { height: 100vh; overflow: hidden; }
+  #root { height: 100vh; display: flex; flex-direction: column; }
+
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; border: 2px solid var(--bg-0); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--fg-3); }
+
+  /* 原生 select 下拉 · 部分浏览器(Chrome 116+, Firefox)支持样式化 option */
+  select { background: var(--bg-2); color: var(--fg-0); }
+  select option, select optgroup {
+    background: var(--bg-1);
+    color: var(--fg-0);
+  }
+  select option:checked { background: var(--accent-soft); color: var(--accent); }
+  select optgroup {
+    font-weight: 600;
+    color: var(--fg-2);
+    font-style: normal;
+  }
+
+  [data-lucide] { width: 15px; height: 15px; stroke-width: 1.75; }
+
+  /* Hide browser-native password reveal — we render our own eye icon */
+  /* Edge / IE */
+  input[type="password"]::-ms-reveal,
+  input[type="password"]::-ms-clear { display: none !important; width: 0; height: 0; }
+  /* Chrome / Safari auto-fill affordance */
+  input[type="password"]::-webkit-credentials-auto-fill-button,
+  input[type="password"]::-webkit-strong-password-auto-fill-button,
+  input[type="password"]::-webkit-caps-lock-indicator {
+    visibility: hidden !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    right: 0;
+    width: 0 !important;
+    height: 0 !important;
+  }
+  /* Firefox reveal button */
+  input[type="password"]::-moz-reveal { display: none !important; }
+
+  /* 侧边栏菜单 hover 用纯 CSS,避免直接改 DOM 后 React 重渲染无法清理残留灰底 */
+  .sidebar-section-hoverable:hover { background: var(--bg-2) !important; }
+  .sidebar-item:not(.sidebar-item-active):hover { background: var(--bg-2) !important; }
+  .sidebar-item:focus-visible { background: var(--bg-2); outline: none; }
+  .sidebar-item-active { background: transparent !important; }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  @keyframes button-spin {
+    to { transform: rotate(360deg); }
+  }
+  @keyframes slide-in-right {
+    from { transform: translateX(20px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes page-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .page-anim { animation: page-in 220ms cubic-bezier(0.4, 0, 0.2, 1) both; }
+</style>
+
+<script>
+  const OCI_TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "theme": "dark",
+  "accent": "green",
+  "density": "compact",
+  "sidebarCollapsed": false
+}/*EDITMODE-END*/;
+  window.OCI_TWEAK_DEFAULTS = OCI_TWEAK_DEFAULTS;
+</script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <!-- noVNC(RFB)ES-module 入口:暴露 window.OCiVnc 供 VNC 控制台渲染真画面 -->
+  <script type="module" src="/modern-ui/vendor/novnc/entry.mjs"></script>
+
+  <script type="text/babel" src="/modern-ui/tweaks_panel.jsx?v=3"></script>
+  <script type="text/babel" src="/modern-ui/src/i18n.jsx?v=13"></script>
+  <script type="text/babel" src="/modern-ui/src/api.jsx?v=7"></script>
+  <script type="text/babel" src="/modern-ui/src/contracts.js"></script>
+  <script type="text/babel" src="/modern-ui/src/services-auth.js?v=8"></script>
+  <script type="text/babel" src="/modern-ui/src/services-tenant.js?v=12"></script>
+  <script type="text/babel" src="/modern-ui/src/services-instance.js?v=4"></script>
+  <script type="text/babel" src="/modern-ui/src/services-boot.js?v=3"></script>
+  <script type="text/babel" src="/modern-ui/src/services-system.js?v=12"></script>
+  <script type="text/babel" src="/modern-ui/src/services-ai.js?v=3"></script>
+  <script type="text/babel" src="/modern-ui/src/services-migration.js?v=2"></script>
+  <script type="text/babel" src="/modern-ui/src/services-mfa-backup.js?v=2"></script>
+  <script type="text/babel" src="/modern-ui/src/services-proxy.js?v=4"></script>
+  <script type="text/babel" src="/modern-ui/src/services-token.js?v=2"></script>
+  <script type="text/babel" src="/modern-ui/src/services-notify.js?v=3"></script>
+  <script type="text/babel" src="/modern-ui/src/services-memo.js?v=2"></script>
+  <script type="text/babel" src="/modern-ui/src/services-mail.js?v=3"></script>
+  <script type="text/babel" src="/modern-ui/src/services-storage.js?v=3"></script>
+  <script src="/modern-ui/src/tenant-row.js?v=9"></script>
+  <script type="text/babel" src="/modern-ui/src/data.jsx?v=11"></script>
+  <!-- 世界地图依赖:d3-geo(投影+路径) + topojson-client(拓扑转 geojson) -->
+  <script src="/modern-ui/vendor/d3-array.min.js"></script>
+  <script src="/modern-ui/vendor/d3-geo.min.js"></script>
+  <script src="/modern-ui/vendor/topojson-client.min.js"></script>
+
+  <script type="text/babel" src="/modern-ui/src/ui.jsx?v=13"></script>
+  <script type="text/babel" src="/modern-ui/src/charts.jsx"></script>
+  <script type="text/babel" src="/modern-ui/src/shell.jsx?v=10"></script>
+  <script type="text/babel" src="/modern-ui/src/layout.jsx?v=16"></script>
+  <script type="text/babel" src="/modern-ui/src/tenant-actions.jsx?v=13"></script>
+  <script type="text/babel" src="/modern-ui/src/instance-actions.jsx?v=24"></script>
+  <script type="text/babel" src="/modern-ui/src/grab-actions.jsx?v=3"></script>
+  <script type="text/babel" src="/modern-ui/src/misc-actions.jsx?v=8"></script>
+  <script type="text/babel" src="/modern-ui/src/page-monitor.jsx?v=8"></script>
+  <script type="text/babel" src="/modern-ui/src/page-tenants.jsx?v=11"></script>
+  <script type="text/babel" src="/modern-ui/src/page-tenant-detail.jsx?v=8"></script>
+  <script type="text/babel" src="/modern-ui/src/page-tenant-grab.jsx?v=6"></script>
+  <script type="text/babel" src="/modern-ui/src/page-tenant-resources.jsx?v=7"></script>
+  <script type="text/babel" src="/modern-ui/src/page-instances.jsx?v=17"></script>
+  <script type="text/babel" src="/modern-ui/src/page-grab.jsx?v=9"></script>
+  <script type="text/babel" src="/modern-ui/src/page-regions.jsx?v=8"></script>
+  <script type="text/babel" src="/modern-ui/src/page-logs.jsx?v=7"></script>
+  <script type="text/babel" src="/modern-ui/src/page-proxy.jsx?v=9"></script>
+  <script type="text/babel" src="/modern-ui/src/page-misc.jsx?v=12"></script>
+  <script type="text/babel" src="/modern-ui/src/page-tools.jsx?v=11"></script>
+  <script type="text/babel" src="/modern-ui/src/auth-factor.js?v=9"></script>
+  <script type="text/babel" src="/modern-ui/src/page-auth.jsx?v=11"></script>
+  <script src="/modern-ui/src/router.js?v=3"></script>
+  <script type="text/babel" src="/modern-ui/src/app.jsx?v=11"></script>
+</body>
+</html>

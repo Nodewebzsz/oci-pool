@@ -1,0 +1,32 @@
+name: Release Notification
+
+on:
+  # 监听 release 事件
+  release:
+    types: [published]
+  # 监听 tag 推送
+  #push:
+  #  tags:
+  #    - 'v-*'
+  # 允许手动触发
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Telegram Message
+        uses: appleboy/telegram-action@v0.1.1
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: |
+            🎉 新版本发布通知
+            
+            项目: ${{ github.repository }}
+            版本: ${{ github.ref_name }}
+            
+            更新内容:
+            ${{ github.event.release.body }}
+            
+            发布链接: ${{ github.event.release.html_url || github.server_url }}/${{ github.repository }}

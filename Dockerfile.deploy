@@ -1,0 +1,21 @@
+# OCI Pool Manager (Modern UI fork) · prebuilt-jar runtime stage
+# 该镜像不再在容器内执行 Maven 下载依赖（宿主机网络快而稳），
+# 只打包宿主机构建好的 oci-pool-release.jar，规避容器内 Maven Central 慢速/截断问题。
+FROM eclipse-temurin:17-jre-jammy
+WORKDIR /oci-pool
+# VNC 前置:ssh/ssh-keygen(SSH -L 隧道) + python3/pip(websockify) + websockify(WebSocket 代理)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        tzdata curl \
+        openssh-client \
+        python3 python3-pip \
+        websockify \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /oci-pool/data /oci-pool/logs
+ENV SERVER_PORT=9856 DATA_PATH=/oci-pool/data LOG_HOME=/oci-pool/logs TZ=Asia/Shanghai \
+    JAVA_OPTS="-XX:+UseG1GC -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/oci-pool/logs"
+COPY oci-server/target/oci-pool-release.jar /oci-pool/oci-pool.jar
+EXPOSE 9856
+VOLUME ["/oci-pool/data", "/oci-pool/logs"]
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=60s \
+  CMD curl -sf http://127.0.0.1:9856/actuator/health >/dev/null || exit 1
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Duser.timezone=$TZ -DSERVER_PORT=$SERVER_PORT -DDATA_PATH=$DATA_PATH -DLOG_HOME=$LOG_HOME -jar oci-pool.jar"]
