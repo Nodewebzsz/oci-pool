@@ -3474,12 +3474,12 @@ function SysSettingPage() {
   const [github, setGithub] = React.useState({ enabled: false, githubUser: '', githubId: '', clientId: '', clientSecret: '', webhookUrl: '', fetching: false });
   // 严格对齐原项目 googleConfig · 字段顺序:email → clientId → clientSecret → redirectUri
   const [google, setGoogle] = React.useState({ enabled: false, email: '', clientId: '', clientSecret: '', webhookUrl: '' });
-  // 严格对齐原项目 mfaConfig · 默认 issuer = "OCI-Start Verify"
+  // 严格对齐原项目 mfaConfig · 默认 issuer = "OCI-Pool Verify"
   // secretKey 未设置前只显示应用名字段;点"重新生成"或"启用"后才显示二维码/密钥/验证码测试
   // mfa.enabled 与登录页联动:开启后登录时需要 MFA 验证码
   // (对齐原项目 LoginController.validateAdditionalFactors)
   const _mfaCfg = (window.getAuthConfig && window.getAuthConfig()) || { mfaEnabled: false };
-  const [mfa, setMfa]       = React.useState({ enabled: _mfaCfg.mfaEnabled, appName: 'OCI-Start Verify', secret: '', verifyCode: '', showSecret: false, qr: '', verifyResult: '', verifyStatus: '' });
+  const [mfa, setMfa]       = React.useState({ enabled: _mfaCfg.mfaEnabled, appName: 'OCI-Pool Verify', secret: '', verifyCode: '', showSecret: false, qr: '', verifyResult: '', verifyStatus: '' });
   // mfa.enabled 任何变化 → 同步 localStorage → AuthPage 下次读到新值
   React.useEffect(() => {
     window.setAuthConfigFlag && window.setAuthConfigFlag('mfa', mfa.enabled);
@@ -3524,7 +3524,7 @@ function SysSettingPage() {
 
   const saveMfa = async () => {
     try {
-      await window.ociServices.system.updateMfaConfig({ enabled: mfa.enabled, issuer: mfa.appName || 'OCI-Start Verify' });
+      await window.ociServices.system.updateMfaConfig({ enabled: mfa.enabled, issuer: mfa.appName || 'OCI-Pool Verify' });
       if (window.setAuthConfigFlag) window.setAuthConfigFlag('mfa', mfa.enabled);
       await loadSettings();
       shell.showToast(tr('pageMisc.3142e4'), { kind: 'success' });
@@ -3874,9 +3874,9 @@ function SysSettingPage() {
               >{tr('pageMisc.ed7526')}</Button>
             </>
           }>
-          {/* 应用名称 · 永远显示 · 默认 OCI-Start Verify */}
+          {/* 应用名称 · 永远显示 · 默认 OCI-Pool Verify */}
           <FormRow label={tr('pageMisc.27c386')} hint={tr('pageMisc.32d037')}>
-            <TextInput value={mfa.appName} onChange={v => setMfa(m => ({ ...m, appName: v }))} placeholder="OCI-Start Verify" />
+            <TextInput value={mfa.appName} onChange={v => setMfa(m => ({ ...m, appName: v }))} placeholder="OCI-Pool Verify" />
           </FormRow>
 
           {/* 只有生成过密钥后才显示 · 严格对齐原项目 <#if mfaConfig.secretKey??> */}

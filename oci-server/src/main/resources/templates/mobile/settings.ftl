@@ -140,7 +140,7 @@
     <div class="mob-settings-body" id="secMfa" style="display:none">
         <div class="mob-sf-row">
             <label class="mob-sf-label">${msg.get('mob.settings.mfa.app.name')}</label>
-            <input class="mob-sf-input" type="text" id="mfaIssuer" value="${(mfaConfig.issuer)!'OCI-Start Verify'}" placeholder="OCI-Start Verify">
+            <input class="mob-sf-input" type="text" id="mfaIssuer" value="${(mfaConfig.issuer)!'OCI-Pool Verify'}" placeholder="OCI-Pool Verify">
         </div>
         <#if (mfaConfig.secretKey)??>
         <div class="mob-sf-row" style="flex-direction:column;align-items:flex-start;gap:10px">

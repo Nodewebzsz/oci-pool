@@ -563,7 +563,7 @@ public class SystemConfigService {
         Optional<SystemConfig> qrCode = systemConfigRepository.findByKey("mfa.qr.code");
 
         config.setEnabled(enabled.map(SystemConfig::isEnabled).orElse(false));
-        config.setIssuer(issuer.map(SystemConfig::getValue).orElse("OCI-Start Verify"));
+        config.setIssuer(issuer.map(SystemConfig::getValue).orElse("OCI-Pool Verify"));
         config.setSecretKey(secretKey.map(SystemConfig::getValue).orElse(null));
         config.setQrCode(qrCode.map(SystemConfig::getValue).orElse(null));
 
