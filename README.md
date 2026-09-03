@@ -146,24 +146,25 @@ location ~ ^/websockify/(\d+)$ {
 
 <div align="center">
 
-### 主控面板
-<img width="900" alt="主界面" src="https://github.com/user-attachments/assets/23b9ab72-6212-42c3-a02c-3efa795ca9ea" />
+### 系统监控
+<img width="900" alt="系统监控" src="screenshots/dashboard.png" />
 
 ### 实例管理
-<img width="900" alt="实例管理" src="https://github.com/user-attachments/assets/af1ef632-84b9-4f08-a7d3-39480d518384" />
+<img width="900" alt="实例管理" src="screenshots/instances.png" />
 
-### 系统配置
-<img width="900" alt="系统配置" src="https://github.com/user-attachments/assets/306f307b-61b7-4e7c-b786-3d9e39471c91" />
+### 租户管理
+<img width="900" alt="租户管理" src="screenshots/tenants.png" />
+
+### 系统设置
+<img width="900" alt="系统设置" src="screenshots/system-config.png" />
 
 <details>
 <summary><b>查看更多截图</b></summary>
 
 <br>
 
-<img width="900" alt="高级设置" src="https://github.com/user-attachments/assets/15994398-0bc9-4bef-aa81-7b44c75021fb" />
-<img width="900" alt="功能页面" src="https://github.com/user-attachments/assets/bf98973a-d3f6-4f2a-836f-3698647b8f3f" />
-<img width="900" alt="监控界面" src="https://github.com/user-attachments/assets/3e8c0ce8-6077-4748-bc39-fc1fa70da08e" />
-<img width="900" alt="数据统计" src="https://github.com/user-attachments/assets/0794298d-702f-4af7-ad5b-6cb5c206fa54" />
+<img width="900" alt="IP 质量管理" src="screenshots/ip-quality.png" />
+<img width="900" alt="资源列表" src="screenshots/resources.png" />
 
 </details>
 

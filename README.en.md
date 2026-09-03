@@ -146,24 +146,25 @@ location ~ ^/websockify/(\d+)$ {
 
 <div align="center">
 
-### Dashboard
-<img width="900" alt="Dashboard" src="https://github.com/user-attachments/assets/23b9ab72-6212-42c3-a02c-3efa795ca9ea" />
+### System Monitor
+<img width="900" alt="System Monitor" src="screenshots/dashboard.png" />
 
 ### Instance Management
-<img width="900" alt="Instance Management" src="https://github.com/user-attachments/assets/af1ef632-84b9-4f08-a7d3-39480d518384" />
+<img width="900" alt="Instance Management" src="screenshots/instances.png" />
 
-### System Configuration
-<img width="900" alt="System Configuration" src="https://github.com/user-attachments/assets/306f307b-61b7-4e7c-b786-3d9e39471c91" />
+### Tenants
+<img width="900" alt="Tenants" src="screenshots/tenants.png" />
+
+### System Settings
+<img width="900" alt="System Settings" src="screenshots/system-config.png" />
 
 <details>
 <summary><b>More screenshots</b></summary>
 
 <br>
 
-<img width="900" alt="Advanced Settings" src="https://github.com/user-attachments/assets/15994398-0bc9-4bef-aa81-7b44c75021fb" />
-<img width="900" alt="Feature Page" src="https://github.com/user-attachments/assets/bf98973a-d3f6-4f2a-836f-3698647b8f3f" />
-<img width="900" alt="Monitoring" src="https://github.com/user-attachments/assets/3e8c0ce8-6077-4748-bc39-fc1fa70da08e" />
-<img width="900" alt="Analytics" src="https://github.com/user-attachments/assets/0794298d-702f-4af7-ad5b-6cb5c206fa54" />
+<img width="900" alt="IP Quality Management" src="screenshots/ip-quality.png" />
+<img width="900" alt="Resource List" src="screenshots/resources.png" />
 
 </details>
 
