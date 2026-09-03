@@ -2,7 +2,7 @@
 
 # OCI-Pool
 
-**A powerful system for creating and managing Oracle Cloud instances via API integration (a modern fork of OCI-Start)**
+**A powerful system for creating and managing Oracle Cloud instances via API integration (a secondary-development fork of OCI-Start)**
 
 [![Stars](https://img.shields.io/github/stars/Nodewebzsz/oci-pool?style=flat-square&logo=github&color=yellow)](https://github.com/Nodewebzsz/oci-pool/stargazers)
 [![License](https://img.shields.io/github/license/Nodewebzsz/oci-pool?style=flat-square&color=blue)](LICENSE)
@@ -18,6 +18,16 @@
 
 > ⚠️ **Important Notice**
 > This project is fully open source. Please respect basic developer ethics — **do not** fork this repository to modify its functionality and trick others into deploying it for the purpose of stealing their account credentials. Do no harm, however small.
+
+---
+
+## About This Project
+
+This project is a **secondary-development fork** of the open-source project [doubleDimple/oci-start](https://github.com/doubleDimple/oci-start). It keeps the core capabilities of the original project and adds a modern web UI (React) plus usability improvements.
+
+This fork tracks upstream updates, but it is **not guaranteed to be fully feature-synced** with the original project. If you want to experience the **latest features** from the original project, please visit:
+
+> 💡 **Original project**: <https://github.com/doubleDimple/oci-start>
 
 ---
 

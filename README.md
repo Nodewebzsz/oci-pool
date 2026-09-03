@@ -2,7 +2,7 @@
 
 # OCI-Pool
 
-**基于 API 集成的 Oracle Cloud 实例创建与管理系统(OCI-Start 的现代分支)**
+**基于 API 集成的 Oracle Cloud 实例创建与管理系统(基于 OCI-Start 的二次开发分支)**
 
 [![Stars](https://img.shields.io/github/stars/Nodewebzsz/oci-pool?style=flat-square&logo=github&color=yellow)](https://github.com/Nodewebzsz/oci-pool/stargazers)
 [![License](https://img.shields.io/github/license/Nodewebzsz/oci-pool?style=flat-square&color=blue)](LICENSE)
@@ -18,6 +18,16 @@
 
 > ⚠️ **使用须知**
 > 本项目完全开源,请各位开发者遵守基本操守。**严禁** 修改功能后引导他人部署以盗取账号信息。勿以恶小而为之,勿以善小而不为。
+
+---
+
+## 关于本项目
+
+本项目是基于开源项目 [doubleDimple/oci-start](https://github.com/doubleDimple/oci-start) 的**二次开发分支**,在保留原项目核心能力的基础上,提供了现代化的 Web 界面(React)与更多易用性改进。
+
+本分支会持续跟踪上游更新,但**不保证与原项目功能完全同步**。如果你想体验原项目的**最新功能**,请前往原项目:
+
+> 💡 **原项目**:<https://github.com/doubleDimple/oci-start>
 
 ---
 
