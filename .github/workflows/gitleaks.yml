@@ -25,6 +25,7 @@ jobs:
             ghcr.io/gitleaks/gitleaks:latest \
             git \
             --redact \
+            --config /path/.gitleaks.toml \
             --report-format sarif \
             --report-path /path/gitleaks.sarif \
             /path

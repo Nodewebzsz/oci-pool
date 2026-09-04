@@ -1,0 +1,21 @@
+title = "oci-pool gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known non-secrets: bundled third-party libs, PEM-format builder code, and UI placeholder text."
+regexTarget = "line"
+
+# Third-party minified bundles that legitimately contain PEM/key routines.
+paths = [
+  '''oci-server/src/main/resources/static/js/common/jsencrypt\.min\.js''',
+  '''oci-server/src/main/resources/static/js/xterm-addon-webgl\.js''',
+]
+
+# Precise line-level exclusions for app-source false positives.
+regexes = [
+  '''pem\.append\("-----BEGIN PRIVATE KEY-----''',
+  '''secretKeyInput\.placeholder''',
+  '''tenant\.533c9e''',
+]
