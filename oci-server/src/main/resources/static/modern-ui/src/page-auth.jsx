@@ -920,6 +920,16 @@ function AuthPage({ onLogin, authView, onAuthViewChange }) {
     return () => { alive = false; };
   }, []);
 
+  // 登录页底部显示后端真实运行版本(原先误写死为上游 v2.14.0)
+  const [appVersion, setAppVersion] = useStateAuth('');
+  useEffectAuth(() => {
+    let alive = true;
+    fetch('/api/version/check').then(r => r.json()).then(info => {
+      if (alive && info && info.currentVersion) setAppVersion(info.currentVersion);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
   // 进入 verify view 时快照 auth config(服务端优先 · localStorage channels 仅作展示兜底)
   const verifyCfg = React.useMemo(() => {
     if (state.view === 'verify') {
@@ -1115,7 +1125,7 @@ function AuthPage({ onLogin, authView, onAuthViewChange }) {
           marginTop: 24,
           fontFamily: 'var(--font-mono)',
         }}>
-          v2.14.0 · MIT · <a href="https://github.com/Nodewebzsz/oci-pool" target="_blank" rel="noopener"
+          {appVersion ? `v${appVersion.replace(/^[vV]-?/, '')} · ` : ''}MIT · <a href="https://github.com/Nodewebzsz/oci-pool" target="_blank" rel="noopener"
                               style={{ color: 'var(--fg-3)', textDecoration: 'none' }}>Nodewebzsz/oci-pool</a>
         </div>
       </div>

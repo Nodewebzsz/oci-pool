@@ -103,35 +103,45 @@ public class VersionCheckTask {
                     .orElseThrow(() -> new RuntimeException("未找到版本信息"));
 
             String latestVersion;
-            JSONObject latestVersionFromGithub = getLatestVersionFromGithub();
-            if (latestVersionFromGithub == null){
-                log.warn("获取GitHub最新版本失败");
+            String releaseNotes = null;
+
+            if (version.getDeployType() == AppVersion.DeployType.DOCKER) {
+                // Docker 部署以 Docker Hub 为权威版本来源，GitHub 仅用于补充更新说明（可选）
+                JSONObject latestVersionFromGithub = getLatestVersionFromGithub();
+                if (latestVersionFromGithub != null) {
+                    releaseNotes = latestVersionFromGithub.optString("release_notes", null);
+                }
+                String dockerHubVersion = getLatestVersionFromDockerHub();
+                if (dockerHubVersion != null) {
+                    latestVersion = dockerHubVersion;
+                } else if (latestVersionFromGithub != null) {
+                    latestVersion = latestVersionFromGithub.optString("tag_name", null);
+                } else {
+                    latestVersion = null;
+                }
+            } else {
+                // SSH 部署仅检查 GitHub
+                JSONObject latestVersionFromGithub = getLatestVersionFromGithub();
+                if (latestVersionFromGithub != null) {
+                    latestVersion = latestVersionFromGithub.optString("tag_name", null);
+                    releaseNotes = latestVersionFromGithub.optString("release_notes", null);
+                } else {
+                    latestVersion = null;
+                }
+            }
+
+            if (latestVersion == null) {
+                log.warn("获取最新版本信息失败");
                 return;
             }
-            String githubVersion = latestVersionFromGithub.getString("tag_name");
-            String releaseNotes = latestVersionFromGithub.getString("release_notes");
-            if (version.getDeployType() == AppVersion.DeployType.DOCKER) {
-                // Docker部署时同时检查GitHub和Docker Hub
-                String dockerHubVersion = getLatestVersionFromDockerHub();
 
-                if (githubVersion == null || dockerHubVersion == null) {
-                    log.warn("获取版本信息失败 - GitHub版本: {}, Docker Hub版本: {}",
-                            githubVersion, dockerHubVersion);
-                    return;
-                }
-                latestVersion = dockerHubVersion;
-            } else {
-                // SSH部署只检查GitHub
-                latestVersion = githubVersion;
-            }
-
-            if (latestVersion != null && compareVersion(latestVersion, version.getCurrentVersion()) < 0) {
+            if (compareVersion(latestVersion, version.getCurrentVersion()) < 0) {
                 log.info("忽略低于当前运行版本的远程版本 - 当前版本: {}, 远程版本: {}",
                         version.getCurrentVersion(), latestVersion);
                 return;
             }
 
-            if (latestVersion != null && !latestVersion.equals(version.getLatestVersion())) {
+            if (!latestVersion.equals(version.getLatestVersion())) {
                 version.setLatestVersion(latestVersion);
                 versionRepository.save(version);
                 //执行消息发送
@@ -155,6 +165,7 @@ public class VersionCheckTask {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.set("Accept", "application/vnd.github.v3+json");
+            headers.set("User-Agent", "OCI-POOL-VersionCheck");
             ResponseEntity<Map> response = restTemplate.exchange(
                     GITHUB_API_URL,
                     HttpMethod.GET,
@@ -187,12 +198,12 @@ public class VersionCheckTask {
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
                 List<Map<String, Object>> results = (List<Map<String, Object>>) response.getBody().get("results");
 
-                // 过滤出纯数字版本号的标签（例如：2.0.6）
+                // 过滤出纯数字版本号的标签（例如：2.0.6），并按语义版本取最大，避免依赖接口返回顺序
                 String latestVersion = results.stream()
                         .map(tag -> (String) tag.get("name"))
-                        .filter(tag -> !tag.equals("latest"))  // 排除latest标签
+                        .filter(tag -> tag != null && !tag.equals("latest"))  // 排除latest标签
                         .filter(tag -> tag.matches("\\d+\\.\\d+\\.\\d+"))  // 匹配纯数字版本号格式 (2.0.6)
-                        .findFirst()
+                        .max(this::compareVersion)
                         .orElse(null);
 
                 if (latestVersion != null) {

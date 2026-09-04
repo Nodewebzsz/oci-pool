@@ -458,7 +458,7 @@ function EngineStatusBody() {
           <div style={{ fontSize: 13, fontWeight: 600, color: running ? 'var(--accent)' : 'var(--danger)' }}>
             {running ? tr('top.engine.active') : tr('top.engine.paused')}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--fg-1)' }}>
+          <div style={{ fontSize: 11, color: running ? 'var(--accent)' : 'var(--danger)', opacity: 0.92 }}>
             {running ? tr('engine.running.desc') : tr('engine.paused.desc')}
           </div>
         </div>
