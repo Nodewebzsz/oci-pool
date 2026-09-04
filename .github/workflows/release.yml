@@ -86,8 +86,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ steps.rtag.outputs.TAG }}"
-          PREV=$(gh release list --limit 100 --json tagName --jq '.[].tagName' \
-            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | grep -v "^$TAG$" | tail -n1)
+          # Resolve release tag 在 checkout 之后才 push 新 tag，必须先 fetch，
+          # 否则本机读不到 $TAG，git log 会失败并回退成「初始发布」。
+          git fetch origin --tags --force
+          PREV=$(git tag --list 'v*' \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+            | sort -V \
+            | grep -v "^$TAG$" \
+            | tail -n1)
           if [ -n "$PREV" ]; then
             RANGE="$PREV..$TAG"
           else
@@ -98,7 +104,7 @@ jobs:
             echo ""
             echo "变更："
             git log --pretty=format:'- %s' "$RANGE" \
-              | grep -viE '\[skip ci\]|bump version' \
+              | grep -viE '\[skip ci\]|bump version|chore: bump' \
               | grep -v '^$' || echo "- 初始发布"
             echo ""
           } > notes.md
