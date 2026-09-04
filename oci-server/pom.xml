@@ -768,28 +768,12 @@
                                 <configuration>
                                     <target>
                                         <mkdir dir="${project.build.directory}/geoip"/>
-                                        <get src="https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&amp;license_key=${env.MAXMIND_LICENSE_KEY}&amp;suffix=tar.gz"
-                                             dest="${project.build.directory}/geoip/GeoLite2-City.tar.gz"
-                                             ignoreerrors="true"/>
-                                        <available file="${project.build.directory}/geoip/GeoLite2-City.tar.gz" property="geoip.tar.present"/>
-                                        <if>
-                                            <equals arg1="${geoip.tar.present}" arg2="true"/>
-                                            <then>
-                                                <untar src="${project.build.directory}/geoip/GeoLite2-City.tar.gz"
-                                                       dest="${project.build.directory}/geoip"
-                                                       compression="gzip"/>
-                                                <copy todir="${project.build.outputDirectory}">
-                                                    <fileset dir="${project.build.directory}/geoip">
-                                                        <include name="*/*.mmdb"/>
-                                                    </fileset>
-                                                    <flattenmapper/>
-                                                </copy>
-                                                <echo>GeoLite2-City.mmdb 已下载并放入 target/classes</echo>
-                                            </then>
-                                            <else>
-                                                <echo>MAXMIND_LICENSE_KEY 为空/无效或网络不可用，跳过 GeoLite2-City 下载（地理定位功能不可用）</echo>
-                                            </else>
-                                        </if>
+                                        <exec executable="bash" failonerror="false">
+                                            <arg value="${project.basedir}/scripts/fetch-geolite2-city.sh"/>
+                                            <arg value="${project.build.directory}/geoip"/>
+                                            <arg value="${project.build.outputDirectory}/"/>
+                                            <arg value="${env.MAXMIND_LICENSE_KEY}"/>
+                                        </exec>
                                     </target>
                                 </configuration>
                             </execution>
