@@ -208,6 +208,24 @@ server:
   port: 9856
 ```
 
+### 环境变量
+
+服务端从环境变量读取以下敏感配置,真实值不写入仓库。Docker 部署请在 `deploy/.env` 中填写(参考 `.env.example`);本地脚本部署请 `export` 或在启动环境里注入。
+
+| 变量 | 说明 |
+| --- | --- |
+| `TELEGRAM_TOKEN` | Telegram Bot Token(`botid:hash`)。不填则 Telegram 通知不可用 |
+| `DB_PASSWORD` | H2 数据库密码。**旧实例升级务必与原有 H2 密码保持一致**,否则无法打开已有 `data/vps_db` |
+| `RSA_PRIVATE_KEY` | RSA 私钥(Base64)。若之前用过请换一把;不用可留空 |
+
+示例 `deploy/.env`:
+
+```bash
+TELEGRAM_TOKEN=123456789:AAF...your-token
+DB_PASSWORD=your-own-h2-pass
+RSA_PRIVATE_KEY=
+```
+
 ### Nginx 反向代理
 
 如需通过域名访问,Nginx 需配置 WebSocket 转发(用于 VNC 控制台):

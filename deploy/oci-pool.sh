@@ -109,6 +109,12 @@ resolve_jar() {
 
 is_running() { [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE" 2>/dev/null)" >/dev/null 2>&1; }
 
+load_env() {
+  if [ -f "$APP_ROOT/.env" ]; then
+    set -a; . "$APP_ROOT/.env"; set +a
+  fi
+}
+
 cmd_start() {
   if is_running; then warn "已在运行（pid $(cat "$PID_FILE")），如需重启请 ./oci-pool.sh restart"; return; fi
   info "start"
@@ -116,6 +122,7 @@ cmd_start() {
   ensure_redis
   resolve_jar
   mkdir -p "$DATA_DIR" "$LOG_DIR"
+  load_env
   ( cd "$APP_ROOT" && nohup java \
       -XX:+UseG1GC \
       -XX:+HeapDumpOnOutOfMemoryError \
@@ -159,6 +166,7 @@ cmd_status() {
 
 cmd_update() {
   info "update"
+  load_env
   if [ -f "$APP_ROOT/pom.xml" ] && [ -d "$APP_ROOT/.git" ]; then
     warn "源码模式：git pull + Maven 重打包..."
     ( cd "$APP_ROOT" && git pull --ff-only )

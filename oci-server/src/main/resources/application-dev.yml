@@ -49,7 +49,7 @@ spring:
     ##数据库的用户名和密码,目前只支持h2
     url: jdbc:h2:file:/Users/admin/devData/vps_db;DB_CLOSE_ON_EXIT=FALSE
     username: oci-start-sa_admin
-    password: 
+    password: ${DB_PASSWORD:}
   jpa:
     hibernate:
       ddl-auto: update
@@ -89,7 +89,7 @@ baseFile:
   filePath: /Users/admin/devData/upload
 
 rsa:
-  privateKey: 
+  privateKey: ${RSA_PRIVATE_KEY:}
 
 thirdApi:
   domain: https://notify.objboy.com/server-support-api/
