@@ -71,3 +71,6 @@ Claude.md
 # GeoIP 数据库：构建时通过 MAXMIND_LICENSE_KEY 下载，不提交仓库
 *.mmdb
 GeoLite2-City*.tar.gz
+
+# gitleaks 生成的 SARIF 报告（构建/扫描产物）
+gitleaks.sarif
