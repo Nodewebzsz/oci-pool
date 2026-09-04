@@ -23,6 +23,9 @@ jobs:
     # 提交信息带 [skip ci] / [ci skip] 时整条流水线跳过，避免版本回写引发循环
     if: ${{ !contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]') }}
     runs-on: ubuntu-latest
+    env:
+      TELEGRAM_TO: ${{ secrets.TELEGRAM_TO }}
+      TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -85,11 +88,11 @@ jobs:
             docker.io/zszken/oci-pool:latest
 
       - name: Send deploy notification
-        if: ${{ secrets.TELEGRAM_TO != '' && secrets.TELEGRAM_TOKEN != '' }}
+        if: ${{ env.TELEGRAM_TO != '' && env.TELEGRAM_TOKEN != '' }}
         uses: appleboy/telegram-action@v0.1.1
         with:
-          to: ${{ secrets.TELEGRAM_TO }}
-          token: ${{ secrets.TELEGRAM_TOKEN }}
+          to: ${{ env.TELEGRAM_TO }}
+          token: ${{ env.TELEGRAM_TOKEN }}
           format: markdown
           message: |
             🚀 OCI-Pool 自动部署完成
