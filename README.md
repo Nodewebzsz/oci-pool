@@ -214,21 +214,15 @@ server:
 
 | 变量 | 说明 |
 | --- | --- |
-| `TELEGRAM_TOKEN` | Telegram Bot Token(`botid:hash`)。不填则 Telegram 通知不可用 |
-| `TELEGRAM_BOT_ID` | Telegram Bot ID(`token` 冒号前那段)。空则从 token 自动解析 |
-| `TELEGRAM_BOT_USERNAME` | Telegram Bot 用户名。空则代码用默认 `OCI_POOL_Bot` |
 | `DB_PASSWORD` | H2 数据库密码。**旧实例升级务必与原有 H2 密码保持一致**,否则无法打开已有 `data/vps_db` |
-| `RSA_PRIVATE_KEY` | RSA 私钥(Base64)。若之前用过请换一把;不用可留空 |
 
 示例 `deploy/.env`:
 
 ```bash
-TELEGRAM_TOKEN=123456789:AAF...your-token
-TELEGRAM_BOT_ID=123456789
-TELEGRAM_BOT_USERNAME=your_bot
 DB_PASSWORD=your-own-h2-pass
-RSA_PRIVATE_KEY=
 ```
+
+> Telegram 通知的 Bot Token / Chat ID / Chat Name 在「通知通道」页面维护，已存入数据库 `system_config`，无需在此配置环境变量。
 
 ### Nginx 反向代理
 

@@ -1,15 +1,2 @@
 server:
   port: 9856
-
-telegram:
-  bot:
-    id: ${TELEGRAM_BOT_ID:}
-    token: ${TELEGRAM_TOKEN:}
-    username: ${TELEGRAM_BOT_USERNAME:}
-  #http 127.0.0.1:10809
-  #sock 127.0.0.1:10808
-  proxy:
-    enabled: true
-    type: HTTP
-    host: 127.0.0.1
-    port: 7890

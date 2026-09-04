@@ -19,11 +19,7 @@ services:
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: "6379"
       MODERN_UI_ENABLED: "${MODERN_UI_ENABLED:-true}"
-      TELEGRAM_TOKEN: "${TELEGRAM_TOKEN:-}"
-      TELEGRAM_BOT_ID: "${TELEGRAM_BOT_ID:-}"
-      TELEGRAM_BOT_USERNAME: "${TELEGRAM_BOT_USERNAME:-}"
       DB_PASSWORD: "${DB_PASSWORD:-}"
-      RSA_PRIVATE_KEY: "${RSA_PRIVATE_KEY:-}"
     volumes:
       - app-data:/oci-pool/data
       - app-logs:/oci-pool/logs
