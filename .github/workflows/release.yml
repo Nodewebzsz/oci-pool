@@ -5,6 +5,12 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（不含 v，如 1.0.4）'
+        required: true
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -61,13 +67,24 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+      - name: Resolve release tag
+        id: rtag
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            TAG="v${{ github.event.inputs.version }}"
+            git tag -a "$TAG" -m "OCI-Pool $TAG" || echo "tag $TAG exists"
+            git push origin "$TAG" || echo "tag $TAG already pushed"
+          else
+            TAG="$GITHUB_REF_NAME"
+          fi
+          echo "TAG=$TAG" >> "$GITHUB_OUTPUT"
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
+          gh release create "${{ steps.rtag.outputs.TAG }}" \
             --repo "$GITHUB_REPOSITORY" \
-            --title "OCI-Pool $GITHUB_REF_NAME" \
+            --title "OCI-Pool ${{ steps.rtag.outputs.TAG }}" \
             --generate-notes \
             artifacts/server-jar/oci-pool-release.jar \
             artifacts/mac-dmg/*.dmg

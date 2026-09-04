@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: auto-deploy-${{ github.ref }}
@@ -87,12 +88,15 @@ jobs:
             docker.io/zszken/oci-pool:${{ steps.version.outputs.VERSION }}
             docker.io/zszken/oci-pool:latest
 
-      - name: Tag version
+      - name: Trigger release workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           V="${{ steps.version.outputs.VERSION }}"
-          TAG="v$V"
-          git tag -a "$TAG" -m "OCI-Pool $V" || echo "tag $TAG already exists"
-          git push origin "$TAG" || echo "tag $TAG already pushed"
+          gh workflow run release.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref master \
+            -f version="$V"
 
       - name: Send deploy notification
         if: ${{ env.TELEGRAM_TO != '' && env.TELEGRAM_TOKEN != '' }}
