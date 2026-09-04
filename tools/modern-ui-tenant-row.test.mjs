@@ -109,7 +109,7 @@ test('租户页在 mapper 之后加载并使用独立字段契约', () => {
     'utf8',
   );
   const mapperIndex = html.indexOf('/modern-ui/src/tenant-row.js');
-  const pageIndex = html.indexOf('/modern-ui/src/page-tenants.jsx');
+  const pageIndex = html.indexOf('/modern-ui/dist/src/page-tenants.js');
   assert.ok(mapperIndex >= 0, 'index.html 未加载 tenant-row.js');
   assert.ok(mapperIndex < pageIndex, 'tenant-row.js 必须先于 page-tenants.jsx 加载');
 });

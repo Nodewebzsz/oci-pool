@@ -174,14 +174,14 @@ test('instance filter summary stays fixed when no filters are selected', async (
 
 test('instance tenant mapping cache versions track the field mapper changes', async () => {
   const index = await source('oci-server/src/main/resources/static/modern-ui/index.html');
-  assert.match(index, /services-instance\.js\?v=3/);
-  assert.match(index, /services-tenant\.js\?v=11/);
-  assert.match(index, /ui\.jsx\?v=11/);
+  assert.match(index, /services-instance\.js\?v=4/);
+  assert.match(index, /services-tenant\.js\?v=12/);
+  assert.match(index, /ui\.js\?v=13/);
   assert.match(index, /tenant-row\.js\?v=9/);
-  assert.match(index, /data\.jsx\?v=10/);
-  assert.match(index, /page-tenant-resources\.jsx\?v=6/);
-  assert.match(index, /page-instances\.jsx\?v=16/);
-  assert.match(index, /instance-actions\.jsx\?v=21/);
+  assert.match(index, /data\.js\?v=11/);
+  assert.match(index, /page-tenant-resources\.js\?v=7/);
+  assert.match(index, /page-instances\.js\?v=17/);
+  assert.match(index, /instance-actions\.js\?v=24/);
 });
 
 test('instance detail does not fabricate metrics or resource identifiers', async () => {

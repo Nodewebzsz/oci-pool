@@ -1,6 +1,10 @@
 # Maven build output
 target/
 
+# Modern UI 前端构建工具（不入 jar）与生成的 dist（构建时自动生成）
+oci-server/modern-ui-build/node_modules/
+oci-server/src/main/resources/static/modern-ui/dist/
+
 # IDE
 .idea/
 *.iml

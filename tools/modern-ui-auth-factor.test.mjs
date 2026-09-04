@@ -61,5 +61,5 @@ test('认证相关脚本使用版本参数，部署后不会继续命中旧缓�
   const html = fs.readFileSync(indexPath, 'utf8');
   assert.match(html, /src="\/modern-ui\/src\/auth-factor\.js\?v=\d+"/);
   assert.match(html, /src="\/modern-ui\/src\/services-auth\.js\?v=\d+"/);
-  assert.match(html, /src="\/modern-ui\/src\/page-auth\.jsx\?v=\d+"/);
+  assert.match(html, /src="\/modern-ui\/dist\/src\/page-auth\.js\?v=\d+"/);
 });

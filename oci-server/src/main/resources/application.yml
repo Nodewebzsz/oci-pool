@@ -83,6 +83,10 @@ server:
   #forward-headers-strategy: native
   max-http-header-size: 81920
   port: 9856
+  compression:
+    enabled: true
+    mime-types: application/javascript,application/json,text/html,text/css,text/plain,image/svg+xml
+    min-response-size: 1024
 
 # 日志配置
 logging:
