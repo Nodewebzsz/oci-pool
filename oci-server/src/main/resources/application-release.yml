@@ -3,9 +3,9 @@ server:
 
 telegram:
   bot:
-    id: 682200000
+    id: ${TELEGRAM_BOT_ID:}
     token: ${TELEGRAM_TOKEN:}
-    username: 哈哈哈
+    username: ${TELEGRAM_BOT_USERNAME:}
   #http 127.0.0.1:10809
   #sock 127.0.0.1:10808
   proxy:

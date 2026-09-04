@@ -10,6 +10,11 @@ target/
 data/
 logs/
 
+# Environment / secrets（.env.example 保留可提交，其余一律不入库）
+.env
+.env.*
+!.env.example
+
 # Private keys
 *.pem
 *.key
