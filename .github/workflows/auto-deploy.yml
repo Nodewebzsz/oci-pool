@@ -90,6 +90,17 @@ jobs:
             docker.io/zszken/oci-pool:${{ steps.version.outputs.VERSION }}
             docker.io/zszken/oci-pool:latest
 
+      - name: Build and push web image
+        uses: docker/build-push-action@v6
+        with:
+          context: deploy/
+          file: Dockerfile.web
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            docker.io/zszken/oci-pool-web:${{ steps.version.outputs.VERSION }}
+            docker.io/zszken/oci-pool-web:latest
+
       - name: Trigger release workflow
         env:
           GH_TOKEN: ${{ github.token }}
