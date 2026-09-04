@@ -67,6 +67,8 @@ jobs:
 
       - name: Package server jar
         run: mvn -B -pl oci-server -am package -DskipTests
+        env:
+          MAXMIND_LICENSE_KEY: ${{ secrets.MAXMIND_LICENSE_KEY }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
