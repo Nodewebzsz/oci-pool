@@ -79,6 +79,7 @@ public class SaTokenConfig implements WebMvcConfigurer {
                         "/login",
                         "/perform_login",
                         "/perform_logout",
+                        "/api/version/check",
                         "/api/register-first-user",
                         "/api/disTurnstile",
                         "/api/github/login/url",

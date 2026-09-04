@@ -436,6 +436,14 @@ function Sidebar({ activePage, onNavigate, collapsed = false }) {
     });
   }, [activeSectionId]);
 
+  // 侧边栏底部展示后端真实运行版本(原先误写死为上游 v2.14.0)
+  const [appVersion, setAppVersion] = React.useState('');
+  React.useEffect(() => {
+    window.ociApi.request('/api/version/check').then((info) => {
+      if (info && info.currentVersion) setAppVersion(info.currentVersion);
+    }).catch(() => {});
+  }, []);
+
   const toggleSection = (id) => setExpanded((p) => ({ ...p, [id]: !p[id] }));
 
   const width = collapsed ? 'var(--sidebar-w-collapsed)' : 'var(--sidebar-w)';
@@ -489,6 +497,7 @@ function Sidebar({ activePage, onNavigate, collapsed = false }) {
               {/* Section header */}
               <button
                 className={collapsed ? '' : 'sidebar-section-hoverable'}
+                title={collapsed ? sec.label : undefined}
                 onClick={(e) => {
                   if (collapsed) return;
                   if (!expanded[sec.id]) {
@@ -614,7 +623,7 @@ function Sidebar({ activePage, onNavigate, collapsed = false }) {
             <StatusDot status="running" size={6} pulse />
             <span style={{ color: 'var(--fg-1)' }}>{tr('tw.sidebar.running')}</span>
           </div>
-          <div style={{ fontSize: 10, color: 'var(--fg-3)', fontFamily: 'var(--font-mono)', marginTop: 3 }}>v2.14.0 · commit 3f2c8b</div>
+          <div style={{ fontSize: 10, color: 'var(--fg-3)', fontFamily: 'var(--font-mono)', marginTop: 3 }}>{appVersion ? `v${appVersion.replace(/^[vV]-?/, '')}` : ''}</div>
         </div>
       }
     </aside>);
