@@ -2199,7 +2199,7 @@ function LinkPage() {
             border: '1px solid var(--border)', borderRadius: 8,
             position: 'relative', overflow: 'hidden',
           }}>
-            <div style={{ position: 'absolute', top: 10, right: 10, opacity: 0.15 }}>
+            <div style={{ position: 'absolute', top: 10, right: 10, opacity: 0.45 }}>
               <Icon name="wifi" size={30} style={{ color: 'var(--info)' }} />
             </div>
             <div style={{ fontSize: 11, color: 'var(--fg-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>{tr('pageMisc.346ece')}</div>
@@ -2213,7 +2213,7 @@ function LinkPage() {
             border: '1px solid ' + (results ? 'var(--accent)' : 'var(--border)'),
             borderRadius: 8, position: 'relative', overflow: 'hidden',
           }}>
-            <div style={{ position: 'absolute', top: 10, right: 10, opacity: 0.2 }}>
+            <div style={{ position: 'absolute', top: 10, right: 10, opacity: 0.5 }}>
               <Icon name="award" size={30} style={{ color: 'var(--accent)' }} />
             </div>
             <div style={{ fontSize: 11, color: 'var(--fg-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>{tr('pageMisc.911b2e')}</div>
@@ -2237,7 +2237,7 @@ function LinkPage() {
             border: '1px solid var(--border)', borderRadius: 8,
             position: 'relative', overflow: 'hidden',
           }}>
-            <div style={{ position: 'absolute', top: 10, right: 10, opacity: 0.15 }}>
+            <div style={{ position: 'absolute', top: 10, right: 10, opacity: 0.45 }}>
               <Icon name="gauge" size={30} style={{ color: 'var(--cyan)' }} />
             </div>
             <div style={{ fontSize: 11, color: 'var(--fg-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>{tr('pageMisc.a1df2e')}</div>

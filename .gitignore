@@ -72,5 +72,5 @@ Claude.md
 *.mmdb
 GeoLite2-City*.tar.gz
 
-# gitleaks 生成的 SARIF 报告（构建/扫描产物）
+# 本地 gitleaks 扫描产物（构建/扫描生成）
 gitleaks.sarif

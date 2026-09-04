@@ -21,7 +21,7 @@ if [ ! -f "$COMPOSE_PULL" ]; then
   curl -L --fail -sS -o "$COMPOSE_PULL" "$RAW/$COMPOSE_PULL"
   ok "已下载 $COMPOSE_PULL"
 fi
-# 读取 .env 里的 OCI_PORT，供健康检查使用
+# 读取 .env 里的 OCI_WEB_PORT，供健康检查使用（web 反代为统一入口）
 if [ -f .env ]; then set -a; . ./.env; set +a; fi
 
 warn "拉取 zszken/oci-pool 最新镜像..."
@@ -30,11 +30,11 @@ docker compose -f "$COMPOSE_PULL" up -d
 
 warn "等待健康检查（最多 90s）..."
 for i in $(seq 1 30); do
-  curl -sf "http://localhost:${OCI_PORT:-9856}/actuator/health" >/dev/null 2>&1 && { ok "healthy"; break; }
+  curl -sf "http://localhost:${OCI_WEB_PORT:-9857}/actuator/health" >/dev/null 2>&1 && { ok "healthy"; break; }
   sleep 3
   [[ $i -eq 30 ]] && { err "timeout · docker compose -f $COMPOSE_PULL logs app"; exit 1; }
 done
 
 ok "updated"
-echo "  UI     → http://localhost:${OCI_PORT:-9856}/"
-echo "  Health → http://localhost:${OCI_PORT:-9856}/actuator/health"
+echo "  UI     → http://localhost:${OCI_WEB_PORT:-9857}/"
+echo "  Health → http://localhost:${OCI_WEB_PORT:-9857}/actuator/health"
