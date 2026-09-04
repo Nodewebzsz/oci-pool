@@ -12,6 +12,8 @@ permissions:
 jobs:
   build-server:
     name: Build server JAR
+    # 跳过 auto-deploy 自动打的 v* 标签（指向 [skip ci] 提交），避免与 gh release 重复
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,6 +33,7 @@ jobs:
 
   build-mac:
     name: Build macOS DMG
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,6 +56,7 @@ jobs:
 
   release:
     name: Create GitHub Release
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-latest
     needs: [build-server, build-mac]
     steps:

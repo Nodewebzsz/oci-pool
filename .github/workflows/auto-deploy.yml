@@ -87,6 +87,18 @@ jobs:
             docker.io/zszken/oci-pool:${{ steps.version.outputs.VERSION }}
             docker.io/zszken/oci-pool:latest
 
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${{ steps.version.outputs.VERSION }}"
+          TAG="v$V"
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "OCI-Pool $V" \
+            --notes "自动部署发布 OCI-Pool $V" \
+            "oci-server/target/oci-pool-release.jar" || true
+
       - name: Send deploy notification
         if: ${{ env.TELEGRAM_TO != '' && env.TELEGRAM_TOKEN != '' }}
         uses: appleboy/telegram-action@v0.1.1
@@ -99,3 +111,4 @@ jobs:
 
             版本: `${{ steps.version.outputs.VERSION }}`
             镜像: `zszken/oci-pool:${{ steps.version.outputs.VERSION }}`
+            Release: `v${{ steps.version.outputs.VERSION }}`
