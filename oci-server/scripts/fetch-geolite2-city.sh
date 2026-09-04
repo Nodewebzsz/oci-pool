@@ -8,7 +8,7 @@ DEST_DIR="$1"
 OUTPUT_DIR="$2"
 LICENSE_KEY="$3"
 
-mkdir -p "$DEST_DIR"
+mkdir -p "$DEST_DIR" "$OUTPUT_DIR"
 TARBALL="$DEST_DIR/GeoLite2-City.tar.gz"
 URL="https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=${LICENSE_KEY}&suffix=tar.gz"
 
