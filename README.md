@@ -83,40 +83,117 @@ sudo apt install default-jdk
 
 ## 部署
 
-提供以下部署方式,任选其一。
+提供两种部署方式,任选其一。
 
-### 方式一:Docker Compose(推荐)
+### 方式一:脚本部署(本地)
 
-仓库内置 `deploy/` 安装脚本,会自动构建后端镜像并启动 Redis 与应用。
+无需 Docker,在一台装有 JDK 的 Linux/macOS 机器上直接运行服务端 jar。脚本会自动检测/安装 JDK 17 与 Redis,并从 GitHub Release 下载最新的 `oci-pool-release.jar`(或使用源码本地构建)。
 
 ```bash
-cd deploy
+# 1. 创建工作目录
+mkdir -p oci-pool && cd oci-pool
+
+# 2. 下载部署脚本
+wget -O oci-pool.sh https://raw.githubusercontent.com/Nodewebzsz/oci-pool/master/deploy/oci-pool.sh
+chmod +x oci-pool.sh
+
+# 3. 一键安装并启动
+./oci-pool.sh start
+```
+
+常用命令:
+
+```bash
+./oci-pool.sh start      # 启动
+./oci-pool.sh stop       # 停止
+./oci-pool.sh restart    # 重启
+./oci-pool.sh status     # 查看状态
+./oci-pool.sh update     # 升级(拉取源码重打包/重新下载 release jar)
+./oci-pool.sh uninstall  # 卸载(停止并清理数据)
+```
+
+启动后浏览器访问 `http://your-ip:9856`,注册管理员账号即可登录。默认端口 `9856`,可通过环境变量覆盖:
+
+```bash
+OCI_PORT=9860 ./oci-pool.sh start
+```
+
+> 新版本脚本会自动检测/安装 Redis,如本机已部署 Redis 请先评估冲突。
+
+### 方式二:Docker Compose 部署(推荐,VPS 公网)
+
+需要 Docker 与 Docker Compose v2。
+
+#### 一键安装(下载脚本)
+
+```bash
+mkdir -p oci-pool && cd oci-pool
+wget -O install.sh https://raw.githubusercontent.com/Nodewebzsz/oci-pool/master/deploy/install.sh
+wget -O update.sh  https://raw.githubusercontent.com/Nodewebzsz/oci-pool/master/deploy/update.sh
+chmod +x install.sh update.sh
 ./install.sh
 ```
 
-服务启动后,浏览器访问 `http://your-ip:9856`,注册管理员账号即可登录。默认端口为 `9856`,可通过环境变量覆盖:
+脚本会自动拉取 `zszken/oci-pool` 最新镜像并启动 Redis + 应用,无需在服务器上编译。启动后浏览器访问 `http://your-ip:9856`,注册管理员账号即可登录。
+
+#### 端口与环境变量
+
+在 `oci-pool/` 下创建 `.env`(参考 `.env.example`,`install.sh` 会自动下载到该目录):
+
+```bash
+cd oci-pool
+cp .env.example .env
+```
+
+| 变量 | 默认 | 说明 |
+| --- | --- | --- |
+| `OCI_PORT` | `9856` | 后端应用对外端口 |
+| `OCI_WEB_PORT` | `9857` | Nginx 统一入口对外端口(源码构建模式才有) |
+| `MODERN_UI_ENABLED` | `true` | 是否启用 React Modern UI |
+
+临时覆盖:
 
 ```bash
 OCI_PORT=9860 ./install.sh
 ```
 
-容器运维:
+#### 日常运维
+
+```bash
+cd oci-pool
+docker compose -f docker-compose.pull.yml ps       # 查看容器状态
+docker compose -f docker-compose.pull.yml logs -f  # 实时查看日志
+docker compose -f docker-compose.pull.yml down     # 停止(保留数据卷)
+./update.sh                                        # 更新到最新镜像
+```
+
+#### 更新
+
+```bash
+cd oci-pool && ./update.sh
+```
+
+#### 卸载
+
+```bash
+cd oci-pool && ./uninstall.sh   # 停止并删除数据卷
+```
+
+#### 本地/源码构建(可选)
+
+克隆整个仓库后在 `deploy/`,会同时构建 Nginx 统一入口(含 VNC WebSocket):
 
 ```bash
 cd deploy
-docker compose build      # 构建
-docker compose up -d      # 启动
-docker compose logs -f    # 实时查看日志
-docker compose down       # 停止
-./uninstall.sh            # 卸载(含数据卷)
+docker compose build
+docker compose up -d
 ```
 
-### 方式二:手动构建(JDK 17 + Maven 3.9 + Redis)
+- 应用入口:`http://localhost:9856/`
+- 统一入口(Nginx 反代,含 VNC WebSocket):`http://localhost:9857/`
+- 健康检查:`http://localhost:9856/actuator/health`
 
-```bash
-mvn -pl oci-server -am package -DskipTests
-java -jar oci-server/target/oci-pool-release.jar
-```
+> `deploy/docker-compose.yml` 是**源码构建**用的(本地/开发);`deploy/docker-compose.pull.yml` 是 **VPS 生产拉镜像**用的。`install.sh`/`update.sh` 被单独下载时默认走拉镜像模式。
 
 ---
 
