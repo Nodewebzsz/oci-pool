@@ -17,6 +17,7 @@
 4. **回写**：以 `chore: bump version to x.y.z [skip ci]` 提交并推回 `master`。
 5. **构建**：`mvn -pl oci-server -am package -DskipTests`。
 6. **推送镜像**：`docker.io/zszken/oci-pool:{version}` + `docker.io/zszken/oci-pool:latest`，多平台 `linux/amd64,linux/arm64`。
+7. **发布 Release**：自动 `workflow_dispatch` 触发 `release.yml`，由它构建服务端 jar + macOS DMG，并用 `git log` 生成条目式 changelog，创建 `v{version}` GitHub Release。
 
 ## 需要在 GitHub 仓库配置的 Secrets
 
