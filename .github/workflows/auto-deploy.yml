@@ -1,4 +1,4 @@
-name: Auto Deploy
+name: 镜像构建与推送
 
 on:
   push:

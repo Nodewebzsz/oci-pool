@@ -34,6 +34,16 @@ fi
 # 读取 .env 里的 OCI_WEB_PORT，供健康检查使用（web 反代为统一入口）
 if [ -f .env ]; then set -a; . ./.env; set +a; fi
 
+# 解析访问地址 host：优先 .env 的 HOST；HOST=auto 自动探测公网 IP；默认 localhost
+detect_host() {
+  case "${HOST:-}" in
+    auto) curl -sf --max-time 3 https://api.ipify.org 2>/dev/null || echo "localhost" ;;
+    '') echo "localhost" ;;
+    *) echo "$HOST" ;;
+  esac
+}
+HOST_URL="$(detect_host)"
+
 warn "拉取 zszken/oci-pool 最新镜像..."
 docker compose -f "$COMPOSE_PULL" pull
 docker compose -f "$COMPOSE_PULL" up -d
@@ -46,6 +56,6 @@ for i in $(seq 1 30); do
 done
 
 ok "running"
-echo "  UI     → http://localhost:${OCI_WEB_PORT:-9857}/"
-echo "  Health → http://localhost:${OCI_WEB_PORT:-9857}/actuator/health"
-echo "  提示：如需改端口，先 cp .env.example .env 再编辑 OCI_WEB_PORT，之后重跑 ./install.sh"
+echo "  UI     → http://${HOST_URL}:${OCI_WEB_PORT:-9857}/"
+echo "  Health → http://${HOST_URL}:${OCI_WEB_PORT:-9857}/actuator/health"
+echo "  提示：改端口编辑 OCI_WEB_PORT；改显示地址编辑 HOST（localhost / 公网IP / auto 自动探测），之后重跑 ./install.sh"
