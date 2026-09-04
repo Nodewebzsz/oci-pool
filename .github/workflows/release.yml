@@ -12,8 +12,6 @@ permissions:
 jobs:
   build-server:
     name: Build server JAR
-    # 跳过 auto-deploy 自动打的 v* 标签（指向 [skip ci] 提交），避免与 gh release 重复
-    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,7 +31,6 @@ jobs:
 
   build-mac:
     name: Build macOS DMG
-    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -56,7 +53,6 @@ jobs:
 
   release:
     name: Create GitHub Release
-    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-latest
     needs: [build-server, build-mac]
     steps:
@@ -66,16 +62,12 @@ jobs:
         with:
           path: artifacts
       - name: Publish release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: OCI-Pool ${{ github.ref_name }}
-          body: |
-            OCI-Pool ${{ github.ref_name }} 发布。
-
-            - macOS: `OciPool-*.dmg`（未公证，安装见 DMG 内“首次打开.command”）
-            - 服务端: `oci-pool-release.jar`
-
-            本仓库是 [doubleDimple/oci-start](https://github.com/doubleDimple/oci-start) 的二次开发分支；想体验原项目最新功能请前往上游。
-          files: |
-            artifacts/server-jar/oci-pool-release.jar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "OCI-Pool $GITHUB_REF_NAME" \
+            --generate-notes \
+            artifacts/server-jar/oci-pool-release.jar \
             artifacts/mac-dmg/*.dmg
