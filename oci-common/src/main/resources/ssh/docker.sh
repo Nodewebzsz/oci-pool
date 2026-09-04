@@ -370,7 +370,7 @@ deploy_app() {
 
     # 检查并拉取最新镜像
     log_info "拉取最新镜像..."
-    if ! docker pull lovele/oci-pool:latest; then
+    if ! docker pull zszken/oci-pool:latest; then
         log_error "拉取镜像失败"
         return 1
     fi
@@ -391,7 +391,7 @@ deploy_app() {
         -e LOG_HOME=/oci-pool/logs \
         -e TZ="$APP_TZ" \
         --restart always \
-        lovele/oci-pool:latest; then
+        zszken/oci-pool:latest; then
 
         log_success "Docker应用部署成功"
 
@@ -498,8 +498,8 @@ uninstall() {
 
     # 清理Docker镜像
     log_info "清理Docker镜像..."
-    if docker images | grep -q "lovele/oci-pool"; then
-        docker rmi "$(docker images lovele/oci-pool -q)" >/dev/null 2>&1
+    if docker images | grep -q "zszken/oci-pool"; then
+        docker rmi "$(docker images zszken/oci-pool -q)" >/dev/null 2>&1
         if [ $? -eq 0 ]; then
             log_success "Docker镜像已删除"
         else
@@ -586,13 +586,13 @@ update() {
 
     # 拉取最新镜像
     log_info "拉取最新镜像..."
-    if ! docker pull lovele/oci-pool:latest; then
+    if ! docker pull zszken/oci-pool:latest; then
         log_error "拉取镜像失败"
         return 1
     fi
 
     # 获取新镜像ID
-    local new_image_id=$(docker images lovele/oci-pool:latest --format='{{.ID}}' | head -n1)
+    local new_image_id=$(docker images zszken/oci-pool:latest --format='{{.ID}}' | head -n1)
     log_info "新镜像ID: $new_image_id"
 
     # 检查镜像是否有更新
@@ -630,7 +630,7 @@ update() {
         -e TZ="$APP_TZ" \
         --network host \
         --restart always \
-        lovele/oci-pool:latest; then
+        zszken/oci-pool:latest; then
 
         log_success "容器创建成功"
 

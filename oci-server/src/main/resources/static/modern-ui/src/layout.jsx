@@ -1120,34 +1120,45 @@ function UserMenuButton() {
 
   const handleAbout = () => {
     setOpen(false);
-    shell.openModal({
-      title: tr('layout.81d9f5'),
-      icon: 'info',
-      size: 'md',
-      body: (
-        <div style={{ padding: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: 'linear-gradient(135deg, var(--accent), var(--cyan))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'oklch(0.14 0.02 155)', fontWeight: 800, fontSize: 18 }}>OCI</div>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--fg-0)' }}>OCI-POOL Manager</div>
-              <div style={{ fontSize: 11.5, color: 'var(--fg-3)', marginTop: 2 }}>{tr('layout.8183de')}</div>
+    window.ociApi.request('/api/version/check').then((info) => {
+      const fmt = (v) => (v && !/^v/i.test(v) ? `v${v}` : (v || tr('layout.7042f5')));
+      const cur = fmt(info && info.currentVersion);
+      const latest = fmt(info && info.latestVersion);
+      const needUpdate = !!(info && info.needUpdate);
+      shell.openModal({
+        title: tr('layout.81d9f5'),
+        icon: 'info',
+        size: 'md',
+        body: (
+          <div style={{ padding: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: 'linear-gradient(135deg, var(--accent), var(--cyan))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'oklch(0.14 0.02 155)', fontWeight: 800, fontSize: 18 }}>OCI</div>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--fg-0)' }}>OCI-POOL Manager</div>
+                <div style={{ fontSize: 11.5, color: 'var(--fg-3)', marginTop: 2 }}>{tr('layout.8183de')}</div>
+              </div>
+            </div>
+            <div style={{ marginTop: 16, fontSize: 12, color: 'var(--fg-1)' }}>{tr('layout.9b601b')} <span className="mono" style={{ color: 'var(--accent)', fontWeight: 600 }}>{cur}</span></div>
+            {needUpdate && (
+              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--warn, #d97706)' }}>{tr('layout.7042f6')} → {latest}</div>
+            )}
+            <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {[
+                { href: 'https://github.com/Nodewebzsz/oci-pool', label: tr('layout.072ab5') },
+                { href: 'https://t.me/+M7XhteVCMMU5ZDhh', label: 'Telegram' },
+                { href: 'https://github.com/Nodewebzsz/oci-pool/releases', label: tr('layout.23093b') },
+              ].map((l) => (
+                <a key={l.label} href={l.href} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: 'var(--accent)', textDecoration: 'none', padding: '6px 12px', borderRadius: 6, background: 'var(--bg-2)', border: '1px solid var(--border)' }}>{l.label}</a>
+              ))}
             </div>
           </div>
-          <div style={{ marginTop: 16, fontSize: 12, color: 'var(--fg-1)' }}>{tr('layout.9b601b')} <span className="mono" style={{ color: 'var(--accent)', fontWeight: 600 }}>v2.14.0</span></div>
-          <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {[
-              { href: 'https://github.com/Nodewebzsz/oci-pool', label: tr('layout.072ab5') },
-              { href: 'https://t.me/+M7XhteVCMMU5ZDhh', label: 'Telegram' },
-              { href: 'https://github.com/Nodewebzsz/oci-pool/releases', label: tr('layout.23093b') },
-            ].map((l) => (
-              <a key={l.label} href={l.href} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: 'var(--accent)', textDecoration: 'none', padding: '6px 12px', borderRadius: 6, background: 'var(--bg-2)', border: '1px solid var(--border)' }}>{l.label}</a>
-            ))}
-          </div>
-        </div>
-      ),
-      footer: (
-        <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('layout.b15d91')}</Button>
-      ),
+        ),
+        footer: (
+          <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('layout.b15d91')}</Button>
+        ),
+      });
+    }).catch((e) => {
+      shell.showToast('获取版本失败: ' + (e.message || e), { kind: 'error' });
     });
   };
 

@@ -272,6 +272,13 @@ public class PingUtil {
         String geoInfoByIP = "";
         try {
             String publicIp = IpUtils.getClientIpAddress(request);
+            // 拿到的若是内网/Docker 网关/回环地址(如 172.18.0.1)时，回退到服务器出口公网 IP，
+            // 避免把容器内网 IP 展示在登录/安全提醒里。
+            if (publicIp == null || publicIp.isEmpty()
+                    || "unknown".equalsIgnoreCase(publicIp)
+                    || isPrivateIP(publicIp)) {
+                publicIp = IpUtils.getPublicIp();
+            }
             geoInfoByIP = publicIp+"/"+getGeoInfoByIP(publicIp);
         } catch (Exception e) {
             log.warn("获取地理位置信息失败");

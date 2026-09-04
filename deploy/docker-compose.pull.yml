@@ -1,0 +1,27 @@
+# VPS 生产拉取镜像版本：CI 把 zszken/oci-pool:latest 推送到 Docker Hub，
+# VPS 只需 docker compose pull，无需在服务器上编译。
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: oci-pool-redis
+    restart: unless-stopped
+    volumes: [redis-data:/data]
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 10s, timeout: 3s, retries: 5 }
+
+  app:
+    image: docker.io/zszken/oci-pool:latest
+    pull_policy: always
+    container_name: oci-pool-modern
+    restart: unless-stopped
+    depends_on: { redis: { condition: service_healthy } }
+    ports: ["${OCI_PORT:-9856}:9856"]
+    environment:
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: "6379"
+      MODERN_UI_ENABLED: "${MODERN_UI_ENABLED:-true}"
+    volumes:
+      - app-data:/oci-pool/data
+      - app-logs:/oci-pool/logs
+    healthcheck: { test: ["CMD", "curl", "-sf", "http://127.0.0.1:9856/actuator/health"], interval: 30s, timeout: 5s, retries: 5, start_period: 60s }
+
+volumes: { redis-data: {}, app-data: {}, app-logs: {} }

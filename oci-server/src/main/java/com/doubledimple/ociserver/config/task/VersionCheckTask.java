@@ -47,7 +47,7 @@ public class VersionCheckTask {
     private final AppVersionRepository versionRepository;
 
     private static final String GITHUB_API_URL = "https://api.github.com/repos/Nodewebzsz/oci-pool/releases/latest";
-    private static final String DOCKER_HUB_API_URL = "https://hub.docker.com/v2/repositories/lovele/oci-pool/tags";
+    private static final String DOCKER_HUB_API_URL = "https://hub.docker.com/v2/repositories/zszken/oci-pool/tags";
 
     @Value("${oci.version:2.0.6}")
     private String dockerVersion;

@@ -25,7 +25,7 @@ spec:
       #  kubernetes.io/hostname: ccs-la
       containers:
         - name: oci-pool
-          image: lovele/oci-pool:latest
+          image: zszken/oci-pool:latest
           imagePullPolicy: Always
 
           ports:

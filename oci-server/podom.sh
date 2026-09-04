@@ -2,11 +2,15 @@
 
 # 设置变量
 REGISTRY="${REGISTRY:-docker.io}"
-NAMESPACE="${NAMESPACE:-lovele}"
+NAMESPACE="${NAMESPACE:-zszken}"
 IMAGE_NAME="${IMAGE_NAME:-oci-pool}"
 IMAGE_REPO="${IMAGE_REPO:-${NAMESPACE}/${IMAGE_NAME}}"
-VERSION="${1:-${VERSION:-5.7.70}}"
+VERSION_FILE="../VERSION"
+VERSION="${1:-${VERSION:-$(cat "${VERSION_FILE}" 2>/dev/null || echo 5.7.70)}}"
 APPLICATION_YML="src/main/resources/application.yml"
+
+# 兼容手动传 v1.2.3
+VERSION="$(printf '%s' "$VERSION" | sed -E 's/^[vV][-_]?//')"
 
 if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     echo "Error: VERSION must be in x.y.z format, got: ${VERSION}"
@@ -19,6 +23,8 @@ if [ ! -f "$APPLICATION_YML" ]; then
     echo "Error: ${APPLICATION_YML} not found. Please run this script from oci-server directory."
     exit 1
 fi
+
+printf '%s\n' "$VERSION" > "${VERSION_FILE}"
 
 echo "Syncing application version..."
 sed -i.bak -E "s/^([[:space:]]*)version:[[:space:]]*.*/\\1version: ${VERSION}/" "$APPLICATION_YML"

@@ -1,0 +1,98 @@
+name: Auto Deploy
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '指定版本号（x.y.z），留空则自动 patch+1'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # 提交信息带 [skip ci] / [ci skip] 时整条流水线跳过，避免版本回写引发循环
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '11'
+          cache: maven
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine version
+        id: version
+        run: |
+          MANUAL="${{ github.event.inputs.version }}"
+          if [ -n "$MANUAL" ]; then
+            NEW="$(./tools/bump-version.sh "$MANUAL")"
+          else
+            NEW="$(./tools/bump-version.sh)"
+          fi
+          echo "VERSION=$NEW" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: $NEW"
+
+      - name: Commit version bump back to master
+        run: |
+          git add VERSION oci-server/src/main/resources/application.yml
+          if git diff --cached --quiet; then
+            echo "No version change - continuing build"
+          else
+            git commit -m "chore: bump version to $(cat VERSION) [skip ci]"
+            git push origin HEAD:"${GITHUB_REF#refs/heads/}"
+          fi
+
+      - name: Package server jar
+        run: mvn -B -pl oci-server -am package -DskipTests
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.deploy
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            docker.io/zszken/oci-pool:${{ steps.version.outputs.VERSION }}
+            docker.io/zszken/oci-pool:latest
+
+      - name: Send deploy notification
+        if: ${{ secrets.TELEGRAM_TO != '' && secrets.TELEGRAM_TOKEN != '' }}
+        uses: appleboy/telegram-action@v0.1.1
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          format: markdown
+          message: |
+            🚀 OCI-Pool 自动部署完成
+
+            版本: `${{ steps.version.outputs.VERSION }}`
+            镜像: `zszken/oci-pool:${{ steps.version.outputs.VERSION }}`

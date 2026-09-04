@@ -5,7 +5,7 @@ mvn clean package -Dmaven.test.skip=true
 
 # <=========部署使用==========>
 # 拉取镜像
-docker pull lovele/oci-pool:2.0.1
+docker pull zszken/oci-pool:2.0.1
 
 # 使用步骤
 
@@ -30,7 +30,7 @@ docker stop oci-pool || true && docker run -d \
     -e LOG_HOME=/oci-pool/logs \
     -e TZ=Asia/Shanghai \
     --rm \
-    lovele/oci-pool:latest
+    zszken/oci-pool:latest
 
 # 查看容器状态
 docker ps -a
@@ -64,4 +64,3 @@ docker rm $(docker ps -a -q)
 
 # 删除所有镜像:
 docker rmi $(docker images -q)
-
