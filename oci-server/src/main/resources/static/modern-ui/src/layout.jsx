@@ -1217,8 +1217,9 @@ function UserMenuButton() {
     }}
       onMouseEnter={e => e.currentTarget.style.background = danger ? 'var(--danger-soft)' : 'var(--bg-2)'}
       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-      <Icon name={icon} size={13} />
-      <span style={{ flex: 1 }}>{label}</span>
+      {/* 图标与文字不拦截指针，整行（含右侧空白）都是按钮的点击/悬停区域 */}
+      <Icon name={icon} size={13} style={{ pointerEvents: 'none' }} />
+      <span style={{ flex: 1, pointerEvents: 'none' }}>{label}</span>
       {right}
     </button>
   );
