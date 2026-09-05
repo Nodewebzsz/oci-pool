@@ -30,7 +30,7 @@ struct SidebarView: View {
             }
 
             ScrollView {
-                LazyVStack(alignment: collapsed ? .center : .leading, spacing: collapsed ? 2 : 2) {
+                VStack(alignment: collapsed ? .center : .leading, spacing: 2) {
                     let catalog = NavigationCatalog.filtered(
                         search: navigation.searchText,
                         cloudType: session.cloudProvider
@@ -48,9 +48,12 @@ struct SidebarView: View {
                             if collapsed
                                 || navigation.isSectionExpanded(section)
                                 || !navigation.searchText.isEmpty {
-                                ForEach(items) { item in
-                                    row(item)
+                                VStack(alignment: collapsed ? .center : .leading, spacing: 2) {
+                                    ForEach(items) { item in
+                                        row(item)
+                                    }
                                 }
+                                .transition(.opacity.combined(with: .move(edge: .top)))
                             }
                         }
                     }
@@ -112,10 +115,14 @@ struct SidebarView: View {
     private func sectionHeader(_ section: NavSection, firstItem: NavigationItem?) -> some View {
         Button(action: {
             let wasExpanded = navigation.isSectionExpanded(section)
-            navigation.toggleSection(section)
+            withAnimation(.easeInOut(duration: 0.22)) {
+                navigation.toggleSection(section)
+            }
             // Web: 点击未展开的母菜单 → 展开并自动选中第一个子菜单(其余分组随之折叠)
             if !wasExpanded, let first = firstItem {
-                navigation.select(first.nav)
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    navigation.select(first.nav)
+                }
             }
         }) {
             HStack(spacing: 8) {
