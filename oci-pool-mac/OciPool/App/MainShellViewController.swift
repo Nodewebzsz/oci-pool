@@ -19,8 +19,8 @@ final class MainShellViewController: NSViewController {
     private var detail: ContentHostViewController!
     private var divider: NSView!
 
-    private let topHeight: CGFloat = 56
-    private let sidebarWidth: CGFloat = 196
+    private let topHeight: CGFloat = 52
+    private let sidebarWidth: CGFloat = 188
     private let dividerWidth: CGFloat = 1
 
     init(session: AppSession, navigation: NavigationState, appearance: AppearanceController = .shared) {
@@ -51,7 +51,7 @@ final class MainShellViewController: NSViewController {
             .environmentObject(appearance)
             .environmentObject(header)
             .environmentObject(chrome)
-            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 56, maxHeight: 56)
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 52, maxHeight: 52)
         topHost = NSHostingController(rootView: AnyView(top))
 
         let sidebarRoot = SidebarView()

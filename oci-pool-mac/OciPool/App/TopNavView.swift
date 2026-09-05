@@ -320,7 +320,7 @@ struct UserDropdownPanel: View {
         VStack(alignment: .leading, spacing: 0) {
             headerBlock
             thinLine
-            menuRow(icon: "chart.pie.fill", color: Color(hex: "FFD700"), title: "云资产报告", action: onAsset)
+            menuRow(icon: "chart.pie.fill", color: textMuted, title: "云资产报告", action: onAsset)
             thinLine
         }
     }
@@ -349,11 +349,11 @@ struct UserDropdownPanel: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(textPrimary)
             Text(levelName)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(Color(hex: "b45309"))
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(AppTheme.sidebarActive)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .background(Capsule().fill(Color(hex: "FFD700").opacity(0.18)))
+                .background(Capsule().fill(AppTheme.sidebarActive.opacity(0.16)))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -448,7 +448,7 @@ private struct AssetAnalysisSheet: View {
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(Capsule().fill(Color(hex: "FFD700").opacity(0.2)))
+                        .background(Capsule().fill(AppTheme.sidebarActive.opacity(0.16)))
                         Text("Scale: Lvl.\(lvl)")
                             .font(.system(size: 11))
                             .foregroundColor(AppTheme.sidebarText(dark))
@@ -461,7 +461,7 @@ private struct AssetAnalysisSheet: View {
                         metric("账号总数", "\(a.totalCount)", nil)
                         metric("升级账号", "\(a.upgradeCount)", Color(hex: "2196f3"))
                         metric("免费额度", "\(a.freeCount)", nil)
-                        metric("账户费用", a.totalCost, Color(hex: "1abc9c"))
+                        metric("账户费用", a.totalCost, Color(hex: "22d3ee"))
                     }
                     .frame(maxWidth: .infinity)
                 }

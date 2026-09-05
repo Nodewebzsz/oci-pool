@@ -87,23 +87,36 @@ struct SidebarView: View {
     private func row(_ item: NavigationItem) -> some View {
         let selected = navigation.selected == item.nav
         return Button(action: { navigation.select(item.nav) }) {
-            HStack(spacing: 8) {
-                Image(systemName: item.systemImage)
-                    .font(.system(size: 12))
-                    .frame(width: 16)
-                Text(item.title)
-                    // 二级菜单略小于一级
-                    .font(.system(size: 12.5, weight: .medium))
-                    .lineLimit(1)
-                Spacer(minLength: 0)
+            ZStack(alignment: .leading) {
+                HStack(spacing: 8) {
+                    Image(systemName: item.systemImage)
+                        .font(.system(size: 12))
+                        .frame(width: 16)
+                    Text(item.title)
+                        // 二级菜单略小于一级
+                        .font(.system(size: 12.5, weight: selected ? .semibold : .medium))
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    if selected {
+                        Circle()
+                            .fill(Color(hex: "f59e0b"))
+                            .frame(width: 6, height: 6)
+                    }
+                }
+                .padding(.leading, selected ? 20 : 10)
+                .padding(.trailing, 10)
+                .padding(.vertical, 6)
+                .foregroundColor(selected ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
+
+                if selected {
+                    RoundedRectangle(cornerRadius: 999)
+                        .fill(AppTheme.sidebarActive)
+                        .frame(width: 3)
+                        .frame(maxHeight: .infinity)
+                        .padding(.vertical, 8)
+                        .padding(.leading, 8)
+                }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(selected ? AppTheme.sidebarActive.opacity(0.9) : Color.clear)
-            )
-            .foregroundColor(selected ? Color.white : AppTheme.sidebarText(dark))
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
