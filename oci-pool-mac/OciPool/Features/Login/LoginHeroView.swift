@@ -25,7 +25,7 @@ struct LoginHeroView: View {
             LoginPalette.panel(dark)
             RadialGradient(
                 gradient: Gradient(colors: [
-                    Color(hex: dark ? "4d9eff" : "6366f1").opacity(dark ? 0.14 : 0.12),
+                    Color(hex: dark ? "10b981" : "34d399").opacity(dark ? 0.14 : 0.12),
                     Color.clear
                 ]),
                 center: UnitPoint(x: 0.3, y: 0.2),
@@ -34,7 +34,7 @@ struct LoginHeroView: View {
             )
             RadialGradient(
                 gradient: Gradient(colors: [
-                    Color(hex: dark ? "8b5cf6" : "0ea5e9").opacity(0.10),
+                    Color(hex: dark ? "22d3ee" : "22d3ee").opacity(0.10),
                     Color.clear
                 ]),
                 center: UnitPoint(x: 0.8, y: 0.8),
@@ -435,7 +435,7 @@ private struct HeroNetCanvas: View {
     var body: some View {
         GeometryReader { geo in
             let maxDist = min(140, max(90, geo.size.width * 0.22))
-            let lineColor = dark ? Color(hex: "4d9eff") : Color(hex: "6366f1")
+            let lineColor = dark ? Color(hex: "10b981") : Color(hex: "0f766e")
             let nodeColor = dark ? Color(hex: "7dd3fc").opacity(0.85) : Color(hex: "4f46e5").opacity(0.75)
             ZStack {
                 // lines (cap pairs for type-checker / perf)

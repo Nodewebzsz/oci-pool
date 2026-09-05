@@ -35,7 +35,7 @@ enum LoginPalette {
     }
     /// Primary CTA + brand badge
     static func primary(_ dark: Bool) -> Color {
-        dark ? Color(hex: "4d9eff") : Color(hex: "111827")
+        dark ? Color(hex: "34d399") : Color(hex: "0f766e")
     }
     static func oauthBg(_ dark: Bool) -> Color {
         dark ? Color(hex: "292d32") : Color(hex: "F3F4F6")
@@ -44,10 +44,10 @@ enum LoginPalette {
         dark ? Color(hex: "31363d") : Color(hex: "E5E7EB")
     }
     static func tabActiveBg(_ dark: Bool) -> Color {
-        dark ? Color(hex: "4d9eff").opacity(0.15) : Color(hex: "111827").opacity(0.06)
+        dark ? Color(hex: "34d399").opacity(0.15) : Color(hex: "0f766e").opacity(0.06)
     }
     static func tabActiveText(_ dark: Bool) -> Color {
-        dark ? Color(hex: "4d9eff") : Color(hex: "111827")
+        dark ? Color(hex: "34d399") : Color(hex: "0f766e")
     }
     static func divider(_ dark: Bool) -> Color {
         dark ? Color.white.opacity(0.06) : Color.black.opacity(0.06)
