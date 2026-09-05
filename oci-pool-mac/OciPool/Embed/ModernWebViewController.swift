@@ -8,6 +8,7 @@ import WebKit
 final class ModernWebViewController: NSViewController, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
 
     private let session: AppSession
+    private let backend: BackendController?
     private let showsToolbar: Bool
 
     private var webView: WKWebView!
@@ -15,6 +16,7 @@ final class ModernWebViewController: NSViewController, WKNavigationDelegate, WKU
     private var forwardButton: NSButton?
     private var reloadButton: NSButton?
     private var openButton: NSButton?
+    private var switchButton: NSButton?
     private var titleLabel: NSTextField?
     private var progressBar: NSProgressIndicator!
     private var emptyLabel: NSTextField!
@@ -25,15 +27,19 @@ final class ModernWebViewController: NSViewController, WKNavigationDelegate, WKU
     private var titleObs: NSKeyValueObservation?
     private var loadGeneration = 0
 
-    /// True when the SPA is not on the login route (heuristic based on hash).
-    /// PR2 will replace this with a more reliable bridge via cookie / /api/userInfo.
+    /// True when the SPA is not on an auth route. The SPA guard redirects anonymous
+    /// users to #/login and authenticated users away from it, so this is a reliable
+    /// signal for the mac shell / menus (username synced in a later PR).
     var onAuthStateChanged: ((Bool) -> Void)?
     var onRouteChanged: ((String) -> Void)?
+    /// Invoked when the user taps 「切换服务器」 in the toolbar.
+    var onSwitchServer: (() -> Void)?
 
     private static let messageHandlerName = "modernUi"
 
-    init(session: AppSession, showsToolbar: Bool = true) {
+    init(session: AppSession, backend: BackendController? = nil, showsToolbar: Bool = true) {
         self.session = session
+        self.backend = backend
         self.showsToolbar = showsToolbar
         super.init(nibName: nil, bundle: nil)
     }
@@ -64,22 +70,30 @@ final class ModernWebViewController: NSViewController, WKNavigationDelegate, WKU
         if let bar = bar { root.addSubview(bar) }
 
         let config = WKWebViewConfiguration()
-        config.preferences.javaScriptEnabled = true
         config.websiteDataStore = .default()
         if #available(macOS 11.0, *) {
             config.defaultWebpagePreferences.allowsContentJavaScript = true
         }
 
-        // Report route / hash changes to the native layer so we can detect login/logout.
+        // Report route / hash changes so the native layer can mirror login state.
         let routeScript = """
         (function() {
+          var AUTH_VIEWS = ['/login', '/register', '/forgot-password'];
+          function isAuth(hash) {
+            for (var i = 0; i < AUTH_VIEWS.length; i++) {
+              if (hash.indexOf(AUTH_VIEWS[i]) !== -1) return true;
+            }
+            return false;
+          }
           function post() {
             try {
+              var hash = location.hash || '';
               window.webkit.messageHandlers.modernUi.postMessage({
                 type: 'route',
-                hash: location.hash || '',
+                hash: hash,
                 path: location.pathname || '',
-                title: document.title || ''
+                title: document.title || '',
+                auth: isAuth(hash)
               });
             } catch (e) {}
           }
@@ -210,7 +224,15 @@ final class ModernWebViewController: NSViewController, WKNavigationDelegate, WKU
         open.translatesAutoresizingMaskIntoConstraints = false
         openButton = open
 
-        for v in [backButton!, forwardButton!, reloadButton!, title, open] {
+        let switchBtn = NSButton(title: "切换服务器", target: self, action: #selector(switchServer))
+        switchBtn.bezelStyle = .inline
+        switchBtn.isBordered = true
+        switchBtn.font = .systemFont(ofSize: 11, weight: .medium)
+        switchBtn.contentTintColor = NSColor(srgbRed: 0x1a / 255, green: 0xbc / 255, blue: 0x9c / 255, alpha: 1)
+        switchBtn.translatesAutoresizingMaskIntoConstraints = false
+        switchButton = switchBtn
+
+        for v in [backButton!, forwardButton!, reloadButton!, title, switchBtn, open] {
             bar.addSubview(v)
         }
 
@@ -223,7 +245,9 @@ final class ModernWebViewController: NSViewController, WKNavigationDelegate, WKU
             reloadButton!.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
             title.leadingAnchor.constraint(equalTo: reloadButton!.trailingAnchor, constant: 12),
             title.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
-            title.trailingAnchor.constraint(lessThanOrEqualTo: open.leadingAnchor, constant: -12),
+            title.trailingAnchor.constraint(lessThanOrEqualTo: switchBtn.leadingAnchor, constant: -12),
+            switchBtn.trailingAnchor.constraint(equalTo: open.leadingAnchor, constant: -8),
+            switchBtn.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
             open.trailingAnchor.constraint(equalTo: bar.trailingAnchor, constant: -12),
             open.centerYAnchor.constraint(equalTo: bar.centerYAnchor)
         ])
@@ -277,6 +301,10 @@ final class ModernWebViewController: NSViewController, WKNavigationDelegate, WKU
         Task { [weak self] in
             guard let self = self else { return }
             do {
+                if let backend = self.backend {
+                    await MainActor.run { self.showLoading("正在启动本地服务…") }
+                    try await self.prepareBackend(backend)
+                }
                 try await self.syncCookies()
                 guard gen == self.loadGeneration else { return }
                 let url = try APIClient.shared.makeURL(self.session.serverURL, path: "/", query: [:])
@@ -289,6 +317,23 @@ final class ModernWebViewController: NSViewController, WKNavigationDelegate, WKU
                     self.showError(error.localizedDescription)
                 }
             }
+        }
+    }
+
+    /// Start the embedded backend (local mode) and wait until it answers before
+    /// loading the SPA. Remote mode passes nil and skips this entirely.
+    private func prepareBackend(_ backend: BackendController) async throws {
+        await backend.start()
+        var waited = 0
+        while !backend.isReadyForLogin {
+            if case .failed(let message) = backend.state {
+                throw NSError(domain: "ModernWeb", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+            }
+            if waited >= 120 {
+                throw NSError(domain: "ModernWeb", code: 2, userInfo: [NSLocalizedDescriptionKey: "本地后端启动超时（120 秒）"])
+            }
+            try await Task.sleep(nanoseconds: 500_000_000)
+            waited += 1
         }
     }
 
@@ -331,6 +376,13 @@ final class ModernWebViewController: NSViewController, WKNavigationDelegate, WKU
         }
     }
 
+    private func showLoading(_ message: String) {
+        emptyLabel.stringValue = message
+        emptyLabel.isHidden = false
+        progressBar.isHidden = false
+        progressBar.doubleValue = 0.1
+    }
+
     private func showError(_ message: String) {
         emptyLabel.stringValue = "页面加载失败\n\(message)"
         emptyLabel.isHidden = false
@@ -353,6 +405,10 @@ final class ModernWebViewController: NSViewController, WKNavigationDelegate, WKU
         let url = webView.url
             ?? (try? APIClient.shared.makeURL(session.serverURL, path: "/", query: [:]))
         if let url = url { NSWorkspace.shared.open(url) }
+    }
+
+    @objc private func switchServer() {
+        onSwitchServer?()
     }
 
     // MARK: - Downloads
@@ -406,7 +462,8 @@ final class ModernWebViewController: NSViewController, WKNavigationDelegate, WKU
               let type = body["type"] as? String,
               type == "route" else { return }
         let hash = body["hash"] as? String ?? ""
-        let loggedIn = !hash.contains("/login") && !hash.isEmpty
+        let isAuth = (body["auth"] as? Bool) ?? false
+        let loggedIn = !isAuth && !hash.isEmpty
         onRouteChanged?(hash)
         onAuthStateChanged?(loggedIn)
     }

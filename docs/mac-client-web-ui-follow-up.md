@@ -60,7 +60,7 @@ macOS 客户端目前不是当前 React Modern UI 的桌面容器，而是一套
   - `MainWindowController`：远程模式直接加载现代 SPA（`serverURL + "/"`），并监听 `deploymentMode` 切换，切回远程时重建内容区。
   - 已加入 `OciPool.xcodeproj`（新增文件引用与 Sources 编译项）。
   - 验证：`xcodebuild -project OciPool.xcodeproj -scheme OciPool -configuration Debug build` 通过；后端 9856 的 `GET /` 返回现代 SPA（200）。
-- **PR2（待做）· 本机模式**
+- **PR2（已完成）· 本机模式 + 登录态桥接**
   - 先启动内置后端，健康检查通过后再加载 Web 登录页；登录态/退出桥接到 `AppSession`。
 - **PR3（待做）· 菜单 / 主题 / 刷新 / 切换服务器作用于 WKWebView；清理不再使用的原生业务导航。**
 - **PR4（待做）· DMG 重建、最小窗口与下载/外部链接回归、数据保留校验。**
@@ -69,3 +69,11 @@ macOS 客户端目前不是当前 React Modern UI 的桌面容器，而是一套
 - 默认只做本地提交，不推送；`dev` 推送不加 `[skip ci]`。
 - 登录态上报当前基于 `location.hash` 启发式判断（`#/login` 之外视为已登录），PR2 会替换为 `satoken` Cookie / `/api/userInfo` 的可靠桥接。
 - 本环境 `functions__exec` / `apply_patch` 工具不可用，本次文件写入改由 CUA 运行时 `node:fs` 完成；后续工具恢复后应回归 `apply_patch`。
+
+### PR2 详情（已提交本地 dev）
+
+- 本机模式：`MainWindowController` 在“已选部署方式”下，无论本机/远程都用 `ModernWebViewController` 加载现代 SPA。
+- 本机模式会先启动内置后端（`BackendController.start()`），健康检查通过（`isReadyForLogin`，含 120 秒超时与失败提示）后再加载 Web 登录页。
+- 登录态桥接：`ModernWebViewController` 依据 SPA 路由（`#/login`、`#/register`、`#/forgot-password` 视为未登录）上报登录态，并由 `AppSession.applyWebAuth(loggedIn:)` 同步到原生层；退出登录时清除 Cookie。
+- “切换服务器”：`ModernWebViewController` 工具栏新增“切换服务器”，点击后 `AppSession.resetDeploymentChoice()` 回到原生引导/模式选择页。
+- 未选部署方式时仍显示原生 `LoginView` 作为模式选择入口（后续 PR3 会替换/精简为极简 `WelcomeView`）。

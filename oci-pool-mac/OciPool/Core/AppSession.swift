@@ -231,6 +231,27 @@ final class AppSession: ObservableObject {
         APIClient.shared.clearCookies(for: serverURL)
     }
 
+    /// Bridge login / logout state reported by the Modern UI WebView.
+    /// The SPA is the source of truth for the sa-token session; the native layer
+    /// only mirrors the state so menus / shell chrome behave consistently.
+    @MainActor
+    func applyWebAuth(loggedIn: Bool) {
+        if loggedIn != isLoggedIn {
+            isLoggedIn = loggedIn
+        }
+        if !loggedIn {
+            APIClient.shared.clearCookies(for: serverURL)
+        }
+        objectWillChange.send()
+    }
+
+    /// Allow the user to go back to the deployment chooser (native login screen).
+    @MainActor
+    func resetDeploymentChoice() {
+        UserDefaults.standard.set(false, forKey: deploymentChosenKey)
+        objectWillChange.send()
+    }
+
     /// Local embedded backend (localhost) vs remote deployment.
     static func isLocalServerURL(_ raw: String) -> Bool {
         var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)

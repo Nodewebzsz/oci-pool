@@ -149,20 +149,9 @@ final class MainWindowController: NSWindowController {
     }
 
     private func bindSession() {
-        session.$isLoggedIn
-            .dropFirst() // init already rebuildContent()'d once
-            .removeDuplicates()
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                // Defer off the current runloop / constraint pass to avoid AL thrash crash.
-                DispatchQueue.main.async {
-                    self?.rebuildContent()
-                    self?.forceDefaultFrame()
-                }
-            }
-            .store(in: &cancellables)
-
-        // 切换本机 / 远程时也要重建内容区域（远程 → ModernWebViewController）。
+        // 切换本机 / 远程时重建内容区域（远程/本机 → ModernWebViewController）。
+        // Web 登录态由 ModernWebViewController 内部路由判断并桥接到 AppSession，
+        // 这里不再因 isLoggedIn 变化重建整个窗口（避免登录后闪一下重载 SPA）。
         session.$deploymentMode
             .dropFirst()
             .removeDuplicates()
@@ -175,31 +164,27 @@ final class MainWindowController: NSWindowController {
             }
             .store(in: &cancellables)
     }
-
     private func rebuildContent() {
-        // 方案 A：远程模式直接用 WKWebView 加载当前 React Modern UI，登录与业务页均复用 Web。
-        if session.isRemoteDeployment {
-            let web = ModernWebViewController(session: session)
-            web.onAuthStateChanged = { loggedIn in
-                AppDelegate.log("modern web authState=\(loggedIn)")
-            }
-            root.setContent(web)
-            window?.title = "OCI-POOL"
-        } else if session.isLoggedIn {
-            let shell = MainShellViewController(
-                session: session,
-                navigation: navigation,
-                appearance: appearance
-            )
-            root.setContent(shell)
-            window?.title = "OCI-POOL"
-        } else {
+        // 未选部署方式：显示原生引导/模式选择页（本机使用 / 远程服务器）。
+        if !session.hasChosenDeploymentMode {
             let login = LoginView()
                 .environmentObject(session)
                 .environmentObject(backend)
                 .environmentObject(appearance)
             root.setSwiftUI(login)
-            window?.title = "OCI-POOL — 登录"
+            window?.title = "OCI-POOL — 选择部署方式"
+        } else if session.isRemoteDeployment {
+            // 方案 A：远程模式直接用 WKWebView 加载当前 React Modern UI。
+            let web = ModernWebViewController(session: session, backend: nil)
+            wire(web)
+            root.setContent(web)
+            window?.title = "OCI-POOL"
+        } else {
+            // 本机模式：先启动内置后端，健康检查通过后再加载现代 SPA。
+            let web = ModernWebViewController(session: session, backend: backend)
+            wire(web)
+            root.setContent(web)
+            window?.title = "OCI-POOL"
         }
         // Single delayed pin after content swap — do NOT spam forceDefaultFrame (causes constraint storms).
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
@@ -207,6 +192,19 @@ final class MainWindowController: NSWindowController {
         }
     }
 
+    private func wire(_ web: ModernWebViewController) {
+        web.onAuthStateChanged = { [weak self] loggedIn in
+            Task { @MainActor in
+                self?.session.applyWebAuth(loggedIn: loggedIn)
+            }
+        }
+        web.onSwitchServer = { [weak self] in
+            guard let self = self else { return }
+            self.session.resetDeploymentChoice()
+            self.rebuildContent()
+            self.forceDefaultFrame()
+        }
+    }
     static func clearPoisonedFrameDefaults() {
         let defaults = UserDefaults.standard
         let keys = defaults.dictionaryRepresentation().keys
