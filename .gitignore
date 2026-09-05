@@ -13,6 +13,7 @@ oci-server/src/main/resources/static/modern-ui/dist/
 # Runtime data
 data/
 logs/
+redis-data/
 
 # Environment / secrets（.env.example 保留可提交，其余一律不入库）
 .env

@@ -39,7 +39,6 @@
 | `.../controller/HomeController.java` | **PATCHED** | Guarded by `@ConditionalOnProperty(name="modern-ui.enabled", havingValue="false")` |
 | `.../config/SaTokenConfig.java` | **PATCHED** | Added `/` and `/modern-ui/**` to excludePathPatterns |
 | `oci-server/.../application.yml` | **APPENDED** 6 lines | `modern-ui.enabled: true` config block |
-| `Dockerfile.modern-ui` | **NEW** | Multi-stage Maven → JRE 17 build |
 | `deploy/` | **NEW** | docker-compose + install/uninstall scripts |
 | `MODERN_UI.md` | **NEW** | This doc |
 
@@ -84,7 +83,7 @@ First run: create the admin account via the register page (`POST /api/register-f
 ### ⚠ Manual checks (unchanged from v2)
 
 1. Ambiguous mapping on `GET /` — the `@ConditionalOnProperty` guard should prevent this.
-2. JAR name assumed `oci-pool-release.jar` — adjust `Dockerfile.modern-ui` if your `<finalName>` differs.
+2. JAR name assumed `oci-pool-release.jar` — adjust `Dockerfile.deploy` if your `<finalName>` differs.
 3. If `/modern-ui/**` returns 404: some custom `WebMvcConfigurer` might override `addResourceHandlers`, add:
    ```java
    registry.addResourceHandler("/modern-ui/**").addResourceLocations("classpath:/static/modern-ui/");
@@ -112,7 +111,6 @@ git fetch upstream && git merge upstream/master
 | `.../controller/HomeController.java` | **补丁** | 加 `@ConditionalOnProperty` 守卫 |
 | `.../config/SaTokenConfig.java` | **补丁** | sa-token 白名单加 `/` 和 `/modern-ui/**` |
 | `oci-server/.../application.yml` | **追加** 6 行 | `modern-ui.enabled: true` |
-| `Dockerfile.modern-ui` | **新增** | 多阶段 Maven → JRE 17 构建 |
 | `deploy/` | **新增** | docker-compose + 安装/卸载脚本 |
 | `MODERN_UI.md` | **新增** | 本文档 |
 
@@ -156,7 +154,7 @@ modern-ui:
 ### ⚠ 你需要手动验证的地方（同 v2）
 
 1. `GET /` 重复映射 — `@ConditionalOnProperty` 守卫应阻止。
-2. JAR 名字 — 假设为 `oci-pool-release.jar`，若 `<finalName>` 不同改 `Dockerfile.modern-ui`。
+2. JAR 名字 — 假设为 `oci-pool-release.jar`，若 `<finalName>` 不同改 `Dockerfile.deploy`。
 3. 自定义 `WebMvcConfigurer` — 若 `/modern-ui/**` 404，添加:
    ```java
    registry.addResourceHandler("/modern-ui/**").addResourceLocations("classpath:/static/modern-ui/");
