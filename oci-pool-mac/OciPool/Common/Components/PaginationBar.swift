@@ -55,7 +55,7 @@ struct PaginationBar: View {
             infoAndJump
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.vertical, appearance.density.paginationPad)
         .background(AppTheme.sidebarBg(dark).opacity(0.55))
         .overlay(
             Rectangle()

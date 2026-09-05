@@ -297,7 +297,7 @@ struct EmailView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if model.tenantTab == .enabled {
                 ScrollView {
-                    LazyVStack(spacing: 12) {
+                    LazyVStack(spacing: appearance.density.cardGap) {
                         ForEach(model.enabledConfigs) { item in
                             enabledCard(item)
                         }
@@ -306,7 +306,7 @@ struct EmailView: View {
                 }
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 12) {
+                    LazyVStack(spacing: appearance.density.cardGap) {
                         ForEach(model.disabledTenants) { item in
                             disabledCard(item)
                         }
@@ -434,7 +434,7 @@ struct EmailView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 12) {
+                    LazyVStack(spacing: appearance.density.cardGap) {
                         ForEach(model.contacts) { c in
                             contactCard(c)
                         }

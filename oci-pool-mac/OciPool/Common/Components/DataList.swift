@@ -15,7 +15,7 @@ struct DataList<Header: View, Content: View>: View {
                 header()
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            .padding(.vertical, appearance.density.headerPad)
             .background(AppTheme.sidebarHover(dark).opacity(0.65))
             .overlay(
                 Rectangle()
