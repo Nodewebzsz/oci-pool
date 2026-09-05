@@ -8,8 +8,8 @@ enum AppTheme {
     static let sidebarBgDark = Color(hex: "1e2124")
     static let sidebarHoverDark = Color(hex: "292d30")
     static let sidebarTextDark = Color(hex: "a9b7c6")
-    static let sidebarActive = Color(hex: "1abc9c")
-    static let brandGold = Color(hex: "FFD700")
+    static let sidebarActive = Color(hex: "34d399")
+    static let brandGold = Color(hex: "34d399")
     static let pageBgDark = Color(hex: "1a1d21")
     static let borderDark = Color(hex: "383c40")
 
@@ -18,7 +18,7 @@ enum AppTheme {
     static let sidebarBgLight = Color(hex: "e4eaf2")
     static let sidebarHoverLight = Color(hex: "d6dfe9")
     static let sidebarTextLight = Color(hex: "374a61")
-    static let brandBrown = Color(hex: "b45309")
+    static let brandBrown = Color(hex: "0f766e")
     static let pageBgLight = Color(hex: "f0f4f8")
     static let borderLight = Color(hex: "b8c8d8")
 
