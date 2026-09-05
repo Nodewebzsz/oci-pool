@@ -16,7 +16,7 @@ struct SidebarView: View {
                 .padding(.bottom, 8)
 
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
+                LazyVStack(alignment: .leading, spacing: appearance.density.listSpacing) {
                     let catalog = NavigationCatalog.filtered(
                         search: navigation.searchText,
                         cloudType: session.cloudProvider
@@ -105,7 +105,7 @@ struct SidebarView: View {
                 }
                 .padding(.leading, selected ? 20 : 10)
                 .padding(.trailing, 10)
-                .padding(.vertical, 6)
+                .padding(.vertical, appearance.density.sidebarRowPad)
                 .foregroundColor(selected ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
 
                 if selected {

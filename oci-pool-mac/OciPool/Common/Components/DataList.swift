@@ -54,7 +54,7 @@ struct DataListRow<Content: View>: View {
                 content()
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.vertical, appearance.density.rowPadding)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 isSelected

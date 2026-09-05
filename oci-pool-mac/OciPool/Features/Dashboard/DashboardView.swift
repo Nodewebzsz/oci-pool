@@ -12,7 +12,7 @@ struct DashboardView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: appearance.density.panelGap) {
                 pageHeader
                 if let err = model.errorText, !err.isEmpty {
                     errorBanner(err)
@@ -21,7 +21,7 @@ struct DashboardView: View {
                 resourceGrid
                 bottomGrid
             }
-            .padding(22)
+            .padding(appearance.density.pagePadding)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(DashboardTheme.bg(dark).ignoresSafeArea())

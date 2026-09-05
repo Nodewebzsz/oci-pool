@@ -119,6 +119,7 @@ struct TopNavView: View {
             languageButton
             themeMenuButton
             accentSwitcher
+            densityToggle
             messageButton
             userButton
         }
@@ -232,6 +233,30 @@ struct TopNavView: View {
         }
         .buttonStyle(PlainButtonStyle())
         .help("强调色")
+    }
+
+    // Web topbar: 信息密度 紧凑/舒适 一键切换
+    private var densityToggle: some View {
+        Button {
+            header.closeMessages()
+            chrome.close()
+            appearance.density = appearance.density == .compact ? .comfortable : .compact
+        } label: {
+            Image(systemName: appearance.density == .compact ? "square.grid.3x1.fill" : "square.grid.2x2")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(AppTheme.navIcon(dark))
+                .frame(width: 30, height: 30)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(AppTheme.sidebarBg(dark).opacity(0.6))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5)
+                        .stroke(AppTheme.border(dark), lineWidth: 1)
+                )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .help(appearance.density == .compact ? "切换到舒适" : "切换到紧凑")
     }
 
     private var messageButton: some View {

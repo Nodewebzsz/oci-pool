@@ -87,6 +87,61 @@ enum AccentPreset: String, CaseIterable, Identifiable {
     }
 }
 
+/// 信息密度，对齐 Web `tweaks.density`（compact/comfortable）。
+enum DensityMode: String, CaseIterable, Identifiable {
+    case compact
+    case comfortable
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .compact: return "紧凑"
+        case .comfortable: return "舒适"
+        }
+    }
+
+    /// 列表/表格行的纵向 padding（对齐 Web Table `py`：9 / 12）。
+    var rowPadding: CGFloat {
+        switch self {
+        case .compact: return 9
+        case .comfortable: return 12
+        }
+    }
+
+    /// 侧栏行纵向 padding。
+    var sidebarRowPad: CGFloat {
+        switch self {
+        case .compact: return 6
+        case .comfortable: return 9
+        }
+    }
+
+    /// 侧栏列表间距。
+    var listSpacing: CGFloat {
+        switch self {
+        case .compact: return 2
+        case .comfortable: return 4
+        }
+    }
+
+    /// 页面主内容纵向间距。
+    var panelGap: CGFloat {
+        switch self {
+        case .compact: return 14
+        case .comfortable: return 22
+        }
+    }
+
+    /// 页面内容四周留白。
+    var pagePadding: CGFloat {
+        switch self {
+        case .compact: return 22
+        case .comfortable: return 30
+        }
+    }
+}
+
 extension Color {
     init(hex: String) {
         let h = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
@@ -136,6 +191,12 @@ final class AppearanceController: ObservableObject {
         }
     }
 
+    @Published var density: DensityMode {
+        didSet {
+            UserDefaults.standard.set(density.rawValue, forKey: "appDensity")
+        }
+    }
+
     @Published var mode: AppAppearanceMode {
         didSet {
             UserDefaults.standard.set(mode.rawValue, forKey: "appAppearance")
@@ -147,6 +208,7 @@ final class AppearanceController: ObservableObject {
         let raw = UserDefaults.standard.string(forKey: "appAppearance") ?? AppAppearanceMode.dark.rawValue
         mode = AppAppearanceMode(rawValue: raw) ?? .dark
         accent = AccentPreset(rawValue: UserDefaults.standard.string(forKey: "appAccent") ?? "") ?? .green
+        density = DensityMode(rawValue: UserDefaults.standard.string(forKey: "appDensity") ?? "") ?? .compact
         apply()
     }
 
