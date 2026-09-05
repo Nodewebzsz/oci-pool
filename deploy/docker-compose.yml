@@ -3,10 +3,10 @@ services:
     image: redis:7-alpine
     container_name: oci-pool-redis
     restart: unless-stopped
-    volumes: [redis-data:/data]
+    volumes: [./redis-data:/data]
     healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 10s, timeout: 3s, retries: 5 }
   app:
-    build: { context: .., dockerfile: Dockerfile.deploy }
+    build: { context: .., dockerfile: deploy/Dockerfile.deploy }
     image: oci-pool-modern-ui:latest
     container_name: oci-pool-modern
     restart: unless-stopped
@@ -18,8 +18,8 @@ services:
       MODERN_UI_ENABLED: "${MODERN_UI_ENABLED:-true}"
       DB_PASSWORD: "${DB_PASSWORD:-}"
     volumes:
-      - app-data:/oci-pool/data
-      - app-logs:/oci-pool/logs
+      - ./data:/oci-pool/data
+      - ./logs:/oci-pool/logs
     healthcheck: { test: ["CMD", "curl", "-sf", "http://127.0.0.1:9856/actuator/health"], interval: 30s, timeout: 5s, retries: 5, start_period: 60s }
   # 统一入口反代:UI + /ws/console + /websockify/{port}(VNC 动态端口)
   # 配置打进镜像(COPY nginx.conf),避免宿主 bind-mount;上下文为本目录(含 Dockerfile.web + nginx.conf)。
@@ -31,4 +31,4 @@ services:
     depends_on: { app: { condition: service_healthy } }
     ports: ["${OCI_WEB_PORT:-9857}:80"]
     healthcheck: { test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/"], interval: 30s, timeout: 5s, retries: 5, start_period: 10s }
-volumes: { redis-data: {}, app-data: {}, app-logs: {} }
+# 数据以相对文件夹持久化(本文件所在目录下 data/ logs/ redis-data/),便于随部署目录迁移

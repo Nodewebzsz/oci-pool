@@ -31,6 +31,131 @@ function resolveTheme(theme) {
   return 'dark';
 }
 
+// 品牌加载页 · authState === 'checking'(刷新后等待 /api/userInfo 返回)时出现,
+// 复用品牌云标 + 强调色渐变,替代原先的纯文本占位,让每次刷新都能看到完整品牌首屏。
+function BrandLoading() {
+  const { t: tr } = useT();
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-label={tr('app.authChecking')}
+      style={{
+        position: 'relative',
+        minHeight: '100vh',
+        overflow: 'hidden',
+        background: 'var(--bg-0)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <style>{`
+        @keyframes ocip-load-drift { 0%,100%{ transform: translateY(0) scale(1); } 50%{ transform: translateY(-10px) scale(1.04); } }
+        @keyframes ocip-load-fade { from{ opacity:0; transform: translateY(12px); } to{ opacity:1; transform: translateY(0); } }
+        @keyframes ocip-load-bar { 0%{ left:-30%; width:34%; } 50%{ width:58%; } 100%{ left:112%; width:34%; } }
+        @keyframes ocip-load-ring { 0%{ transform: scale(0.9); opacity:0.7; } 60%{ transform: scale(1.25); opacity:0; } 100%{ transform: scale(1.25); opacity:0; } }
+      `}</style>
+
+      {/* 环境光晕 */}
+      <div aria-hidden="true" style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        backgroundImage: `radial-gradient(circle at 18% 22%, color-mix(in oklab, var(--accent) 16%, transparent), transparent 42%),
+          radial-gradient(circle at 82% 78%, color-mix(in oklab, var(--cyan) 14%, transparent), transparent 42%),
+          radial-gradient(circle at 50% 50%, color-mix(in oklab, var(--accent) 6%, transparent), transparent 58%)`,
+      }} />
+
+      {/* 极淡网格 */}
+      <div aria-hidden="true" style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.55,
+        backgroundImage: `linear-gradient(to right, color-mix(in oklab, var(--fg-3) 12%, transparent) 1px, transparent 1px),
+          linear-gradient(to bottom, color-mix(in oklab, var(--fg-3) 12%, transparent) 1px, transparent 1px)`,
+        backgroundSize: '46px 46px',
+        maskImage: 'radial-gradient(circle at 50% 50%, black, transparent 74%)',
+        WebkitMaskImage: 'radial-gradient(circle at 50% 50%, black, transparent 74%)',
+      }} />
+
+      {/* 居中品牌区 */}
+      <div style={{
+        position: 'relative', zIndex: 1,
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        animation: 'ocip-load-fade 620ms cubic-bezier(0.4, 0, 0.2, 1) both',
+      }}>
+        {/* 标识 · 呼吸 + 波纹环 */}
+        <div style={{ position: 'relative', width: 92, height: 92 }}>
+          <div aria-hidden="true" style={{
+            position: 'absolute', inset: 0, borderRadius: 26,
+            border: '1px solid color-mix(in oklab, var(--accent) 55%, transparent)',
+            animation: 'ocip-load-ring 2.4s ease-out infinite',
+          }} />
+          <div aria-hidden="true" style={{
+            position: 'absolute', inset: 0, borderRadius: 26,
+            border: '1px solid color-mix(in oklab, var(--accent) 40%, transparent)',
+            animation: 'ocip-load-ring 2.4s ease-out infinite',
+            animationDelay: '0.8s',
+          }} />
+          <div style={{
+            width: 92, height: 92, borderRadius: 26,
+            background: 'linear-gradient(135deg, var(--accent) 0%, var(--cyan) 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 18px 52px color-mix(in oklab, var(--accent) 35%, transparent)',
+            animation: 'ocip-load-drift 5s ease-in-out infinite',
+          }}>
+            <svg width="50" height="50" viewBox="0 0 36 36" role="img" aria-label={tr('layout.2e9579')}>
+              <path d="M10 20.4a4.2 4.2 0 0 1 2.6-7.5 6.1 6.1 0 0 1 11.6 1.2 3.7 3.7 0 0 1 .7 7.3H11.2"
+                    fill="none" stroke="oklch(0.14 0.02 155)" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="13" cy="25.5" r="1.6" fill="oklch(0.14 0.02 155)" />
+              <circle cx="18" cy="25.5" r="1.6" fill="oklch(0.14 0.02 155)" />
+              <circle cx="23" cy="25.5" r="1.6" fill="oklch(0.14 0.02 155)" />
+              <path d="M13 23.9v-2.5" stroke="oklch(0.14 0.02 155)" strokeWidth="1.4" />
+              <path d="M18 23.9v-2.5" stroke="oklch(0.14 0.02 155)" strokeWidth="1.4" />
+              <path d="M23 23.9v-2.5" stroke="oklch(0.14 0.02 155)" strokeWidth="1.4" />
+            </svg>
+          </div>
+        </div>
+
+        {/* 品牌名 */}
+        <div style={{ textAlign: 'center', marginTop: 22 }}>
+          <div style={{
+            fontSize: 27, fontWeight: 800, letterSpacing: 4.5,
+            color: 'var(--fg-0)', fontFamily: 'var(--font-sans)',
+          }}>
+            {tr('brand.name')}
+          </div>
+          <div style={{
+            marginTop: 7, fontSize: 12, letterSpacing: 2.2,
+            color: 'var(--fg-2)', fontFamily: 'var(--font-sans)',
+          }}>
+            {tr('brand.tagline')}
+          </div>
+        </div>
+
+        {/* 加载条 */}
+        <div style={{
+          width: 190, height: 3, borderRadius: 999, marginTop: 22,
+          background: 'var(--bg-2)', overflow: 'hidden',
+        }}>
+          <div style={{ position: 'relative', height: '100%' }}>
+            <div style={{
+              position: 'absolute', top: 0, height: '100%', borderRadius: 999,
+              background: 'linear-gradient(90deg, var(--accent), var(--cyan))',
+              animation: 'ocip-load-bar 1.5s ease-in-out infinite',
+            }} />
+          </div>
+        </div>
+
+        {/* 状态说明 */}
+        <div style={{
+          marginTop: 16, fontSize: 11, letterSpacing: 0.8, color: 'var(--fg-3)',
+          fontFamily: 'var(--font-mono)',
+        }}>
+          {tr('app.authChecking')}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AppInner() {
   const { lang, setLang, t: tr } = useT();
   const tk = useTweaks(window.OCI_TWEAK_DEFAULTS);
@@ -62,13 +187,20 @@ function AppInner() {
   }, []);
   React.useEffect(() => {
     let active = true;
+    // 让品牌加载页至少展示一小段时间,避免本地/快速响应时只闪一瞬就消失。
+    const MIN_SPLASH_MS = 420;
+    const started = Date.now();
+    const settle = (state) => {
+      const wait = Math.max(0, MIN_SPLASH_MS - (Date.now() - started));
+      setTimeout(() => { if (active) setAuthState(state); }, wait);
+    };
     window.ociApi.request('/api/userInfo')
       .then((response) => {
         if (!active) return;
-        setAuthState(response?.success && response?.code === 200 ? 'authenticated' : 'anonymous');
+        settle(response?.success && response?.code === 200 ? 'authenticated' : 'anonymous');
       })
       .catch(() => {
-        if (active) setAuthState('anonymous');
+        if (active) settle('anonymous');
       });
     const onUnauthorized = () => setAuthState('anonymous');
     window.addEventListener('ocip:unauthorized', onUnauthorized);
@@ -245,11 +377,7 @@ function AppInner() {
   // The auth page still respects theme/accent/lang because those are set on
   // <html>/CSS variables above and via LangProvider around this component.
   if (authState === 'checking') {
-    return (
-      <div role="status" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', color: 'var(--fg-2)' }}>
-        {tr('app.authChecking')}
-      </div>
-    );
+    return <BrandLoading />;
   }
   if (authState === 'anonymous') {
     return <AuthPage

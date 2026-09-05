@@ -163,7 +163,7 @@ OCI_PORT=9860 ./install.sh
 cd oci-pool
 docker compose -f docker-compose.pull.yml ps       # 查看容器状态
 docker compose -f docker-compose.pull.yml logs -f  # 实时查看日志
-docker compose -f docker-compose.pull.yml down     # 停止(保留数据卷)
+docker compose -f docker-compose.pull.yml down     # 停止(保留 data/ logs/ redis-data/ 数据)
 ./update.sh                                        # 更新到最新镜像
 ```
 
@@ -176,7 +176,7 @@ cd oci-pool && ./update.sh
 #### 卸载
 
 ```bash
-cd oci-pool && ./uninstall.sh   # 停止并删除数据卷
+cd oci-pool && ./uninstall.sh   # 停止并删除 data/ logs/ redis-data/ 数据文件夹
 ```
 
 #### 本地/源码构建(可选)

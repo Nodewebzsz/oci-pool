@@ -108,7 +108,7 @@ docker compose build      # Build
 docker compose up -d      # Start
 docker compose logs -f    # Follow logs
 docker compose down       # Stop
-./uninstall.sh            # Uninstall (removes data volumes)
+./uninstall.sh            # Uninstall (removes data folders)
 ```
 
 ### Option 2: Manual Build (JDK 17 + Maven 3.9 + Redis)

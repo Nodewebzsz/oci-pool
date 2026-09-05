@@ -406,11 +406,11 @@ function InstancesPage({ density }) {
       <div style={{
           display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
           padding: '8px 12px', marginBottom: 12,
-          background: 'var(--info-soft)', border: '1px solid var(--info)',
+          background: 'var(--accent-soft)', border: '1px solid color-mix(in oklab, var(--accent) 45%, transparent)',
           borderRadius: 6, fontSize: 12,
         }}>
-          <Icon name="filter" size={13} style={{ color: 'var(--info)' }} />
-          <span style={{ color: 'var(--info)', fontWeight: 500 }}>{tr('instances.filter.current')}</span>
+          <Icon name="filter" size={13} style={{ color: 'var(--accent)' }} />
+          <span style={{ color: 'var(--accent)', fontWeight: 500 }}>{tr('instances.filter.current')}</span>
           {nameFilter && (
             <span style={{ padding: '2px 8px', background: 'var(--bg-1)', borderRadius: 3, display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--fg-0)' }}>
               <span style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>{tr('instances.filter.name')}</span>
@@ -452,7 +452,7 @@ function InstancesPage({ density }) {
               </span>
             </>
           )}
-          <span style={{ color: 'var(--fg-2)' }}>· {tr('instances.filter.matchedPrefix')}<b style={{ color: 'var(--info)' }}>{filtered.length}</b>{tr('instances.filter.matchedSuffix')}</span>
+          <span style={{ color: 'var(--fg-2)' }}>· {tr('instances.filter.matchedPrefix')}<b style={{ color: 'var(--accent)' }}>{filtered.length}</b>{tr('instances.filter.matchedSuffix')}</span>
           <div style={{ flex: 1 }} />
           <Button size="xs" variant="outline" icon="rotate-ccw"
           disabled={!hasFilter}
