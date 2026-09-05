@@ -11,7 +11,7 @@ struct TopNavDropdownOverlay: View {
     private var dark: Bool { appearance.isDarkEffective }
 
     /// Match MainShell top bar height
-    private let topBarHeight: CGFloat = 56
+    private let topBarHeight: CGFloat = 52
     private let trailingPad: CGFloat = 16
     private let messagePanelWidth: CGFloat = 400
 

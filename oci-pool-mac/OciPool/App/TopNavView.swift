@@ -18,10 +18,9 @@ struct TopNavView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 sidebarToggle
-                brand
-                pageTrail
+                engineStatus
             }
             .layoutPriority(1)
 
@@ -31,7 +30,7 @@ struct TopNavView: View {
         }
         .padding(.horizontal, 16)
         .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-        .frame(height: 56)
+        .frame(height: 52)
         .background(AppTheme.topNavBg(dark))
         .overlay(
             Rectangle()
@@ -82,33 +81,30 @@ struct TopNavView: View {
         .help(navigation.sidebarCollapsed ? "展开侧栏（⌘⌥S）" : "收起侧栏（⌘⌥S）")
     }
 
-    private var brand: some View {
-        Button(action: {
-            chrome.close()
-            navigation.select(.dashboard)
-        }) {
-            Text(session.siteName)
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundColor(AppTheme.brand(dark))
-                .tracking(0.8)
+    // Web topbar 引擎状态 pill:运行点 + 引擎 + 运行中
+    private var engineStatus: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(AppTheme.sidebarActive)
+                .frame(width: 7, height: 7)
+            Text("引擎")
+                .font(.system(size: 11))
+                .foregroundColor(AppTheme.navIcon(dark))
+            Text("运行中")
+                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .foregroundColor(AppTheme.sidebarActive)
         }
-        .buttonStyle(PlainButtonStyle())
-        .help("回到系统监控")
-    }
-
-    private var pageTrail: some View {
-        HStack(spacing: 6) {
-            if let item = NavigationCatalog.item(for: navigation.selected) {
-                Text("·")
-                    .foregroundColor(AppTheme.navIcon(dark).opacity(0.35))
-                Image(systemName: item.systemImage)
-                    .font(.system(size: 11))
-                Text(item.title)
-                    .font(.system(size: 13, weight: .medium))
-            }
-        }
-        .foregroundColor(AppTheme.navIcon(dark).opacity(0.85))
-        .lineLimit(1)
+        .padding(.horizontal, 10)
+        .frame(height: 30)
+        .background(
+            RoundedRectangle(cornerRadius: 5)
+                .fill(AppTheme.sidebarBg(dark).opacity(0.6))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
+        )
+        .fixedSize()
     }
 
     // MARK: - Right

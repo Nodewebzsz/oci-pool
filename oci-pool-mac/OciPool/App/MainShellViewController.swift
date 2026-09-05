@@ -21,6 +21,7 @@ final class MainShellViewController: NSViewController {
 
     private let topHeight: CGFloat = 52
     private let sidebarWidth: CGFloat = 188
+    private let sidebarCollapsedWidth: CGFloat = 60
     private let dividerWidth: CGFloat = 1
 
     init(session: AppSession, navigation: NavigationState, appearance: AppearanceController = .shared) {
@@ -139,21 +140,17 @@ final class MainShellViewController: NSViewController {
         guard b.width > 1, b.height > 1 else { return }
 
         let collapsed = navigation.sidebarCollapsed
-        let sideW: CGFloat = collapsed ? 0 : sidebarWidth
-        let bodyH = max(0, b.height - topHeight)
-        let bodyY: CGFloat = 0
-        let topY = b.height - topHeight
+        let sideW: CGFloat = collapsed ? sidebarCollapsedWidth : sidebarWidth
 
-        topHost.view.frame = NSRect(x: 0, y: topY, width: b.width, height: topHeight)
-        sidebarHost.view.frame = NSRect(x: 0, y: bodyY, width: sideW, height: bodyH)
-        sidebarHost.view.isHidden = collapsed
+        // Web 布局：左侧栏全高，顶栏在内容列上方，内容在顶栏下方。
+        sidebarHost.view.frame = NSRect(x: 0, y: 0, width: sideW, height: b.height)
+        divider.frame = NSRect(x: sideW, y: 0, width: dividerWidth, height: b.height)
 
-        let divX = sideW
-        divider.frame = NSRect(x: divX, y: bodyY, width: collapsed ? 0 : dividerWidth, height: bodyH)
-        divider.isHidden = collapsed
-
-        let detailX = collapsed ? 0 : (sideW + dividerWidth)
-        detail.view.frame = NSRect(x: detailX, y: bodyY, width: max(0, b.width - detailX), height: bodyH)
+        let contentX = sideW + dividerWidth
+        let contentW = max(0, b.width - contentX)
+        let contentH = max(0, b.height - topHeight)
+        topHost.view.frame = NSRect(x: contentX, y: contentH, width: contentW, height: topHeight)
+        detail.view.frame = NSRect(x: contentX, y: 0, width: contentW, height: contentH)
 
         dropdownHost?.frame = b
         statusOverlayHost?.frame = b
