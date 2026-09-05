@@ -13,6 +13,9 @@ struct TopNavView: View {
 
     private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
 
+    @State private var nowText = ""
+    private let clockTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
     var body: some View {
         HStack(spacing: 0) {
             HStack(spacing: 12) {
@@ -36,8 +39,16 @@ struct TopNavView: View {
                 .foregroundColor(AppTheme.border(dark).opacity(0.8)),
             alignment: .bottom
         )
-        .onAppear { header.start() }
-        .onDisappear { header.stop() }
+        .onAppear {
+            header.start()
+            nowText = Self.clockFormatter.string(from: Date())
+        }
+        .onDisappear {
+            header.stop()
+        }
+        .onReceive(clockTimer) { _ in
+            nowText = Self.clockFormatter.string(from: Date())
+        }
         // 消息中心改为右侧滑出抽屉（见 TopNavDropdownOverlay），不再用居中 sheet
         .sheet(isPresented: $header.showAsset) {
             AssetAnalysisSheet(header: header, dark: dark)
@@ -104,72 +115,92 @@ struct TopNavView: View {
 
     private var trailingActions: some View {
         HStack(spacing: 10) {
-            if header.version.needUpdate {
-                updateButton
-            }
-
-            iconButton(
-                systemName: themeIcon,
-                help: "主题：\(appearance.mode.title)（⌘T）"
-            ) {
-                chrome.close()
-                appearance.cycle()
-            }
-
+            clockChip
             languageButton
+            themeMenuButton
             messageButton
-
-            iconButton(systemName: "arrow.clockwise", help: "刷新（⌘R）") {
-                chrome.close()
-                NotificationCenter.default.post(name: .ociReloadCurrentPage, object: nil)
-            }
-
             userButton
         }
         .fixedSize(horizontal: true, vertical: false)
     }
 
-    private var updateButton: some View {
-        Button(action: {
-            chrome.close()
-            header.requestUpdate()
-        }) {
-            HStack(spacing: 5) {
-                Image(systemName: header.updatePhase.isActive ? "arrow.triangle.2.circlepath" : "arrow.up.circle.fill")
-                Text(header.updatePhase.isActive
-                     ? "升级中…"
-                     : "发现 Mac 新版本 (\(header.version.latestDisplay))")
-                    .font(.system(size: 12, weight: .bold))
-            }
-            .foregroundColor(dark ? Color.white : Color(hex: "dc2626"))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(Color.red.opacity(dark ? 0.15 : 0.08))
-            )
-            .overlay(
-                Capsule().stroke(Color.red.opacity(0.35), lineWidth: 1)
-            )
+    // Web topbar: 时钟 · 实时时间(每秒刷新) — 无背景,仅图标+mono 文本
+    private var clockChip: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "clock")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(AppTheme.navIcon(dark).opacity(0.75))
+            Text(nowText)
+                .font(.system(size: 11.5, design: .monospaced))
+                .foregroundColor(AppTheme.navIcon(dark))
         }
-        .buttonStyle(PlainButtonStyle())
-        .disabled(header.updatePhase.isActive)
-        .help("下载 macOS 安装包（DMG），替换应用程序后重启")
+        .fixedSize()
     }
 
+    // Web topbar: 语言切换（图标 + 当前语言文本）— 保持原生下拉选择器
     private var languageButton: some View {
         Button(action: {
             header.closeMessages()
             chrome.toggle(.language)
         }) {
-            Image(systemName: "globe")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(AppTheme.navIcon(dark))
-                .frame(width: 36, height: 36)
-                .background(circleBg(highlight: chrome.open == .language))
+            HStack(spacing: 6) {
+                Image(systemName: "languages")
+                    .font(.system(size: 12, weight: .medium))
+                Text(langShortTitle)
+                    .font(.system(size: 11.5, weight: .medium, design: .monospaced))
+                    .tracking(0.3)
+            }
+            .foregroundColor(AppTheme.navIcon(dark))
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(chrome.open == .language ? AppTheme.sidebarHover(dark) : AppTheme.sidebarBg(dark).opacity(0.6))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 5)
+                    .stroke(chrome.open == .language ? AppTheme.sidebarActive : AppTheme.border(dark), lineWidth: 1)
+            )
         }
         .buttonStyle(PlainButtonStyle())
         .help("语言")
+    }
+
+    @ViewBuilder
+    private var themeMenuButton: some View {
+        Menu {
+            Button {
+                appearance.mode = .light
+            } label: {
+                Label("浅色", systemImage: "sun.max")
+            }
+            Button {
+                appearance.mode = .dark
+            } label: {
+                Label("深色", systemImage: "moon.fill")
+            }
+            Button {
+                appearance.mode = .system
+            } label: {
+                Label("跟随系统", systemImage: "desktopcomputer")
+            }
+        } label: {
+            Image(systemName: themeIcon)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(AppTheme.navIcon(dark))
+                .frame(width: 30, height: 30)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(AppTheme.sidebarBg(dark).opacity(0.6))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5)
+                        .stroke(AppTheme.border(dark), lineWidth: 1)
+                )
+        }
+        .menuStyle(BorderlessButtonMenuStyle())
+        .fixedSize()
+        .help("主题")
     }
 
     private var messageButton: some View {
@@ -243,22 +274,18 @@ struct TopNavView: View {
         }
     }
 
+    private var langShortTitle: String {
+        switch header.locale {
+        case .zhCN: return "中文"
+        case .zhTW: return "繁中"
+        case .enUS: return "English"
+        }
+    }
+
     private var avatarLetter: String {
         let name = session.username
         if let c = name.first { return String(c).uppercased() }
         return "A"
-    }
-
-    private func iconButton(systemName: String, help: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(AppTheme.navIcon(dark))
-                .frame(width: 36, height: 36)
-                .background(circleBg(highlight: false))
-        }
-        .buttonStyle(PlainButtonStyle())
-        .help(help)
     }
 
     private func circleBg(highlight: Bool) -> some View {
@@ -269,6 +296,12 @@ struct TopNavView: View {
                     : Color.white.opacity(dark ? 0.06 : 0.22)
             )
     }
+
+    private static let clockFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return f
+    }()
 }
 
 // MARK: - User dropdown panel (web structure)
