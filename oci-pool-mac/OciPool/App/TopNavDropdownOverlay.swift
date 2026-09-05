@@ -120,6 +120,22 @@ struct TopNavDropdownOverlay: View {
                     .help(preset.title)
                 }
             }
+            // 底部页脚：对齐 Web AccentSwitcher popover 的 hue 行 + 顶部 1px 分隔线
+            VStack(spacing: 0) {
+                Rectangle()
+                    .fill(dark ? Color.white.opacity(0.08) : Color.black.opacity(0.08))
+                    .frame(height: 1)
+                HStack {
+                    Text("hue \(appearance.accent.hue)°")
+                    Spacer()
+                    Text("ESC 关闭")
+                }
+                .font(.system(size: 9.5, design: .monospaced))
+                .foregroundColor(dark ? Color.white.opacity(0.45) : Color(hex: "6b7280"))
+                .padding(.top, 6)
+                .padding(.horizontal, 4)
+            }
+            .padding(.top, 8)
         }
         .padding(12)
         .frame(width: 224, alignment: .leading)
