@@ -45,6 +45,8 @@ final class MainWindowController: NSWindowController {
     private let appearance: AppearanceController
     private var cancellables = Set<AnyCancellable>()
     private let root = RootContainerViewController()
+    /// Currently mounted web container, so native menu actions can target the SPA.
+    private(set) var activeWeb: ModernWebViewController?
 
     static let defaultSize = NSSize(width: 1280, height: 800)
     static let minSize = NSSize(width: 960, height: 640)
@@ -167,6 +169,7 @@ final class MainWindowController: NSWindowController {
     private func rebuildContent() {
         // 未选部署方式：显示原生引导/模式选择页（本机使用 / 远程服务器）。
         if !session.hasChosenDeploymentMode {
+            activeWeb = nil
             let login = LoginView()
                 .environmentObject(session)
                 .environmentObject(backend)
@@ -177,12 +180,14 @@ final class MainWindowController: NSWindowController {
             // 方案 A：远程模式直接用 WKWebView 加载当前 React Modern UI。
             let web = ModernWebViewController(session: session, backend: nil)
             wire(web)
+            activeWeb = web
             root.setContent(web)
             window?.title = "OCI-POOL"
         } else {
             // 本机模式：先启动内置后端，健康检查通过后再加载现代 SPA。
             let web = ModernWebViewController(session: session, backend: backend)
             wire(web)
+            activeWeb = web
             root.setContent(web)
             window?.title = "OCI-POOL"
         }
@@ -203,6 +208,17 @@ final class MainWindowController: NSWindowController {
             self.session.resetDeploymentChoice()
             self.rebuildContent()
             self.forceDefaultFrame()
+        }
+    }
+
+    /// Native app menu「退出登录」：Web 模式走 SPA 的 __ocipLogout，其余走原生 session.logout()。
+    func performLogout() {
+        if let web = activeWeb {
+            web.performWebLogout()
+        } else {
+            Task { @MainActor in
+                await session.logout()
+            }
         }
     }
     static func clearPoisonedFrameDefaults() {

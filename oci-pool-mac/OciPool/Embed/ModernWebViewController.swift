@@ -26,6 +26,7 @@ final class ModernWebViewController: NSViewController, WKNavigationDelegate, WKU
     private var canGoForwardObs: NSKeyValueObservation?
     private var titleObs: NSKeyValueObservation?
     private var loadGeneration = 0
+    private var reloadObserver: NSObjectProtocol?
 
     /// True when the SPA is not on an auth route. The SPA guard redirects anonymous
     /// users to #/login and authenticated users away from it, so this is a reliable
@@ -54,6 +55,9 @@ final class ModernWebViewController: NSViewController, WKNavigationDelegate, WKU
         canGoBackObs?.invalidate()
         canGoForwardObs?.invalidate()
         titleObs?.invalidate()
+        if let reloadObserver = reloadObserver {
+            NotificationCenter.default.removeObserver(reloadObserver)
+        }
         webView?.configuration.userContentController.removeScriptMessageHandler(forName: Self.messageHandlerName)
     }
 
@@ -260,7 +264,16 @@ final class ModernWebViewController: NSViewController, WKNavigationDelegate, WKU
     override func viewDidLoad() {
         super.viewDidLoad()
         observeWebView()
+        observeMenuNotifications()
         loadModernUI()
+    }
+
+    private func observeMenuNotifications() {
+        reloadObserver = NotificationCenter.default.addObserver(
+            forName: .ociReloadCurrentPage, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.reloadPage()
+        }
     }
 
     // MARK: - Observation
@@ -409,6 +422,11 @@ final class ModernWebViewController: NSViewController, WKNavigationDelegate, WKU
 
     @objc private func switchServer() {
         onSwitchServer?()
+    }
+
+    /// Native app menu「退出登录」→ 触发 SPA 自己的 logout（会清 sa-token 会话并回到登录页）。
+    func performWebLogout() {
+        webView.evaluateJavaScript("window.__ocipLogout && window.__ocipLogout();", completionHandler: nil)
     }
 
     // MARK: - Downloads

@@ -62,7 +62,7 @@ macOS 客户端目前不是当前 React Modern UI 的桌面容器，而是一套
   - 验证：`xcodebuild -project OciPool.xcodeproj -scheme OciPool -configuration Debug build` 通过；后端 9856 的 `GET /` 返回现代 SPA（200）。
 - **PR2（已完成）· 本机模式 + 登录态桥接**
   - 先启动内置后端，健康检查通过后再加载 Web 登录页；登录态/退出桥接到 `AppSession`。
-- **PR3（待做）· 菜单 / 主题 / 刷新 / 切换服务器作用于 WKWebView；清理不再使用的原生业务导航。**
+- **PR3（进行中）· 菜单动作作用于 WKWebView；死代码清理与主题同步延后。**
 - **PR4（待做）· DMG 重建、最小窗口与下载/外部链接回归、数据保留校验。**
 
 ### 说明 / 约定
@@ -77,3 +77,15 @@ macOS 客户端目前不是当前 React Modern UI 的桌面容器，而是一套
 - 登录态桥接：`ModernWebViewController` 依据 SPA 路由（`#/login`、`#/register`、`#/forgot-password` 视为未登录）上报登录态，并由 `AppSession.applyWebAuth(loggedIn:)` 同步到原生层；退出登录时清除 Cookie。
 - “切换服务器”：`ModernWebViewController` 工具栏新增“切换服务器”，点击后 `AppSession.resetDeploymentChoice()` 回到原生引导/模式选择页。
 - 未选部署方式时仍显示原生 `LoginView` 作为模式选择入口（后续 PR3 会替换/精简为极简 `WelcomeView`）。
+
+### PR3 已落地（已提交本地 dev）
+
+- 原生菜单「刷新」（⌘R / 刷新）→ `ModernWebViewController` 监听 `.ociReloadCurrentPage` 并 `reload()`。
+- 原生菜单「退出登录」→ `MainWindowController.performLogout()`：Web 模式触发 SPA 自身的 `window.__ocipLogout()`，非 Web 模式回退为原生 `session.logout()`。
+- `MainWindowController` 记录 `activeWeb` 以支持菜单动作定位当前 SPA 容器。
+
+### 延后项（待可视化校验后再做）
+
+- 原生主题循环与 SPA 主题的同步（避免在无法可视化验证时改乱前端主题状态）。
+- 清理不再使用的原生业务导航（`MainShellViewController`、`FeatureRouter`、`SidebarView`、`TopNavView` 及众多 `Features` 页面）——改动面大，需在能运行客户端确认无回归后执行。
+- 重建 DMG、最小窗口与下载/外部链接回归。
