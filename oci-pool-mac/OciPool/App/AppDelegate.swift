@@ -93,7 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func logoutAction(_ sender: Any?) {
-        mainWindowController?.performLogout()
+        Task { await AppSession.shared.logout() }
     }
 
     @objc func refreshAction(_ sender: Any?) {

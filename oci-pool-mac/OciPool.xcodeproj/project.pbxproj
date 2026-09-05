@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		068D71A5E38981ABA0520E12 /* ModernWebViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69328C4BFAD7EDEE865D634C /* ModernWebViewController.swift */; };
 		00AE48CDE9FF7ECD36D42CC8 /* TenantsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D1BBB6BCF30A23F51AE374F /* TenantsService.swift */; };
 		03200FCE1D6B253B557D2AA8 /* OpenLogsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C794F019A5073172D132D12 /* OpenLogsViewModel.swift */; };
 		041142E2EA0E6629090D1573 /* KeyConfigModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0F4231165FC0493F5FDDAE /* KeyConfigModels.swift */; };
@@ -186,7 +185,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		69328C4BFAD7EDEE865D634C /* ModernWebViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernWebViewController.swift; sourceTree = "<group>"; };
 		05CE6478500ABD9135365456 /* EmailSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmailSheets.swift; sourceTree = "<group>"; };
 		074620D7FB755ADA6975D4E7 /* AiChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiChatView.swift; sourceTree = "<group>"; };
 		08CD95F390B53A56FC64F6C3 /* InstancesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstancesViewModel.swift; sourceTree = "<group>"; };
@@ -840,7 +838,6 @@
 			children = (
 				CEDF30779FC0F0A1A005B8D6 /* WebEmbedStyle.swift */,
 				1FF0A4CE64F330B7A0B2D8D9 /* WebEmbedViewController.swift */,
-				69328C4BFAD7EDEE865D634C /* ModernWebViewController.swift */,
 			);
 			path = Embed;
 			sourceTree = "<group>";
@@ -938,7 +935,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				8DB930760926DB2047E13458 /* APIClient.swift in Sources */,
-				068D71A5E38981ABA0520E12 /* ModernWebViewController.swift in Sources */,
 				DB384BE057679D893400C383 /* AiChatModels.swift in Sources */,
 				A4EDF8323C8FA8032DAF244F /* AiChatService.swift in Sources */,
 				9854BE02C837B2E328F2C313 /* AiChatView.swift in Sources */,

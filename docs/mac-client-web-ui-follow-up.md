@@ -1,13 +1,5 @@
 # macOS 客户端与 Web 前端统一跟踪
 
-## 当前任务（2026-09-05）
-
-Web 前端平板到 PC 的自适应布局优化已完成（见 recent commits），现进入 macOS 客户端统一阶段：
-
-- 目标：让 macOS 客户端复用当前 React Modern UI，使浏览器与客户端共享同一套登录页与业务页。
-- 优先方向：评估并实现 `WKWebView` 加载当前 Web 前端。
-- 本任务启动前需确认本机 / 远程两种模式、认证流程、最小窗口尺寸与数据保留方案。
-
 ## 当前结论
 
 macOS 客户端目前不是当前 React Modern UI 的桌面容器，而是一套独立维护的原生 SwiftUI 界面。
@@ -24,8 +16,8 @@ macOS 客户端目前不是当前 React Modern UI 的桌面容器，而是一套
 
 ## 处理顺序
 
-1. ~~完成当前 React Modern UI 的自适应布局优化~~（已完成）。
-2. 确定 macOS 客户端统一方案（当前任务，进行中）。
+1. 先完成当前 React Modern UI 的自适应布局优化。
+2. 再确定 macOS 客户端统一方案，避免在 Web 布局尚未稳定时重复适配。
 3. 完成客户端改造后，重新构建和验证 DMG。
 
 ## 后续方案方向
@@ -47,45 +39,3 @@ macOS 客户端目前不是当前 React Modern UI 的桌面容器，而是一套
 - Web 前端页面更新后，不再需要同步重写一套 SwiftUI 业务界面。
 - 本机部署和远程部署两种模式均能完成登录及核心业务操作。
 - DMG 安装、首次启动、应用图标和签名流程不受影响。
-
-
-## 方案与实施状态（2026-09-05 更新）
-
-### 确定方案
-采用**方案 A（全窗 Web）**：整个窗口内容由 `WKWebView` 加载当前 React Modern UI，登录页与登录后的业务页直接复用前端。客户端仅保留本机 / 远程引导、后端启动、窗口生命周期与 Cookie 同步。
-
-### 分阶段落地
-- **PR1（已完成）· 远程模式打通 Web 登录与业务页**
-  - 新增 `oci-pool-mac/OciPool/Embed/ModernWebViewController.swift`（全窗 WKWebView 容器，含刷新/后退/浏览器打开工具栏，Cookie 同步，登录态路由上报）。
-  - `MainWindowController`：远程模式直接加载现代 SPA（`serverURL + "/"`），并监听 `deploymentMode` 切换，切回远程时重建内容区。
-  - 已加入 `OciPool.xcodeproj`（新增文件引用与 Sources 编译项）。
-  - 验证：`xcodebuild -project OciPool.xcodeproj -scheme OciPool -configuration Debug build` 通过；后端 9856 的 `GET /` 返回现代 SPA（200）。
-- **PR2（已完成）· 本机模式 + 登录态桥接**
-  - 先启动内置后端，健康检查通过后再加载 Web 登录页；登录态/退出桥接到 `AppSession`。
-- **PR3（进行中）· 菜单动作作用于 WKWebView；死代码清理与主题同步延后。**
-- **PR4（待做）· DMG 重建、最小窗口与下载/外部链接回归、数据保留校验。**
-
-### 说明 / 约定
-- 默认只做本地提交，不推送；`dev` 推送不加 `[skip ci]`。
-- 登录态上报当前基于 `location.hash` 启发式判断（`#/login` 之外视为已登录），PR2 会替换为 `satoken` Cookie / `/api/userInfo` 的可靠桥接。
-- 本环境 `functions__exec` / `apply_patch` 工具不可用，本次文件写入改由 CUA 运行时 `node:fs` 完成；后续工具恢复后应回归 `apply_patch`。
-
-### PR2 详情（已提交本地 dev）
-
-- 本机模式：`MainWindowController` 在“已选部署方式”下，无论本机/远程都用 `ModernWebViewController` 加载现代 SPA。
-- 本机模式会先启动内置后端（`BackendController.start()`），健康检查通过（`isReadyForLogin`，含 120 秒超时与失败提示）后再加载 Web 登录页。
-- 登录态桥接：`ModernWebViewController` 依据 SPA 路由（`#/login`、`#/register`、`#/forgot-password` 视为未登录）上报登录态，并由 `AppSession.applyWebAuth(loggedIn:)` 同步到原生层；退出登录时清除 Cookie。
-- “切换服务器”：`ModernWebViewController` 工具栏新增“切换服务器”，点击后 `AppSession.resetDeploymentChoice()` 回到原生引导/模式选择页。
-- 未选部署方式时仍显示原生 `LoginView` 作为模式选择入口（后续 PR3 会替换/精简为极简 `WelcomeView`）。
-
-### PR3 已落地（已提交本地 dev）
-
-- 原生菜单「刷新」（⌘R / 刷新）→ `ModernWebViewController` 监听 `.ociReloadCurrentPage` 并 `reload()`。
-- 原生菜单「退出登录」→ `MainWindowController.performLogout()`：Web 模式触发 SPA 自身的 `window.__ocipLogout()`，非 Web 模式回退为原生 `session.logout()`。
-- `MainWindowController` 记录 `activeWeb` 以支持菜单动作定位当前 SPA 容器。
-
-### 延后项（待可视化校验后再做）
-
-- 原生主题循环与 SPA 主题的同步（避免在无法可视化验证时改乱前端主题状态）。
-- 清理不再使用的原生业务导航（`MainShellViewController`、`FeatureRouter`、`SidebarView`、`TopNavView` 及众多 `Features` 页面）——改动面大，需在能运行客户端确认无回归后执行。
-- 重建 DMG、最小窗口与下载/外部链接回归。
