@@ -243,6 +243,7 @@ struct LoginView: View {
             model.metaError = nil
             model.metaLoadedURL = nil
             model.isLoadingMeta = false
+            model.resetVerifyState()
         }
         // Align URL only; do not re-write "chosen" flag.
         session.setDeploymentMode(mode, userChosen: false)
@@ -276,6 +277,7 @@ struct LoginView: View {
             model.googleEnabled = false
             model.messageEnabled = false
             model.mfaEnabled = false
+            model.resetVerifyState()
             model.isLoadingMeta = false
         }
 
@@ -308,6 +310,7 @@ struct LoginView: View {
 
         model.serverURL = raw
         session.serverURL = raw
+        model.resetVerifyState()
         if model.deploymentMode == .remote {
             session.lastRemoteServerURL = raw
         }
@@ -351,6 +354,15 @@ struct LoginView: View {
             }
         }
 
+        // Web-parity: the code is only shown on a dedicated verify step AFTER
+        // the first login attempt asks for it. If already verifying, resubmit
+        // the code instead of treating this as a fresh login.
+        let verifying = await MainActor.run { model.showVerifyStep }
+        if verifying {
+            await submitVerification()
+            return
+        }
+
         let valid = await MainActor.run { model.validateLoginFields() }
         if !valid {
             return
@@ -369,18 +381,54 @@ struct LoginView: View {
         }
         let pass = await MainActor.run { model.password }
         let remember = await MainActor.run { model.rememberMe }
-        let vCode: String? = await MainActor.run {
-            if model.showMessageCode && !model.verificationCode.isEmpty {
-                return model.verificationCode
+
+        do {
+            try await session.login(
+                username: user,
+                password: pass,
+                verificationCode: nil,
+                mfaCode: nil,
+                rememberMe: remember
+            )
+            await MainActor.run { model.isSubmitting = false }
+        } catch {
+            let msg = error.localizedDescription
+            if Self.needsVerification(msg) {
+                await MainActor.run {
+                    model.isSubmitting = false
+                    model.enterVerifyStep()
+                }
+                return
             }
-            return nil
-        }
-        let mCode: String? = await MainActor.run {
-            if model.showMfaCode && !model.mfaCode.isEmpty {
-                return model.mfaCode
+            await MainActor.run {
+                model.errorText = msg
+                model.isSubmitting = false
+                model.cryHero = true
             }
-            return nil
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            await MainActor.run { model.cryHero = false }
         }
+    }
+
+    /// Second login attempt from the verify step — resubmit credentials with the
+    /// message/MFA code the server requested.
+    @MainActor
+    private func submitVerification() async {
+        let valid = model.validateVerifyFields()
+        if !valid { return }
+
+        model.errorText = nil
+        model.infoText = nil
+        model.isSubmitting = true
+        session.serverURL = model.serverURL
+
+        let user = model.username.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        let pass = model.password
+        let remember = model.rememberMe
+        let vCode: String? = model.showMessageCode && !model.verificationCode.isEmpty
+            ? model.verificationCode : nil
+        let mCode: String? = model.showMfaCode && !model.mfaCode.isEmpty
+            ? model.mfaCode : nil
 
         do {
             try await session.login(
@@ -390,16 +438,18 @@ struct LoginView: View {
                 mfaCode: mCode,
                 rememberMe: remember
             )
-            await MainActor.run { model.isSubmitting = false }
+            model.isSubmitting = false
+            model.resetVerifyState()
         } catch {
-            await MainActor.run {
-                model.errorText = error.localizedDescription
-                model.isSubmitting = false
-                model.cryHero = true
-            }
-            try? await Task.sleep(nanoseconds: 1_200_000_000)
-            await MainActor.run { model.cryHero = false }
+            model.isSubmitting = false
+            model.errorText = error.localizedDescription
         }
+    }
+
+    /// Server signals "需要验证码 / MFA" with a message on the failed login.
+    private static func needsVerification(_ message: String) -> Bool {
+        let m = message.lowercased()
+        return m.contains("验证码") || m.contains("mfa")
     }
 
     private func doRegister() async {

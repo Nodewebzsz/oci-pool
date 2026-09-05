@@ -36,6 +36,9 @@ final class LoginFormModel: ObservableObject {
     @Published var googleEnabled = false
 
     @Published var verifyMethod: VerifyMethod = .message
+    /// True while the form is collecting a verification code after the server
+    /// asked for one on the first login attempt (web-parity: code is NOT inline).
+    @Published var showVerifyStep = false
     @Published var errorText: String?
     @Published var infoText: String?
     @Published var isSubmitting = false
@@ -91,6 +94,38 @@ final class LoginFormModel: ObservableObject {
         modeActivated && deploymentMode == .local
     }
 
+    /// Pick the method after the server requires verification (both → message).
+    func enterVerifyStep() {
+        if messageEnabled && mfaEnabled {
+            verifyMethod = .message
+        } else if mfaEnabled {
+            verifyMethod = .mfa
+        } else {
+            verifyMethod = .message
+        }
+        verificationCode = ""
+        mfaCode = ""
+        errorText = nil
+        infoText = nil
+        showVerifyStep = true
+    }
+
+    func leaveVerifyStep() {
+        showVerifyStep = false
+        verificationCode = ""
+        mfaCode = ""
+        codeCountdown = 0
+        errorText = nil
+        infoText = nil
+    }
+
+    func resetVerifyState() {
+        showVerifyStep = false
+        verificationCode = ""
+        mfaCode = ""
+        codeCountdown = 0
+    }
+
     /// Login button always pressable when form is ready — empty fields shake instead of hard-disable.
     func canAttemptLogin(backendReady: Bool) -> Bool {
         modeActivated && backendReady && !isSubmitting && !isLoadingMeta
@@ -103,6 +138,21 @@ final class LoginFormModel: ObservableObject {
     /// Returns false if empty required fields (and bumps shake tokens).
     @discardableResult
     func validateLoginFields() -> Bool {
+        var ok = true
+        if username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            shakeUsername += 1
+            ok = false
+        }
+        if password.isEmpty {
+            shakePassword += 1
+            ok = false
+        }
+        return ok
+    }
+
+    /// Verify step: re-checks credentials plus the relevant code field.
+    @discardableResult
+    func validateVerifyFields() -> Bool {
         var ok = true
         if username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             shakeUsername += 1

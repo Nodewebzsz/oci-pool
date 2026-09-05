@@ -1,7 +1,9 @@
 import SwiftUI
 import AppKit
 
-/// Right form panel — structure mirrors web `.form-panel .login-card`.
+/// Right form panel — mirrors web AuthPage right side (welcome + form card).
+/// Keeps native desktop extras (deployment mode + status) compact so the login
+/// page still matches the web layout while fitting the client window height.
 struct LoginRightPanel: View {
     @ObservedObject var model: LoginFormModel
     var dark: Bool
@@ -14,6 +16,9 @@ struct LoginRightPanel: View {
     var onDeploymentMode: (DeploymentMode) -> Void = { _ in }
     var onForgotPassword: () -> Void = {}
     var onLocale: (AppLocale) -> Void = { _ in }
+
+    @State private var backendVersion = ""
+    @State private var pageLoadToken = 0
 
     private var formReady: Bool {
         guard model.modeActivated else { return false }
@@ -36,6 +41,10 @@ struct LoginRightPanel: View {
         return nil
     }
 
+    private var infoColor: Color { Color(hex: dark ? "818cf8" : "4f46e5") }
+    private var dangerColor: Color { Color(hex: "ef4444") }
+    private var formFieldEnabled: Bool { formReady && !model.isLoadingMeta && !model.isSubmitting }
+
     var body: some View {
         ZStack {
             if showBootLoading {
@@ -45,63 +54,59 @@ struct LoginRightPanel: View {
                 bootFailedView(fail)
                     .transition(.opacity)
             } else {
-                formScroll
+                mainContent
                     .transition(.opacity.combined(with: .offset(y: 6)))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(LoginPalette.bg(dark))
         .animation(.easeInOut(duration: 0.28), value: showBootLoading)
         .animation(.easeInOut(duration: 0.28), value: localBootFailed != nil)
         .animation(.easeInOut(duration: 0.22), value: model.modeActivated)
-        .background(Color.clear)
+        .onAppear { routeLoadVersion() }
+        .onChange(of: model.metaLoadedURL) { _ in routeLoadVersion() }
     }
 
-    // MARK: - Minimal boot states
+    // MARK: - Boot states
 
     private var bootLoadingView: some View {
         VStack(spacing: 0) {
-            topChipBar
-                .padding(.horizontal, 56)
-                .padding(.top, 48)
-            deploymentModeSwitcher
-                .padding(.horizontal, 56)
-                .padding(.top, 28)
+            topControls
+                .padding(.horizontal, 40)
+                .padding(.top, 30)
             Spacer(minLength: 0)
             VStack(spacing: 14) {
                 ProgressView()
                     .progressViewStyle(CircularProgressViewStyle())
                     .scaleEffect(1.55)
                 Text(model.locale == .enUS ? "Starting local backend…" : "正在启动本机服务…")
-                    .font(.system(size: 13))
-                    .foregroundColor(LoginPalette.muted(dark))
+                    .font(.system(size: 14))
+                    .foregroundColor(LoginPalette.text(dark))
                 Text(model.locale == .enUS
                      ? "Switch to Remote if you already deployed a server"
-                     : "若已远程部署，可切换到「已远程部署」")
+                     : "若已远程部署，可切换到「远程」")
                     .font(.system(size: 12))
-                    .foregroundColor(LoginPalette.muted(dark).opacity(0.9))
-                    .multilineTextAlignment(.center)
+                    .foregroundColor(LoginPalette.muted(dark))
             }
             Spacer(minLength: 0)
-            Color.clear.frame(height: 48 + 28)
+            footer
+                .padding(.bottom, 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func bootFailedView(_ message: String) -> some View {
         VStack(spacing: 0) {
-            topChipBar
-                .padding(.horizontal, 56)
-                .padding(.top, 48)
-            deploymentModeSwitcher
-                .padding(.horizontal, 56)
-                .padding(.top, 28)
+            topControls
+                .padding(.horizontal, 40)
+                .padding(.top, 30)
             Spacer(minLength: 0)
             VStack(spacing: 14) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 28, weight: .medium))
+                    .font(.system(size: 30, weight: .medium))
                     .foregroundColor(Color(hex: "f59e0b"))
                 Text(model.locale == .enUS ? "Service failed to start" : "服务启动失败")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(LoginPalette.text(dark))
                 Text(message)
                     .font(.system(size: 12))
@@ -110,217 +115,96 @@ struct LoginRightPanel: View {
                     .frame(maxWidth: 360)
                 Text(model.locale == .enUS
                      ? "Or switch to Remote and connect an existing server"
-                     : "也可切换到「已远程部署」连接已有服务")
+                     : "也可切换到「远程」连接已有服务")
                     .font(.system(size: 12))
                     .foregroundColor(LoginPalette.muted(dark))
                     .multilineTextAlignment(.center)
             }
-            .padding(.horizontal, 56)
+            .padding(.horizontal, 40)
             Spacer(minLength: 0)
-            Color.clear.frame(height: 48 + 28)
+            footer
+                .padding(.bottom, 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Form
+    // MARK: - Main (web-style)
 
-    private var formScroll: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                topChipBar
-                    .padding(.bottom, 28)
+    private var mainContent: some View {
+        VStack(spacing: 0) {
+            topControls
+                .padding(.horizontal, 40)
+                .padding(.top, 30)
 
-                brand
-                    .padding(.bottom, 34)
-
-                deploymentModeSwitcher
-                    .padding(.bottom, 22)
-
-                if !model.modeActivated && !model.hasPersistedChoice {
-                    pickModeHint
-                        .padding(.bottom, 8)
-                        .transition(.opacity)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    formCard
                 }
-
-                if model.modeActivated {
-                    if model.allowRegister {
-                        tabs
-                            .padding(.bottom, 26)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
-
-                    if model.isRemoteServer {
-                        serverRow
-                            .padding(.bottom, 14)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
-
-                    statusStrip
-                        .padding(.bottom, 14)
-
-                    ZStack {
-                        Group {
-                            if model.tab == .login {
-                                loginFields
-                            } else {
-                                registerFields
-                            }
-                        }
-                        .opacity(model.isLoadingMeta ? 0.45 : 1)
-                        .allowsHitTesting(!model.isLoadingMeta)
-                        .animation(.easeOut(duration: 0.2), value: model.isLoadingMeta)
-
-                        if model.isLoadingMeta {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle())
-                                .scaleEffect(1.05)
-                                .transition(.opacity)
-                        }
-                    }
-                    .animation(.easeOut(duration: 0.18), value: model.isLoadingMeta)
-
-                    if let e = model.errorText {
-                        Text(e)
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(Color(hex: "ef4444"))
-                            .padding(.top, 12)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .transition(.opacity)
-                    }
-                    if let info = model.infoText {
-                        Text(info)
-                            .font(.system(size: 13))
-                            .foregroundColor(LoginPalette.muted(dark))
-                            .padding(.top, 8)
-                            .transition(.opacity)
-                    }
-                }
+                .frame(maxWidth: 380)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 30)
             }
-            .padding(.horizontal, 56)
-            .padding(.top, 48)
-            .padding(.bottom, 40)
-            .frame(maxWidth: 520, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .center)
-            .animation(.easeInOut(duration: 0.22), value: model.deploymentMode)
-            .animation(.easeInOut(duration: 0.22), value: model.modeActivated)
-            .animation(.easeInOut(duration: 0.22), value: model.allowRegister)
-            .animation(.easeInOut(duration: 0.22), value: model.tab)
-            .animation(.easeInOut(duration: 0.2), value: model.errorText)
-            .animation(.easeInOut(duration: 0.2), value: model.infoText)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            footer
+                .padding(.bottom, 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var pickModeHint: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "hand.tap")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(LoginPalette.primary(dark))
-            Text(model.locale == .enUS
-                 ? "First launch: choose Local or Remote. Your choice will be remembered."
-                 : "首次使用请选择「本机使用」或「已远程部署」，之后会自动记住")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(LoginPalette.muted(dark))
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-        }
-        .padding(.vertical, 4)
-    }
+    // MARK: - Top controls
 
-    // MARK: - Top: locale
-
-    private var topChipBar: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 0) {
-                langItem(.zhCN, "中文")
-                Text("|")
-                    .font(.system(size: 12))
-                    .foregroundColor(LoginPalette.line(dark))
-                    .padding(.horizontal, 6)
-                langItem(.enUS, "English")
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(LoginPalette.chipBg(dark))
-            .cornerRadius(999)
-            .shadow(color: Color.black.opacity(dark ? 0.3 : 0.08), radius: 10, y: 4)
-
+    private var topControls: some View {
+        HStack {
+            deploymentChip
             Spacer()
+            languageChip
         }
     }
 
-    /// 本机使用 / 已远程部署 — first install must tap; later launches restore last choice.
-    private var deploymentModeSwitcher: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Text(model.locale == .enUS ? "Deployment" : "部署方式")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(LoginPalette.text(dark))
-                if !model.modeActivated && !model.hasPersistedChoice {
-                    Text(model.locale == .enUS ? "required" : "首次必选")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(LoginPalette.primary(dark))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(LoginPalette.tabActiveBg(dark))
-                        .cornerRadius(999)
-                }
-                Spacer(minLength: 0)
-            }
-
-            HStack(spacing: 4) {
-                modeSegment(
-                    .local,
-                    title: model.locale == .enUS ? "Local" : "本机使用",
-                    subtitle: model.locale == .enUS ? "Start backend here" : "启动本地后端"
-                )
-                modeSegment(
-                    .remote,
-                    title: model.locale == .enUS ? "Remote" : "已远程部署",
-                    subtitle: model.locale == .enUS ? "No local Java" : "不启动本地服务"
-                )
-            }
+    private var deploymentChip: some View {
+        HStack(spacing: 2) {
+            deploySegment(.local, model.locale == .enUS ? "本机" : "本机")
+            deploySegment(.remote, model.locale == .enUS ? "远程" : "远程")
         }
+        .padding(3)
+        .background(LoginPalette.chipBg(dark))
+        .cornerRadius(999)
+        .overlay(RoundedRectangle(cornerRadius: 999).stroke(LoginPalette.line(dark).opacity(0.6), lineWidth: 1))
     }
 
-    private func modeSegment(_ mode: DeploymentMode, title: String, subtitle: String) -> some View {
+    private func deploySegment(_ mode: DeploymentMode, _ title: String) -> some View {
         let selected = model.modeActivated && model.deploymentMode == mode
-        return Button(action: {
-            if model.modeActivated, model.deploymentMode == mode { return }
-            onDeploymentMode(mode)
-        }) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Image(systemName: mode == .local ? "laptopcomputer" : "cloud")
-                        .font(.system(size: 11, weight: .semibold))
-                    Text(title)
-                        .font(.system(size: 13, weight: .bold))
-                }
-                .foregroundColor(selected ? LoginPalette.tabActiveText(dark) : LoginPalette.text(dark))
-                Text(subtitle)
-                    .font(.system(size: 11))
-                    .foregroundColor(selected ? LoginPalette.tabActiveText(dark).opacity(0.85) : LoginPalette.muted(dark))
-                    .lineLimit(1)
+        return Button(action: { onDeploymentMode(mode) }) {
+            HStack(spacing: 5) {
+                Image(systemName: mode == .local ? "laptopcomputer" : "cloud")
+                    .font(.system(size: 11, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 11.5, weight: selected ? .bold : .medium))
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(selected ? LoginPalette.tabActiveBg(dark) : LoginPalette.chipBg(dark))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(
-                        selected
-                            ? LoginPalette.primary(dark).opacity(dark ? 0.45 : 0.2)
-                            : LoginPalette.line(dark).opacity(0.6),
-                        lineWidth: selected ? 1.5 : 1
-                    )
-            )
+            .foregroundColor(selected ? LoginPalette.tabActiveText(dark) : LoginPalette.muted(dark))
+            .padding(.horizontal, 11)
+            .frame(height: 26)
+            .background(Capsule().fill(selected ? LoginPalette.tabActiveBg(dark) : Color.clear))
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(model.isSubmitting || model.isLoadingMeta)
+    }
+
+    private var languageChip: some View {
+        HStack(spacing: 0) {
+            langItem(.zhCN, "中文")
+            Text("|")
+                .font(.system(size: 12))
+                .foregroundColor(LoginPalette.line(dark))
+                .padding(.horizontal, 6)
+            langItem(.enUS, "English")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(LoginPalette.chipBg(dark))
+        .cornerRadius(999)
+        .overlay(RoundedRectangle(cornerRadius: 999).stroke(LoginPalette.line(dark).opacity(0.6), lineWidth: 1))
     }
 
     private func langItem(_ loc: AppLocale, _ title: String) -> some View {
@@ -330,228 +214,342 @@ struct LoginRightPanel: View {
             onLocale(loc)
         }) {
             Text(title)
-                .font(.system(size: 13, weight: active ? .bold : .regular))
+                .font(.system(size: 12, weight: active ? .bold : .regular))
                 .foregroundColor(active ? LoginPalette.text(dark) : LoginPalette.muted(dark))
         }
         .buttonStyle(PlainButtonStyle())
     }
 
-    private var brand: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(LoginPalette.primary(dark))
-                    .frame(width: 38, height: 38)
-                Text("OS")
-                    .font(.system(size: 16, weight: .black))
-                    .foregroundColor(.white)
-                    .tracking(0.4)
-            }
-            VStack(alignment: .leading, spacing: 6) {
-                Text("OCI-POOL")
-                    .font(.system(size: 22, weight: .heavy))
-                    .foregroundColor(LoginPalette.text(dark))
-                    .tracking(0.2)
-                Text(model.locale == .enUS ? "Welcome back" : "欢迎回来")
-                    .font(.system(size: 13))
-                    .foregroundColor(LoginPalette.muted(dark))
-                    .tracking(0.2)
-            }
+    // MARK: - Form card
+
+    @ViewBuilder
+    private var formCard: some View {
+        if model.showVerifyStep {
+            verifyCard
+        } else if model.tab == .register {
+            registerCard
+        } else {
+            loginCard
         }
     }
 
-    private var tabs: some View {
-        HStack(spacing: 4) {
-            tabBtn(model.locale == .enUS ? "Login" : "登录", selected: model.tab == .login) {
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    model.tab = .login
-                    model.errorText = nil
-                }
+    // MARK: - Verify step (code shown only after the server asks for it)
+
+    private var verifyCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            heading(title: verifyTitle, subtitle: verifySubtitle)
+                .padding(.bottom, 22)
+
+            if model.showVerifyChoice {
+                verifyChoice
+                    .padding(.bottom, 18)
             }
-            tabBtn(model.locale == .enUS ? "Register" : "注册", selected: model.tab == .register) {
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    model.tab = .register
-                    model.errorText = nil
-                }
+
+            if model.showMessageCode {
+                messageCodeRow
+                    .padding(.bottom, 12)
             }
-            Spacer()
+
+            if model.showMfaCode {
+                fieldLabel(model.locale == .enUS ? "MFA code" : "MFA 验证码")
+                LoginField(
+                    title: "",
+                    placeholder: "6 位动态码",
+                    text: $model.mfaCode,
+                    dark: dark,
+                    enabled: formFieldEnabled,
+                    onCommit: onLogin,
+                    shakeToken: model.shakeMfa
+                )
+                .padding(.bottom, 10)
+            }
+
+            if let info = model.infoText {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(Color(hex: "22c55e"))
+                    Text(info)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(LoginPalette.muted(dark))
+                }
+                .padding(.bottom, 12)
+            }
+
+            if let e = model.errorText {
+                Text(e)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(dangerColor)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.bottom, 12)
+            }
+
+            verifySubmitButton
+
+            backToLoginButton
+                .padding(.top, 10)
         }
     }
 
-    private func tabBtn(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 14, weight: selected ? .bold : .medium))
-                .foregroundColor(selected ? LoginPalette.tabActiveText(dark) : LoginPalette.text(dark))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(selected ? LoginPalette.tabActiveBg(dark) : Color.clear)
-                .cornerRadius(999)
+    private var verifyIsMfa: Bool { model.showMfaCode && !model.showMessageCode }
+    private var zh: Bool { model.locale == .zhCN || model.locale == .zhTW }
+
+    private var verifyTitle: String {
+        verifyIsMfa
+            ? (zh ? "双因素认证" : "Two-factor authentication")
+            : (zh ? "消息验证码" : "Message verification")
+    }
+
+    private var verifySubtitle: String {
+        verifyIsMfa
+            ? (zh ? "请输入 6 位验证码 · 由你的身份验证器 App 生成" : "Enter the 6-digit code from your authenticator app")
+            : (zh ? "请输入通过消息渠道收到的 6 位验证码" : "Enter the 6-digit code from your notification channel")
+    }
+
+    private var verifySubmitButton: some View {
+        Button(action: onLogin) {
+            HStack(spacing: 8) {
+                if model.isSubmitting {
+                    ProgressView().scaleEffect(0.7).frame(width: 14, height: 14)
+                } else {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                Text(model.isSubmitting
+                     ? (model.locale == .enUS ? "Verifying…" : "验证中…")
+                     : (model.locale == .enUS ? "Verify" : "验证"))
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
+            .foregroundColor(.white)
+            .background(LoginPalette.primary(dark))
+            .cornerRadius(8)
+        }
+        .buttonStyle(LoginPressButtonStyle())
+        .disabled(!model.canAttemptLogin(backendReady: formReady))
+        .opacity(model.canAttemptLogin(backendReady: formReady) ? 1 : 0.55)
+    }
+
+    private var backToLoginButton: some View {
+        Button(action: { model.leaveVerifyStep() }) {
+            HStack(spacing: 5) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 11, weight: .medium))
+                Text(model.locale == .enUS ? "Back to sign in" : "返回登录")
+                    .font(.system(size: 12))
+            }
+            .foregroundColor(LoginPalette.muted(dark))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
     }
 
-    /// Remote server URL + Connect — only visible in remote deployment mode.
-    private var serverRow: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(model.locale == .enUS ? "Server URL" : "服务器地址")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(LoginPalette.text(dark))
-            HStack(alignment: .center, spacing: 12) {
-                LoginField(
-                    title: "",
-                    placeholder: "https://your-host:port",
-                    text: $model.serverURL,
-                    secure: false,
-                    dark: dark,
-                    enabled: !model.isLoadingMeta,
-                    onCommit: onServerCommit
-                )
-                LoginFieldActionButton(
-                    title: model.isLoadingMeta
-                        ? (model.locale == .enUS ? "…" : "连接中")
-                        : (model.locale == .enUS ? "Connect" : "连接"),
-                    loading: model.isLoadingMeta,
-                    enabled: !model.serverURL.trimmingCharacters(in: .whitespaces).isEmpty
-                        && !model.serverURL.trimmingCharacters(in: .whitespaces).hasSuffix("://"),
-                    dark: dark,
-                    minWidth: 96,
-                    action: onServerCommit
-                )
-            }
-        }
-        .padding(.bottom, 6)
-    }
+    private var loginCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            heading(title: model.locale == .enUS ? "Welcome back" : "欢迎回来",
+                    subtitle: model.locale == .enUS ? "Sign in to your OCI-POOL account" : "登录你的 OCI-POOL 管理账号")
+                .padding(.bottom, 26)
 
-    // MARK: - Compact status (no heavy cards that jump)
-
-    @ViewBuilder
-    private var statusStrip: some View {
-        if model.modeActivated {
-            if model.isRemoteServer {
-                if let err = model.metaError, !model.isLoadingMeta {
-                    compactStatus(
-                        icon: "wifi.exclamationmark",
-                        color: Color(hex: "ef4444"),
-                        text: model.locale == .enUS ? "Remote unreachable" : "远程服务器不可用",
-                        detail: err
-                    )
-                } else if model.metaLoadedURL != nil, !model.isLoadingMeta {
-                    compactStatus(
-                        icon: "checkmark.circle.fill",
-                        color: Color(hex: "22c55e"),
-                        text: model.locale == .enUS ? "Remote ready" : "远程服务器已就绪"
-                    )
-                } else if !model.isLoadingMeta {
-                    compactStatus(
-                        icon: "link",
-                        color: LoginPalette.muted(dark),
-                        text: model.locale == .enUS
-                            ? "Enter URL and tap Connect — no local backend"
-                            : "填写地址后点「连接」— 不会启动本地后端"
-                    )
-                }
-            } else if model.metaLoadedURL != nil, !model.isLoadingMeta {
-                compactStatus(
-                    icon: "checkmark.circle.fill",
-                    color: Color(hex: "22c55e"),
-                    text: model.locale == .enUS ? "Local backend ready" : "本机服务已就绪，请登录"
-                )
-            }
-        }
-    }
-
-    private func compactStatus(icon: String, color: Color, text: String, detail: String? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(color)
-                Text(text)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(LoginPalette.muted(dark))
-                Spacer(minLength: 0)
-            }
-            if let detail = detail, !detail.isEmpty {
-                Text(detail)
-                    .font(.system(size: 11))
-                    .foregroundColor(Color(hex: "ef4444").opacity(0.85))
-                    .lineLimit(2)
-                    .padding(.leading, 20)
-            }
-        }
-        .padding(.vertical, 2)
-        .transition(.opacity)
-    }
-
-    // MARK: - Login / Register
-
-    private var loginFields: some View {
-        VStack(alignment: .leading, spacing: 18) {
+            fieldLabel(model.locale == .enUS ? "Username" : "用户名")
             LoginField(
-                title: model.locale == .enUS ? "Username" : "用户名",
+                title: "",
                 placeholder: model.locale == .enUS ? "Enter username" : "请输入用户名",
                 text: $model.username,
                 dark: dark,
-                enabled: formReady && !model.isLoadingMeta,
+                enabled: formFieldEnabled,
                 onCommit: onLogin,
                 shakeToken: model.shakeUsername
             )
+            .padding(.bottom, 14)
+
+            passwordLabelRow
             LoginField(
-                title: model.locale == .enUS ? "Password" : "密码",
+                title: "",
                 placeholder: model.locale == .enUS ? "Enter password" : "请输入密码",
                 text: $model.password,
                 secure: true,
                 dark: dark,
-                enabled: formReady && !model.isLoadingMeta,
+                enabled: formFieldEnabled,
                 onCommit: onLogin,
                 shakeToken: model.shakePassword,
                 isFocusedOut: $model.passwordFocused
             )
+            .padding(.bottom, 10)
 
-            if model.showVerifyChoice {
-                verifyChoice
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-            if model.showMessageCode {
-                messageCodeRow
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-            if model.showMfaCode {
-                LoginField(
-                    title: model.locale == .enUS ? "MFA code" : "MFA 验证码",
-                    placeholder: model.locale == .enUS ? "6-digit code" : "6 位动态码",
-                    text: $model.mfaCode,
-                    dark: dark,
-                    enabled: formReady && !model.isLoadingMeta,
-                    onCommit: onLogin,
-                    shakeToken: model.shakeMfa
-                )
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
+            statusLine
+                .padding(.bottom, 12)
 
-            metaRow
-                .padding(.top, 2)
-                .padding(.bottom, 14)
+            rememberRow
+                .padding(.bottom, 18)
 
-            LoginPillButton(
-                title: loginButtonTitle,
-                loading: model.isSubmitting,
-                enabled: model.canAttemptLogin(backendReady: formReady),
-                dark: dark,
-                action: onLogin
-            )
+            loginPrimaryButton
+
+            HStack(spacing: 4) {
+                Text(model.locale == .enUS ? "No account yet?" : "还没有账号？")
+                    .font(.system(size: 12))
+                    .foregroundColor(LoginPalette.muted(dark))
+                Button(action: { withAnimation(.easeInOut(duration: 0.18)) { model.tab = .register; model.errorText = nil } }) {
+                    Text(model.locale == .enUS ? "Sign up now" : "立即注册")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(LoginPalette.primary(dark))
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 14)
+
+            adminNotice
+                .padding(.top, 18)
 
             if model.githubEnabled || model.googleEnabled {
+                orDivider
+                    .padding(.top, 22)
                 oauthRow
                     .padding(.top, 14)
-                    .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.22), value: model.showMessageCode)
-        .animation(.easeInOut(duration: 0.22), value: model.showMfaCode)
-        .animation(.easeInOut(duration: 0.22), value: model.showVerifyChoice)
-        .animation(.easeInOut(duration: 0.22), value: model.githubEnabled || model.googleEnabled)
+    }
+
+    private var registerCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            heading(title: model.locale == .enUS ? "Create account" : "注册账号",
+                    subtitle: model.locale == .enUS ? "Register your first OCI-POOL account" : "创建你的 OCI-POOL 管理账号")
+                .padding(.bottom, 26)
+
+            fieldLabel(model.locale == .enUS ? "Username" : "用户名")
+            LoginField(
+                title: "",
+                placeholder: "请输入用户名",
+                text: $model.username,
+                dark: dark,
+                enabled: formFieldEnabled,
+                shakeToken: model.shakeUsername
+            )
+            .padding(.bottom, 14)
+
+            fieldLabel(model.locale == .enUS ? "Password" : "密码")
+            LoginField(
+                title: "",
+                placeholder: "请输入密码",
+                text: $model.password,
+                secure: true,
+                dark: dark,
+                enabled: formFieldEnabled,
+                shakeToken: model.shakePassword,
+                isFocusedOut: $model.passwordFocused
+            )
+            .padding(.bottom, 14)
+
+            fieldLabel(model.locale == .enUS ? "Confirm password" : "确认密码")
+            LoginField(
+                title: "",
+                placeholder: "再次输入密码",
+                text: $model.confirmPassword,
+                secure: true,
+                dark: dark,
+                enabled: formFieldEnabled,
+                onCommit: onRegister,
+                shakeToken: model.shakeConfirm,
+                isFocusedOut: $model.passwordFocused
+            )
+            .padding(.bottom, 10)
+
+            statusLine
+                .padding(.bottom, 12)
+
+            registerPrimaryButton
+
+            HStack(spacing: 4) {
+                Text(model.locale == .enUS ? "Already have an account?" : "已有账号？")
+                    .font(.system(size: 12))
+                    .foregroundColor(LoginPalette.muted(dark))
+                Button(action: { withAnimation(.easeInOut(duration: 0.18)) { model.tab = .login; model.errorText = nil } }) {
+                    Text(model.locale == .enUS ? "Sign in" : "去登录")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(LoginPalette.primary(dark))
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 14)
+        }
+    }
+
+    // MARK: - Pieces
+
+    private func heading(title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 22, weight: .bold))
+                .foregroundColor(LoginPalette.text(dark))
+                .tracking(-0.3)
+            Text(subtitle)
+                .font(.system(size: 12.5))
+                .foregroundColor(LoginPalette.muted(dark))
+        }
+    }
+
+    private func fieldLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .medium))
+            .foregroundColor(LoginPalette.muted(dark))
+            .padding(.bottom, 6)
+    }
+
+    private var passwordLabelRow: some View {
+        HStack {
+            Text(model.locale == .enUS ? "Password" : "密码")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(LoginPalette.muted(dark))
+            Spacer()
+            Button(action: onForgotPassword) {
+                Text(model.locale == .enUS ? "Forgot password?" : "忘记密码？")
+                    .font(.system(size: 11))
+                    .foregroundColor(infoColor)
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .padding(.bottom, 6)
+    }
+
+    private var rememberRow: some View {
+        Button(action: { model.rememberMe.toggle() }) {
+            HStack(spacing: 8) {
+                Image(systemName: model.rememberMe ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 14))
+                    .foregroundColor(model.rememberMe ? LoginPalette.primary(dark) : LoginPalette.muted(dark))
+                Text(model.locale == .enUS ? "Remember me for 30 days" : "记住我 30 天")
+                    .font(.system(size: 12))
+                    .foregroundColor(LoginPalette.text(dark))
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    private var loginPrimaryButton: some View {
+        Button(action: onLogin) {
+            HStack(spacing: 8) {
+                if model.isSubmitting {
+                    ProgressView().scaleEffect(0.7).frame(width: 14, height: 14)
+                } else {
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                Text(loginButtonTitle)
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
+            .foregroundColor(.white)
+            .background(LoginPalette.primary(dark))
+            .cornerRadius(8)
+        }
+        .buttonStyle(LoginPressButtonStyle())
+        .disabled(!model.canAttemptLogin(backendReady: formReady))
+        .opacity(model.canAttemptLogin(backendReady: formReady) ? 1 : 0.55)
     }
 
     private var loginButtonTitle: String {
@@ -561,62 +559,127 @@ struct LoginRightPanel: View {
         return model.locale == .enUS ? "Sign in" : "登录"
     }
 
-    private var registerFields: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            LoginField(
-                title: model.locale == .enUS ? "Username" : "用户名",
-                placeholder: "请输入用户名",
-                text: $model.username,
-                dark: dark,
-                enabled: formReady && !model.isLoadingMeta,
-                shakeToken: model.shakeUsername
-            )
-            LoginField(
-                title: model.locale == .enUS ? "Password" : "密码",
-                placeholder: "请输入密码",
-                text: $model.password,
-                secure: true,
-                dark: dark,
-                enabled: formReady && !model.isLoadingMeta,
-                shakeToken: model.shakePassword,
-                isFocusedOut: $model.passwordFocused
-            )
-            LoginField(
-                title: model.locale == .enUS ? "Confirm password" : "确认密码",
-                placeholder: "再次输入密码",
-                text: $model.confirmPassword,
-                secure: true,
-                dark: dark,
-                enabled: formReady && !model.isLoadingMeta,
-                onCommit: onRegister,
-                shakeToken: model.shakeConfirm,
-                isFocusedOut: $model.passwordFocused
-            )
-            LoginPillButton(
-                title: model.isSubmitting
-                    ? (model.locale == .enUS ? "Registering…" : "注册中…")
-                    : (model.locale == .enUS ? "Register" : "注册"),
-                loading: model.isSubmitting,
-                enabled: model.canAttemptRegister(backendReady: formReady),
-                dark: dark,
-                action: onRegister
-            )
-            .padding(.top, 8)
+    private var registerPrimaryButton: some View {
+        Button(action: onRegister) {
+            HStack(spacing: 8) {
+                if model.isSubmitting {
+                    ProgressView().scaleEffect(0.7).frame(width: 14, height: 14)
+                } else {
+                    Image(systemName: "user.plus")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                Text(model.isSubmitting
+                     ? (model.locale == .enUS ? "Registering…" : "注册中…")
+                     : (model.locale == .enUS ? "Register" : "注册"))
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
+            .foregroundColor(.white)
+            .background(LoginPalette.primary(dark))
+            .cornerRadius(8)
+        }
+        .buttonStyle(LoginPressButtonStyle())
+        .disabled(!model.canAttemptRegister(backendReady: formReady))
+        .opacity(model.canAttemptRegister(backendReady: formReady) ? 1 : 0.55)
+    }
+
+    @ViewBuilder
+    private var statusLine: some View {
+        if let e = model.errorText {
+            Text(e)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(dangerColor)
+                .fixedSize(horizontal: false, vertical: true)
+        } else if let info = model.infoText {
+            Text(info)
+                .font(.system(size: 12))
+                .foregroundColor(LoginPalette.muted(dark))
+        } else if model.modeActivated, !model.isRemoteServer, model.metaLoadedURL != nil, !model.isLoadingMeta {
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(hex: "22c55e"))
+                Text(model.locale == .enUS ? "Local backend ready" : "本机服务已就绪，请登录")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(LoginPalette.muted(dark))
+            }
         }
     }
+
+    private var adminNotice: some View {
+        HStack(alignment: .center, spacing: 8) {
+            Image(systemName: "info.circle")
+                .font(.system(size: 13))
+                .foregroundColor(infoColor)
+            Text(model.locale == .enUS ? "Sign in with the admin account you created on first run" : "使用您首次注册的管理员账号登录")
+                .font(.system(size: 11))
+                .foregroundColor(LoginPalette.text(dark))
+                .lineSpacing(1.5)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(hex: dark ? "1e1b4b" : "eef2ff").opacity(dark ? 0.45 : 0.8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(infoColor, style: StrokeStyle(lineWidth: 1, dash: [6, 3]))
+        )
+        .cornerRadius(6)
+    }
+
+    private var orDivider: some View {
+        HStack(spacing: 12) {
+            Rectangle().fill(LoginPalette.line(dark)).frame(height: 1)
+            Text(model.locale == .enUS ? "or continue with" : "或使用以下方式")
+                .font(.system(size: 11))
+                .foregroundColor(LoginPalette.muted(dark))
+            Rectangle().fill(LoginPalette.line(dark)).frame(height: 1)
+        }
+    }
+
+    private var oauthRow: some View {
+        HStack(spacing: 12) {
+            if model.githubEnabled {
+                oauthButton(title: "GitHub", icon: "chevron.left.forwardslash.chevron.right", action: { onOAuth("github") })
+            }
+            if model.googleEnabled {
+                oauthButton(title: "Google", icon: "g.circle", action: { onOAuth("google") })
+            }
+        }
+    }
+
+    private func oauthButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .medium))
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
+            .foregroundColor(LoginPalette.text(dark))
+            .background(LoginPalette.oauthBg(dark))
+            .cornerRadius(8)
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(LoginPalette.oauthBorder(dark), lineWidth: 1))
+        }
+        .buttonStyle(LoginPressButtonStyle())
+    }
+
+    // MARK: - Verify
 
     private var verifyChoice: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(model.locale == .enUS ? "Verification" : "验证方式")
-                .font(.system(size: 15, weight: .heavy))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(LoginPalette.text(dark))
             HStack(spacing: 8) {
-                tabBtn(model.locale == .enUS ? "Message code" : "消息验证码",
-                       selected: model.verifyMethod == .message) {
+                verifyTab(model.locale == .enUS ? "Message code" : "消息验证码", selected: model.verifyMethod == .message) {
                     model.verifyMethod = .message
                     model.mfaCode = ""
                 }
-                tabBtn("MFA", selected: model.verifyMethod == .mfa) {
+                verifyTab("MFA", selected: model.verifyMethod == .mfa) {
                     model.verifyMethod = .mfa
                     model.verificationCode = ""
                 }
@@ -625,18 +688,29 @@ struct LoginRightPanel: View {
         }
     }
 
+    private func verifyTab(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: selected ? .bold : .medium))
+                .foregroundColor(selected ? LoginPalette.tabActiveText(dark) : LoginPalette.text(dark))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(selected ? LoginPalette.tabActiveBg(dark) : Color.clear)
+                .cornerRadius(999)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
     private var messageCodeRow: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(model.locale == .enUS ? "Verification code" : "验证码")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(LoginPalette.text(dark))
+        VStack(alignment: .leading, spacing: 6) {
+            fieldLabel(model.locale == .enUS ? "Verification code" : "验证码")
             HStack(alignment: .center, spacing: 12) {
                 LoginField(
                     title: "",
                     placeholder: model.locale == .enUS ? "Code" : "消息验证码",
                     text: $model.verificationCode,
                     dark: dark,
-                    enabled: formReady && !model.isLoadingMeta,
+                    enabled: formFieldEnabled,
                     onCommit: onLogin,
                     shakeToken: model.shakeVerify
                 )
@@ -647,9 +721,7 @@ struct LoginRightPanel: View {
                            ? (model.locale == .enUS ? "Sending" : "发送中")
                            : (model.locale == .enUS ? "Send code" : "发送验证码")),
                     loading: model.isSendingCode,
-                    enabled: formReady
-                        && !model.isLoadingMeta
-                        && model.codeCountdown == 0
+                    enabled: formReady && !model.isLoadingMeta && model.codeCountdown == 0
                         && !model.username.trimmingCharacters(in: .whitespaces).isEmpty,
                     dark: dark,
                     minWidth: 118,
@@ -657,44 +729,41 @@ struct LoginRightPanel: View {
                 )
             }
         }
-        .padding(.bottom, 6)
     }
 
-    private var metaRow: some View {
-        HStack {
-            Button(action: { model.rememberMe.toggle() }) {
-                HStack(spacing: 8) {
-                    Image(systemName: model.rememberMe ? "checkmark.square.fill" : "square")
-                        .font(.system(size: 15))
-                        .foregroundColor(model.rememberMe ? LoginPalette.primary(dark) : LoginPalette.muted(dark))
-                    Text(model.locale == .enUS ? "Remember me" : "记住我")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(LoginPalette.text(dark))
-                }
-            }
-            .buttonStyle(PlainButtonStyle())
-            Spacer()
-            Button(action: onForgotPassword) {
-                Text(model.locale == .enUS ? "Forgot password?" : "忘记密码？")
-                    .font(.system(size: 14))
-                    .foregroundColor(LoginPalette.muted(dark))
-            }
-            .buttonStyle(PlainButtonStyle())
+    // MARK: - Footer
+
+    private var footer: some View {
+        Text("\(backendVersion.isEmpty ? "" : "v\(backendVersion) · ")MIT · Nodewebzsz/oci-pool")
+            .font(.system(size: 10.5, weight: .regular, design: .monospaced))
+            .foregroundColor(LoginPalette.muted(dark))
+            .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Version fetch
+
+    private func routeLoadVersion() {
+        pageLoadToken += 1
+        let token = pageLoadToken
+        Task {
+            await loadBackendVersion(token: token)
         }
     }
 
-    private var oauthRow: some View {
-        HStack(spacing: 16) {
-            if model.githubEnabled {
-                LoginPillButton(title: "GitHub", dark: dark, secondary: true) {
-                    onOAuth("github")
+    private func loadBackendVersion(token: Int) async {
+        let base = model.serverURL
+        guard let url = URL(string: base)?.appendingPathComponent("api/version/check") else { return }
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 4
+        do {
+            let (data, _) = try await URLSession.shared.data(for: req)
+            if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let cur = obj["currentVersion"] as? String, !cur.isEmpty {
+                let v = cur.replacingOccurrences(of: "^[vV]-?", with: "", options: .regularExpression)
+                if token == pageLoadToken {
+                    await MainActor.run { backendVersion = v }
                 }
             }
-            if model.googleEnabled {
-                LoginPillButton(title: "Google", dark: dark, secondary: true) {
-                    onOAuth("google")
-                }
-            }
-        }
+        } catch {}
     }
 }
