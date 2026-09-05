@@ -166,6 +166,7 @@ const I18N = {
     'monitor.chart.grabRate': '抢机趋势 · 过去 24 小时',
     'monitor.chart.grabRateSub': '每 30 分钟一个数据点',
     'monitor.chart.activity': '实时活动',
+    'monitor.chart.activityEmpty': '暂无实时活动',
 
     // Tenants page
     'tenants.title': '租户管理',
@@ -3249,6 +3250,7 @@ const I18N = {
     'monitor.chart.grabRate': 'Grab Rate · Last 24h',
     'monitor.chart.grabRateSub': '30-min buckets',
     'monitor.chart.activity': 'Live Activity',
+    'monitor.chart.activityEmpty': 'No live activity',
 
     'tenants.title': 'Tenants',
     'tenants.search': 'Search by tenant name or region...',

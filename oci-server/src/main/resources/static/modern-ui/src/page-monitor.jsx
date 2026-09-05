@@ -197,7 +197,7 @@ function MonitorPage({ density }) {
 
         <Card title={tr('monitor.chart.activity')} headerIcon="radio" headerIconColor="var(--accent)" padding={0}>
           <div style={{ maxHeight: 320, overflowY: 'auto' }}>
-            {activityLogs.map((l, i) => (
+            {activityLogs.length ? activityLogs.map((l, i) => (
               <div key={i} className="monitor-activity-row" style={{
                 padding: '10px 16px',
                 borderBottom: i < 9 ? '1px solid var(--border)' : 'none',
@@ -221,7 +221,11 @@ function MonitorPage({ density }) {
                   </div>
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="monitor-activity-empty">
+                {tr('monitor.chart.activityEmpty')}
+              </div>
+            )}
           </div>
         </Card>
       </div>

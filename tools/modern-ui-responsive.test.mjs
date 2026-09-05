@@ -56,6 +56,16 @@ test('响应式改动递增浏览器缓存版本', async () => {
 
   assert.match(html, /dist\/src\/charts\.js\?v=2/);
   assert.match(html, /dist\/src\/layout\.js\?v=19/);
-  assert.match(html, /dist\/src\/page-monitor\.js\?v=9/);
+  assert.match(html, /dist\/src\/page-monitor\.js\?v=10/);
   assert.match(html, /dist\/src\/app\.js\?v=13/);
+});
+
+test('实时活动为空时提供占位文本而不是只有标题', async () => {
+  const page = await loadText('oci-server/src/main/resources/static/modern-ui/src/page-monitor.jsx');
+  const i18n = await loadText('oci-server/src/main/resources/static/modern-ui/src/i18n.jsx');
+
+  assert.match(page, /monitor-activity-empty/);
+  assert.match(page, /activityLogs\.length\s*\?\s*activityLogs\.map|activityLogs\.length\s*\?/);
+  assert.match(i18n, /['"]monitor\.chart\.activityEmpty['"]\s*:\s*['"]暂无实时活动['"]/);
+  assert.match(i18n, /['"]monitor\.chart\.activityEmpty['"]\s*:\s*['"]No live activity['"]/);
 });
