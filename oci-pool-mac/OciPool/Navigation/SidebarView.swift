@@ -43,7 +43,7 @@ struct SidebarView: View {
                             .padding(.top, 24)
                     } else {
                         ForEach(catalog, id: \.0) { section, items in
-                            sectionHeader(section)
+                            sectionHeader(section, firstItem: items.first)
                             // 折叠:全部子项图标态;展开:手风琴(当前 section 或搜索命中时显示子项)
                             if collapsed
                                 || navigation.isSectionExpanded(section)
@@ -109,8 +109,15 @@ struct SidebarView: View {
         )
     }
 
-    private func sectionHeader(_ section: NavSection) -> some View {
-        Button(action: { navigation.toggleSection(section) }) {
+    private func sectionHeader(_ section: NavSection, firstItem: NavigationItem?) -> some View {
+        Button(action: {
+            let wasExpanded = navigation.isSectionExpanded(section)
+            navigation.toggleSection(section)
+            // Web: 点击未展开的母菜单 → 展开并自动选中第一个子菜单(其余分组随之折叠)
+            if !wasExpanded, let first = firstItem {
+                navigation.select(first.nav)
+            }
+        }) {
             HStack(spacing: 8) {
                 Image(systemName: section.systemImage)
                     .font(.system(size: 15, weight: .semibold))
