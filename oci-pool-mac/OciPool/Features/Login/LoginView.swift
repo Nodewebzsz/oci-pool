@@ -25,7 +25,8 @@ struct LoginView: View {
                     LoginHeroView(
                         dark: dark,
                         crying: model.cryHero,
-                        shyMode: model.passwordFocused
+                        shyMode: model.passwordFocused,
+                        locale: model.locale
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
