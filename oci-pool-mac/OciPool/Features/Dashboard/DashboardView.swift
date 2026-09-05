@@ -39,16 +39,17 @@ struct DashboardView: View {
         HStack(alignment: .center) {
             HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 11)
-                        .fill(DashboardTheme.green(dark).opacity(0.14))
-                        .frame(width: 40, height: 40)
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(DashboardTheme.green(dark).opacity(0.18))
+                        .frame(width: 32, height: 32)
                     Image(systemName: "activity")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundColor(DashboardTheme.green(dark))
                 }
                 Text("系统监控")
-                    .font(.system(size: 20, weight: .bold))
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundColor(DashboardTheme.text(dark))
+                    .tracking(-0.2)
             }
             Spacer()
             HStack(spacing: 8) {
@@ -87,14 +88,14 @@ struct DashboardView: View {
                 .buttonStyle(PlainButtonStyle())
             }
         }
-        .padding(.bottom, 6)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .background(DashboardTheme.surface(dark))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
-            Rectangle()
-                .fill(DashboardTheme.border(dark))
-                .frame(height: 1),
-            alignment: .bottom
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(DashboardTheme.border(dark), lineWidth: 1)
         )
-        .padding(.bottom, 10)
     }
 
     private func errorBanner(_ text: String) -> some View {

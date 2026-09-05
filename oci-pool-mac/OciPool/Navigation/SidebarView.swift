@@ -113,6 +113,7 @@ struct SidebarView: View {
                 Image(systemName: section.systemImage)
                     .font(.system(size: 13, weight: .semibold))
                     .frame(width: 16)
+                    .foregroundColor(sectionColor(section))
                 if !collapsed {
                     Text(section.title)
                         .font(.system(size: 13.5, weight: .bold))
@@ -184,7 +185,7 @@ struct SidebarView: View {
                 Circle()
                     .fill(AppTheme.sidebarActive)
                     .frame(width: 6, height: 6)
-                Text("运行中")
+                Text("后端服务运行中")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(AppTheme.navIcon(dark))
             }
@@ -201,9 +202,21 @@ struct SidebarView: View {
         let s = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
         return s?.replacingOccurrences(of: "^[vV]-?", with: "", options: .regularExpression)
     }
+
+    // Web sidebar 各分部图标色:服务=accent 代理=cyan 资源=violet 系统=orange 工具=info 开发=violet
+    private func sectionColor(_ section: NavSection) -> Color {
+        switch section {
+        case .service: return AppTheme.sidebarActive
+        case .proxy: return Color(hex: "2fd0cc")
+        case .resource: return Color(hex: "a78bfa")
+        case .system: return Color(hex: "f59e0b")
+        case .tools: return Color(hex: "3b82f6")
+        case .devConfig: return Color(hex: "a78bfa")
+        }
+    }
 }
 
-// Web PoolBrandMark 近似:渐变圆角方块 + 池化节点图标
+// Web PoolBrandMark 近似:渐变圆角方块 + 池化节点图形(云环 + 三节点)
 private struct SidebarBrandMark: View {
     var size: CGFloat
     var accent: Color
@@ -211,14 +224,54 @@ private struct SidebarBrandMark: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: size * 0.28)
                 .fill(LinearGradient(gradient: Gradient(colors: [accent, cyan]),
                                      startPoint: .topLeading, endPoint: .bottomTrailing))
                 .frame(width: size, height: size)
-            Image(systemName: "server.rack")
-                .font(.system(size: size * 0.46, weight: .semibold))
-                .foregroundColor(Color(hex: "0e2a22"))
+            PoolBrandGlyphStroke()
+                .stroke(Color(hex: "0e2a22"),
+                        style: StrokeStyle(lineWidth: size * 0.055, lineCap: .round, lineJoin: .round))
+            PoolBrandGlyphDots()
+                .fill(Color(hex: "0e2a22"))
         }
         .frame(width: size, height: size)
+    }
+}
+
+// 与 Web 36x36 viewBox 坐标一致的云环轮廓 + 底部三条短线(仅描边)
+private struct PoolBrandGlyphStroke: Shape {
+    func path(in rect: CGRect) -> Path {
+        let sx = rect.width / 36
+        let sy = rect.height / 36
+        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: rect.minX + x * sx, y: rect.minY + y * sy)
+        }
+        var path = Path()
+        path.move(to: p(10, 20.4))
+        path.addCurve(to: p(12.6, 12.9), control1: p(10, 16.6), control2: p(10.6, 14.5))
+        path.addCurve(to: p(24.2, 13.9), control1: p(16.6, 10.2), control2: p(21.4, 10.9))
+        path.addCurve(to: p(24.9, 21.4), control1: p(26.6, 15.8), control2: p(26.2, 18.8))
+        path.addLine(to: p(11.4, 21.4))
+        for x in [13.0, 18.0, 23.0] {
+            path.move(to: p(x, 23.9))
+            path.addLine(to: p(x, 21.4))
+        }
+        return path
+    }
+}
+
+// 底部三个填充节点圆点
+private struct PoolBrandGlyphDots: Shape {
+    func path(in rect: CGRect) -> Path {
+        let sx = rect.width / 36
+        let sy = rect.height / 36
+        var path = Path()
+        for x in [13.0, 18.0, 23.0] {
+            let r = 1.9
+            let cx = rect.minX + x * sx
+            let cy = rect.minY + 25.5 * sy
+            path.addEllipse(in: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
+        }
+        return path
     }
 }

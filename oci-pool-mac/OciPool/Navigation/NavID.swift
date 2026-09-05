@@ -48,19 +48,19 @@ enum NavID: String, CaseIterable, Hashable {
 enum NavSection: String, CaseIterable {
     case service
     case proxy
-    case vps
+    case resource
     case system
     case tools
-    case dev
+    case devConfig
 
     var title: String {
         switch self {
         case .service: return "服务管理"
         case .proxy: return "代理管理"
-        case .vps: return "VPS 管理"
+        case .resource: return "资源管理"
         case .system: return "系统管理"
         case .tools: return "我的工具"
-        case .dev: return "开发者"
+        case .devConfig: return "开发配置"
         }
     }
 
@@ -68,11 +68,11 @@ enum NavSection: String, CaseIterable {
         switch self {
         case .service: return "server.rack"
         case .proxy: return "arrow.left.arrow.right"
-        case .vps: return "desktopcomputer"
+        case .resource: return "shippingbox"
         case .system: return "gearshape"
         case .tools: return "wrench.and.screwdriver"
         // SF Symbols 2 (macOS 11) — avoid iOS15+ only names like chevron.left.forwardslash.chevron.right
-        case .dev: return "chevron.left.slash.chevron.right"
+        case .devConfig: return "chevron.left.slash.chevron.right"
         }
     }
 }

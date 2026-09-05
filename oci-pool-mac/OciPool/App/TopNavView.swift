@@ -87,7 +87,7 @@ struct TopNavView: View {
             Circle()
                 .fill(AppTheme.sidebarActive)
                 .frame(width: 7, height: 7)
-            Text("引擎")
+            Text("抢机引擎")
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.navIcon(dark))
             Text("运行中")
@@ -336,8 +336,15 @@ struct TopNavView: View {
 
     private var avatarLetter: String {
         let name = session.username
-        if let c = name.first { return String(c).uppercased() }
-        return "A"
+        let normalized = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return "A" }
+        let parts = normalized.split { c in
+            c == " " || c == "." || c == "_" || c == "-"
+        }.filter { !$0.isEmpty }
+        if parts.count > 1 {
+            return (String(parts[0].prefix(1)) + String(parts[1].prefix(1))).uppercased()
+        }
+        return String(normalized.prefix(2)).uppercased()
     }
 
     private func circleBg(highlight: Bool) -> some View {
