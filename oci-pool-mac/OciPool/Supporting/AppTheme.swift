@@ -105,63 +105,7 @@ enum DensityMode: String, CaseIterable, Identifiable {
     var rowPadding: CGFloat {
         switch self {
         case .compact: return 9
-        case .comfortable: return 13
-        }
-    }
-
-    /// 数据列表表头纵向 padding。
-    var headerPad: CGFloat {
-        switch self {
-        case .compact: return 8
         case .comfortable: return 12
-        }
-    }
-
-    /// 分页条纵向 padding。
-    var paginationPad: CGFloat {
-        switch self {
-        case .compact: return 10
-        case .comfortable: return 14
-        }
-    }
-
-    /// 卡片式列表纵向间距。
-    var cardGap: CGFloat {
-        switch self {
-        case .compact: return 12
-        case .comfortable: return 18
-        }
-    }
-
-    /// 侧栏行纵向 padding。
-    var sidebarRowPad: CGFloat {
-        switch self {
-        case .compact: return 6
-        case .comfortable: return 9
-        }
-    }
-
-    /// 侧栏列表间距。
-    var listSpacing: CGFloat {
-        switch self {
-        case .compact: return 2
-        case .comfortable: return 4
-        }
-    }
-
-    /// 页面主内容纵向间距。
-    var panelGap: CGFloat {
-        switch self {
-        case .compact: return 14
-        case .comfortable: return 22
-        }
-    }
-
-    /// 页面内容四周留白。
-    var pagePadding: CGFloat {
-        switch self {
-        case .compact: return 22
-        case .comfortable: return 30
         }
     }
 }

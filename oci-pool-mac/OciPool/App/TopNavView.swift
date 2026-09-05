@@ -256,7 +256,7 @@ struct TopNavView: View {
                 )
         }
         .buttonStyle(PlainButtonStyle())
-        .help(appearance.density == .compact ? "切换到舒适" : "切换到紧凑")
+        .help("信息密度: \(appearance.density.title) · 点击切换到 \(appearance.density == .compact ? DensityMode.comfortable.title : DensityMode.compact.title)")
     }
 
     private var messageButton: some View {
