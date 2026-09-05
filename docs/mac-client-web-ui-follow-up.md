@@ -47,3 +47,25 @@ macOS 客户端目前不是当前 React Modern UI 的桌面容器，而是一套
 - Web 前端页面更新后，不再需要同步重写一套 SwiftUI 业务界面。
 - 本机部署和远程部署两种模式均能完成登录及核心业务操作。
 - DMG 安装、首次启动、应用图标和签名流程不受影响。
+
+
+## 方案与实施状态（2026-09-05 更新）
+
+### 确定方案
+采用**方案 A（全窗 Web）**：整个窗口内容由 `WKWebView` 加载当前 React Modern UI，登录页与登录后的业务页直接复用前端。客户端仅保留本机 / 远程引导、后端启动、窗口生命周期与 Cookie 同步。
+
+### 分阶段落地
+- **PR1（已完成）· 远程模式打通 Web 登录与业务页**
+  - 新增 `oci-pool-mac/OciPool/Embed/ModernWebViewController.swift`（全窗 WKWebView 容器，含刷新/后退/浏览器打开工具栏，Cookie 同步，登录态路由上报）。
+  - `MainWindowController`：远程模式直接加载现代 SPA（`serverURL + "/"`），并监听 `deploymentMode` 切换，切回远程时重建内容区。
+  - 已加入 `OciPool.xcodeproj`（新增文件引用与 Sources 编译项）。
+  - 验证：`xcodebuild -project OciPool.xcodeproj -scheme OciPool -configuration Debug build` 通过；后端 9856 的 `GET /` 返回现代 SPA（200）。
+- **PR2（待做）· 本机模式**
+  - 先启动内置后端，健康检查通过后再加载 Web 登录页；登录态/退出桥接到 `AppSession`。
+- **PR3（待做）· 菜单 / 主题 / 刷新 / 切换服务器作用于 WKWebView；清理不再使用的原生业务导航。**
+- **PR4（待做）· DMG 重建、最小窗口与下载/外部链接回归、数据保留校验。**
+
+### 说明 / 约定
+- 默认只做本地提交，不推送；`dev` 推送不加 `[skip ci]`。
+- 登录态上报当前基于 `location.hash` 启发式判断（`#/login` 之外视为已登录），PR2 会替换为 `satoken` Cookie / `/api/userInfo` 的可靠桥接。
+- 本环境 `functions__exec` / `apply_patch` 工具不可用，本次文件写入改由 CUA 运行时 `node:fs` 完成；后续工具恢复后应回归 `apply_patch`。

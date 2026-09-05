@@ -161,10 +161,31 @@ final class MainWindowController: NSWindowController {
                 }
             }
             .store(in: &cancellables)
+
+        // 切换本机 / 远程时也要重建内容区域（远程 → ModernWebViewController）。
+        session.$deploymentMode
+            .dropFirst()
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.rebuildContent()
+                    self?.forceDefaultFrame()
+                }
+            }
+            .store(in: &cancellables)
     }
 
     private func rebuildContent() {
-        if session.isLoggedIn {
+        // 方案 A：远程模式直接用 WKWebView 加载当前 React Modern UI，登录与业务页均复用 Web。
+        if session.isRemoteDeployment {
+            let web = ModernWebViewController(session: session)
+            web.onAuthStateChanged = { loggedIn in
+                AppDelegate.log("modern web authState=\(loggedIn)")
+            }
+            root.setContent(web)
+            window?.title = "OCI-POOL"
+        } else if session.isLoggedIn {
             let shell = MainShellViewController(
                 session: session,
                 navigation: navigation,
