@@ -53,6 +53,8 @@ struct AppInputChrome<Content: View>: View {
     var dark: Bool
     var focused: Bool = false
     var height: CGFloat = AppInputStyle.height
+    var radius: CGFloat = AppInputStyle.radius
+    var hPad: CGFloat = AppInputStyle.hPad
     var leading: AnyView? = nil
     var trailing: AnyView? = nil
     @ViewBuilder var content: () -> Content
@@ -69,14 +71,14 @@ struct AppInputChrome<Content: View>: View {
                 trailing
             }
         }
-        .padding(.horizontal, AppInputStyle.hPad)
+        .padding(.horizontal, hPad)
         .frame(height: height)
         .background(
-            RoundedRectangle(cornerRadius: AppInputStyle.radius)
+            RoundedRectangle(cornerRadius: radius)
                 .fill(AppInputStyle.fill(dark, focused: focused))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: AppInputStyle.radius)
+            RoundedRectangle(cornerRadius: radius)
                 .stroke(
                     AppInputStyle.border(dark, focused: focused, hovering: hovering),
                     lineWidth: focused ? 1.5 : 1

@@ -55,7 +55,7 @@ struct SidebarView: View {
                         }
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, 6)
                 .padding(.horizontal, collapsed ? 6 : 8)
             }
 
@@ -81,10 +81,11 @@ struct SidebarView: View {
         HStack(spacing: 10) {
             SidebarBrandMark(size: 30, accent: AppTheme.sidebarActive, cyan: Color(hex: "2fd0cc"))
             if !collapsed {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 5) {
                     Text(session.siteName)
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(AppTheme.navIcon(dark))
+                        .tracking(-0.1)
                         .lineLimit(1)
                     Text("多租户池化管理")
                         .font(.system(size: 10))
@@ -103,7 +104,8 @@ struct SidebarView: View {
         SearchField(
             text: $navigation.searchText,
             placeholder: "搜索菜单…",
-            fillsWidth: true
+            fillsWidth: true,
+            compact: true
         )
     }
 
@@ -111,50 +113,49 @@ struct SidebarView: View {
         Button(action: { navigation.toggleSection(section) }) {
             HStack(spacing: 8) {
                 Image(systemName: section.systemImage)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .frame(width: 16)
                     .foregroundColor(sectionColor(section))
                 if !collapsed {
                     Text(section.title)
-                        .font(.system(size: 13.5, weight: .bold))
+                        .font(.system(size: 12.5, weight: .semibold))
                     Spacer(minLength: 4)
-                    Image(systemName: navigation.isSectionExpanded(section) ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 10, weight: .bold))
-                        .opacity(0.75)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(AppTheme.sidebarText(dark).opacity(0.7))
+                        .rotationEffect(.degrees(navigation.isSectionExpanded(section) ? 0 : -90))
                 }
             }
-            .foregroundColor(collapsed ? AppTheme.navIcon(dark) : (dark ? Color.white.opacity(0.88) : AppTheme.sidebarText(dark)))
-            .padding(.horizontal, collapsed ? 0 : 8)
+            .foregroundColor(AppTheme.navIcon(dark))
+            .padding(.horizontal, collapsed ? 0 : 10)
             .padding(.vertical, collapsed ? 10 : 8)
             .frame(maxWidth: .infinity, alignment: collapsed ? .center : .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(collapsed)
-        .padding(.top, collapsed ? 2 : 10)
+        .padding(.bottom, 4)
     }
 
     private func row(_ item: NavigationItem) -> some View {
         let selected = navigation.selected == item.nav
         return Button(action: { navigation.select(item.nav) }) {
             ZStack(alignment: .leading) {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     Image(systemName: item.systemImage)
-                        .font(.system(size: collapsed ? 13 : 12))
+                        .font(.system(size: 14, weight: selected ? .semibold : .regular))
                         .frame(width: 16)
                     if !collapsed {
                         Text(item.title)
-                            .font(.system(size: 12.5, weight: selected ? .semibold : .medium))
+                            .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
                             .lineLimit(1)
                         Spacer(minLength: 0)
                         if selected {
-                            Circle()
-                                .fill(Color(hex: "f59e0b"))
-                                .frame(width: 6, height: 6)
+                            PulseDot(color: Color(hex: "f59e0b"))
                         }
                     }
                 }
-                .padding(.leading, collapsed ? 0 : (selected ? 20 : 10))
+                .padding(.leading, collapsed ? 0 : 20)
                 .padding(.trailing, collapsed ? 0 : 10)
                 .padding(.vertical, 6)
                 .frame(maxWidth: .infinity, alignment: collapsed ? .center : .leading)
@@ -180,11 +181,9 @@ struct SidebarView: View {
 
     // Web sidebar 底部状态:运行中 + 版本
     private var statusFooter: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
-                Circle()
-                    .fill(AppTheme.sidebarActive)
-                    .frame(width: 6, height: 6)
+                PulseDot(color: AppTheme.sidebarActive)
                 Text("后端服务运行中")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(AppTheme.navIcon(dark))
@@ -213,6 +212,23 @@ struct SidebarView: View {
         case .tools: return Color(hex: "3b82f6")
         case .devConfig: return Color(hex: "a78bfa")
         }
+    }
+}
+
+// Web 选中项/运行状态圆点:持续脉冲 (pulse-dot 1.8s)
+private struct PulseDot: View {
+    var color: Color
+    var size: CGFloat = 6
+    @State private var pulse = false
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: size, height: size)
+            .scaleEffect(pulse ? 1.0 : 0.72)
+            .opacity(pulse ? 1.0 : 0.55)
+            .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
+            .onAppear { pulse = true }
     }
 }
 
