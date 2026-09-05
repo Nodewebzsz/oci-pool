@@ -45,6 +45,48 @@ enum NavID: String, CaseIterable, Hashable {
     case apiTokens
 }
 
+extension NavID {
+    /// Lucide icon name (aligned with `modern-ui/src/layout.jsx` `buildNav`).
+    var lucideIcon: String {
+        switch self {
+        case .dashboard: return "activity"
+        case .regions: return "globe"
+        case .tenants: return "users"
+        case .instances: return "server"
+        case .email: return "mail"
+        case .storage: return "database"
+        case .boot: return "zap"
+        case .ai: return "brain-circuit"
+        case .speedTest: return "wifi"
+        case .openLogs: return "terminal"
+        case .gcpAccounts: return "cloud"
+        case .gcpInstances: return "server"
+        case .azureVms: return "server"
+        case .azureResources: return "layers"
+        case .azureStorage: return "database"
+        case .azureNetworks: return "network"
+        case .awsEc2: return "server"
+        case .awsS3: return "cloud"
+        case .awsLambda: return "code"
+        case .awsRds: return "database"
+        case .keyConfig: return "key"
+        case .cloudflare: return "cloud"
+        case .edgeOne: return "network"
+        case .vpsList: return "server"
+        case .ipQuality: return "shield"
+        case .systemLogs: return "file-text"
+        case .settings: return "shield-check"
+        case .proxyConfig: return "shuffle"
+        case .aiChat: return "message-square"
+        case .notify: return "bell"
+        case .memo: return "book-open"
+        case .migration: return "arrow-left-right"
+        case .mfa: return "smartphone"
+        case .apiTokens: return "key"
+        }
+    }
+}
+
 enum NavSection: String, CaseIterable {
     case service
     case proxy
@@ -73,6 +115,18 @@ enum NavSection: String, CaseIterable {
         case .tools: return "wrench.and.screwdriver"
         // SF Symbols 2 (macOS 11) — avoid iOS15+ only names like chevron.left.forwardslash.chevron.right
         case .devConfig: return "chevron.left.slash.chevron.right"
+        }
+    }
+
+    /// Lucide icon name (aligned with `modern-ui/src/layout.jsx` `buildNav`).
+    var lucideIcon: String {
+        switch self {
+        case .service: return "layers"
+        case .proxy: return "shuffle"
+        case .resource: return "package"
+        case .system: return "settings"
+        case .tools: return "wrench"
+        case .devConfig: return "code-2"
         }
     }
 }

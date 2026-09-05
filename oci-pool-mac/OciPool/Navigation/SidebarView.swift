@@ -129,10 +129,8 @@ struct SidebarView: View {
             }
         }) {
             HStack(spacing: 8) {
-                Image(systemName: section.systemImage)
-                    .font(.system(size: 15, weight: .semibold))
+                MenuGlyph(name: section.lucideIcon, size: 15, color: sectionColor(section))
                     .frame(width: 16)
-                    .foregroundColor(sectionColor(section))
                 if !collapsed {
                     Text(section.title)
                         .font(.system(size: 12.5, weight: .semibold))
@@ -159,8 +157,11 @@ struct SidebarView: View {
         return Button(action: { navigation.select(item.nav) }) {
             ZStack(alignment: .leading) {
                 HStack(spacing: 10) {
-                    Image(systemName: item.systemImage)
-                        .font(.system(size: 14, weight: selected ? .semibold : .regular))
+                    MenuGlyph(
+                        name: item.nav.lucideIcon,
+                        size: 14,
+                        color: selected ? AppTheme.sidebarActive : AppTheme.sidebarText(dark)
+                    )
                         .frame(width: 16)
                     if !collapsed {
                         Text(item.title)

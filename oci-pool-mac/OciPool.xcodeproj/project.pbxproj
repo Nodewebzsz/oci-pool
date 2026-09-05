@@ -39,6 +39,7 @@
 		2A8006E6B17EBA0223989859 /* NavigationCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B455A730A5A1D6640D544DDE /* NavigationCatalog.swift */; };
 		2BF6FAD93082019906D8CCE5 /* KeyConfigService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9AF375448D188B09FC1562C /* KeyConfigService.swift */; };
 		2C71E87BA5036C64CB844070 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C61AAC60362FE14AAA21E862 /* SidebarView.swift */; };
+		7A1B2C3D4E5F60718293A4B1 /* MenuGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1B2C3D4E5F60718293A4B2 /* MenuGlyph.swift */; };
 		2D10F44FD4C1FFB1044DD974 /* OpenLogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD95153B002E1C7A95426184 /* OpenLogsView.swift */; };
 		2FE2CA7A1902FCDAEF012054 /* DropdownHostingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E809724D573B7EC1B40CDD6 /* DropdownHostingView.swift */; };
 		3275ADFBA0B01806662A72A0 /* TenantQuotaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD72397982401D94A4E48C1C /* TenantQuotaView.swift */; };
@@ -327,6 +328,7 @@
 		BFF76672E0866F01D67ACCED /* ProxyConfigModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyConfigModels.swift; sourceTree = "<group>"; };
 		C09EE9E4A7E6C6AC559C6F22 /* SpeedTestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedTestView.swift; sourceTree = "<group>"; };
 		C61AAC60362FE14AAA21E862 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+		7A1B2C3D4E5F60718293A4B2 /* MenuGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuGlyph.swift; sourceTree = "<group>"; };
 		C6577BCE4067C95877F12095 /* NavigationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationState.swift; sourceTree = "<group>"; };
 		C6E02472EF6784E0D0B247C2 /* BootModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BootModels.swift; sourceTree = "<group>"; };
 		C709872E28022B2BC7766B72 /* SearchField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchField.swift; sourceTree = "<group>"; };
@@ -428,6 +430,7 @@
 				B455A730A5A1D6640D544DDE /* NavigationCatalog.swift */,
 				C6577BCE4067C95877F12095 /* NavigationState.swift */,
 				C61AAC60362FE14AAA21E862 /* SidebarView.swift */,
+				7A1B2C3D4E5F60718293A4B2 /* MenuGlyph.swift */,
 			);
 			path = Navigation;
 			sourceTree = "<group>";
@@ -1068,6 +1071,7 @@
 				0A9CE3035F17B35D5C5EBEBD /* SelectMenu.swift in Sources */,
 				95C500A8750B19DB9515FCED /* SelectOption.swift in Sources */,
 				2C71E87BA5036C64CB844070 /* SidebarView.swift in Sources */,
+				7A1B2C3D4E5F60718293A4B1 /* MenuGlyph.swift in Sources */,
 				0D08E2CA2A598AC2425CD3AC /* SpeedTestModels.swift in Sources */,
 				6C6470CCF4BA963F50908109 /* SpeedTestView.swift in Sources */,
 				B101EC4544D3E7D1CF7892A9 /* SpeedTestViewModel.swift in Sources */,
