@@ -1205,8 +1205,8 @@ function CFManagePage() {
         iconColor="var(--orange)"
         actions={
           <>
-            <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>{tr('dnsp.zone')}</span>
-            <CustomDropdown value={zoneId} onChange={e => { setZoneId(e); window.ociRouter.go('cfManage', e ? { zoneId: e } : {}, { replace: true }); }} height={32} width="100%">
+            <span style={{ fontSize: 12, color: 'var(--fg-3)', whiteSpace: 'nowrap' }}>{tr('dnsp.zone')}</span>
+            <CustomDropdown value={zoneId} onChange={e => { setZoneId(e); window.ociRouter.go('cfManage', e ? { zoneId: e } : {}, { replace: true }); }} height={32} width="220px">
               <option value="">{tr('dnsp.selectZone')}</option>
               {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
             </CustomDropdown>
@@ -1534,8 +1534,8 @@ function EOManagePage() {
         iconColor="var(--info)"
         actions={
           <>
-            <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>{tr('dnsp.zone')}</span>
-            <CustomDropdown value={zoneId} onChange={e => { setZoneId(e); window.ociRouter.go('eoManage', e ? { zoneId: e } : {}, { replace: true }); }} height={32} width="100%">
+            <span style={{ fontSize: 12, color: 'var(--fg-3)', whiteSpace: 'nowrap' }}>{tr('dnsp.zone')}</span>
+            <CustomDropdown value={zoneId} onChange={e => { setZoneId(e); window.ociRouter.go('eoManage', e ? { zoneId: e } : {}, { replace: true }); }} height={32} width="220px">
               <option value="">{tr('dnsp.selectZone')}</option>
               {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
             </CustomDropdown>

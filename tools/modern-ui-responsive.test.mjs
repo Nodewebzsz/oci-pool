@@ -78,5 +78,6 @@ test('服务商配置卡片网格在窄屏降列避免文案换行', async () =>
   assert.match(html, /\.provider-grid\s*\{[^}]*repeat\(3,\s*minmax\(0,\s*1fr\)\)/s);
   assert.match(html, /@media\s*\(max-width:\s*1023px\)[\s\S]*?\.provider-grid[^}]*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
   assert.match(html, /@media\s*\(max-width:\s*767px\)[\s\S]*?\.provider-grid[^}]*minmax\(0,\s*1fr\)/);
-  assert.match(html, /dist\/src\/page-proxy\.js\?v=10/);
+  assert.match(html, /dist\/src\/page-proxy\.js\?v=11/);
+  assert.match(page, /width="220px"/);
 });
