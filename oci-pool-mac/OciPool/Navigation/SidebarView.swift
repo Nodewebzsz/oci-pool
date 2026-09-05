@@ -45,16 +45,19 @@ struct SidebarView: View {
                         ForEach(catalog, id: \.0) { section, items in
                             sectionHeader(section, firstItem: items.first)
                             // 折叠:全部子项图标态;展开:手风琴(当前 section 或搜索命中时显示子项)
-                            if collapsed
+                            // 平滑撑开高度 + 渐隐(对齐 Web grid-template-rows/opacity)
+                            let show = collapsed
                                 || navigation.isSectionExpanded(section)
-                                || !navigation.searchText.isEmpty {
-                                VStack(alignment: collapsed ? .center : .leading, spacing: 2) {
-                                    ForEach(items) { item in
-                                        row(item)
-                                    }
+                                || !navigation.searchText.isEmpty
+                            VStack(alignment: collapsed ? .center : .leading, spacing: 2) {
+                                ForEach(items) { item in
+                                    row(item)
                                 }
-                                .transition(.opacity.combined(with: .move(edge: .top)))
                             }
+                            .opacity(show ? 1 : 0)
+                            .frame(maxHeight: show ? nil : 0, alignment: .top)
+                            .clipped()
+                            .animation(.timingCurve(0.4, 0, 0.2, 1, duration: 0.24), value: show)
                         }
                     }
                 }
@@ -115,12 +118,12 @@ struct SidebarView: View {
     private func sectionHeader(_ section: NavSection, firstItem: NavigationItem?) -> some View {
         Button(action: {
             let wasExpanded = navigation.isSectionExpanded(section)
-            withAnimation(.easeInOut(duration: 0.22)) {
+            withAnimation(.timingCurve(0.4, 0, 0.2, 1, duration: 0.24)) {
                 navigation.toggleSection(section)
             }
             // Web: 点击未展开的母菜单 → 展开并自动选中第一个子菜单(其余分组随之折叠)
             if !wasExpanded, let first = firstItem {
-                withAnimation(.easeInOut(duration: 0.22)) {
+                withAnimation(.timingCurve(0.4, 0, 0.2, 1, duration: 0.24)) {
                     navigation.select(first.nav)
                 }
             }
