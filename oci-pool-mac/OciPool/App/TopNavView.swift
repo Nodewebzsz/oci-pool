@@ -1,6 +1,33 @@
 import SwiftUI
 import AppKit
 
+private struct LanguagesGlyph: Shape {
+    func path(in rect: CGRect) -> Path {
+        let scaleX = rect.width / 24
+        let scaleY = rect.height / 24
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: x * scaleX, y: y * scaleY)
+        }
+
+        var path = Path()
+        path.move(to: point(5, 8))
+        path.addLine(to: point(11, 14))
+        path.move(to: point(4, 14))
+        path.addLine(to: point(10, 8))
+        path.addLine(to: point(12, 5))
+        path.move(to: point(2, 5))
+        path.addLine(to: point(14, 5))
+        path.move(to: point(7, 2))
+        path.addLine(to: point(8, 2))
+        path.move(to: point(22, 22))
+        path.addLine(to: point(17, 12))
+        path.addLine(to: point(12, 22))
+        path.move(to: point(14, 18))
+        path.addLine(to: point(20, 18))
+        return path
+    }
+}
+
 /// Web-parity top bar (`header.ftl` + `header.js`).
 /// Dropdown panels are rendered by `TopNavDropdownOverlay` (in-window), not system popover.
 struct TopNavView: View {
@@ -142,8 +169,9 @@ struct TopNavView: View {
             header.toggleLocale()
         }) {
             HStack(spacing: 6) {
-                Image(systemName: "languages")
-                    .font(.system(size: 12, weight: .medium))
+                LanguagesGlyph()
+                    .stroke(style: StrokeStyle(lineWidth: 1.75, lineCap: .round, lineJoin: .round))
+                    .frame(width: 14, height: 14)
                 Text(langShortTitle)
                     .font(.system(size: 11.5, weight: .medium, design: .monospaced))
                     .tracking(0.3)
@@ -169,24 +197,19 @@ struct TopNavView: View {
             header.closeMessages()
             chrome.toggle(.theme)
         }) {
-            HStack(spacing: 2) {
-                Image(systemName: themeIcon)
-                    .font(.system(size: 13, weight: .medium))
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 8, weight: .bold))
-                    .opacity(0.55)
-            }
-            .foregroundColor(AppTheme.navIcon(dark))
-            .padding(.horizontal, 7)
-            .frame(height: 30)
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(chrome.open == .theme ? AppTheme.sidebarHover(dark) : AppTheme.sidebarBg(dark).opacity(0.6))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 5)
-                    .stroke(chrome.open == .theme ? AppTheme.sidebarActive : AppTheme.border(dark), lineWidth: 1)
-            )
+            Image(systemName: themeIcon)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(AppTheme.navIcon(dark))
+                .frame(width: 30)
+                .frame(height: 30)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(chrome.open == .theme ? AppTheme.sidebarHover(dark) : AppTheme.sidebarBg(dark).opacity(0.6))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5)
+                        .stroke(chrome.open == .theme ? AppTheme.sidebarActive : AppTheme.border(dark), lineWidth: 1)
+                )
         }
         .buttonStyle(PlainButtonStyle())
         .fixedSize()
