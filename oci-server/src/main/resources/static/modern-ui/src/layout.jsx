@@ -407,7 +407,7 @@ function UserAvatar({ userName, size = 26 }) {
   );
 }
 
-function Sidebar({ activePage, onNavigate, collapsed = false }) {
+function Sidebar({ activePage, onNavigate, collapsed = false, tabletOverlay = false, onNavigateComplete }) {
   const { t: tr } = useT();
   const NAV = buildNav(tr);
 
@@ -445,11 +445,15 @@ function Sidebar({ activePage, onNavigate, collapsed = false }) {
   }, []);
 
   const toggleSection = (id) => setExpanded((p) => ({ ...p, [id]: !p[id] }));
+  const selectPage = (page) => {
+    onNavigate(page);
+    if (onNavigateComplete) onNavigateComplete();
+  };
 
   const width = collapsed ? 'var(--sidebar-w-collapsed)' : 'var(--sidebar-w)';
 
   return (
-    <aside style={{
+    <aside className={tabletOverlay ? 'sidebar sidebar--tablet-overlay' : 'sidebar'} style={{
       width,
       flexShrink: 0,
       background: 'var(--bg-1)',
@@ -484,7 +488,7 @@ function Sidebar({ activePage, onNavigate, collapsed = false }) {
       {/* Search — 模糊匹配所有子菜单项,支持键盘导航 + 点击跳转 */}
       {!collapsed &&
       <div style={{ padding: '10px 10px 4px' }}>
-          <MenuSearch nav={NAV} onNavigate={onNavigate} placeholder={tr('top.search')} />
+          <MenuSearch nav={NAV} onNavigate={selectPage} placeholder={tr('top.search')} />
         </div>
       }
 
@@ -504,7 +508,7 @@ function Sidebar({ activePage, onNavigate, collapsed = false }) {
                     // 点击折叠的父菜单:展开并自动高亮/跳转到第一个子菜单
                     toggleSection(sec.id);
                     const first = sec.items[0];
-                    if (first) onNavigate(first.id);
+                    if (first) selectPage(first.id);
                   } else {
                     // 已展开的父菜单:保持原有折叠行为
                     toggleSection(sec.id);
@@ -563,7 +567,7 @@ function Sidebar({ activePage, onNavigate, collapsed = false }) {
                     className={'sidebar-item' + (isActive ? ' sidebar-item-active' : '')}
                     title={collapsed ? item.label : undefined}
                      href={(window.ociRouter ? "\#" + window.ociRouter.href(item.id) : "\#" + item.id)}
-                     onClick={(e) => { e.preventDefault(); onNavigate(item.id); }}
+                     onClick={(e) => { e.preventDefault(); selectPage(item.id); }}
                       style={{
                         width: '100%',
                         padding: collapsed ? '8px 0' : '6px 10px 6px 20px', background: "transparent",

@@ -31,6 +31,25 @@ function resolveTheme(theme) {
   return 'dark';
 }
 
+function useTabletLayout() {
+  const query = '(min-width: 768px) and (max-width: 1199px)';
+  const [matches, setMatches] = useStateA(() => window.matchMedia(query).matches);
+
+  useEffectA(() => {
+    const media = window.matchMedia(query);
+    const update = () => setMatches(media.matches);
+    update();
+    if (media.addEventListener) media.addEventListener('change', update);
+    else media.addListener(update);
+    return () => {
+      if (media.removeEventListener) media.removeEventListener('change', update);
+      else media.removeListener(update);
+    };
+  }, []);
+
+  return matches;
+}
+
 // 品牌加载页 · authState === 'checking'(刷新后等待 /api/userInfo 返回)时出现,
 // 复用品牌云标 + 强调色渐变,替代原先的纯文本占位,让每次刷新都能看到完整品牌首屏。
 function BrandLoading() {
@@ -160,6 +179,8 @@ function AppInner() {
   const { lang, setLang, t: tr } = useT();
   const tk = useTweaks(window.OCI_TWEAK_DEFAULTS);
   const [tweaks, setTweak] = [tk[0], tk[1]];
+  const isTabletLayout = useTabletLayout();
+  const [tabletSidebarOpen, setTabletSidebarOpen] = useStateA(false);
 
   // 后端 sa-token 会话是唯一登录依据；本地存储只保留纯 UI 偏好。
   const [authState, setAuthState] = useStateA('checking');
@@ -228,6 +249,19 @@ function AppInner() {
     if (window.ociRouter.read().invalid) window.ociRouter.go('monitor', {}, { replace: true });
     return un;
   }, []);
+
+  useEffectA(() => {
+    setTabletSidebarOpen(false);
+  }, [isTabletLayout, route.page]);
+
+  useEffectA(() => {
+    if (!isTabletLayout || !tabletSidebarOpen) return;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setTabletSidebarOpen(false);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [isTabletLayout, tabletSidebarOpen]);
 
   // 未登录时访问非 auth 路由 → 记录目标页并回到登录页;登录成功后回到该页
   // 已登录时访问 auth 路由 → 直接去监控面板
@@ -372,6 +406,14 @@ function AppInner() {
   const pageProps = (effectivePage in CHILD_PAGES)
     ? { ...commonProps, ctx: detailCtx, navigate, updateDetailCtx }
     : commonProps;
+  const sidebarCollapsed = isTabletLayout ? !tabletSidebarOpen : tweaks.sidebarCollapsed;
+  const toggleSidebar = () => {
+    if (isTabletLayout) {
+      setTabletSidebarOpen((open) => !open);
+      return;
+    }
+    setTweak('sidebarCollapsed', !tweaks.sidebarCollapsed);
+  };
 
   // Not signed in → render the auth SPA and skip the whole app shell.
   // The auth page still respects theme/accent/lang because those are set on
@@ -388,10 +430,27 @@ function AppInner() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-0)' }}>
-      <Sidebar
-        activePage={activeNavId}
-        onNavigate={navigate}
-        collapsed={tweaks.sidebarCollapsed} />
+      {isTabletLayout && tabletSidebarOpen &&
+        <button
+          type="button"
+          className="tablet-sidebar-backdrop"
+          aria-label={tr('common.close')}
+          onClick={() => setTabletSidebarOpen(false)} />
+      }
+      {isTabletLayout
+        ? <div className="tablet-sidebar-slot">
+            <Sidebar
+              activePage={activeNavId}
+              onNavigate={navigate}
+              collapsed={sidebarCollapsed}
+              tabletOverlay={tabletSidebarOpen}
+              onNavigateComplete={() => setTabletSidebarOpen(false)} />
+          </div>
+        : <Sidebar
+            activePage={activeNavId}
+            onNavigate={navigate}
+            collapsed={sidebarCollapsed} />
+      }
       
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <Topbar
@@ -399,8 +458,8 @@ function AppInner() {
           onChangeTheme={(v) => setTweak('theme', v)}
           lang={lang}
           onToggleLang={() => setLang(lang === 'zh' ? 'en' : 'zh')}
-          collapsed={tweaks.sidebarCollapsed}
-          onToggleCollapse={() => setTweak('sidebarCollapsed', !tweaks.sidebarCollapsed)}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={toggleSidebar}
           accent={
             typeof tweaks.accent === 'string' && ACCENT_PRESETS[tweaks.accent] ? tweaks.accent :
             (tweaks.accent && (tweaks.accent.value || tweaks.accent.key)) || 'green'

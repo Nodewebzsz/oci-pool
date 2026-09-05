@@ -146,6 +146,113 @@
   .sidebar-item:not(.sidebar-item-active):hover { background: var(--bg-2) !important; }
   .sidebar-item:focus-visible { background: var(--bg-2); outline: none; }
   .sidebar-item-active { background: transparent !important; }
+  .sidebar { z-index: 30; }
+  .tablet-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 24;
+    padding: 0;
+    border: 0;
+    background: rgba(3, 10, 8, 0.52);
+    backdrop-filter: blur(2px);
+    cursor: default;
+    animation: fade-in 160ms ease both;
+  }
+
+  /* 系统监控页:桌面保持高密度,平板按可用宽度重排完整信息。 */
+  .monitor-page { width: 100%; min-width: 0; }
+  .monitor-kpi-grid,
+  .monitor-resource-grid,
+  .monitor-bottom-grid {
+    display: grid;
+    gap: 14px;
+    min-width: 0;
+  }
+  .monitor-kpi-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .monitor-resource-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-bottom: 14px;
+  }
+  .monitor-bottom-grid {
+    grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
+  }
+  .monitor-kpi-grid > *,
+  .monitor-resource-grid > *,
+  .monitor-bottom-grid > * {
+    min-width: 0;
+  }
+  .monitor-resource-card { overflow: hidden; }
+  .monitor-resource-card > div:first-child > div,
+  .monitor-resource-card > div:first-child > div > div { min-width: 0; }
+  .monitor-resource-card > div:first-child > div > div:last-child {
+    overflow-wrap: anywhere;
+  }
+  .monitor-gauge > div {
+    width: clamp(144px, 13vw, 180px) !important;
+    height: auto !important;
+    aspect-ratio: 1;
+  }
+  .monitor-gauge > div > svg,
+  .monitor-gauge > div > div {
+    width: 100% !important;
+    height: 100% !important;
+  }
+  .monitor-activity-row > div { overflow-wrap: anywhere; }
+
+  @media (min-width: 1024px) and (max-width: 1199px) {
+    .monitor-kpi-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .monitor-resource-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .monitor-bottom-grid {
+      grid-template-columns: minmax(0, 1.45fr) minmax(260px, 1fr);
+    }
+    .monitor-gauge > div {
+      width: clamp(156px, 20vw, 180px) !important;
+    }
+  }
+
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .monitor-kpi-grid,
+    .monitor-resource-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .monitor-bottom-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .monitor-header > div {
+      align-items: flex-start !important;
+      flex-wrap: wrap;
+      row-gap: 10px;
+    }
+    .monitor-header > div > div:last-child {
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .monitor-gauge > div {
+      width: clamp(148px, 24vw, 180px) !important;
+    }
+  }
+
+  @media (min-width: 768px) and (max-width: 1199px) {
+    .tablet-sidebar-slot {
+      width: var(--sidebar-w-collapsed);
+      flex: 0 0 var(--sidebar-w-collapsed);
+    }
+    .sidebar--tablet-overlay {
+      position: fixed !important;
+      left: 0;
+      top: 0;
+      width: var(--sidebar-w) !important;
+      box-shadow: 12px 0 36px rgba(0, 0, 0, 0.38);
+    }
+  }
 
   @keyframes pulse-dot {
     0%, 100% { opacity: 1; }
@@ -214,14 +321,14 @@
   <script src="/modern-ui/vendor/topojson-client.min.js"></script>
 
   <script src="/modern-ui/dist/src/ui.js?v=13"></script>
-  <script src="/modern-ui/dist/src/charts.js"></script>
+  <script src="/modern-ui/dist/src/charts.js?v=2"></script>
   <script src="/modern-ui/dist/src/shell.js?v=10"></script>
-  <script src="/modern-ui/dist/src/layout.js?v=18"></script>
+  <script src="/modern-ui/dist/src/layout.js?v=19"></script>
   <script src="/modern-ui/dist/src/tenant-actions.js?v=13"></script>
   <script src="/modern-ui/dist/src/instance-actions.js?v=24"></script>
   <script src="/modern-ui/dist/src/grab-actions.js?v=3"></script>
   <script src="/modern-ui/dist/src/misc-actions.js?v=8"></script>
-  <script src="/modern-ui/dist/src/page-monitor.js?v=8"></script>
+  <script src="/modern-ui/dist/src/page-monitor.js?v=9"></script>
   <script src="/modern-ui/dist/src/page-tenants.js?v=11"></script>
   <script src="/modern-ui/dist/src/page-tenant-detail.js?v=8"></script>
   <script src="/modern-ui/dist/src/page-tenant-grab.js?v=6"></script>
@@ -236,6 +343,6 @@
   <script src="/modern-ui/src/auth-factor.js?v=9"></script>
   <script src="/modern-ui/dist/src/page-auth.js?v=11"></script>
   <script src="/modern-ui/src/router.js?v=3"></script>
-  <script src="/modern-ui/dist/src/app.js?v=12"></script>
+  <script src="/modern-ui/dist/src/app.js?v=13"></script>
 </body>
 </html>
