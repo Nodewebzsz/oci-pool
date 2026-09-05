@@ -856,11 +856,7 @@ function ProxyKeyConfigPage() {
           </div>
 
           {/* 3 卡并排:CF + EO + 占位 */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 12,
-          }}>
+          <div className="provider-grid">
             {/* ─── Cloudflare 卡 ─── */}
             <div style={{
               background: 'var(--bg-2)',

@@ -213,6 +213,18 @@
     color: var(--fg-3);
     letter-spacing: 0.02em;
   }
+  /* 服务商配置页:3 卡网格在窄屏降列,避免提示文案被挤成两行。 */
+  .provider-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+  @media (max-width: 1023px) {
+    .provider-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 767px) {
+    .provider-grid { grid-template-columns: minmax(0, 1fr); }
+  }
 
   @media (min-width: 1024px) and (max-width: 1199px) {
     .monitor-kpi-grid {
@@ -348,7 +360,7 @@
   <script src="/modern-ui/dist/src/page-grab.js?v=9"></script>
   <script src="/modern-ui/dist/src/page-regions.js?v=8"></script>
   <script src="/modern-ui/dist/src/page-logs.js?v=7"></script>
-  <script src="/modern-ui/dist/src/page-proxy.js?v=9"></script>
+  <script src="/modern-ui/dist/src/page-proxy.js?v=10"></script>
   <script src="/modern-ui/dist/src/page-misc.js?v=14"></script>
   <script src="/modern-ui/dist/src/page-tools.js?v=11"></script>
   <script src="/modern-ui/src/auth-factor.js?v=9"></script>

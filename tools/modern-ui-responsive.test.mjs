@@ -69,3 +69,14 @@ test('实时活动为空时提供占位文本而不是只有标题', async () =>
   assert.match(i18n, /['"]monitor\.chart\.activityEmpty['"]\s*:\s*['"]暂无实时活动['"]/);
   assert.match(i18n, /['"]monitor\.chart\.activityEmpty['"]\s*:\s*['"]No live activity['"]/);
 });
+
+test('服务商配置卡片网格在窄屏降列避免文案换行', async () => {
+  const page = await loadText('oci-server/src/main/resources/static/modern-ui/src/page-proxy.jsx');
+  const html = await loadText('oci-server/src/main/resources/static/modern-ui/index.html');
+
+  assert.match(page, /className="provider-grid"/);
+  assert.match(html, /\.provider-grid\s*\{[^}]*repeat\(3,\s*minmax\(0,\s*1fr\)\)/s);
+  assert.match(html, /@media\s*\(max-width:\s*1023px\)[\s\S]*?\.provider-grid[^}]*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(html, /@media\s*\(max-width:\s*767px\)[\s\S]*?\.provider-grid[^}]*minmax\(0,\s*1fr\)/);
+  assert.match(html, /dist\/src\/page-proxy\.js\?v=10/);
+});
