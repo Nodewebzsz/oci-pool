@@ -30,6 +30,8 @@ public class VersionController  extends BaseController{
 
     @GetMapping("/check")
     public Map<String, Object> checkV() {
+        // 实时刷新最新版本（Docker 部署以 Docker Hub 为权威），避免“关于”弹窗读到过期缓存值。
+        versionCheckTask.checkVersion();
         AppVersion version = versionCheckTask.getVersion();
         Map<String, Object> result = new HashMap<>();
         result.put("currentVersion", version.getCurrentVersion());
