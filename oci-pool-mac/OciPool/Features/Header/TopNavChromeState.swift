@@ -1,11 +1,13 @@
 import Foundation
 import Combine
 
-/// Coordinates in-window top-nav dropdowns (language / user).
+/// Coordinates mutually-exclusive in-window top-nav popovers.
 /// Avoids SwiftUI `.popover` which escapes the app window and can glitch when two are adjacent.
 enum TopNavDropdown: Equatable {
     case none
+    case theme
     case accent
+    case notifications
     case user
 }
 

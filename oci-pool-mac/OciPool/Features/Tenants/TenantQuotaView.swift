@@ -296,7 +296,7 @@ struct TenantQuotaView: View {
                 .frame(width: wPct, alignment: .center)
         }
         .padding(.horizontal, hPad)
-        .padding(.vertical, 9)
+        .padding(.vertical, appearance.density.rowPadding)
         .frame(width: width, alignment: .leading)
         .background(stripe)
         .overlay(

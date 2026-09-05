@@ -164,25 +164,11 @@ struct TopNavView: View {
         .help("语言")
     }
 
-    @ViewBuilder
     private var themeMenuButton: some View {
-        Menu {
-            Button {
-                appearance.mode = .light
-            } label: {
-                Label("浅色", systemImage: "sun.max")
-            }
-            Button {
-                appearance.mode = .dark
-            } label: {
-                Label("深色", systemImage: "moon.fill")
-            }
-            Button {
-                appearance.mode = .system
-            } label: {
-                Label("跟随系统", systemImage: "desktopcomputer")
-            }
-        } label: {
+        Button(action: {
+            header.closeMessages()
+            chrome.toggle(.theme)
+        }) {
             HStack(spacing: 2) {
                 Image(systemName: themeIcon)
                     .font(.system(size: 13, weight: .medium))
@@ -195,14 +181,14 @@ struct TopNavView: View {
             .frame(height: 30)
             .background(
                 RoundedRectangle(cornerRadius: 5)
-                    .fill(AppTheme.sidebarBg(dark).opacity(0.6))
+                    .fill(chrome.open == .theme ? AppTheme.sidebarHover(dark) : AppTheme.sidebarBg(dark).opacity(0.6))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 5)
-                    .stroke(AppTheme.border(dark), lineWidth: 1)
+                    .stroke(chrome.open == .theme ? AppTheme.sidebarActive : AppTheme.border(dark), lineWidth: 1)
             )
         }
-        .menuStyle(BorderlessButtonMenuStyle())
+        .buttonStyle(PlainButtonStyle())
         .fixedSize()
         .help("主题")
     }
@@ -244,7 +230,7 @@ struct TopNavView: View {
             chrome.close()
             appearance.density = appearance.density == .compact ? .comfortable : .compact
         } label: {
-            Image(systemName: appearance.density == .compact ? "square.grid.3x1.fill" : "square.grid.2x2")
+            Image(systemName: appearance.density == .compact ? "list.bullet" : "square.grid.2x2")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(AppTheme.navIcon(dark))
                 .frame(width: 30, height: 30)
@@ -263,65 +249,71 @@ struct TopNavView: View {
 
     private var messageButton: some View {
         Button(action: {
-            chrome.close()
-            header.toggleMessages()
+            if chrome.open == .notifications {
+                chrome.close()
+                header.closeMessages()
+            } else {
+                chrome.open = .notifications
+                header.openMessages()
+            }
         }) {
             ZStack(alignment: .topTrailing) {
-                Image(systemName: "bell.fill")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(AppTheme.navIcon(dark))
-                    .frame(width: 36, height: 36)
-                    .background(circleBg(highlight: header.showMessages))
-                if header.unreadCount > 0 {
-                    Text(header.unreadCount > 99 ? "99+" : "\(header.unreadCount)")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 4)
-                        .frame(minWidth: 16, minHeight: 16)
-                        .background(Capsule().fill(Color(hex: "ff4d4f")))
-                        .offset(x: 4, y: -2)
-                }
+                Image(systemName: "bell")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(chrome.open == .notifications ? Color(hex: "f59e0b") : AppTheme.navIcon(dark))
+                    .frame(width: 30, height: 30)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(chrome.open == .notifications ? AppTheme.sidebarHover(dark) : AppTheme.sidebarBg(dark).opacity(0.6))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5)
+                            .stroke(chrome.open == .notifications ? Color(hex: "f59e0b") : AppTheme.border(dark), lineWidth: 1)
+                    )
+                Circle()
+                    .fill(Color(hex: "f59e0b"))
+                    .frame(width: 7, height: 7)
+                    .padding(.top, 4)
+                    .padding(.trailing, 5)
             }
+            .frame(width: 30, height: 30)
         }
         .buttonStyle(PlainButtonStyle())
-        .help("消息中心")
+        .help(header.unreadCount > 0 ? "通知 · \(header.unreadCount) 条未读" : "通知")
     }
 
     private var userButton: some View {
         Button(action: {
             header.closeMessages()
             chrome.toggle(.user)
+            if chrome.open == .user {
+                Task { await header.loadAsset() }
+            }
         }) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 ZStack {
                     Circle()
                         .fill(AppTheme.brand(dark).opacity(0.25))
-                        .frame(width: 30, height: 30)
+                        .frame(width: 26, height: 26)
                     Text(avatarLetter)
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundColor(AppTheme.brand(dark))
                 }
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(session.username.isEmpty ? "Admin" : session.username)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(AppTheme.navIcon(dark))
-                    Text(session.cloudProviderName)
-                        .font(.system(size: 10))
-                        .foregroundColor(AppTheme.navIcon(dark).opacity(0.7))
-                }
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(.system(size: 8, weight: .bold))
                     .foregroundColor(AppTheme.navIcon(dark).opacity(0.7))
                     .rotationEffect(.degrees(chrome.open == .user ? 180 : 0))
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.leading, 4)
+            .padding(.trailing, 6)
+            .frame(height: 30)
             .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.white.opacity(dark ? 0.06 : 0.35))
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(chrome.open == .user ? AppTheme.sidebarHover(dark) : Color.clear)
             )
         }
         .buttonStyle(PlainButtonStyle())
+        .help("账号菜单")
     }
 
     private var themeIcon: String {
@@ -378,14 +370,6 @@ struct UserDropdownPanel: View {
     var onAbout: () -> Void
     var onLogout: () -> Void
 
-    private var welcome: String {
-        username.isEmpty ? "欢迎" : "欢迎，\(username)"
-    }
-
-    private var levelName: String {
-        levelTitle.isEmpty ? AssetAnalysis.levelConfig(level).name : levelTitle
-    }
-
     private var textPrimary: Color {
         dark ? Color.white.opacity(0.92) : Color(hex: "111827")
     }
@@ -396,12 +380,40 @@ struct UserDropdownPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            topPart
-            cloudPart
-            bottomPart
+            userHeader
+            VStack(alignment: .leading, spacing: 0) {
+                menuRow(
+                    icon: "chart.pie.fill",
+                    title: "资产分析",
+                    trailing: "L\(max(1, min(level, 9)))",
+                    action: onAsset
+                )
+                divider
+                Text("切换云厂商")
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundColor(textMuted)
+                    .padding(.horizontal, 10)
+                    .padding(.top, 6)
+                    .padding(.bottom, 3)
+                menuRow(
+                    icon: "cloud",
+                    title: "Oracle Cloud",
+                    selected: cloudProvider == 1,
+                    action: { onCloud(1, "Oracle Cloud") }
+                )
+                menuRow(
+                    icon: "globe",
+                    title: "Google Cloud",
+                    selected: cloudProvider == 2,
+                    action: { onCloud(2, "Google Cloud") }
+                )
+                divider
+                menuRow(icon: "info.circle", title: "关于", action: onAbout)
+                menuRow(icon: "arrow.right.square", title: "退出登录", danger: true, action: onLogout)
+            }
+            .padding(4)
         }
-        .padding(.bottom, 6)
-        .frame(width: 240)
+        .frame(width: 250)
         .background(dark ? Color(hex: "2a2f36") : Color.white)
         .cornerRadius(10)
         .overlay(
@@ -410,90 +422,105 @@ struct UserDropdownPanel: View {
         )
     }
 
-    private var topPart: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            headerBlock
-            thinLine
-            menuRow(icon: "chart.pie.fill", color: textMuted, title: "云资产报告", action: onAsset)
-            thinLine
-        }
-    }
-
-    private var cloudPart: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            sectionLabel("切换云厂商")
-            menuRow(icon: "cloud", color: checkColor(1), title: cloudLabel(1, "Oracle Cloud"), action: { onCloud(1, "Oracle Cloud") })
-            menuRow(icon: "g.circle", color: checkColor(2), title: cloudLabel(2, "Google Cloud"), action: { onCloud(2, "Google Cloud") })
-            menuRow(icon: "square.stack.3d.up", color: checkColor(3), title: cloudLabel(3, "Azure Cloud"), action: { onCloud(3, "Azure Cloud") })
-            menuRow(icon: "server.rack", color: checkColor(4), title: cloudLabel(4, "Amazon Cloud"), action: { onCloud(4, "Amazon Cloud") })
-        }
-    }
-
-    private var bottomPart: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            thinLine
-            menuRow(icon: "info.circle", color: textMuted, title: "关于 OCI-POOL", action: onAbout)
-            menuRow(icon: "arrow.right.square", color: Color(hex: "f85149"), title: "退出登录", action: onLogout)
-        }
-    }
-
-    private var headerBlock: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(welcome)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(textPrimary)
-            Text(levelName)
-                .font(.system(size: 11, weight: .semibold))
+    private var userHeader: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(AppTheme.sidebarActive.opacity(0.25))
+                    .frame(width: 36, height: 36)
+                Text(avatarLetters)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(AppTheme.sidebarActive)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text("欢迎，\(username.isEmpty ? "Admin" : username)")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundColor(textPrimary)
+                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.shield.fill")
+                        .font(.system(size: 9, weight: .semibold))
+                    Text("超级管理员")
+                        .font(.system(size: 9.5, weight: .semibold))
+                }
                 .foregroundColor(AppTheme.sidebarActive)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(Capsule().fill(AppTheme.sidebarActive.opacity(0.16)))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(AppTheme.sidebarActive.opacity(0.14))
+                )
+            }
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
+        .background(dark ? Color(hex: "252a31") : Color(hex: "f5f7fa"))
+        .overlay(
+            Rectangle()
+                .fill(dark ? Color.white.opacity(0.08) : Color.black.opacity(0.08))
+                .frame(height: 1),
+            alignment: .bottom
+        )
     }
 
-    private var thinLine: some View {
+    private var divider: some View {
         Rectangle()
             .fill(dark ? Color.white.opacity(0.08) : Color.black.opacity(0.08))
             .frame(height: 1)
+            .padding(.horizontal, 6)
             .padding(.vertical, 4)
     }
 
-    private func sectionLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundColor(textMuted)
-            .padding(.horizontal, 14)
-            .padding(.top, 6)
-            .padding(.bottom, 2)
-    }
-
-    private func cloudLabel(_ type: Int, _ name: String) -> String {
-        cloudProvider == type ? "✓  \(name)" : name
-    }
-
-    private func checkColor(_ type: Int) -> Color {
-        cloudProvider == type ? AppTheme.sidebarActive : textMuted
-    }
-
-    private func menuRow(icon: String, color: Color, title: String, action: @escaping () -> Void) -> some View {
+    private func menuRow(
+        icon: String,
+        title: String,
+        trailing: String? = nil,
+        selected: Bool = false,
+        danger: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            HStack(spacing: 9) {
                 Image(systemName: icon)
-                    .font(.system(size: 12))
-                    .foregroundColor(color)
-                    .frame(width: 16)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(danger ? Color(hex: "f85149") : (selected ? AppTheme.sidebarActive : textMuted))
+                    .frame(width: 14)
                 Text(title)
-                    .font(.system(size: 13))
-                    .foregroundColor(textPrimary)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(danger ? Color(hex: "f85149") : textPrimary)
                 Spacer(minLength: 0)
+                if let trailing = trailing {
+                    Text(trailing)
+                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                        .foregroundColor(AppTheme.sidebarActive)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(AppTheme.sidebarActive.opacity(0.14))
+                        )
+                } else if selected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(AppTheme.sidebarActive)
+                }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 9)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
+    }
+
+    private var avatarLetters: String {
+        let normalized = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return "A" }
+        let parts = normalized.split { " ._-".contains($0) }
+        if parts.count > 1 {
+            return (String(parts[0].prefix(1)) + String(parts[1].prefix(1))).uppercased()
+        }
+        return String(normalized.prefix(2)).uppercased()
     }
 }
 

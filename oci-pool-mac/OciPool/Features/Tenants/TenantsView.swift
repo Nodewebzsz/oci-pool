@@ -321,7 +321,7 @@ struct TenantsView: View {
             }
         }
         .padding(.horizontal, cols.hPad)
-        .padding(.vertical, 9)
+        .padding(.vertical, appearance.density.rowPadding)
         .frame(width: width, alignment: .leading)
         .contentShape(Rectangle())
         .overlay(

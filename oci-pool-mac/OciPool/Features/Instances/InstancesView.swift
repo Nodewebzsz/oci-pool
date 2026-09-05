@@ -374,7 +374,7 @@ struct InstancesView: View {
             }
         }
         .padding(.horizontal, hPad)
-        .padding(.vertical, 10)
+        .padding(.vertical, appearance.density.rowPadding)
         .frame(width: width, alignment: .leading)
         .contentShape(Rectangle())
         .background(rowBackground(group: grp, hovered: hovered))

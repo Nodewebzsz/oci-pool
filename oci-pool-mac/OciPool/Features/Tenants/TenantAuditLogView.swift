@@ -214,7 +214,7 @@ struct TenantAuditLogView: View {
                 .frame(width: wStatus, alignment: .center)
         }
         .padding(.horizontal, hPad)
-        .padding(.vertical, 9)
+        .padding(.vertical, appearance.density.rowPadding)
         .frame(width: width, alignment: .leading)
         .background(log.isError ? errorTint : stripe)
         .overlay(

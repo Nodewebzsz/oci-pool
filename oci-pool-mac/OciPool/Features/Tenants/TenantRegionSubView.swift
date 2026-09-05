@@ -214,7 +214,7 @@ struct TenantRegionSubView: View {
                 .frame(width: wStatus, alignment: .leading)
         }
         .padding(.horizontal, hPad)
-        .padding(.vertical, 9)
+        .padding(.vertical, appearance.density.rowPadding)
         .frame(width: width, alignment: .leading)
         .background(index % 2 == 1 ? AppTheme.sidebarHover(dark).opacity(0.18) : Color.clear)
         .overlay(Rectangle().frame(height: 1).foregroundColor(border.opacity(0.3)), alignment: .bottom)
@@ -321,7 +321,7 @@ struct TenantRegionSubView: View {
                 Spacer()
             }
             .padding(.horizontal, hPad)
-            .padding(.vertical, 10)
+            .padding(.vertical, appearance.density.rowPadding)
             .frame(width: width, alignment: .leading)
             .background(selected ? AppTheme.sidebarActive.opacity(0.07) : (index % 2 == 1 ? AppTheme.sidebarHover(dark).opacity(0.18) : Color.clear))
             .overlay(Rectangle().frame(height: 1).foregroundColor(border.opacity(0.3)), alignment: .bottom)

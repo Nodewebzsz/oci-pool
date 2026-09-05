@@ -423,7 +423,7 @@ struct TenantCostView: View {
                 .lineLimit(1)
         }
         .padding(.horizontal, hPad)
-        .padding(.vertical, 8)
+        .padding(.vertical, appearance.density.rowPadding)
         .frame(width: width, alignment: .leading)
         .background(stripe)
         .overlay(

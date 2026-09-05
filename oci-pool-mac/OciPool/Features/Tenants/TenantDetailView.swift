@@ -329,7 +329,7 @@ struct TenantDetailView: View {
                 .frame(width: action, alignment: .center)
         }
         .padding(.horizontal, hPad)
-        .padding(.vertical, 10)
+        .padding(.vertical, appearance.density.rowPadding)
         .frame(width: width, alignment: .leading)
         .background(rowBackground(index: index, hovered: hovered))
         .overlay(

@@ -311,7 +311,7 @@ struct StorageView: View {
             .frame(width: 160, alignment: .trailing)
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 9)
+        .padding(.vertical, appearance.density.rowPadding)
     }
 
     private func iconBtn(_ system: String, help: String, danger: Bool = false, action: @escaping () -> Void) -> some View {

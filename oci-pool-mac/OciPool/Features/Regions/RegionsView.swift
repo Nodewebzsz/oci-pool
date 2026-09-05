@@ -317,7 +317,7 @@ struct RegionsView: View {
                             cell("\(row.monthlyOpenCount)", 100)
                             cell(Self.fmt(row.lastNotifyTime), 140)
                         }
-                        .padding(.vertical, 11)
+                        .padding(.vertical, appearance.density.rowPadding)
                         .padding(.horizontal, 8)
                         .overlay(Rectangle().fill(RegionsTheme.border(dark).opacity(0.6)).frame(height: 1), alignment: .bottom)
                     }
