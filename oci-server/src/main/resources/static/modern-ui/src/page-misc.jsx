@@ -941,8 +941,8 @@ function ObjectPage() {
         iconColor="var(--info)"
         actions={
           <>
-            <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>{tr('obj.selectTenant')}</span>
-            <CustomDropdown value={tenantId} onChange={e => setTenantId(e)} height={32} width="100%">
+            <span style={{ fontSize: 12, color: 'var(--fg-3)', whiteSpace: 'nowrap' }}>{tr('obj.selectTenant')}</span>
+            <CustomDropdown value={tenantId} onChange={e => setTenantId(e)} height={32} width="240px">
               <option value="">{tr('obj.selectTenantPh')}</option>
               {tenants.map(t => (
                 <option key={t.id} value={t.id}>{t.name} · {getTenantName(t)}</option>
