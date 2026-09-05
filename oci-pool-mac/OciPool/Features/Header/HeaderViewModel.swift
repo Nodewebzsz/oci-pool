@@ -64,6 +64,11 @@ final class HeaderViewModel: ObservableObject {
         // Instant — no text toast; selection checkmark is enough.
     }
 
+    /// Web parity: topbar language button is a one-click zh ↔ en toggle (not a dropdown).
+    func toggleLocale() {
+        setLocale(locale == .enUS ? .zhCN : .enUS)
+    }
+
     // MARK: - User
 
     func refreshUserInfo() async {

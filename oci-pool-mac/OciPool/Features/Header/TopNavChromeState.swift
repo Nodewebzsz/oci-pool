@@ -5,7 +5,6 @@ import Combine
 /// Avoids SwiftUI `.popover` which escapes the app window and can glitch when two are adjacent.
 enum TopNavDropdown: Equatable {
     case none
-    case language
     case accent
     case user
 }

@@ -22,19 +22,12 @@ struct TopNavDropdownOverlay: View {
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .topTrailing) {
-                // 语言 / 用户：点击空白关闭
+                // 强调色 / 用户：点击空白关闭
                 if chrome.open != .none && !header.showMessages {
                     Color.clear
                         .contentShape(Rectangle())
                         .frame(width: geo.size.width, height: geo.size.height)
                         .onTapGesture { chrome.close() }
-                }
-
-                if chrome.open == .language && !header.showMessages {
-                    languagePanel
-                        .padding(.top, topBarHeight + 4)
-                        .padding(.trailing, trailingPad + 120)
-                        .transition(.opacity)
                 }
 
                 if chrome.open == .accent && !header.showMessages {
@@ -86,51 +79,6 @@ struct TopNavDropdownOverlay: View {
             .animation(.easeInOut(duration: 0.15), value: chrome.open)
         }
         .allowsHitTesting(anyOverlayOpen)
-    }
-
-    // MARK: - Language
-
-    private var languagePanel: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("语言")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(dark ? Color.white.opacity(0.45) : Color(hex: "6b7280"))
-                .padding(.horizontal, 12)
-                .padding(.top, 10)
-                .padding(.bottom, 4)
-
-            ForEach(AppLocale.allCases) { loc in
-                Button(action: {
-                    header.setLocale(loc)
-                    chrome.close()
-                }) {
-                    HStack {
-                        Text(loc.title)
-                            .font(.system(size: 13))
-                        Spacer()
-                        if header.locale == loc {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(AppTheme.sidebarActive)
-                        }
-                    }
-                    .foregroundColor(dark ? Color.white.opacity(0.9) : Color(hex: "111827"))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-        }
-        .padding(.bottom, 8)
-        .frame(width: 160, alignment: .leading)
-        .background(dark ? Color(hex: "2a2f36") : Color.white)
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(dark ? Color.white.opacity(0.08) : Color.black.opacity(0.08), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(dark ? 0.45 : 0.18), radius: 16, y: 8)
     }
 
     // MARK: - Accent

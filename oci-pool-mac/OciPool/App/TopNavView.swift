@@ -135,11 +135,11 @@ struct TopNavView: View {
         .fixedSize()
     }
 
-    // Web topbar: 语言切换（图标 + 当前语言文本）— 保持原生下拉选择器
+    // Web topbar: 语言切换（图标 + 当前语言文本）— 一键 中文↔English
     private var languageButton: some View {
         Button(action: {
             header.closeMessages()
-            chrome.toggle(.language)
+            header.toggleLocale()
         }) {
             HStack(spacing: 6) {
                 Image(systemName: "languages")
@@ -153,11 +153,11 @@ struct TopNavView: View {
             .frame(height: 30)
             .background(
                 RoundedRectangle(cornerRadius: 5)
-                    .fill(chrome.open == .language ? AppTheme.sidebarHover(dark) : AppTheme.sidebarBg(dark).opacity(0.6))
+                    .fill(AppTheme.sidebarBg(dark).opacity(0.6))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 5)
-                    .stroke(chrome.open == .language ? AppTheme.sidebarActive : AppTheme.border(dark), lineWidth: 1)
+                    .stroke(AppTheme.border(dark), lineWidth: 1)
             )
         }
         .buttonStyle(PlainButtonStyle())
@@ -327,11 +327,7 @@ struct TopNavView: View {
     }
 
     private var langShortTitle: String {
-        switch header.locale {
-        case .zhCN: return "中文"
-        case .zhTW: return "繁中"
-        case .enUS: return "English"
-        }
+        header.locale == .enUS ? "English" : "中文"
     }
 
     private var avatarLetter: String {
