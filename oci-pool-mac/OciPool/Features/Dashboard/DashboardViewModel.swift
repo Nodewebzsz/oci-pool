@@ -7,13 +7,13 @@ final class DashboardViewModel: ObservableObject {
     @Published private(set) var stats = DashboardStats()
     @Published private(set) var metrics = SystemMetrics()
     @Published private(set) var networkHistory: [NetworkSample] = []
+    @Published private(set) var activityLogs: [ActivityLog] = []
     @Published private(set) var lastUpdateText = "加载中..."
     @Published private(set) var isLoading = false
     @Published private(set) var errorText: String?
 
     private let session: AppSession
     private var monitorTimer: Timer?
-    private var statsTimer: Timer?
     private let maxNetworkPoints = 30
 
     init(session: AppSession = .shared) {
@@ -23,21 +23,14 @@ final class DashboardViewModel: ObservableObject {
     func start() {
         Task { await refreshAll() }
         stopTimers()
-        // web: monitor 20s, stats 60s
-        monitorTimer = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { [weak self] _ in
+        // Web monitor page polls all three endpoints every 10s.
+        monitorTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             Task { @MainActor in
-                await self.refreshMetrics()
-            }
-        }
-        statsTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            Task { @MainActor in
-                await self.refreshStats()
+                await self.refreshAll()
             }
         }
         if let monitorTimer = monitorTimer { RunLoop.main.add(monitorTimer, forMode: .common) }
-        if let statsTimer = statsTimer { RunLoop.main.add(statsTimer, forMode: .common) }
     }
 
     func stop() {
@@ -49,7 +42,8 @@ final class DashboardViewModel: ObservableObject {
         errorText = nil
         async let s: () = refreshStats()
         async let m: () = refreshMetrics()
-        _ = await (s, m)
+        async let l: () = refreshActivity()
+        _ = await (s, m, l)
         isLoading = false
     }
 
@@ -67,8 +61,8 @@ final class DashboardViewModel: ObservableObject {
 
     func refreshMetrics() async {
         do {
-            // Prefer web path used by dashboard.js
-            let data = try await fetchEnvelope(path: "/monitor/stats", as: SystemMetrics.self)
+            // Prefer web path used by page-monitor.jsx
+            let data = try await fetchEnvelope(path: "/boot/stats", as: SystemMetrics.self)
             metrics = data
             appendNetwork(upload: data.uploadSpeed, download: data.downloadSpeed)
             if !data.timestamp.isEmpty {
@@ -95,6 +89,20 @@ final class DashboardViewModel: ObservableObject {
         }
     }
 
+    func refreshActivity() async {
+        do {
+            let base = session.serverURL
+            let url = try APIClient.shared.makeURL(base, path: "/system/openLogs/json")
+            let raw = try await APIClient.shared.getJSON(url)
+            let envelope = try JSONDecoder().decode(OpenLogLinesEnvelope.self, from: raw)
+            let lines = envelope.lines ?? []
+            activityLogs = lines.prefix(10).enumerated().map { ActivityLog.parse($0.element, id: $0.offset) }
+            if errorText != nil && !lines.isEmpty { errorText = nil }
+        } catch {
+            // Activity feed is secondary — do not surface a page-level error for it.
+        }
+    }
+
     private func appendNetwork(upload: Double, download: Double) {
         let f = DateFormatter()
         f.locale = Locale(identifier: "zh_CN")
@@ -118,13 +126,10 @@ final class DashboardViewModel: ObservableObject {
 
     private func stopTimers() {
         monitorTimer?.invalidate()
-        statsTimer?.invalidate()
         monitorTimer = nil
-        statsTimer = nil
     }
 
     deinit {
         monitorTimer?.invalidate()
-        statsTimer?.invalidate()
     }
 }
