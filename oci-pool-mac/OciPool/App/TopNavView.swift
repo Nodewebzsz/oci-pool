@@ -183,18 +183,24 @@ struct TopNavView: View {
                 Label("跟随系统", systemImage: "desktopcomputer")
             }
         } label: {
-            Image(systemName: themeIcon)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(AppTheme.navIcon(dark))
-                .frame(width: 30, height: 30)
-                .background(
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(AppTheme.sidebarBg(dark).opacity(0.6))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 5)
-                        .stroke(AppTheme.border(dark), lineWidth: 1)
-                )
+            HStack(spacing: 2) {
+                Image(systemName: themeIcon)
+                    .font(.system(size: 13, weight: .medium))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+                    .opacity(0.55)
+            }
+            .foregroundColor(AppTheme.navIcon(dark))
+            .padding(.horizontal, 7)
+            .frame(height: 30)
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(AppTheme.sidebarBg(dark).opacity(0.6))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 5)
+                    .stroke(AppTheme.border(dark), lineWidth: 1)
+            )
         }
         .menuStyle(BorderlessButtonMenuStyle())
         .fixedSize()
@@ -327,7 +333,7 @@ struct TopNavView: View {
     }
 
     private var langShortTitle: String {
-        header.locale == .enUS ? "English" : "中文"
+        header.locale == .enUS ? "EN" : "中"
     }
 
     private var avatarLetter: String {
