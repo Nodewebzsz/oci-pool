@@ -1,41 +1,42 @@
 # macOS 客户端与 Web 前端统一跟踪
 
-## 当前结论
+## 当前结论（2026-09-05 更新）
 
-macOS 客户端目前不是当前 React Modern UI 的桌面容器，而是一套独立维护的原生 SwiftUI 界面。
+macOS 客户端采用 **原生 AppKit / SwiftUI** 方案，**不使用 WKWebView 内嵌**。
+目标：按原项目的原生实现方式，将当前 React Modern UI **一比一复刻**为原生页面。
 
-- 未登录时，`MainWindowController.rebuildContent()` 直接加载原生 `LoginView`。
-- 登录后，`FeatureRouter` 将菜单路由到 `DashboardView`、`RegionsView`、`TenantsView` 等原生 SwiftUI 页面。
-- `WebEmbedViewController` 虽然仍在仓库中，但当前没有调用点。
-- 因此 Web 前端的登录页、布局和交互更新不会自动反映到 macOS 客户端。
+- 登录前：MainWindowController 加载原生 LoginView。
+- 登录后：FeatureRouter 路由到原生 SwiftUI 业务页。
+- 现有原生 Features 模块（AiChat / AiModels / ApiTokens / Boot / Cloudflare / Dashboard / EdgeOne / Email / Instances / IpQuality / KeyConfig / Login / Memo / MfaBackup / Migration / Notify / OpenLogs / ProxyConfig / Regions / SecuritySettings / SpeedTest / Storage / SystemLogs / Tenants / Vps 等）作为复刻骨架，逐页对齐当前 Web 前端。
+
+## 方向（用户明确要求）
+
+- 放弃方案 A（WKWebView 全窗内嵌），已通过提交 dfbd779 回退。
+- 采用原项目的原生实现方式，将当前前端页面一比一复刻为原生页面。
+- 前端源码基准：oci-server/src/main/resources/static/modern-ui/（React SPA：登录/注册/MFA + 20+ 页面）。
+- 前端 Web 更新后，原生页面需人工同步，不通过 WKWebView 自动复用。
 
 ## 已发现问题
 
 - 客户端登录页与当前 Web 登录页的视觉、字段布局和交互流程不一致。
-- 客户端其他原生页面也可能与当前 Web 前端存在功能和样式差异，不能视为完全复用当前前端。
+- 客户端各原生页面与当前 Web 前端存在功能和样式差异。
+- Web 前端更新不会自动反映到原生客户端。
 
-## 处理顺序
+## 处理顺序（分批）
 
-1. 先完成当前 React Modern UI 的自适应布局优化。
-2. 再确定 macOS 客户端统一方案，避免在 Web 布局尚未稳定时重复适配。
-3. 完成客户端改造后，重新构建和验证 DMG。
-
-## 后续方案方向
-
-优先评估让 macOS 客户端使用 `WKWebView` 加载当前 React Modern UI，使登录页和登录后页面直接复用同一套前端。客户端仍需保留本机后端启动、远程服务器选择、窗口管理和首次启动等桌面能力。
-
-需要重点处理：
-
-- 本机模式：先启动内置后端，健康检查通过后再加载 Web 登录页。
-- 远程模式：确认服务器地址后加载远程 Web 前端。
-- 登录、注册、忘记密码、消息验证码、MFA 和 OAuth 流程与浏览器端一致。
-- Cookie、会话失效、退出登录、外部链接和文件下载在 `WKWebView` 中正常工作。
-- Web 前端在 macOS 客户端最小窗口尺寸下完整可用。
-- 客户端升级后继续保留现有本地数据目录和服务端数据。
+1. 建立原生复刻基线：主题 / 布局 shell / 路由骨架。
+2. 登录链路：登录、注册、忘记密码、消息验证码、MFA，对齐当前 Web。
+3. 布局：侧边栏 / 顶栏 / 内容切换与当前 Web 一致。
+4. 业务页逐个对齐（可按导航顺序）：
+   - Dashboard / Monitor
+   - Regions / Tenants / Tenant Detail / Instances
+   - Storage / Proxy / AI / Tools 等
+5. 保留桌面能力：本机/远程部署选择、窗口管理、首启、数据目录。
+6. 每完成一批，重新构建并验证 DMG。
 
 ## 验收标准
 
-- 同一版本下，浏览器和 macOS 客户端显示相同的登录页面与业务页面。
-- Web 前端页面更新后，不再需要同步重写一套 SwiftUI 业务界面。
-- 本机部署和远程部署两种模式均能完成登录及核心业务操作。
-- DMG 安装、首次启动、应用图标和签名流程不受影响。
+- 同一版本下，浏览器与 macOS 客户端显示相同的登录页与业务页面（视觉 / 交互一致）。
+- 原生页面与 Web 前端功能对齐。
+- 本机与远程两种部署模式均可完成登录及核心业务操作。
+- DMG 安装、首次启动、应用图标、签名流程不受影响。
