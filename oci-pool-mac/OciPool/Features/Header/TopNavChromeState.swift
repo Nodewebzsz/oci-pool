@@ -6,6 +6,7 @@ import Combine
 enum TopNavDropdown: Equatable {
     case none
     case language
+    case accent
     case user
 }
 

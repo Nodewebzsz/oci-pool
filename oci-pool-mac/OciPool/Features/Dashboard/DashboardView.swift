@@ -574,7 +574,7 @@ enum DashboardTheme {
     static func border(_ dark: Bool) -> Color { dark ? Color(hex: "383c42") : Color(hex: "dde3ec") }
     static func text(_ dark: Bool) -> Color { dark ? Color(hex: "fafbfd") : Color(hex: "1a202c") }
     static func muted(_ dark: Bool) -> Color { dark ? Color(hex: "a2a5ab") : Color(hex: "64748b") }
-    static func green(_ dark: Bool) -> Color { dark ? Color(hex: "34d399") : Color(hex: "0f766e") }
+    static func green(_ dark: Bool) -> Color { AppTheme.sidebarActive }
     static func cyan(_ dark: Bool) -> Color { dark ? Color(hex: "2ed3cc") : Color(hex: "0891b2") }
     static func orange(_ dark: Bool) -> Color { dark ? Color(hex: "f59e0b") : Color(hex: "d97706") }
     static func red(_ dark: Bool) -> Color { dark ? Color(hex: "f0524f") : Color(hex: "dc2626") }

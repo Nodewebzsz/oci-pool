@@ -118,6 +118,7 @@ struct TopNavView: View {
             clockChip
             languageButton
             themeMenuButton
+            accentSwitcher
             messageButton
             userButton
         }
@@ -201,6 +202,36 @@ struct TopNavView: View {
         .menuStyle(BorderlessButtonMenuStyle())
         .fixedSize()
         .help("主题")
+    }
+
+    // Web topbar: 强调色 5 点切换 · 调色板按钮 + popover 色板
+    private var accentSwitcher: some View {
+        Button {
+            header.closeMessages()
+            chrome.toggle(.accent)
+        } label: {
+            ZStack(alignment: .bottomTrailing) {
+                Image(systemName: "paintpalette")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(AppTheme.sidebarActive)
+                    .frame(width: 30, height: 30)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(chrome.open == .accent ? AppTheme.sidebarHover(dark) : AppTheme.sidebarBg(dark).opacity(0.6))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5)
+                            .stroke(chrome.open == .accent ? AppTheme.sidebarActive : AppTheme.border(dark), lineWidth: 1)
+                    )
+                Circle()
+                    .fill(AppTheme.sidebarActive)
+                    .frame(width: 7, height: 7)
+                    .padding(3)
+            }
+            .frame(width: 30, height: 30)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .help("强调色")
     }
 
     private var messageButton: some View {

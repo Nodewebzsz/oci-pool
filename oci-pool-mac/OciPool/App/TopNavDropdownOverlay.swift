@@ -37,6 +37,13 @@ struct TopNavDropdownOverlay: View {
                         .transition(.opacity)
                 }
 
+                if chrome.open == .accent && !header.showMessages {
+                    accentPanel
+                        .padding(.top, topBarHeight + 4)
+                        .padding(.trailing, trailingPad + 58)
+                        .transition(.opacity)
+                }
+
                 if chrome.open == .user && !header.showMessages {
                     UserDropdownPanel(
                         dark: dark,
@@ -117,6 +124,57 @@ struct TopNavDropdownOverlay: View {
         }
         .padding(.bottom, 8)
         .frame(width: 160, alignment: .leading)
+        .background(dark ? Color(hex: "2a2f36") : Color.white)
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(dark ? Color.white.opacity(0.08) : Color.black.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(dark ? 0.45 : 0.18), radius: 16, y: 8)
+    }
+
+    // MARK: - Accent
+
+    private var accentPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("强调色")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(dark ? Color.white.opacity(0.5) : Color(hex: "6b7280"))
+                Spacer()
+                Text(appearance.accent.title)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(dark ? Color.white.opacity(0.65) : Color(hex: "374151"))
+            }
+            HStack(spacing: 8) {
+                ForEach(AccentPreset.allCases) { preset in
+                    Button {
+                        appearance.accent = preset
+                        chrome.close()
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(preset.color)
+                                .frame(width: 26, height: 26)
+                            if appearance.accent == preset {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(preset.fg)
+                            }
+                        }
+                        .frame(width: 30, height: 30)
+                        .overlay(
+                            Circle()
+                                .stroke(appearance.accent == preset ? Color.white.opacity(0.9) : Color.clear, lineWidth: 2)
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .help(preset.title)
+                }
+            }
+        }
+        .padding(12)
+        .frame(width: 224, alignment: .leading)
         .background(dark ? Color(hex: "2a2f36") : Color.white)
         .cornerRadius(10)
         .overlay(
