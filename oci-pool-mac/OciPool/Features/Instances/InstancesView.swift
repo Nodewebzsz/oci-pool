@@ -81,9 +81,6 @@ struct InstancesView: View {
                     listBody
                         .padding(.horizontal, 16)
                         .padding(.bottom, 12)
-                    PaginationBar(state: $model.pageState) {
-                        model.onPageChange()
-                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .appLoading(model.isLoading && !model.rows.isEmpty)
@@ -287,67 +284,78 @@ struct InstancesView: View {
 
     @ViewBuilder
     private var listBody: some View {
-        if model.isLoading && model.rows.isEmpty {
-            VStack(spacing: 10) {
-                Spacer()
-                ProgressView()
-                Text("正在加载实例数据…")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
-                Spacer()
+        // Web 三段结构：卡片占满剩余高度，表格内部滚动，分页钉在卡片底部
+        VStack(spacing: 0) {
+            if model.isLoading && model.rows.isEmpty {
+                VStack(spacing: 10) {
+                    Spacer()
+                    ProgressView()
+                    Text("正在加载实例数据…")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.sidebarText(dark))
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if model.rows.isEmpty {
+                EmptyStateView(
+                    icon: "server.rack",
+                    title: "暂无实例",
+                    subtitle: model.hasActiveFilter
+                        ? "当前筛选条件下没有实例"
+                        : "可从租户同步实例，或调整筛选后查询",
+                    actionTitle: "刷新",
+                    action: { Task { await model.reload() } }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                tableArea
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(tableCardBackground)
-        } else if model.rows.isEmpty {
-            EmptyStateView(
-                icon: "server.rack",
-                title: "暂无实例",
-                subtitle: model.hasActiveFilter
-                    ? "当前筛选条件下没有实例"
-                    : "可从租户同步实例，或调整筛选后查询",
-                actionTitle: "刷新",
-                action: { Task { await model.reload() } }
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(tableCardBackground)
-        } else {
-            GeometryReader { geo in
-                let totalW = max(geo.size.width, fixedColsWidth)
-                let flex = max(0, totalW - fixedColsWidth)
-                let wName = minName + flex * 0.55
-                let wIp = minIp + flex * 0.45
-                let needsHScroll = totalW > geo.size.width + 0.5
 
-                let table = VStack(spacing: 0) {
-                    headerRow(wName: wName, wIp: wIp, width: totalW)
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            ForEach(Array(model.rows.enumerated()), id: \.element.id) { idx, row in
-                                dataRow(index: idx, item: row, wName: wName, wIp: wIp, width: totalW)
-                            }
+            PaginationBar(state: $model.pageState) {
+                model.onPageChange()
+            }
+            .cornerRadius(12, corners: [.bottomLeft, .bottomRight])
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(tableCardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(dark ? 0.22 : 0.06), radius: 8, x: 0, y: 2)
+    }
+
+    private var tableArea: some View {
+        GeometryReader { geo in
+            let totalW = max(geo.size.width, fixedColsWidth)
+            let flex = max(0, totalW - fixedColsWidth)
+            let wName = minName + flex * 0.55
+            let wIp = minIp + flex * 0.45
+            let needsHScroll = totalW > geo.size.width + 0.5
+
+            let table = VStack(spacing: 0) {
+                headerRow(wName: wName, wIp: wIp, width: totalW)
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(model.rows.enumerated()), id: \.element.id) { idx, row in
+                            dataRow(index: idx, item: row, wName: wName, wIp: wIp, width: totalW)
                         }
                     }
                 }
-                .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
+            }
+            .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
 
-                Group {
-                    if needsHScroll {
-                        ScrollView(.horizontal, showsIndicators: true) { table }
-                            .frame(width: geo.size.width, height: geo.size.height)
-                    } else {
-                        table
-                    }
+            Group {
+                if needsHScroll {
+                    ScrollView(.horizontal, showsIndicators: true) { table }
+                        .frame(width: geo.size.width, height: geo.size.height)
+                } else {
+                    table
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(tableCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(dark ? 0.22 : 0.06), radius: 8, x: 0, y: 2)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var tableCardBackground: some View {
@@ -425,7 +433,7 @@ struct InstancesView: View {
             return AppTheme.sidebarActive.opacity(dark ? 0.12 : 0.08)
         }
         return group % 2 == 1
-            ? Color(hex: "63b3ed").opacity(dark ? 0.05 : 0.07)
+            ? AppTheme.info.opacity(dark ? 0.05 : 0.07)
             : Color.clear
     }
 

@@ -297,9 +297,10 @@ struct RegionsView: View {
         ZStack(alignment: .topLeading) {
             // Table block (full card content, with top inset for the filter row)
             VStack(alignment: .leading, spacing: 0) {
-                // Spacer matching filter row height
+                // Spacer matching filter row height（筛选栏自带 10/16 内边距）
                 Color.clear
-                    .frame(height: AppInputStyle.height + 14)
+                    .frame(height: AppInputStyle.height + 20)
+                    .overlay(Rectangle().fill(RegionsTheme.border(dark)).frame(height: 1), alignment: .bottom)
 
                 HStack(spacing: 0) {
                     col("状态", 80)
@@ -335,12 +336,10 @@ struct RegionsView: View {
                 }
                 .frame(maxHeight: .infinity, alignment: .top)
 
-                // 分页 — 固定卡片底部（Web: flexShrink 0 + borderTop）
+                // 分页 — 固定卡片底部（Web: flexShrink 0 + borderTop，PaginationBar 自带分隔线）
                 PaginationBar(state: $model.pageState) {
                     model.goPage { _ in }
                 }
-                .padding(.top, 10)
-                .overlay(Rectangle().fill(RegionsTheme.border(dark)).frame(height: 1), alignment: .top)
             }
 
             // Filter row on top layer — SelectMenu panel floats over the table
@@ -372,10 +371,12 @@ struct RegionsView: View {
                         .frame(width: 20, height: AppInputStyle.height)
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
             .zIndex(50)
         }
-        .padding(18)
-        // Background without .cornerRadius (that clips floating menus)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Web：卡片自身无 padding，筛选/表格/分页通铺到卡片边缘
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(RegionsTheme.surface2(dark))

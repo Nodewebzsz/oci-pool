@@ -83,9 +83,6 @@ struct BootView: View {
                     listBody
                         .padding(.horizontal, 16)
                         .padding(.bottom, 12)
-                    PaginationBar(state: $model.pageState) {
-                        model.onPageChange()
-                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .appLoading(model.isLoading && !model.rows.isEmpty)
@@ -283,82 +280,91 @@ struct BootView: View {
 
     @ViewBuilder
     private var listBody: some View {
-        if model.isLoading && model.rows.isEmpty {
-            VStack(spacing: 10) {
-                Spacer()
-                ProgressView()
-                Text("加载开机任务…")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
-                Spacer()
+        // Web 三段结构：卡片占满剩余高度，表格内部滚动，分页钉在卡片底部
+        VStack(spacing: 0) {
+            if model.isLoading && model.rows.isEmpty {
+                VStack(spacing: 10) {
+                    Spacer()
+                    ProgressView()
+                    Text("加载开机任务…")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.sidebarText(dark))
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if model.rows.isEmpty {
+                EmptyStateView(
+                    icon: "play.circle",
+                    title: "暂无开机任务",
+                    subtitle: model.hasActiveFilter
+                        ? "当前筛选条件下没有抢机配置"
+                        : "可在租户管理中创建抢机配置，或调整筛选后查询",
+                    actionTitle: "刷新",
+                    action: { Task { await model.reload() } }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                tableArea
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(tableCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-        } else if model.rows.isEmpty {
-            EmptyStateView(
-                icon: "play.circle",
-                title: "暂无开机任务",
-                subtitle: model.hasActiveFilter
-                    ? "当前筛选条件下没有抢机配置"
-                    : "可在租户管理中创建抢机配置，或调整筛选后查询",
-                actionTitle: "刷新",
-                action: { Task { await model.reload() } }
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(tableCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-        } else {
-            GeometryReader { geo in
-                let totalW = max(geo.size.width, fixedColsWidth)
-                let flex = max(0, totalW - fixedColsWidth + minFlex)
-                let wTenantFlex = wTenant + flex * 0.4
-                let wRemarkFlex = wRemark + flex * 0.3
-                let wRegionFlex = wRegion + flex * 0.3
-                let needsHScroll = totalW > geo.size.width + 0.5
 
-                let table = VStack(spacing: 0) {
-                    headerRow(
-                        wTenant: wTenantFlex,
-                        wRemark: wRemarkFlex,
-                        wRegion: wRegionFlex,
-                        width: totalW
-                    )
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            ForEach(Array(model.rows.enumerated()), id: \.element.id) { idx, item in
-                                dataRow(
-                                    index: idx,
-                                    item: item,
-                                    wTenant: wTenantFlex,
-                                    wRemark: wRemarkFlex,
-                                    wRegion: wRegionFlex,
-                                    width: totalW
-                                )
-                            }
+            PaginationBar(state: $model.pageState) {
+                model.onPageChange()
+            }
+            .cornerRadius(12, corners: [.bottomLeft, .bottomRight])
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // 背景圆角单独画，避免 clipShape/cornerRadius 裁掉右侧操作按钮
+        .background(tableCardBackground)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(dark ? 0.22 : 0.06), radius: 8, x: 0, y: 2)
+    }
+
+    private var tableArea: some View {
+        GeometryReader { geo in
+            let totalW = max(geo.size.width, fixedColsWidth)
+            let flex = max(0, totalW - fixedColsWidth + minFlex)
+            let wTenantFlex = wTenant + flex * 0.4
+            let wRemarkFlex = wRemark + flex * 0.3
+            let wRegionFlex = wRegion + flex * 0.3
+            let needsHScroll = totalW > geo.size.width + 0.5
+
+            let table = VStack(spacing: 0) {
+                headerRow(
+                    wTenant: wTenantFlex,
+                    wRemark: wRemarkFlex,
+                    wRegion: wRegionFlex,
+                    width: totalW
+                )
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(model.rows.enumerated()), id: \.element.id) { idx, item in
+                            dataRow(
+                                index: idx,
+                                item: item,
+                                wTenant: wTenantFlex,
+                                wRemark: wRemarkFlex,
+                                wRegion: wRegionFlex,
+                                width: totalW
+                            )
                         }
                     }
                 }
-                .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
+            }
+            .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
 
-                Group {
-                    if needsHScroll {
-                        ScrollView(.horizontal, showsIndicators: true) { table }
-                            .frame(width: geo.size.width, height: geo.size.height)
-                    } else {
-                        table
-                    }
+            Group {
+                if needsHScroll {
+                    ScrollView(.horizontal, showsIndicators: true) { table }
+                        .frame(width: geo.size.width, height: geo.size.height)
+                } else {
+                    table
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            // 背景圆角单独画，避免 clipShape/cornerRadius 裁掉右侧操作按钮
-            .background(tableCardBackground)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(dark ? 0.22 : 0.06), radius: 8, x: 0, y: 2)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var tableCardBackground: some View {
