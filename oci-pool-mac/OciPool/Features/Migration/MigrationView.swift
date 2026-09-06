@@ -14,7 +14,7 @@ struct MigrationView: View {
     var body: some View {
         PageScaffold(
             title: "数据迁移",
-            subtitle: "加密导出备份 · 导入恢复",
+            subtitle: "加密备份 · 一键导出 · 密钥恢复",
             systemImage: "arrow.left.and.right",
             toolbar: { EmptyView() },
             content: {
@@ -49,7 +49,7 @@ struct MigrationView: View {
             title: "数据导出",
             subtitle: "生成加密 .enc 备份",
             systemImage: "square.and.arrow.up",
-            accent: Color(hex: "4a9eff"),
+            accent: AppTheme.sidebarActive,
             enabled: nil,
             minHeight: cardMinHeight
         ) {
@@ -127,7 +127,7 @@ struct MigrationView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Color(hex: "4a9eff"))
+                .foregroundColor(AppTheme.sidebarActive)
                 .frame(width: 16)
             Text(text)
                 .font(.system(size: 12))
@@ -155,11 +155,11 @@ struct MigrationView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(hex: "f0881a").opacity(0.12))
+                .fill(AppTheme.orange.opacity(0.12))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(hex: "f0881a").opacity(0.35), lineWidth: 1)
+                .stroke(AppTheme.orange.opacity(0.35), lineWidth: 1)
         )
     }
 }

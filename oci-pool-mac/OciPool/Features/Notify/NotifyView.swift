@@ -17,7 +17,7 @@ struct NotifyView: View {
     var body: some View {
         PageScaffold(
             title: "通知管理",
-            subtitle: "定时任务 · Telegram · Bark · 钉钉 · 飞书",
+            subtitle: "通知设置",
             systemImage: "bell",
             toolbar: { toolbar },
             content: {
@@ -78,7 +78,7 @@ struct NotifyView: View {
 
     private var taskCard: some View {
         ModuleSettingsCard(
-            title: "定时任务",
+            title: "通知任务",
             subtitle: "每天固定时刻执行所选检测任务",
             systemImage: "clock",
             accent: Color(hex: "4a9eff"),
@@ -112,18 +112,18 @@ struct NotifyView: View {
                         title: "账号测活",
                         subtitle: "检测租户账号可用性",
                         systemImage: "person.2",
-                        accent: Color(hex: "3fb950"),
+                        accent: AppTheme.sidebarActive,
                         isOn: $model.task.enableAccountCheck
                     )
                     taskOptionTile(
-                        title: "开机日志统计",
+                        title: "抢机日志",
                         subtitle: "汇总抢机/开机日志",
                         systemImage: "doc.text",
                         accent: Color(hex: "4a9eff"),
                         isOn: $model.task.enableBootLog
                     )
                     taskOptionTile(
-                        title: "OCI 费用检查",
+                        title: "OCI 花费 (Payg)",
                         subtitle: "检查账单与费用异常",
                         systemImage: "creditcard",
                         accent: Color(hex: "f0881a"),
@@ -320,7 +320,7 @@ struct NotifyView: View {
 
     private var barkCard: some View {
         ModuleSettingsCard(
-            title: "Bark",
+            title: "Bark 通知",
             subtitle: "iOS 推送通知",
             systemImage: "bell.badge",
             accent: Color(hex: "f0881a"),
@@ -361,7 +361,7 @@ struct NotifyView: View {
 
     private var dingTalkCard: some View {
         ModuleSettingsCard(
-            title: "钉钉",
+            title: "钉钉机器人",
             subtitle: "群机器人 Webhook",
             systemImage: "message",
             accent: Color(hex: "0089ff"),
@@ -371,7 +371,7 @@ struct NotifyView: View {
             FormFieldRow(label: "Webhook") {
                 AppTextField(text: $model.dingTalk.webhook, placeholder: "https://oapi.dingtalk.com/...")
             }
-            FormFieldRow(label: "加签密钥") {
+            FormFieldRow(label: "签名密钥") {
                 AppTextField(text: $model.dingTalk.secret, placeholder: "可选 Secret", secure: true)
             }
             Text("在钉钉群「智能群助手」中添加自定义机器人获取 Webhook。")
@@ -402,7 +402,7 @@ struct NotifyView: View {
 
     private var feishuCard: some View {
         ModuleSettingsCard(
-            title: "飞书",
+            title: "飞书机器人",
             subtitle: "群机器人 Webhook",
             systemImage: "bubble.left.and.bubble.right",
             accent: Color(hex: "00d6b9"),
@@ -445,15 +445,15 @@ struct NotifyView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
+                .foregroundColor(AppTheme.danger)
             Text(text).font(.system(size: 12))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(8)
     }
 }

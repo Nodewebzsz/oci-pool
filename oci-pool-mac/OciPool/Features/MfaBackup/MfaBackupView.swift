@@ -12,8 +12,8 @@ struct MfaBackupView: View {
 
     var body: some View {
         PageScaffold(
-            title: "MFA 备份",
-            subtitle: "TOTP 密钥托管 · 动态验证码 · 导出",
+            title: "MFA 密钥备份",
+            subtitle: "本地加密保存的 TOTP 密钥库 · 用于两步验证一键代填",
             systemImage: "lock.shield",
             toolbar: { toolbar },
             content: {
@@ -24,7 +24,7 @@ struct MfaBackupView: View {
                             .padding(.top, 12)
                     }
                     FilterBar {
-                        SearchField(text: $model.searchText, placeholder: "搜索名称 / 发行方")
+                        SearchField(text: $model.searchText, placeholder: "按名称或发行方搜索...")
                         Spacer()
                         Text("刷新倒计时 \(model.countdown)s")
                             .font(.system(size: 11))
@@ -75,7 +75,7 @@ struct MfaBackupView: View {
             AppButton(title: "添加密钥", systemImage: "plus", kind: .primary) {
                 model.openAdd()
             }
-            AppButton(title: "导出 CSV", systemImage: "square.and.arrow.up", kind: .secondary) {
+            AppButton(title: "导出全部", systemImage: "square.and.arrow.up", kind: .secondary) {
                 model.exportCSV()
             }
             AppButton(
@@ -104,10 +104,10 @@ struct MfaBackupView: View {
             } else {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(hex: "4a9eff").opacity(0.12))
+                        .fill(Color(hex: "b484e8").opacity(0.12))
                         .frame(width: 72, height: 72)
                     Image(systemName: "qrcode")
-                        .foregroundColor(Color(hex: "4a9eff"))
+                        .foregroundColor(Color(hex: "b484e8"))
                 }
             }
 
@@ -120,9 +120,9 @@ struct MfaBackupView: View {
                         .font(.system(size: 11))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
-                        .background(Color(hex: "4a9eff").opacity(0.15))
+                        .background(Color(hex: "b484e8").opacity(0.15))
                         .cornerRadius(6)
-                        .foregroundColor(Color(hex: "4a9eff"))
+                        .foregroundColor(Color(hex: "b484e8"))
                 }
                 Button(action: { model.toggleSecret(item) }) {
                     Text(item.revealSecret ? item.secretKey : "••••••••••••")
@@ -167,15 +167,15 @@ struct MfaBackupView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
+                .foregroundColor(AppTheme.danger)
             Text(text).font(.system(size: 12))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(8)
     }
 }

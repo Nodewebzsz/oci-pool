@@ -30,7 +30,7 @@ struct VpsListView: View {
 
     private var mainBoard: some View {
         PageScaffold(
-            title: "VPS 监控看板",
+            title: "资源列表",
             subtitle: "共 \(model.totalCount) 台 · 在线 \(model.onlineCount) · 离线 \(model.offlineCount)",
             systemImage: "desktopcomputer",
             toolbar: { toolbar },
@@ -39,7 +39,7 @@ struct VpsListView: View {
                     if let err = model.errorText, !err.isEmpty {
                         Text(err)
                             .font(.system(size: 12))
-                            .foregroundColor(Color(hex: "f85149"))
+                            .foregroundColor(AppTheme.danger)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 16)
                             .padding(.top, 10)
@@ -108,7 +108,7 @@ struct VpsListView: View {
                 title: "在线数量",
                 value: "\(model.onlineCount)",
                 icon: "wifi",
-                accent: Color(hex: "10b981"),
+                accent: AppTheme.sidebarActive,
                 active: false,
                 action: nil
             )
@@ -116,7 +116,7 @@ struct VpsListView: View {
                 title: "离线数量",
                 value: "\(model.offlineCount)",
                 icon: "heart.slash",
-                accent: Color(hex: "ef4444"),
+                accent: AppTheme.danger,
                 active: model.offlineOnly,
                 action: { model.toggleOfflineFilter() }
             )
@@ -154,13 +154,13 @@ struct VpsListView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(
-                    active ? Color(hex: "ef4444") : AppTheme.border(dark).opacity(0.55),
+                    active ? AppTheme.danger : AppTheme.border(dark).opacity(0.55),
                     lineWidth: active ? 1.5 : 1
                 )
         )
         .background(
             active
-                ? RoundedRectangle(cornerRadius: 12).fill(Color(hex: "ef4444").opacity(0.08))
+                ? RoundedRectangle(cornerRadius: 12).fill(AppTheme.danger.opacity(0.08))
                 : nil
         )
 
@@ -186,7 +186,7 @@ struct VpsListView: View {
                     .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
             }
             Spacer(minLength: 8)
-            SearchField(text: $model.searchText, placeholder: "搜索 IP、地区、租户…")
+            SearchField(text: $model.searchText, placeholder: "搜索 IP、地区、租户...")
                 .frame(width: 240)
             toolChip(
                 title: model.showIP ? "隐藏 IP" : "显示 IP",
@@ -244,16 +244,16 @@ struct VpsListView: View {
 
     private var moreMenu: some View {
         ZStack(alignment: .topTrailing) {
-            toolChip(title: "更多操作", systemImage: "gearshape", active: model.moreMenuOpen) {
+            toolChip(title: "更多", systemImage: "gearshape", active: model.moreMenuOpen) {
                 model.toggleMoreMenu()
             }
             if model.moreMenuOpen {
                 VStack(alignment: .leading, spacing: 2) {
-                    moreItem("开启自动 Ping", "play.fill", Color(hex: "10b981")) { model.enablePing() }
-                    moreItem("停止自动 Ping", "stop.fill", Color(hex: "ef4444")) { model.disablePing() }
+                    moreItem("开启自动 Ping", "play.fill", AppTheme.sidebarActive) { model.enablePing() }
+                    moreItem("停止自动 Ping", "stop.fill", AppTheme.danger) { model.disablePing() }
                     moreItem("手动 Ping 检测", "scope", AppTheme.sidebarActive) { model.manualPing() }
                     Divider().opacity(0.4)
-                    moreItem("刷新列表", "arrow.clockwise", AppTheme.sidebarText(dark)) {
+                    moreItem("刷新页面", "arrow.clockwise", AppTheme.sidebarText(dark)) {
                         model.closeMoreMenu()
                         Task { await model.reload() }
                     }
@@ -373,7 +373,7 @@ private struct VpsServerCard: View {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(
                     card.monitorWarning
-                        ? Color(hex: "f59e0b").opacity(0.75)
+                        ? AppTheme.orange.opacity(0.75)
                         : (hovered ? AppTheme.sidebarActive.opacity(0.45) : AppTheme.border(dark).opacity(0.55)),
                     lineWidth: card.monitorWarning || hovered ? 1.5 : 1
                 )
@@ -453,7 +453,7 @@ private struct VpsServerCard: View {
                 tag("负载 \(card.metrics.load)", icon: "gauge")
             }
             if card.isLatencyTesting {
-                tag("延迟 …", icon: "bolt")
+                tag("测速中", icon: "bolt")
             } else if let ms = card.latencyMs {
                 latencyTag(ms)
             }
@@ -464,8 +464,8 @@ private struct VpsServerCard: View {
         let a = card.item.architecture.isEmpty ? "NONE" : card.item.architecture
         let color: Color = {
             switch card.archClass {
-            case "arm": return Color(hex: "a78bfa")
-            case "amd": return Color(hex: "60a5fa")
+            case "arm": return Color(hex: "b484e8")
+            case "amd": return AppTheme.info
             default: return AppTheme.sidebarText(dark)
             }
         }()
@@ -479,10 +479,10 @@ private struct VpsServerCard: View {
 
     private func latencyTag(_ ms: Int) -> some View {
         let color: Color = {
-            if ms < 0 { return Color(hex: "ef4444") }
-            if ms < 150 { return Color(hex: "10b981") }
-            if ms < 300 { return Color(hex: "f59e0b") }
-            return Color(hex: "ef4444")
+            if ms < 0 { return AppTheme.danger }
+            if ms < 150 { return AppTheme.sidebarActive }
+            if ms < 300 { return AppTheme.orange }
+            return AppTheme.danger
         }()
         return tag(VpsFormat.latencyLabel(ms), icon: "bolt.fill", color: color)
     }
@@ -508,18 +508,18 @@ private struct VpsServerCard: View {
 
     private var metricsBlock: some View {
         VStack(spacing: 8) {
-            metricRow("CPU", card.metrics.cpuPercent, Color(hex: "10b981"))
+            metricRow("CPU", card.metrics.cpuPercent, AppTheme.sidebarActive)
             metricRow("内存", card.metrics.memPercent, AppTheme.sidebarActive)
             metricRow(
                 "硬盘\(card.metrics.diskTotalLabel.isEmpty ? "" : " (\(card.metrics.diskTotalLabel))")",
                 card.metrics.diskPercent,
-                Color(hex: "8b5cf6")
+                Color(hex: "b484e8")
             )
             HStack(spacing: 14) {
                 Label(card.metrics.netRx, systemImage: "arrow.down")
-                    .foregroundColor(Color(hex: "10b981"))
+                    .foregroundColor(AppTheme.sidebarActive)
                 Label(card.metrics.netTx, systemImage: "arrow.up")
-                    .foregroundColor(Color(hex: "f59e0b"))
+                    .foregroundColor(AppTheme.orange)
                 Spacer()
             }
             .font(.system(size: 11, weight: .medium, design: .monospaced))
@@ -534,8 +534,8 @@ private struct VpsServerCard: View {
     private func metricRow(_ title: String, _ percent: Double, _ color: Color) -> some View {
         let p = min(100, max(0, percent))
         let barColor: Color = {
-            if p > 90 { return Color(hex: "ef4444") }
-            if p > 70 { return Color(hex: "f59e0b") }
+            if p > 90 { return AppTheme.danger }
+            if p > 70 { return AppTheme.orange }
             return color
         }()
         return VStack(spacing: 3) {
@@ -572,7 +572,7 @@ private struct VpsServerCard: View {
             if card.monitorWarning {
                 Text("探针超时")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(Color(hex: "f59e0b"))
+                    .foregroundColor(AppTheme.orange)
             }
         }
         .padding(.horizontal, 12)

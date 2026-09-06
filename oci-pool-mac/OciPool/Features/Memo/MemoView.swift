@@ -10,10 +10,14 @@ struct MemoView: View {
     private var dark: Bool { appearance.isDarkEffective }
     private let cardMinHeight: CGFloat = 200
 
+    private var memoCountSubtitle: String {
+        "\(model.items.count) 条笔记"
+    }
+
     var body: some View {
         PageScaffold(
-            title: "备忘管理",
-            subtitle: "本地笔记 · 标题 / 摘要 / 正文",
+            title: "笔记管理",
+            subtitle: memoCountSubtitle,
             systemImage: "book",
             toolbar: { toolbar },
             content: {
@@ -24,7 +28,7 @@ struct MemoView: View {
                             .padding(.top, 12)
                     }
                     FilterBar {
-                        SearchField(text: $model.searchText, placeholder: "搜索标题 / 摘要 / 内容")
+                        SearchField(text: $model.searchText, placeholder: "按标题或摘要搜索...")
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
@@ -34,7 +38,7 @@ struct MemoView: View {
                             EmptyStateView(
                                 icon: "book.closed",
                                 title: model.items.isEmpty ? "暂无备忘" : "无匹配结果",
-                                subtitle: model.items.isEmpty ? "点击「新建备忘」记录内容" : "试试其他关键词",
+                                subtitle: model.items.isEmpty ? "点右上角开始记录" : "试试其他关键词",
                                 actionTitle: model.items.isEmpty ? "新建备忘" : nil,
                                 action: model.items.isEmpty ? { model.openCreate() } : nil
                             )
@@ -76,7 +80,7 @@ struct MemoView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
-            AppButton(title: "新建备忘", systemImage: "plus", kind: .primary) {
+            AppButton(title: "新建笔记", systemImage: "plus", kind: .primary) {
                 model.openCreate()
             }
             AppButton(
@@ -108,7 +112,7 @@ struct MemoView: View {
             title: item.title.isEmpty ? "无标题" : item.title,
             subtitle: item.summary.isEmpty ? "无摘要" : item.summary,
             systemImage: "note.text",
-            accent: Color(hex: "4a9eff"),
+            accent: AppTheme.info,
             enabled: nil,
             minHeight: cardMinHeight
         ) {
@@ -137,15 +141,15 @@ struct MemoView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
+                .foregroundColor(AppTheme.danger)
             Text(text).font(.system(size: 12))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(8)
     }
 }
@@ -188,7 +192,7 @@ private struct MemoEditorSheet: View {
                         FormFieldRow(label: "摘要") {
                             AppTextField(text: binding.summary, placeholder: "可选，最多约 200 字")
                         }
-                        FormFieldRow(label: "正文", required: true) {
+                        FormFieldRow(label: "内容", required: true) {
                             AppTextEditor(text: binding.content, minHeight: 220)
                         }
                     }

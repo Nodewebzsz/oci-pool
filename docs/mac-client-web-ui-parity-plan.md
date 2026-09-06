@@ -60,16 +60,16 @@
 | # | 页面 | Web 源 | 原生视图 | 状态 |
 |---|---|---|---|---|
 | E1 | AI 对话 | （Web 无此页，原生扩展） | AiChat/ | ❓ Web 无对应页面，保持原生实现即可 |
-| E2 | 通知管理 | page-tools.jsx (NotifyMgmtPage) | Notify/NotifyView | ⬜ |
-| E3 | 笔记管理 | page-tools.jsx (MemPage) | Memo/MemoView | ⬜ |
-| E4 | 数据迁移 | page-tools.jsx (MigPage) | Migration/MigrationView | ⬜ |
-| E5 | MFA 备份 | page-tools.jsx (MfaBackupPage) | MfaBackup/ | ⬜ |
+| E2 | 通知管理 | page-tools.jsx (NotifyMgmtPage) | Notify/NotifyView | 🔄 一轮完成（副标题「通知设置」/卡题 通知任务·Bark 通知·钉钉机器人·飞书机器人/任务项 抢机日志·OCI 花费 (Payg)/按钮 测试发送·保存配置/签名密钥/色板）。❓ 通知密钥字段、注册机器人/上传 AI 按钮、时钟按钮待做 |
+| E3 | 笔记管理 | page-tools.jsx (MemPage) | Memo/MemoView | 🔄 一轮完成（标题/动态副标题/新建笔记/内容 label/搜索占位/空态/色板）。❓ 全部/最近筛选、计数行、内联编辑器、清空/更新按钮待做 |
+| E4 | 数据迁移 | page-tools.jsx (MigPage) | Migration/MigrationView | 🔄 一轮完成（副标题/生成加密备份按钮/色板）。❓ mig.notice 提示条、导出步骤文案、导入模式行与拖拽区、Master Key 横幅待做 |
+| E5 | MFA 备份 | page-tools.jsx (MfaBackupPage) | MfaBackup/ | 🔄 一轮完成（标题 MFA 密钥备份/副标题/导出全部/搜索占位/色板）。❓ OTP 进度条、6 列表格、发行方字段、复制入口待做 |
 
 ## 批次 F · 开发配置（1 页）
 
 | # | 页面 | Web 源 | 原生视图 | 状态 |
 |---|---|---|---|---|
-| F1 | Token 配置 | page-tools.jsx (KeyConfigPage) | ApiTokens/ApiTokensView | ⬜ |
+| F1 | Token 配置 | page-proxy.jsx (KeyConfigPage) | ApiTokens/ApiTokensView | 🔄 一轮完成（副标题/卡题 API 文档访问·API 使用说明/说明文案/色板 3fb950·adbac7·f0881a·9b59b6·f85149 收敛）。❓ 信息行 label/值逐字、剩余天数三档配色、按钮顺序、安全提示 3 条待做 |
 
 ## 疑问/待确认清单
 
@@ -92,3 +92,4 @@
 - 2026-09-06（续 3）：用户反馈区域管理页三处不一致（KPI1 图标应为 map-pin、tab 文字裁剪、缺少地图）→ MenuGlyph 新增 map-pin/map glyph，重构为 Web 的「数量+三分段 tab」卡 + 表格卡/地图卡切换，新增 RegionWorldMapView.swift（TopoJSON 解码 + geoNaturalEarth1 投影 + 节点大小 ∝ √开机数 + 今日橙色 + hover tooltip + 图例 hint），构建通过并运行时核验。
 - 2026-09-06（续 4）：A8 完成「审计→修复→构建→提交」。修复过程发现并顺带修复：A2 地图 antimeridian 直线（TopoJSON 反经线解缠绕）、悬停失效（NSEvent mouseMoved 最近节点判定 + 标题栏坐标偏移修正）、经纬线闭合弦直线（path closed:false）。
 - 2026-09-06（续 5）：A13/D2 完成（terminal 图标、暂停/下载、级别色 token 化、footer 中文化）；A11/A12 一轮修复完成（副标题/标题/语义色/色板/阈值），二轮细项标记 ❓。
+- 2026-09-06（续 6）：批次 C/E/F 六页一轮对齐完成并提交（标题/副标题/文案/色板收敛），二轮细项已标记 ❓。至此对接计划全部页面一轮对齐完成。
