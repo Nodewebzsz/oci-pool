@@ -15,12 +15,11 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            auroraBackground
+            // Web 布局：全屏满铺，左 hero 55% / 右表单 45%（无玻璃壳）
+            LoginPalette.bg(dark)
+                .ignoresSafeArea()
 
             GeometryReader { geo in
-                let w = min(1240, max(920, geo.size.width - 48))
-                let h = min(760, max(640, geo.size.height - 48))
-
                 HStack(spacing: 0) {
                     LoginHeroView(
                         dark: dark,
@@ -28,10 +27,13 @@ struct LoginView: View {
                         shyMode: model.passwordFocused,
                         locale: model.locale
                     )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(width: geo.size.width * 0.55)
+                    .contentShape(Rectangle())
+                    // 点击空白处结束编辑（子控件/按钮优先消费各自的点击）
+                    .onTapGesture { dismissLoginFocus() }
 
                     Rectangle()
-                        .fill(LoginPalette.divider(dark))
+                        .fill(LoginPalette.line(dark))
                         .frame(width: 1)
 
                     LoginRightPanel(
@@ -49,17 +51,10 @@ struct LoginView: View {
                             UserDefaults.standard.set(loc.rawValue, forKey: "appLocale")
                         }
                     )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(width: geo.size.width * 0.45)
+                    .contentShape(Rectangle())
+                    .onTapGesture { dismissLoginFocus() }
                 }
-                .frame(width: w, height: h)
-                .background(LoginPalette.shellFill(dark))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 26)
-                        .stroke(LoginPalette.shellBorder(dark), lineWidth: 1)
-                )
-                .cornerRadius(26)
-                .shadow(color: Color.black.opacity(dark ? 0.55 : 0.14), radius: 30, y: 16)
-                .frame(width: geo.size.width, height: geo.size.height)
             }
 
             if model.showForgotPassword {
@@ -110,51 +105,12 @@ struct LoginView: View {
         }
     }
 
-    // MARK: - Aurora
-
-    private var auroraBackground: some View {
-        ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: dark
-                    ? [Color(hex: "12151a"), Color(hex: "1a1d21"), Color(hex: "151820")]
-                    : [Color(hex: "eef1f6"), Color(hex: "e8ecf3"), Color(hex: "eef2f8")]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            Circle()
-                .fill(Color(hex: dark ? "10b981" : "34d399").opacity(dark ? 0.35 : 0.40))
-                .frame(width: 560, height: 560)
-                .blur(radius: 64)
-                .offset(x: -280, y: -220)
-            Circle()
-                .fill(Color(hex: dark ? "22d3ee" : "22d3ee").opacity(dark ? 0.32 : 0.36))
-                .frame(width: 480, height: 480)
-                .blur(radius: 64)
-                .offset(x: 320, y: -40)
-            Circle()
-                .fill(Color(hex: dark ? "22d3ee" : "60a5fa").opacity(dark ? 0.22 : 0.28))
-                .frame(width: 620, height: 620)
-                .blur(radius: 70)
-                .offset(x: -40, y: 320)
-            Circle()
-                .fill(Color(hex: dark ? "34d399" : "3b82f6").opacity(dark ? 0.16 : 0.18))
-                .frame(width: 360, height: 360)
-                .blur(radius: 50)
-                .offset(x: 80, y: 40)
-            RadialGradient(
-                gradient: Gradient(colors: [
-                    Color.clear,
-                    Color.black.opacity(dark ? 0.45 : 0.08)
-                ]),
-                center: .center,
-                startRadius: 80,
-                endRadius: 700
-            )
-        }
-        .ignoresSafeArea()
-    }
-
     // MARK: - Meta
+
+    /// 点击登录页空白处：结束编辑（用户名/密码/6 格验证码统一失焦）。
+    private func dismissLoginFocus() {
+        NSApp.keyWindow?.makeFirstResponder(nil)
+    }
 
     private func loadMeta(force: Bool) async {
         let activated = await MainActor.run { model.modeActivated }
@@ -398,6 +354,15 @@ struct LoginView: View {
                     model.isSubmitting = false
                     model.enterVerifyStep()
                 }
+                // Web VerifyView 挂载即自动发送一次消息验证码（MFA 模式无需发送）
+                let shouldAutoSend = await MainActor.run { () -> Bool in
+                    model.showMessageCode && model.codeCountdown == 0
+                        && model.codeSentTo == nil
+                        && !model.username.trimmingCharacters(in: .whitespaces).isEmpty
+                }
+                if shouldAutoSend {
+                    await doSendCode()
+                }
                 return
             }
             await MainActor.run {
@@ -510,6 +475,7 @@ struct LoginView: View {
             await MainActor.run {
                 model.isSendingCode = false
                 model.infoText = model.locale == .enUS ? "Code sent" : "验证码已发送"
+                model.codeSentTo = user
                 model.codeCountdown = 60
             }
             countdownTask?.cancel()

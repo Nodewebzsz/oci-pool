@@ -17,7 +17,7 @@ struct LoginHeroView: View {
     @State private var t: TimeInterval = 0
     private let viewBox: CGFloat = 600
 
-    private var accent: Color { Color(hex: dark ? "34d399" : "0f766e") }
+    private var accent: Color { Color(hex: "34d399") }
     private var cyanAccent: Color { Color(hex: "22d3ee") }
     private var orangeAccent: Color { Color(hex: "f59e0b") }
     private var coreFill: Color { Color(hex: dark ? "272c34" : "f2f4f7") }
@@ -29,7 +29,7 @@ struct LoginHeroView: View {
     private var heroTitle: String { zh ? "现代化的 OCI 池化管理" : "Modern OCI pool management" }
     private var heroSubtitle: String {
         zh
-            ? "14+ 项租户操作 · 45 个 Oracle 商业区域 · 深色主题 · 双语支持 · 现代化 UI 重做，业务逻辑与 doubleDimple/oci-start 完全一致。"
+            ? "14+ 项租户操作 · 45 个 Oracle 商业区域 · 深色主题 · 双语支持 · 现代化 UI 重做,业务逻辑与 doubleDimple/oci-start 完全一致。"
             : "14+ tenant operations · 45 Oracle commercial regions · dark theme · bilingual · a modernised UI on top of the doubleDimple/oci-start business logic."
     }
     private var statTenants: String { zh ? "内置租户" : "Tenants" }
@@ -38,7 +38,14 @@ struct LoginHeroView: View {
 
     var body: some View {
         ZStack {
-            LoginPalette.panel(dark)
+            // Web hero 背景：linear-gradient(135deg, var(--bg-1), var(--bg-0))
+            LinearGradient(
+                gradient: Gradient(colors: dark
+                    ? [Color(hex: "0d1216"), Color(hex: "060a0d")]
+                    : [Color(hex: "ffffff"), Color(hex: "f8fafd")]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
 
             RadialGradient(
                 gradient: Gradient(colors: [accent.opacity(dark ? 0.14 : 0.12), Color.clear]),

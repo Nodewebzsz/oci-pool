@@ -191,31 +191,25 @@ struct LoginRightPanel: View {
         .disabled(model.isSubmitting || model.isLoadingMeta)
     }
 
+    /// Web 登录页右上角：单按钮一键中英切换（languages 图标 + 当前语言）。
     private var languageChip: some View {
-        HStack(spacing: 0) {
-            langItem(.zhCN, "中文")
-            Text("|")
-                .font(.system(size: 12))
-                .foregroundColor(LoginPalette.line(dark))
-                .padding(.horizontal, 6)
-            langItem(.enUS, "English")
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .background(LoginPalette.chipBg(dark))
-        .cornerRadius(999)
-        .overlay(RoundedRectangle(cornerRadius: 999).stroke(LoginPalette.line(dark).opacity(0.6), lineWidth: 1))
-    }
-
-    private func langItem(_ loc: AppLocale, _ title: String) -> some View {
-        let active = model.locale == loc
-        return Button(action: {
-            model.locale = loc
-            onLocale(loc)
+        Button(action: {
+            let next: AppLocale = model.locale == .zhCN ? .enUS : .zhCN
+            model.locale = next
+            onLocale(next)
         }) {
-            Text(title)
-                .font(.system(size: 12, weight: active ? .bold : .regular))
-                .foregroundColor(active ? LoginPalette.text(dark) : LoginPalette.muted(dark))
+            HStack(spacing: 5) {
+                Image(systemName: "globe")
+                    .font(.system(size: 13, weight: .medium))
+                Text(model.locale == .zhCN ? "中" : "EN")
+                    .font(.system(size: 11.5, weight: .medium, design: .monospaced))
+            }
+            .foregroundColor(Color(hex: dark ? "ccd2d6" : "2d3439"))
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+            .background(Color(hex: dark ? "151c21" : "f1f4f6"))
+            .cornerRadius(6)
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(LoginPalette.line(dark), lineWidth: 1))
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -237,6 +231,8 @@ struct LoginRightPanel: View {
 
     private var verifyCard: some View {
         VStack(alignment: .leading, spacing: 0) {
+            verifyIconBlock
+                .padding(.bottom, 12)
             heading(title: verifyTitle, subtitle: verifySubtitle)
                 .padding(.bottom, 22)
 
@@ -245,16 +241,30 @@ struct LoginRightPanel: View {
                     .padding(.bottom, 18)
             }
 
+            // 消息码模式：未发送时显示 outline 发送按钮，已发送显示 sentTo 横幅（Web 流程）
             if model.showMessageCode {
-                messageCodeRow
-                    .padding(.bottom, 12)
+                if let sentTo = model.codeSentTo {
+                    sentBanner(sentTo: sentTo)
+                        .padding(.bottom, 14)
+                } else if model.codeCountdown == 0 {
+                    outlineSendButton
+                        .padding(.bottom, 14)
+                } else {
+                    resendRow
+                        .padding(.bottom, 14)
+                }
+                LoginCodeInput(
+                    text: $model.verificationCode,
+                    dark: dark,
+                    enabled: formFieldEnabled,
+                    onCommit: onLogin,
+                    shakeToken: model.shakeVerify
+                )
+                .padding(.bottom, 10)
             }
 
             if model.showMfaCode {
-                fieldLabel(model.locale == .enUS ? "MFA code" : "MFA 验证码")
-                LoginField(
-                    title: "",
-                    placeholder: "6 位动态码",
+                LoginCodeInput(
                     text: $model.mfaCode,
                     dark: dark,
                     enabled: formFieldEnabled,
@@ -264,7 +274,7 @@ struct LoginRightPanel: View {
                 .padding(.bottom, 10)
             }
 
-            if let info = model.infoText {
+            if let info = model.infoText, model.codeSentTo == nil {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 11))
@@ -288,6 +298,85 @@ struct LoginRightPanel: View {
 
             backToLoginButton
                 .padding(.top, 10)
+        }
+    }
+
+    /// Web VerifyView 顶部 48×48 图标块：消息=mail(info) / MFA=shield(accent)。
+    private var verifyIconBlock: some View {
+        let isMfa = verifyIsMfa
+        return Image(systemName: isMfa ? "checkmark.shield.fill" : "envelope.fill")
+            .font(.system(size: 22))
+            .foregroundColor(isMfa ? LoginPalette.primary(dark) : infoColor)
+            .frame(width: 48, height: 48)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill((isMfa ? LoginPalette.primary(dark) : infoColor).opacity(0.14))
+            )
+    }
+
+    /// 已发送横幅（Web sentTo：info-soft 底 + info 边框 + 倒计时）。
+    private func sentBanner(sentTo: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 13))
+            Text(model.locale == .enUS ? "Code sent via " : "验证码已发送到 ")
+                .font(.system(size: 11.5))
+            Text(sentTo)
+                .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
+            Spacer()
+            if model.codeCountdown > 0 {
+                Text("\(model.codeCountdown)s")
+                    .font(.system(size: 11.5, design: .monospaced))
+                    .foregroundColor(LoginPalette.muted(dark))
+            }
+        }
+        .foregroundColor(infoColor)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(infoColor.opacity(0.12))
+        )
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(infoColor, lineWidth: 1))
+    }
+
+    /// Web outline 变体按钮：透明底 + border-strong 边框 + fg-1 文字。
+    private var outlineSendButton: some View {
+        Button(action: onSendCode) {
+            HStack(spacing: 8) {
+                if model.isSendingCode {
+                    ProgressView().scaleEffect(0.7).frame(width: 14, height: 14)
+                } else {
+                    Image(systemName: "paperplane.fill")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                Text(model.locale == .enUS ? "Send code" : "发送验证码")
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 40)
+            .foregroundColor(Color(hex: dark ? "ccd2d6" : "2d3439"))
+            .background(Color.clear)
+            .cornerRadius(6)
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(hex: dark ? "363e45" : "bfc5ca"), lineWidth: 1))
+        }
+        .buttonStyle(LoginPressButtonStyle())
+        .disabled(model.isSendingCode || !formReady
+                  || model.username.trimmingCharacters(in: .whitespaces).isEmpty)
+    }
+
+    /// 倒计时结束后的重发行。
+    private var resendRow: some View {
+        HStack {
+            Spacer()
+            Button(action: onSendCode) {
+                Text(model.locale == .enUS ? "Resend" : "重新发送")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(LoginPalette.primary(dark))
+            }
+            .buttonStyle(PlainButtonStyle())
+            .disabled(model.isSendingCode || !formReady)
+            Spacer()
         }
     }
 
@@ -318,17 +407,17 @@ struct LoginRightPanel: View {
                 Text(model.isSubmitting
                      ? (model.locale == .enUS ? "Verifying…" : "验证中…")
                      : (model.locale == .enUS ? "Verify" : "验证"))
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 44)
-            .foregroundColor(.white)
+            .frame(height: 40)
+            .foregroundColor(LoginPalette.buttonFg(dark))
             .background(LoginPalette.primary(dark))
-            .cornerRadius(8)
+            .cornerRadius(6)
         }
         .buttonStyle(LoginPressButtonStyle())
         .disabled(!model.canAttemptLogin(backendReady: formReady))
-        .opacity(model.canAttemptLogin(backendReady: formReady) ? 1 : 0.55)
+        .opacity(model.canAttemptLogin(backendReady: formReady) ? 1 : 0.6)
     }
 
     private var backToLoginButton: some View {
@@ -388,7 +477,7 @@ struct LoginRightPanel: View {
             loginPrimaryButton
 
             HStack(spacing: 4) {
-                Text(model.locale == .enUS ? "No account yet?" : "还没有账号？")
+                Text(model.locale == .enUS ? "No account yet?" : "还没有账号?")
                     .font(.system(size: 12))
                     .foregroundColor(LoginPalette.muted(dark))
                 Button(action: { withAnimation(.easeInOut(duration: 0.18)) { model.tab = .register; model.errorText = nil } }) {
@@ -415,8 +504,8 @@ struct LoginRightPanel: View {
 
     private var registerCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            heading(title: model.locale == .enUS ? "Create account" : "注册账号",
-                    subtitle: model.locale == .enUS ? "Register your first OCI-POOL account" : "创建你的 OCI-POOL 管理账号")
+            heading(title: model.locale == .enUS ? "Create account" : "创建账号",
+                    subtitle: model.locale == .enUS ? "Manage multiple OCI tenants after signup" : "注册后可管理多个 OCI 租户")
                 .padding(.bottom, 26)
 
             fieldLabel(model.locale == .enUS ? "Username" : "用户名")
@@ -430,10 +519,10 @@ struct LoginRightPanel: View {
             )
             .padding(.bottom, 14)
 
-            fieldLabel(model.locale == .enUS ? "Password" : "密码")
+            registerPasswordLabel
             LoginField(
                 title: "",
-                placeholder: "请输入密码",
+                placeholder: model.locale == .enUS ? "At least 6 characters" : "至少 6 位",
                 text: $model.password,
                 secure: true,
                 dark: dark,
@@ -441,7 +530,9 @@ struct LoginRightPanel: View {
                 shakeToken: model.shakePassword,
                 isFocusedOut: $model.passwordFocused
             )
-            .padding(.bottom, 14)
+            .padding(.bottom, 6)
+            passwordStrengthBar
+                .padding(.bottom, 8)
 
             fieldLabel(model.locale == .enUS ? "Confirm password" : "确认密码")
             LoginField(
@@ -463,7 +554,7 @@ struct LoginRightPanel: View {
             registerPrimaryButton
 
             HStack(spacing: 4) {
-                Text(model.locale == .enUS ? "Already have an account?" : "已有账号？")
+                Text(model.locale == .enUS ? "Already have an account?" : "已有账号?")
                     .font(.system(size: 12))
                     .foregroundColor(LoginPalette.muted(dark))
                 Button(action: { withAnimation(.easeInOut(duration: 0.18)) { model.tab = .login; model.errorText = nil } }) {
@@ -475,6 +566,67 @@ struct LoginRightPanel: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.top, 14)
+        }
+    }
+
+    // MARK: - Password strength (Web passwordStrength 1:1)
+
+    /// Web 注册页：label 行右侧的彩色强度提示。
+    private var registerPasswordLabel: some View {
+        HStack {
+            Text(model.locale == .enUS ? "New password" : "新密码")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(LoginPalette.muted(dark))
+            Spacer()
+            if !strengthLabel.isEmpty {
+                Text(strengthLabel)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(strengthColor)
+            }
+        }
+        .padding(.bottom, 6)
+    }
+
+    /// 5 段强度条（Web：grid 5 列 / 高 3 / gap 3 / radius 2）。
+    private var passwordStrengthBar: some View {
+        HStack(spacing: 3) {
+            ForEach(1...5, id: \.self) { i in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(i <= strengthScore ? strengthColor : Color(hex: dark ? "1e252a" : "e7ecef"))
+                    .frame(height: 3)
+            }
+        }
+    }
+
+    private var strengthScore: Int {
+        var score = 0
+        if model.password.count >= 6 { score += 1 }
+        if model.password.count >= 10 { score += 1 }
+        if model.password.range(of: "[A-Z]", options: .regularExpression) != nil,
+           model.password.range(of: "[a-z]", options: .regularExpression) != nil { score += 1 }
+        if model.password.range(of: "\\d", options: .regularExpression) != nil { score += 1 }
+        if model.password.range(of: "[^A-Za-z0-9]", options: .regularExpression) != nil { score += 1 }
+        return score
+    }
+
+    private var strengthColor: Color {
+        switch strengthScore {
+        case 0: return LoginPalette.muted(dark)
+        case 1: return Color(hex: "f05653")   // danger
+        case 2: return Color(hex: "ef852e")   // orange
+        case 3: return Color(hex: "6898e8")   // info
+        default: return LoginPalette.primary(dark)
+        }
+    }
+
+    private var strengthLabel: String {
+        switch strengthScore {
+        case 0: return ""
+        case 1: return model.locale == .enUS ? "Very weak" : "弱"
+        case 2: return model.locale == .enUS ? "Weak" : "一般"
+        case 3: return model.locale == .enUS ? "Medium" : "中等"
+        case 4: return model.locale == .enUS ? "Strong" : "强"
+        default: return model.locale == .enUS ? "Very strong" : "很强"
         }
     }
 
@@ -506,7 +658,7 @@ struct LoginRightPanel: View {
                 .foregroundColor(LoginPalette.muted(dark))
             Spacer()
             Button(action: onForgotPassword) {
-                Text(model.locale == .enUS ? "Forgot password?" : "忘记密码？")
+                Text(model.locale == .enUS ? "Forgot password?" : "忘记密码?")
                     .font(.system(size: 11))
                     .foregroundColor(infoColor)
             }
@@ -535,21 +687,22 @@ struct LoginRightPanel: View {
                 if model.isSubmitting {
                     ProgressView().scaleEffect(0.7).frame(width: 14, height: 14)
                 } else {
-                    Image(systemName: "arrow.right")
+                    // Web icon: log-in
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
                         .font(.system(size: 14, weight: .semibold))
                 }
                 Text(loginButtonTitle)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 44)
-            .foregroundColor(.white)
+            .frame(height: 40)
+            .foregroundColor(LoginPalette.buttonFg(dark))
             .background(LoginPalette.primary(dark))
-            .cornerRadius(8)
+            .cornerRadius(6)
         }
         .buttonStyle(LoginPressButtonStyle())
         .disabled(!model.canAttemptLogin(backendReady: formReady))
-        .opacity(model.canAttemptLogin(backendReady: formReady) ? 1 : 0.55)
+        .opacity(model.canAttemptLogin(backendReady: formReady) ? 1 : 0.6)
     }
 
     private var loginButtonTitle: String {
@@ -571,13 +724,13 @@ struct LoginRightPanel: View {
                 Text(model.isSubmitting
                      ? (model.locale == .enUS ? "Registering…" : "注册中…")
                      : (model.locale == .enUS ? "Register" : "注册"))
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 44)
-            .foregroundColor(.white)
+            .frame(height: 40)
+            .foregroundColor(LoginPalette.buttonFg(dark))
             .background(LoginPalette.primary(dark))
-            .cornerRadius(8)
+            .cornerRadius(6)
         }
         .buttonStyle(LoginPressButtonStyle())
         .disabled(!model.canAttemptRegister(backendReady: formReady))
@@ -658,11 +811,11 @@ struct LoginRightPanel: View {
                     .font(.system(size: 13, weight: .semibold))
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 44)
+            .frame(height: 40)
             .foregroundColor(LoginPalette.text(dark))
             .background(LoginPalette.oauthBg(dark))
-            .cornerRadius(8)
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(LoginPalette.oauthBorder(dark), lineWidth: 1))
+            .cornerRadius(6)
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(LoginPalette.oauthBorder(dark), lineWidth: 1))
         }
         .buttonStyle(LoginPressButtonStyle())
     }
@@ -670,65 +823,49 @@ struct LoginRightPanel: View {
     // MARK: - Verify
 
     private var verifyChoice: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(model.locale == .enUS ? "Verification" : "验证方式")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(LoginPalette.text(dark))
-            HStack(spacing: 8) {
-                verifyTab(model.locale == .enUS ? "Message code" : "消息验证码", selected: model.verifyMethod == .message) {
-                    model.verifyMethod = .message
-                    model.mfaCode = ""
-                }
-                verifyTab("MFA", selected: model.verifyMethod == .mfa) {
-                    model.verifyMethod = .mfa
-                    model.verificationCode = ""
-                }
-                Spacer()
+        // Web 分段式：bg-2 容器 + border + radius 6 + padding 3，选中段 bg-1 + fg-0 + 轻投影
+        HStack(spacing: 4) {
+            verifySegment(
+                model.locale == .enUS ? "Message code" : "消息验证码",
+                icon: "envelope.fill",
+                selected: model.verifyMethod == .message
+            ) {
+                model.verifyMethod = .message
+                model.mfaCode = ""
+            }
+            verifySegment(
+                model.locale == .enUS ? "MFA code" : "MFA 验证码",
+                icon: "checkmark.shield.fill",
+                selected: model.verifyMethod == .mfa
+            ) {
+                model.verifyMethod = .mfa
+                model.verificationCode = ""
             }
         }
+        .padding(3)
+        .background(Color(hex: dark ? "151c21" : "f1f4f6"))
+        .cornerRadius(6)
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(LoginPalette.line(dark), lineWidth: 1))
     }
 
-    private func verifyTab(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+    private func verifySegment(_ title: String, icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title)
-                .font(.system(size: 12, weight: selected ? .bold : .medium))
-                .foregroundColor(selected ? LoginPalette.tabActiveText(dark) : LoginPalette.text(dark))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(selected ? LoginPalette.tabActiveBg(dark) : Color.clear)
-                .cornerRadius(999)
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 13))
+                Text(title)
+                    .font(.system(size: 12, weight: selected ? .semibold : .medium))
+            }
+            .foregroundColor(selected ? Color(hex: dark ? "f6f9fb" : "0c1217") : Color(hex: dark ? "8d9398" : "5d646a"))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(selected ? Color(hex: dark ? "0d1216" : "ffffff") : Color.clear)
+                    .shadow(color: selected ? Color.black.opacity(dark ? 0.4 : 0.12) : .clear, radius: 1, y: 1)
+            )
         }
         .buttonStyle(PlainButtonStyle())
-    }
-
-    private var messageCodeRow: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            fieldLabel(model.locale == .enUS ? "Verification code" : "验证码")
-            HStack(alignment: .center, spacing: 12) {
-                LoginField(
-                    title: "",
-                    placeholder: model.locale == .enUS ? "Code" : "消息验证码",
-                    text: $model.verificationCode,
-                    dark: dark,
-                    enabled: formFieldEnabled,
-                    onCommit: onLogin,
-                    shakeToken: model.shakeVerify
-                )
-                LoginFieldActionButton(
-                    title: model.codeCountdown > 0
-                        ? "\(model.codeCountdown)s"
-                        : (model.isSendingCode
-                           ? (model.locale == .enUS ? "Sending" : "发送中")
-                           : (model.locale == .enUS ? "Send code" : "发送验证码")),
-                    loading: model.isSendingCode,
-                    enabled: formReady && !model.isLoadingMeta && model.codeCountdown == 0
-                        && !model.username.trimmingCharacters(in: .whitespaces).isEmpty,
-                    dark: dark,
-                    minWidth: 118,
-                    action: onSendCode
-                )
-            }
-        }
     }
 
     // MARK: - Footer

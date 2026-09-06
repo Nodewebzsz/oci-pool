@@ -20,7 +20,7 @@ final class LoginFormModel: ObservableObject {
     @Published var confirmPassword = ""
     @Published var verificationCode = ""
     @Published var mfaCode = ""
-    @Published var rememberMe = true
+    @Published var rememberMe = false
     /// Last / current deployment choice.
     @Published var deploymentMode: DeploymentMode = .local
     /// This session has an active mode (user just picked, or remembered choice was restored).
@@ -44,6 +44,8 @@ final class LoginFormModel: ObservableObject {
     @Published var isSubmitting = false
     @Published var isSendingCode = false
     @Published var codeCountdown = 0
+    /// 验证码已发送到的目标（Web sentTo 横幅）。
+    @Published var codeSentTo: String?
     @Published var cryHero = false
     /// Password field focused → hero shy look-down (web).
     @Published var passwordFocused = false
@@ -115,6 +117,7 @@ final class LoginFormModel: ObservableObject {
         verificationCode = ""
         mfaCode = ""
         codeCountdown = 0
+        codeSentTo = nil
         errorText = nil
         infoText = nil
     }
@@ -124,6 +127,7 @@ final class LoginFormModel: ObservableObject {
         verificationCode = ""
         mfaCode = ""
         codeCountdown = 0
+        codeSentTo = nil
     }
 
     /// Login button always pressable when form is ready — empty fields shake instead of hard-disable.

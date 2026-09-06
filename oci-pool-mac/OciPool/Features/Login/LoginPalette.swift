@@ -9,7 +9,7 @@ enum LoginPalette {
     // --text:#cdd9e5; --muted:#768390; --line:#31363d;
 
     static func bg(_ dark: Bool) -> Color {
-        dark ? Color(hex: "1a1d21") : Color(hex: "ECEEF2")
+        dark ? Color(hex: "060a0d") : Color(hex: "f8fafd")
     }
     static func panel(_ dark: Bool) -> Color {
         dark ? Color(hex: "1e2124") : Color(hex: "F3F4F6")
@@ -33,9 +33,13 @@ enum LoginPalette {
     static func line(_ dark: Bool) -> Color {
         dark ? Color(hex: "31363d") : Color(hex: "D1D5DB")
     }
-    /// Primary CTA + brand badge
+    /// Primary CTA + brand badge — Web 基准 light/dark 均为绿色 oklch(0.72 0.16 155)。
     static func primary(_ dark: Bool) -> Color {
-        dark ? Color(hex: "34d399") : Color(hex: "0f766e")
+        Color(hex: "34d399")
+    }
+    /// 主按钮文字色（对齐 Web `--accent-fg`：dark 深绿字 / light 白字）。
+    static func buttonFg(_ dark: Bool) -> Color {
+        dark ? Color(hex: "0e2a22") : Color.white
     }
     static func oauthBg(_ dark: Bool) -> Color {
         dark ? Color(hex: "292d32") : Color(hex: "F3F4F6")
@@ -44,10 +48,10 @@ enum LoginPalette {
         dark ? Color(hex: "31363d") : Color(hex: "E5E7EB")
     }
     static func tabActiveBg(_ dark: Bool) -> Color {
-        dark ? Color(hex: "34d399").opacity(0.15) : Color(hex: "0f766e").opacity(0.06)
+        Color(hex: "34d399").opacity(0.15)
     }
     static func tabActiveText(_ dark: Bool) -> Color {
-        dark ? Color(hex: "34d399") : Color(hex: "0f766e")
+        Color(hex: "34d399")
     }
     static func divider(_ dark: Bool) -> Color {
         dark ? Color.white.opacity(0.06) : Color.black.opacity(0.06)
