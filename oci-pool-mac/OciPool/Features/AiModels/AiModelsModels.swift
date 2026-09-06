@@ -3,6 +3,8 @@ import Foundation
 struct AiTenantOption: Identifiable, Equatable {
     var id: String = ""
     var name: String = ""
+    /// 后端 tname：租户名（自定义名优先）+ 区域，下拉展示用；name 为 userName(OCID)+区域
+    var tname: String = ""
 }
 
 struct AiAvailableModel: Identifiable, Equatable {
@@ -56,6 +58,7 @@ enum AiModelsJSON {
             var t = AiTenantOption()
             t.id = string(m["id"])
             t.name = string(m["name"])
+            t.tname = string(m["tname"])
             return t
         }
     }

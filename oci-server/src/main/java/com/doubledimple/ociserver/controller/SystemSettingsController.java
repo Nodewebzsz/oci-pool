@@ -384,10 +384,11 @@ public class SystemSettingsController  extends BaseController{
             for (Tenant tenant : tenants) {
                 Map<String, Object> t = new HashMap<>();
                 t.put("id", tenant.getId().toString());
-                // 下拉展示租户名（自定义名优先，其次租户名），userName 是 OCID 不适合展示
-                String displayName = (tenant.getDefName() != null && !tenant.getDefName().isEmpty())
+                t.put("name", tenant.getUserName() + " - " + RegionEnum.getRegionCode(tenant.getRegion()));
+                // 下拉展示用：租户名（自定义名优先，其次租户名）+ 区域；name 保持原样（userName/OCID）以兼容既有调用
+                String tenantDisplayName = (tenant.getDefName() != null && !tenant.getDefName().isEmpty())
                         ? tenant.getDefName() : tenant.getTenancyName();
-                t.put("name", displayName + " - " + RegionEnum.getRegionCode(tenant.getRegion()));
+                t.put("tname", tenantDisplayName + " - " + RegionEnum.getRegionCode(tenant.getRegion()));
                 result.add(t);
             }
             return ResponseEntity.ok(result);

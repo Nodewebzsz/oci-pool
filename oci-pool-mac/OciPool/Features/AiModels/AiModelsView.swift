@@ -78,7 +78,7 @@ struct AiModelsView: View {
             toolbar: {
                 HStack(spacing: 8) {
                     SelectMenu(
-                        options: model.tenants.map { SelectOption(id: $0.id, title: $0.name) },
+                        options: model.tenants.map { SelectOption(id: $0.id, title: $0.tname.isEmpty ? $0.name : $0.tname) },
                         selection: Binding(
                             get: { model.selectedTenantId.isEmpty ? nil : model.selectedTenantId },
                             set: { model.onTenantChanged($0) }
@@ -138,7 +138,7 @@ struct AiModelsView: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(AppTheme.sidebarText(dark))
                     SelectMenu(
-                        options: model.tenants.map { SelectOption(id: $0.id, title: $0.name) },
+                        options: model.tenants.map { SelectOption(id: $0.id, title: $0.tname.isEmpty ? $0.name : $0.tname) },
                         selection: Binding(
                             get: { model.selectedTenantId.isEmpty ? nil : model.selectedTenantId },
                             set: { model.onTenantChanged($0) }
