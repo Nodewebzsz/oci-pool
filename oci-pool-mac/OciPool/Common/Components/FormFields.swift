@@ -2,12 +2,12 @@ import SwiftUI
 
 // MARK: - Shared input chrome (aligned with login page filled fields)
 
-/// Global input tokens — match login filled box (soft fill, radius 12, focus glow).
-/// Toolbar/filter height is slightly denser than login form (40 vs 48).
+/// Global input tokens — 对齐 Web ui.jsx：SearchInput/Select/TextInput 统一 md 高度 30。
+/// 登录页输入框为 Web 特例（高 40 / 圆角 6），由 LoginField 自行定义。
 enum AppInputStyle {
-    static let height: CGFloat = 40
-    static let radius: CGFloat = 12
-    static let fontSize: CGFloat = 13
+    static let height: CGFloat = 30
+    static let radius: CGFloat = 5
+    static let fontSize: CGFloat = 12
     static let iconSize: CGFloat = 12
     static let hPad: CGFloat = 12
 
