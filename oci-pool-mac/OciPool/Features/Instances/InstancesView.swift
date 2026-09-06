@@ -68,7 +68,8 @@ struct InstancesView: View {
         PageScaffold(
             title: "OCI 实例管理",
             subtitle: tenantSubPage ? tenantSubtitle : filterSubtitle,
-            systemImage: "server",
+            systemImage: "server.rack",
+            iconColor: AppTheme.cyan,
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {

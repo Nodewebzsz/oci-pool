@@ -13,6 +13,7 @@ struct StorageView: View {
             title: "OCI 对象存储",
             subtitle: "OCI Object Storage · 存储桶与对象管理",
             systemImage: "externaldrive",
+            iconColor: AppTheme.info,
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {

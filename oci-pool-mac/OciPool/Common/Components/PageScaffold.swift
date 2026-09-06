@@ -6,6 +6,8 @@ struct PageScaffold<Toolbar: View, Content: View, Footer: View>: View {
     let title: String
     var subtitle: String? = nil
     var systemImage: String? = nil
+    /// 页头图标色（Web 各页不同：如 实例=cyan / 开机=orange / 邮箱=cyan / 存储=info / AI=violet），默认强调色
+    var iconColor: Color? = nil
     @ViewBuilder var toolbar: () -> Toolbar
     @ViewBuilder var content: () -> Content
     @ViewBuilder var footer: () -> Footer
@@ -13,6 +15,8 @@ struct PageScaffold<Toolbar: View, Content: View, Footer: View>: View {
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme
     private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
+
+    private var resolvedIconColor: Color { iconColor ?? AppTheme.sidebarActive }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,11 +40,11 @@ struct PageScaffold<Toolbar: View, Content: View, Footer: View>: View {
                 if let systemImage = systemImage {
                     ZStack {
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(AppTheme.sidebarActive.opacity(0.18))
+                            .fill(resolvedIconColor.opacity(0.18))
                             .frame(width: 32, height: 32)
                         Image(systemName: systemImage)
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(AppTheme.sidebarActive)
+                            .foregroundColor(resolvedIconColor)
                     }
                 }
                 VStack(alignment: .leading, spacing: 2) {
@@ -85,13 +89,14 @@ extension PageScaffold where Toolbar == EmptyView, Footer == EmptyView {
 }
 
 extension PageScaffold where Footer == EmptyView {
-    init(title: String, subtitle: String? = nil, systemImage: String? = nil,
+    init(title: String, subtitle: String? = nil, systemImage: String? = nil, iconColor: Color? = nil,
          @ViewBuilder toolbar: @escaping () -> Toolbar,
          @ViewBuilder content: @escaping () -> Content) {
         self.init(
             title: title,
             subtitle: subtitle,
             systemImage: systemImage,
+            iconColor: iconColor,
             toolbar: toolbar,
             content: content,
             footer: { EmptyView() }

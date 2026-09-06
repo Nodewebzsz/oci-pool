@@ -14,6 +14,7 @@ struct EmailView: View {
             title: "OCI 邮箱服务",
             subtitle: emailSubtitle,
             systemImage: "envelope",
+            iconColor: AppTheme.cyan,
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {

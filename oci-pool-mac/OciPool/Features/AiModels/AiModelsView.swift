@@ -74,6 +74,7 @@ struct AiModelsView: View {
             title: "OCI AI 管理",
             subtitle: "OCI Generative AI · 模型配置与对话管理",
             systemImage: "sparkles",
+            iconColor: Color(hex: "b484e8"),
             toolbar: {
                 HStack(spacing: 8) {
                     SelectMenu(

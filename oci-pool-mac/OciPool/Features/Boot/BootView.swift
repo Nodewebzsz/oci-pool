@@ -71,6 +71,7 @@ struct BootView: View {
             title: "预开列表",
             subtitle: tenantSubPage ? tenantSubtitle : filterSubtitle,
             systemImage: "zap.fill",
+            iconColor: AppTheme.orange,
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
