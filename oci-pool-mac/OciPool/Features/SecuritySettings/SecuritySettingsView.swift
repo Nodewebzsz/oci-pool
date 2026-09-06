@@ -16,7 +16,8 @@ struct SecuritySettingsView: View {
         PageScaffold(
             title: "系统设置",
             subtitle: "账号安全 · OAuth · MFA · 验证码 · 频道通知",
-            systemImage: "slider.horizontal.3",
+            systemImage: "gearshape",
+            iconColor: AppTheme.sidebarActive,
             toolbar: { toolbar },
             content: {
                 ScrollView {

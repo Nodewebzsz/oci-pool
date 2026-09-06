@@ -14,7 +14,8 @@ struct ApiTokensView: View {
         PageScaffold(
             title: "Token 配置",
             subtitle: "平台 REST API 的 Bearer Token 管理",
-            systemImage: "key.fill",
+            systemImage: "key",
+            iconColor: AppTheme.sidebarActive,
             toolbar: { toolbar },
             content: {
                 ScrollView {

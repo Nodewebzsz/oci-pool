@@ -19,6 +19,7 @@ struct MemoView: View {
             title: "笔记管理",
             subtitle: memoCountSubtitle,
             systemImage: "book",
+            iconColor: AppTheme.info,
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {

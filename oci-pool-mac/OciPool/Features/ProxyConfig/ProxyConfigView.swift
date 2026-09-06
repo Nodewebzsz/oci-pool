@@ -12,9 +12,10 @@ struct ProxyConfigView: View {
 
     var body: some View {
         PageScaffold(
-            title: "代理配置",
-            subtitle: "Proxy Configuration · 全局代理池 · 各租户可绑定不同出口",
-            systemImage: "arrow.left.arrow.right",
+            title: "代理管理",
+            subtitle: "出站代理池，用于绕过 OCI 区域限制和速率限制",
+            systemImage: "shuffle",
+            iconColor: AppTheme.cyan,
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {

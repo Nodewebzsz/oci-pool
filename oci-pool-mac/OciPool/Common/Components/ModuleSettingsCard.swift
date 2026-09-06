@@ -51,73 +51,67 @@ struct ModuleSettingsCard<BodyContent: View, Footer: View>: View {
 
     private var isOn: Bool { enabled?.wrappedValue == true }
 
+    /// Web SettingsCard：标题条 bg-2（10px 14px · icon 13 · 标题 12/600）+ body 14 + footer bg-2 右对齐
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .frame(height: 64)
-
-            Divider().opacity(0.45)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(AppTheme.sidebarHover(dark))
+                .overlay(Rectangle().fill(AppTheme.border(dark)).frame(height: 1), alignment: .bottom)
 
             VStack(alignment: .leading, spacing: 12) {
                 bodyContent()
                 Spacer(minLength: 0)
             }
-            .padding(16)
+            .padding(14)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
-            Divider().opacity(0.45)
 
             HStack {
                 Spacer()
                 footer()
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .frame(height: 56)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(AppTheme.sidebarHover(dark))
+            .overlay(Rectangle().fill(AppTheme.border(dark)).frame(height: 1), alignment: .top)
         }
         .frame(maxWidth: .infinity, minHeight: minHeight, maxHeight: .infinity, alignment: .top)
         .background(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: 8)
                 .fill(AppTheme.sidebarBg(dark))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: 8)
                 .stroke(
                     isOn
                         ? accent.opacity(dark ? 0.45 : 0.35)
-                        : AppTheme.border(dark).opacity(0.7),
+                        : AppTheme.border(dark),
                     lineWidth: 1
                 )
         )
-        .shadow(color: Color.black.opacity(dark ? 0.22 : 0.06), radius: 10, y: 3)
+        .cornerRadius(8)
         .animation(.easeInOut(duration: 0.18), value: isOn)
     }
 
     private var header: some View {
-        HStack(spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(accent.opacity(0.15))
-                    .frame(width: 36, height: 36)
-                Image(systemName: systemImage)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(accent)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(accent)
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(AppTheme.navIcon(dark))
+            if !subtitle.isEmpty {
                 Text(subtitle)
                     .font(.system(size: 11))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .foregroundColor(AppTheme.textTertiary(dark))
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
             if let enabled = enabled {
                 Toggle("", isOn: enabled)
-                    .toggleStyle(SwitchToggleStyle())
+                    .toggleStyle(SwitchToggleStyle(tint: AppTheme.sidebarActive))
                     .labelsHidden()
             }
         }

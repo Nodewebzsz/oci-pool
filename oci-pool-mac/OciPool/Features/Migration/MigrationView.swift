@@ -16,6 +16,7 @@ struct MigrationView: View {
             title: "数据迁移",
             subtitle: "加密备份 · 一键导出 · 密钥恢复",
             systemImage: "arrow.left.and.right",
+            iconColor: AppTheme.info,
             toolbar: { EmptyView() },
             content: {
                 ScrollView {

@@ -15,9 +15,10 @@ struct IpQualityView: View {
 
     var body: some View {
         PageScaffold(
-            title: "质量管理",
-            subtitle: "IP 质量检测开关 · 三网 VPS SSH 探测节点",
+            title: "IP 质量管理",
+            subtitle: "IP 质量检测与运营商链路配置 · 保障新分配 IP 的可用性",
             systemImage: "shield",
+            iconColor: AppTheme.info,
             toolbar: { toolbar },
             content: {
                 ScrollView {

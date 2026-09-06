@@ -15,6 +15,7 @@ struct SystemLogsView: View {
             title: "系统日志",
             subtitle: "System Logs · 全站运行日志",
             systemImage: "terminal",
+            iconColor: AppTheme.sidebarActive,
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {

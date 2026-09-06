@@ -31,8 +31,9 @@ struct VpsListView: View {
     private var mainBoard: some View {
         PageScaffold(
             title: "资源列表",
-            subtitle: "共 \(model.totalCount) 台 · 在线 \(model.onlineCount) · 离线 \(model.offlineCount)",
-            systemImage: "desktopcomputer",
+            subtitle: "VPS 实例监控面板 · 跨云商聚合视图",
+            systemImage: "server.rack",
+            iconColor: Color(hex: "b484e8"),
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
@@ -74,14 +75,6 @@ struct VpsListView: View {
     private var toolbar: some View {
         HStack(spacing: 8) {
             AppButton(
-                title: model.isLatencyTesting ? "测试中…" : "延迟测试",
-                systemImage: "bolt.fill",
-                kind: .secondary,
-                isLoading: model.isLatencyTesting
-            ) { model.runLatencyTest() }
-            .disabled(model.isLatencyTesting)
-
-            AppButton(
                 title: "刷新",
                 systemImage: "arrow.clockwise",
                 kind: .secondary,
@@ -100,7 +93,7 @@ struct VpsListView: View {
                 title: "服务器总数",
                 value: "\(model.totalCount)",
                 icon: "server.rack",
-                accent: AppTheme.sidebarActive,
+                accent: AppTheme.info,
                 active: false,
                 action: nil
             )
@@ -109,6 +102,7 @@ struct VpsListView: View {
                 value: "\(model.onlineCount)",
                 icon: "wifi",
                 accent: AppTheme.sidebarActive,
+                valueColor: AppTheme.sidebarActive,
                 active: false,
                 action: nil
             )
@@ -117,52 +111,67 @@ struct VpsListView: View {
                 value: "\(model.offlineCount)",
                 icon: "heart.slash",
                 accent: AppTheme.danger,
+                valueColor: AppTheme.danger,
                 active: model.offlineOnly,
                 action: { model.toggleOfflineFilter() }
             )
         }
     }
 
+    /// Web 状态卡：label 11 fg-3 + 数值 26/700 语义色 + 右上角 40×40 软底图标；离线卡可点击筛选（danger-soft 底 + 徽章）
     private func statCard(
         title: String,
         value: String,
         icon: String,
         accent: Color,
+        valueColor: Color? = nil,
         active: Bool,
         action: (() -> Void)?
     ) -> some View {
-        let content = HStack {
+        let content = ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(title)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                HStack(spacing: 5) {
+                    Text(title)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(active ? AppTheme.danger : AppTheme.textTertiary(dark))
+                    if active {
+                        Text("筛选中")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(AppTheme.danger)
+                            .cornerRadius(2)
+                    }
+                }
                 Text(value)
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundColor(valueColor ?? AppTheme.navIcon(dark))
             }
-            Spacer()
-            Image(systemName: icon)
-                .font(.system(size: 26, weight: .light))
-                .foregroundColor(accent.opacity(0.35))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(accent.opacity(0.16))
+                    .frame(width: 40, height: 40)
+                Image(systemName: icon)
+                    .font(.system(size: 19, weight: .medium))
+                    .foregroundColor(accent)
+            }
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 88, alignment: .topLeading)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(AppTheme.sidebarBg(dark))
+            RoundedRectangle(cornerRadius: 8)
+                .fill(active ? AppTheme.dangerSoft(dark) : AppTheme.sidebarBg(dark))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 8)
                 .stroke(
-                    active ? AppTheme.danger : AppTheme.border(dark).opacity(0.55),
-                    lineWidth: active ? 1.5 : 1
+                    active ? AppTheme.danger : AppTheme.border(dark),
+                    lineWidth: 1
                 )
         )
-        .background(
-            active
-                ? RoundedRectangle(cornerRadius: 12).fill(AppTheme.danger.opacity(0.08))
-                : nil
-        )
+        .cornerRadius(8)
 
         return Group {
             if let action = action {
@@ -198,6 +207,13 @@ struct VpsListView: View {
                 systemImage: model.showTenant ? "eye.slash" : "eye",
                 active: model.showTenant
             ) { model.toggleShowTenant() }
+            AppButton(
+                title: model.isLatencyTesting ? "测试中…" : "延迟测试",
+                systemImage: "bolt.fill",
+                kind: .primary,
+                isLoading: model.isLatencyTesting
+            ) { model.runLatencyTest() }
+            .disabled(model.isLatencyTesting)
             moreMenu
         }
         .padding(12)

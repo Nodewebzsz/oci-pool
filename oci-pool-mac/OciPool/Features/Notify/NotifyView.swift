@@ -19,6 +19,7 @@ struct NotifyView: View {
             title: "通知管理",
             subtitle: "通知设置",
             systemImage: "bell",
+            iconColor: AppTheme.orange,
             toolbar: { toolbar },
             content: {
                 ScrollView {

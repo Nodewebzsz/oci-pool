@@ -14,7 +14,8 @@ struct MfaBackupView: View {
         PageScaffold(
             title: "MFA 密钥备份",
             subtitle: "本地加密保存的 TOTP 密钥库 · 用于两步验证一键代填",
-            systemImage: "lock.shield",
+            systemImage: "iphone",
+            iconColor: Color(hex: "b484e8"),
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
