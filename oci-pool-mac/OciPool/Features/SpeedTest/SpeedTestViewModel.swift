@@ -46,9 +46,10 @@ final class SpeedTestViewModel: ObservableObject {
 
     // MARK: - Load
 
+    /// Web 同款 5 级兜底链：后端 getCurrentIp → ipwho.is → ipinfo.io → geojs → ipify
     func loadClientIP() async {
-        do {
-            let raw = try await fetchStringData(path: "/api/getCurrentIp")
+        // 1) 后端 /api/getCurrentIp（登录后返回 公网IP/地址）
+        if let raw = try? await fetchStringData(path: "/api/getCurrentIp"), raw.lowercased() != "error", !raw.isEmpty {
             if raw.contains("/") {
                 let parts = raw.split(separator: "/", maxSplits: 1).map(String.init)
                 let ip = parts.first ?? raw
@@ -57,9 +58,62 @@ final class SpeedTestViewModel: ObservableObject {
             } else {
                 clientIPText = raw.replacingOccurrences(of: "_", with: ".")
             }
-        } catch {
-            clientIPText = "error"
+            return
         }
+        // 2) ipwho.is — 含 城市/国家/ISP
+        if let d = try? await publicIPJSON("https://ipwho.is/") as? [String: Any] {
+            let explicitFail = d["success"] != nil && (d["success"] as? Bool) == false
+            if !explicitFail, let ip = d["ip"] as? String, !ip.isEmpty {
+                var parts: [String] = []
+                if let flag = (d["flag"] as? [String: Any])?["emoji"] as? String { parts.append(flag) }
+                if let city = d["city"] as? String, !city.isEmpty { parts.append(city) }
+                if let country = d["country"] as? String, !country.isEmpty { parts.append(country) }
+                let conn = d["connection"] as? [String: Any] ?? [:]
+                let org = (conn["isp"] as? String) ?? (conn["org"] as? String) ?? ""
+                let loc = parts.joined(separator: " · ") + (org.isEmpty ? "" : " · \(org)")
+                clientIPText = loc.isEmpty ? ip : "\(ip)  \(loc)"
+                return
+            }
+        }
+        // 3) ipinfo.io
+        if let d = try? await publicIPJSON("https://ipinfo.io/json") as? [String: Any] {
+            if let ip = d["ip"] as? String, !ip.isEmpty {
+                let city = d["city"] as? String ?? ""
+                let country = d["country"] as? String ?? ""
+                let org = (d["org"] as? String ?? "").replacingOccurrences(of: "^AS\\d+\\s*", with: "", options: .regularExpression)
+                let loc = [city, country].filter { !$0.isEmpty }.joined(separator: " · ") + (org.isEmpty ? "" : " · \(org)")
+                clientIPText = loc.isEmpty ? ip : "\(ip)  \(loc)"
+                return
+            }
+        }
+        // 4) geojs
+        if let d = try? await publicIPJSON("https://get.geojs.io/v1/ip/geo.json") as? [String: Any] {
+            if let ip = d["ip"] as? String, !ip.isEmpty {
+                let city = d["city"] as? String ?? ""
+                let country = d["country"] as? String ?? ""
+                let org = d["organization_name"] as? String ?? ""
+                let loc = [city, country].filter { !$0.isEmpty }.joined(separator: " · ") + (org.isEmpty ? "" : " · \(org)")
+                clientIPText = loc.isEmpty ? ip : "\(ip)  \(loc)"
+                return
+            }
+        }
+        // 5) ipify — 仅 IP
+        if let d = try? await publicIPJSON("https://api.ipify.org?format=json") as? [String: Any] {
+            if let ip = d["ip"] as? String, !ip.isEmpty {
+                clientIPText = ip
+                return
+            }
+        }
+        clientIPText = "获取失败"
+    }
+
+    /// 直连公共 IP API（不走后端）
+    private func publicIPJSON(_ urlString: String) async throws -> Any {
+        guard let url = URL(string: urlString) else { throw APIError.serverMessage("bad url") }
+        var req = URLRequest(url: url, timeoutInterval: 8)
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        let (data, _) = try await APIClient.shared.data(for: req)
+        return try JSONSerialization.jsonObject(with: data)
     }
 
     func loadRegions() async {
