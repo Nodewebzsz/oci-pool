@@ -188,15 +188,16 @@ enum CloudflareJSON {
         SelectOption(id: "86400", title: "1 天")
     ]
 
+    /// 对齐 Web page-proxy `typeColor`：A=info, AAAA=cyan, CNAME=accent, MX=orange, TXT/NS=fg。
     static func typeColor(_ type: String) -> Color {
         switch type.uppercased() {
-        case "A": return Color(hex: "43b581")
-        case "AAAA": return Color(hex: "1abc9c")
-        case "CNAME": return Color(hex: "7289da")
-        case "TXT": return Color(hex: "faa61a")
-        case "MX": return Color(hex: "f38020")
-        case "NS": return Color(hex: "99aab5")
-        default: return Color(hex: "58a6ff")
+        case "A": return Color(hex: "6898e8")
+        case "AAAA": return AccentPreset.cyan.color
+        case "CNAME": return AppTheme.sidebarActive
+        case "TXT": return Color(hex: "8d9398")
+        case "MX": return AccentPreset.orange.color
+        case "NS": return Color(hex: "5d646a")
+        default: return Color(hex: "8d9398")
         }
     }
 

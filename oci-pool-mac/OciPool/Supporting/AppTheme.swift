@@ -1,23 +1,23 @@
 import SwiftUI
 import AppKit
 
-/// Visual tokens aligned with Web `header.css` / sidebar (dark default).
+/// Visual tokens aligned with Web modern-ui `index.html` CSS variables (cool slate oklch 240).
 enum AppTheme {
-    // Web dark
-    static let topNavBgDark = Color(hex: "1f1f1f")
-    static let sidebarBgDark = Color(hex: "1e2124")
-    static let sidebarHoverDark = Color(hex: "292d30")
-    static let sidebarTextDark = Color(hex: "a9b7c6")
-    static let pageBgDark = Color(hex: "1a1d21")
-    static let borderDark = Color(hex: "383c40")
+    // Web dark: --bg-0/1/2, --border, --fg-1, --fg-0
+    static let pageBgDark = Color(hex: "060a0d")
+    static let topNavBgDark = Color(hex: "0d1216")
+    static let sidebarBgDark = Color(hex: "0d1216")
+    static let sidebarHoverDark = Color(hex: "151c21")
+    static let borderDark = Color(hex: "232a2f")
+    static let sidebarTextDark = Color(hex: "ccd2d6")
 
-    // Web light
-    static let topNavBgLight = Color(hex: "d0dae6")
-    static let sidebarBgLight = Color(hex: "e4eaf2")
-    static let sidebarHoverLight = Color(hex: "d6dfe9")
-    static let sidebarTextLight = Color(hex: "374a61")
-    static let pageBgLight = Color(hex: "f0f4f8")
-    static let borderLight = Color(hex: "b8c8d8")
+    // Web light: --bg-0/1/2, --border, --fg-1, --fg-0
+    static let pageBgLight = Color(hex: "f8fafd")
+    static let topNavBgLight = Color(hex: "ffffff")
+    static let sidebarBgLight = Color(hex: "ffffff")
+    static let sidebarHoverLight = Color(hex: "f1f4f6")
+    static let borderLight = Color(hex: "d9dfe3")
+    static let sidebarTextLight = Color(hex: "2d3439")
 
     /// 当前强调色（随 `AppearanceController.accent` 变化，对齐 Web `--accent`）。
     static var sidebarActive: Color { AppearanceController.shared.accent.color }
@@ -30,7 +30,7 @@ enum AppTheme {
     static func pageBg(_ dark: Bool) -> Color { dark ? pageBgDark : pageBgLight }
     static func border(_ dark: Bool) -> Color { dark ? borderDark : borderLight }
     static func navIcon(_ dark: Bool) -> Color {
-        dark ? Color.white.opacity(0.9) : Color(hex: "1e2f42")
+        dark ? Color(hex: "f6f9fb") : Color(hex: "0c1217")
     }
 }
 
@@ -47,8 +47,8 @@ enum AccentPreset: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .green: return "活力绿"
-        case .cyan: return "海蓝青"
-        case .violet: return "紫罗兰"
+        case .cyan: return "海洋青"
+        case .violet: return "幽紫"
         case .orange: return "琥珀橙"
         case .blue: return "经典蓝"
         }

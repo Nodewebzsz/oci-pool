@@ -345,7 +345,7 @@ struct TenantsView: View {
             color = Color(hex: dark ? "e67e22" : "d35400")
             tip = "强制代理已开启 · 点击配置"
         } else if item.proxyBound {
-            color = Color(hex: dark ? "1abc9c" : "16a085")
+            color = AppTheme.sidebarActive
             tip = "已绑定专属代理 · 点击配置"
         } else {
             color = Color(hex: dark ? "8b949e" : "95a5a6").opacity(dark ? 0.55 : 0.65)

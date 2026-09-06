@@ -13,7 +13,7 @@ struct TenantCostView: View {
     private var accentGreen: Color { AppTheme.sidebarActive }
     private var computeColor: Color { Color(hex: "4a73ff") }
     private var storageColor: Color { Color(hex: "ff9f40") }
-    private var networkColor: Color { Color(hex: "1abc9c") }
+    private var networkColor: Color { AppTheme.sidebarActive }
     private var otherColor: Color { Color(hex: "6b7280") }
     private var surface: Color { dark ? Color(hex: "1a1d27") : Color.white }
     private var cardBorder: Color { dark ? Color(hex: "2a2d3a") : Color(hex: "e2e8f0") }

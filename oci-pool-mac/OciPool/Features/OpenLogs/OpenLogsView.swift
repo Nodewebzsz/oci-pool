@@ -76,9 +76,9 @@ struct OpenLogsView: View {
 
     private var connectionColor: Color {
         switch model.connection {
-        case .connected: return Color(hex: "1abc9c")
-        case .connecting: return Color(hex: "f39c12")
-        case .disconnected: return Color(hex: "ff6b6b")
+        case .connected: return AppTheme.sidebarActive
+        case .connecting: return AccentPreset.orange.color
+        case .disconnected: return Color(hex: "f05653")
         }
     }
 

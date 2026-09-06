@@ -140,13 +140,13 @@ struct ProxyConfigView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(item.isForce
                                          ? Color(hex: "e67e22")
-                                         : Color(hex: "1abc9c"))
+                                         : AppTheme.sidebarActive)
                         .frame(width: 28, height: 28)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
                                 .fill((item.isForce
                                        ? Color(hex: "e67e22")
-                                       : Color(hex: "1abc9c")).opacity(0.12))
+                                       : AppTheme.sidebarActive).opacity(0.12))
                         )
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -188,12 +188,12 @@ struct ProxyConfigView: View {
                     .font(.system(size: 12))
                     .foregroundColor(item.isForce
                                      ? Color(hex: dark ? "e67e22" : "d35400")
-                                     : Color(hex: dark ? "1abc9c" : "16a085"))
+                                     : AppTheme.sidebarActive)
                 Text(item.forceLabel)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(item.isForce
                                      ? Color(hex: dark ? "e67e22" : "d35400")
-                                     : Color(hex: dark ? "1abc9c" : "16a085"))
+                                     : AppTheme.sidebarActive)
                     .lineLimit(1)
             }
             .padding(.horizontal, 6)
@@ -202,7 +202,7 @@ struct ProxyConfigView: View {
                 RoundedRectangle(cornerRadius: 6)
                     .fill((item.isForce
                            ? Color(hex: "e67e22")
-                           : Color(hex: "1abc9c")).opacity(0.12))
+                           : AppTheme.sidebarActive).opacity(0.12))
             )
             .frame(width: 72, alignment: .leading)
             .contentShape(Rectangle())

@@ -74,7 +74,7 @@ struct MigrationView: View {
             title: "数据导入",
             subtitle: "上传 .enc 并填写密钥",
             systemImage: "square.and.arrow.down",
-            accent: Color(hex: "1abc9c"),
+            accent: AccentPreset.orange.color,
             enabled: nil,
             minHeight: cardMinHeight
         ) {
