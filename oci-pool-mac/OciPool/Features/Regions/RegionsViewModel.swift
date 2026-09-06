@@ -6,6 +6,7 @@ import Combine
 final class RegionsViewModel: ObservableObject {
     @Published private(set) var openRecords: [OpenRegionNotify] = []
     @Published private(set) var myRecords: [OpenRegionNotify] = []
+    @Published private(set) var myRegionCodes: Set<String> = []
     @Published private(set) var regionMap: [String: String] = [:]
     @Published private(set) var allRows: [RegionRow] = []
     @Published private(set) var filteredRows: [RegionRow] = []
@@ -23,7 +24,11 @@ final class RegionsViewModel: ObservableObject {
     @Published var statusFilter: RegionStatusFilter = .all {
         didSet { refilter() }
     }
-    @Published var mapMode: RegionsMapViewMode = .arm
+    @Published var mapMode: RegionsMapViewMode = .arm {
+        didSet {
+            if mapMode != oldValue { refilter() }
+        }
+    }
     @Published var showMapBoard = false
     @Published var pageState = PageState(page: 0, size: 10)
 
@@ -40,12 +45,8 @@ final class RegionsViewModel: ObservableObject {
             return d >= start
         }.count
     }
-    var mapCount: Int {
-        switch mapMode {
-        case .arm: return openArmCount
-        case .mine: return Set(myRecords.map(\.region)).count
-        }
-    }
+    /// Web「数量:」= 当前 tab + 筛选后的行数
+    var filteredCount: Int { filteredRows.count }
 
     init(session: AppSession = .shared) {
         self.session = session
@@ -75,6 +76,7 @@ final class RegionsViewModel: ObservableObject {
             async let arm: () = fetchArmData()
             async let mine: () = fetchMyRegions()
             _ = await (arm, mine)
+            myRegionCodes = Set(myRecords.map(\.region))
             rebuildRows()
             let f = DateFormatter()
             f.locale = Locale(identifier: "zh_CN")
@@ -116,37 +118,52 @@ final class RegionsViewModel: ObservableObject {
         var rows: [RegionRow] = []
         var added = Set<String>()
 
+        func makeRow(code: String, name: String, isOpen: Bool, arch: String,
+                     openTime: String?, openCount: Int, monthly: Int, lastNotify: String?) -> RegionRow {
+            RegionRow(
+                regionCode: code,
+                name: name,
+                isOpen: isOpen,
+                architectureType: arch,
+                openTime: openTime,
+                openCount: openCount,
+                monthlyOpenCount: monthly,
+                lastNotifyTime: lastNotify,
+                continent: RegionContinent.of(regionCode: code),
+                isMine: myRegionCodes.contains(code),
+                todayGrabs: Self.openedToday(openTime) ? openCount : 0
+            )
+        }
+
         // Open regions first (backend order)
         for rec in openRecords {
             let code = rec.region
             guard KnownRegions.codes.contains(code) || !code.isEmpty else { continue }
             added.insert(code)
-            rows.append(RegionRow(
-                regionCode: code,
+            rows.append(makeRow(
+                code: code,
                 name: regionMap[code] ?? code,
                 isOpen: rec.openCount > 0,
-                architectureType: rec.architectureType.isEmpty ? "--" : rec.architectureType,
+                arch: rec.architectureType.isEmpty ? "—" : rec.architectureType,
                 openTime: rec.openTime,
                 openCount: rec.openCount,
-                monthlyOpenCount: rec.monthlyOpenCount,
-                lastNotifyTime: rec.lastNotifyTime,
-                continent: RegionContinent.of(regionCode: code)
+                monthly: rec.monthlyOpenCount,
+                lastNotify: rec.lastNotifyTime
             ))
         }
 
         // Closed known regions
         var closed: [RegionRow] = []
         for code in KnownRegions.codes where !added.contains(code) {
-            closed.append(RegionRow(
-                regionCode: code,
+            closed.append(makeRow(
+                code: code,
                 name: regionMap[code] ?? code,
                 isOpen: false,
-                architectureType: "--",
+                arch: "—",
                 openTime: nil,
                 openCount: 0,
-                monthlyOpenCount: 0,
-                lastNotifyTime: nil,
-                continent: RegionContinent.of(regionCode: code)
+                monthly: 0,
+                lastNotify: nil
             ))
         }
         closed.sort { $0.regionCode < $1.regionCode }
@@ -165,9 +182,21 @@ final class RegionsViewModel: ObservableObject {
         refilter()
     }
 
+    private static func openedToday(_ time: String?) -> Bool {
+        guard let time, !time.isEmpty, let d = parseDate(time) else { return false }
+        return Calendar.current.isDateInToday(d)
+    }
+
     private func refilter() {
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        filteredRows = allRows.filter { row in
+        // Web：tab 先过滤（released → 已放货，mine → 我的区域，map → 全部）
+        let tabFiltered: [RegionRow]
+        switch mapMode {
+        case .arm: tabFiltered = allRows.filter(\.isOpen)
+        case .mine: tabFiltered = allRows.filter(\.isMine)
+        case .map: tabFiltered = allRows
+        }
+        filteredRows = tabFiltered.filter { row in
             let matchQ = q.isEmpty
                 || row.regionCode.lowercased().contains(q)
                 || row.name.lowercased().contains(q)

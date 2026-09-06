@@ -6,6 +6,7 @@ struct RegionsView: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appearance: AppearanceController
     @StateObject private var model = RegionsViewModel()
+    @StateObject private var worldMap = WorldMapData()
 
     private var dark: Bool { appearance.isDarkEffective }
 
@@ -17,15 +18,22 @@ struct RegionsView: View {
                     errorBanner(err)
                 }
                 statsGrid
-                mapCard
-                listCard
+                tabsCard
+                if model.mapMode == .map {
+                    mapCard
+                } else {
+                    listCard
+                }
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(RegionsTheme.bg(dark).ignoresSafeArea())
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-        .onAppear { model.start() }
+        .onAppear {
+            model.start()
+            worldMap.load(baseURL: session.serverURL)
+        }
         .onDisappear { model.stop() }
         .onReceive(NotificationCenter.default.publisher(for: .ociReloadCurrentPage)) { _ in
             Task { await model.refresh() }
@@ -84,7 +92,8 @@ struct RegionsView: View {
 
     private var statsGrid: some View {
         HStack(spacing: 14) {
-            statCard(icon: "mappin", color: AppTheme.info,
+            // Web icon=map-pin（Lucide 泪滴定位针，SF mappin 形状不符）
+            statCard(lucide: "map-pin", color: AppTheme.info,
                      title: "总区域数", value: "\(model.totalRegions)")
             statCard(icon: "checkmark.circle", color: AppTheme.sidebarActive,
                      title: "已开 ARM 架构区域数", value: "\(model.openArmCount)")
@@ -95,15 +104,19 @@ struct RegionsView: View {
     }
 
     /// Web KPICard 布局：图标 36×36（18% 软底）+ 右侧「上标签 11 / 下数值 22·700」
-    private func statCard(icon: String, color: Color, title: String, value: String) -> some View {
+    private func statCard(icon: String? = nil, lucide: String? = nil, color: Color, title: String, value: String) -> some View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(color.opacity(0.18))
                     .frame(width: 36, height: 36)
-                Image(systemName: icon)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(color)
+                if let lucide = lucide {
+                    MenuGlyph(name: lucide, size: 16, color: color)
+                } else if let icon = icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(color)
+                }
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
@@ -122,54 +135,43 @@ struct RegionsView: View {
         .cornerRadius(12)
     }
 
-    // MARK: - Map board (native stand-in for Leaflet)
-
-    private var mapCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(AppTheme.sidebarActive.opacity(0.14))
-                        .frame(width: 38, height: 38)
-                    Image(systemName: "globe")
-                        .foregroundColor(AppTheme.sidebarActive)
-                }
-                Text("数量: \(model.mapCount)")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(RegionsTheme.text(dark))
-
-                Spacer(minLength: 8)
-
-                HStack(spacing: 0) {
-                    mapToggle("ARM 放货区域", mode: .arm)
-                    mapToggle("我的区域", mode: .mine)
-                }
-                .background(RegionsTheme.surface(dark))
-                .cornerRadius(8)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(RegionsTheme.border(dark), lineWidth: 1))
-
-                Button(action: { model.showMapBoard.toggle() }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: model.showMapBoard ? "map.fill" : "map")
-                        Text(model.showMapBoard ? "隐藏地图" : "显示地图")
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                    .foregroundColor(model.showMapBoard ? .white : RegionsTheme.text(dark))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(model.showMapBoard ? AppTheme.info : RegionsTheme.surface(dark))
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(RegionsTheme.border(dark), lineWidth: model.showMapBoard ? 0 : 1)
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
+    /// Web：数量 + 三分段 tab（check-circle-2 / user-check / map）的独立卡片
+    private var tabsCard: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(AppTheme.sidebarActive.opacity(0.14))
+                    .frame(width: 38, height: 38)
+                Image(systemName: "globe")
+                    .foregroundColor(AppTheme.sidebarActive)
+            }
+            HStack(spacing: 4) {
+                Text("数量:")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(RegionsTheme.text(dark).opacity(0.85))
+                Text("\(model.filteredRows.count)")
+                    .font(.system(size: 13, weight: .bold, design: .monospaced))
+                    .foregroundColor(AppTheme.sidebarActive)
             }
 
-            if model.showMapBoard {
-                regionBoard
+            Spacer(minLength: 8)
+
+            HStack(spacing: 4) {
+                tabSegment(Image(systemName: "checkmark.circle.fill"), "ARM 放货区域", mode: .arm)
+                tabSegment(Image(systemName: "person.fill.checkmark"), "我的区域", mode: .mine)
+                tabSegment(
+                    AnyView(MenuGlyph(
+                        name: "map",
+                        size: 12,
+                        color: model.mapMode == .map ? .white : RegionsTheme.text(dark).opacity(0.85)
+                    )),
+                    "显示地图", mode: .map
+                )
             }
+            .padding(3)
+            .background(RegionsTheme.surface(dark))
+            .cornerRadius(6)
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(RegionsTheme.border(dark), lineWidth: 1))
         }
         .padding(18)
         .background(RegionsTheme.surface2(dark))
@@ -177,104 +179,101 @@ struct RegionsView: View {
         .cornerRadius(12)
     }
 
-    private func mapToggle(_ title: String, mode: RegionsMapViewMode) -> some View {
-        Button(action: { model.mapMode = mode }) {
-            Text(title)
-                .font(.system(size: 12, weight: model.mapMode == mode ? .semibold : .regular))
-                .foregroundColor(model.mapMode == mode ? .white : RegionsTheme.muted(dark))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(model.mapMode == mode ? AppTheme.info : Color.clear)
+    /// 三分段 tab：激活 = info 实心白字（对齐 Web page-regions.jsx:318-319）
+    private func tabSegment<I: View>(_ icon: I, _ title: String, mode: RegionsMapViewMode) -> some View {
+        let active = model.mapMode == mode
+        return Button(action: { model.mapMode = mode }) {
+            HStack(spacing: 6) {
+                icon.font(.system(size: 12, weight: .medium))
+                Text(title)
+                    .font(.system(size: 12, weight: active ? .medium : .regular))
+                    .fixedSize()
+            }
+            .foregroundColor(active ? .white : RegionsTheme.text(dark).opacity(0.85))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(RoundedRectangle(cornerRadius: 4).fill(active ? AppTheme.info : Color.clear))
+            .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
     }
 
-    private var regionBoard: some View {
-        let openSet = Set(model.openRecords.filter { $0.openCount > 0 }.map(\.region))
-        let todaySet = Set(model.openRecords.filter { Self.isToday($0.lastNotifyTime) || Self.isToday($0.openTime) }.map(\.region))
-        let mineSet = Set(model.myRecords.map(\.region))
-        let groups: [(String, [String])] = [
-            ("亚太", KnownRegions.codes.filter { $0.hasPrefix("ap-") }),
-            ("欧洲/英国", KnownRegions.codes.filter { $0.hasPrefix("eu-") || $0.hasPrefix("uk-") || $0.hasPrefix("il-") }),
-            ("北美", KnownRegions.codes.filter { $0.hasPrefix("us-") || $0.hasPrefix("ca-") || $0.hasPrefix("mx-") }),
-            ("南美", KnownRegions.codes.filter { $0.hasPrefix("sa-") }),
-            ("中东/非洲", KnownRegions.codes.filter { $0.hasPrefix("me-") || $0.hasPrefix("af-") })
-        ]
+    // MARK: - Map card（Web 地图 tab）
 
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 14) {
-                legendDot(AppTheme.sidebarActive, "已放货区域")
-                legendDot(RegionsTheme.orange(dark), "今日新放货")
-                legendDot(RegionsTheme.muted(dark).opacity(0.45), "未放货区域")
-                Spacer()
-                Text("原生区域状态板（Web 端为 Leaflet 地图）")
-                    .font(.system(size: 11))
-                    .foregroundColor(RegionsTheme.muted(dark))
-            }
-            ForEach(groups, id: \.0) { title, codes in
-                if !codes.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(title)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(RegionsTheme.muted(dark))
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], spacing: 8) {
-                            ForEach(codes, id: \.self) { code in
-                                let name = model.regionMap[code] ?? code
-                                let isOpen = openSet.contains(code)
-                                let isToday = todaySet.contains(code)
-                                let isMine = mineSet.contains(code)
-                                let active: Bool = {
-                                    switch model.mapMode {
-                                    case .arm: return isOpen
-                                    case .mine: return isMine
-                                    }
-                                }()
-                                // Web 地图节点：已放货=accent、今日新增放货=orange
-                                let color: Color = {
-                                    if model.mapMode == .arm && isOpen && isToday { return RegionsTheme.orange(dark) }
-                                    if active { return AppTheme.sidebarActive }
-                                    return RegionsTheme.muted(dark).opacity(0.35)
-                                }()
-                                HStack(spacing: 8) {
-                                    Circle()
-                                        .fill(color)
-                                        .frame(width: active ? 10 : 8, height: active ? 10 : 8)
-                                    VStack(alignment: .leading, spacing: 1) {
-                                        Text(name)
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundColor(RegionsTheme.text(dark))
-                                            .lineLimit(1)
-                                        Text(code)
-                                            .font(.system(size: 10))
-                                            .foregroundColor(RegionsTheme.muted(dark))
-                                            .lineLimit(1)
-                                    }
-                                    Spacer(minLength: 0)
-                                }
-                                .padding(8)
-                                .background(RegionsTheme.surface(dark))
-                                .cornerRadius(8)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(active ? color.opacity(0.5) : RegionsTheme.border(dark), lineWidth: 1)
-                                )
-                            }
-                        }
-                    }
+    /// Web 地图 tab：全球放货地图 Card（headerIcon map/info + 世界地图 + 图例）
+    private var mapCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(AppTheme.info.opacity(0.12))
+                        .frame(width: 38, height: 38)
+                    MenuGlyph(name: "map", size: 16, color: AppTheme.info)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("全球放货地图")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(RegionsTheme.text(dark))
+                    Text("节点大小表示历史开机次数;橙色节点表示今日新增放货")
+                        .font(.system(size: 11))
+                        .foregroundColor(RegionsTheme.muted(dark))
                 }
             }
+
+            RegionWorldMapView(world: worldMap, nodes: mapNodes, dark: dark)
+                .frame(minHeight: 320)
+
+            // Web 图例：已放货=accent 光晕 · 今日新放货=orange 光环 · 未放货=fg-3 小点
+            HStack(spacing: 20) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(AppTheme.sidebarActive)
+                        .frame(width: 10, height: 10)
+                        .shadow(color: AppTheme.sidebarActive, radius: 4)
+                    Text("已放货区域").font(.system(size: 11)).foregroundColor(RegionsTheme.text(dark).opacity(0.75))
+                }
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(AppTheme.orange)
+                        .frame(width: 10, height: 10)
+                        .overlay(Circle().stroke(AppTheme.orange.opacity(0.25), lineWidth: 4))
+                    Text("今日新放货").font(.system(size: 11)).foregroundColor(RegionsTheme.text(dark).opacity(0.75))
+                }
+                HStack(spacing: 6) {
+                    Circle().fill(RegionsTheme.muted(dark)).frame(width: 5, height: 5)
+                    Text("未放货区域").font(.system(size: 11)).foregroundColor(RegionsTheme.text(dark).opacity(0.75))
+                }
+                Spacer(minLength: 8)
+                Text("悬停节点查看详情 · 节点半径 ∝ √(历史开机数)")
+                    .font(.system(size: 10.5))
+                    .foregroundColor(RegionsTheme.muted(dark))
+            }
+            .padding(.top, 12)
+            .overlay(Rectangle().fill(RegionsTheme.border(dark)).frame(height: 1), alignment: .top)
         }
-        .padding(.top, 4)
+        .padding(20)
+        .background(RegionsTheme.surface2(dark))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(RegionsTheme.border(dark), lineWidth: 1))
+        .cornerRadius(12)
     }
 
-    private func legendDot(_ color: Color, _ title: String) -> some View {
-        HStack(spacing: 6) {
-            Circle().fill(color).frame(width: 8, height: 8)
-            Text(title).font(.system(size: 11)).foregroundColor(RegionsTheme.muted(dark))
+    /// Web：地图节点来自筛选后的行（搜索/大洲/状态联动）
+    private var mapNodes: [RegionMapNode] {
+        model.filteredRows.compactMap { row in
+            guard let ll = RegionLngLat.table[row.regionCode] else { return nil }
+            return RegionMapNode(
+                code: row.regionCode,
+                name: row.name,
+                arch: row.architectureType,
+                released: row.isOpen,
+                totalGrabs: row.openCount,
+                todayGrabs: row.todayGrabs,
+                firstAt: row.openTime ?? "—",
+                lng: ll[0],
+                lat: ll[1]
+            )
         }
     }
-
-    // MARK: - List
 
     private var listCard: some View {
         // ZStack so filter dropdown can float above the table without pushing rows.

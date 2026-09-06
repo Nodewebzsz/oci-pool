@@ -11,6 +11,7 @@
 		039B56049EE635D68D513F6A /* ProxyConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C8331C0C9819AD1CD4D1DFF /* ProxyConfigView.swift */; };
 		04DDF42D29D0D2C1C9A568C6 /* MfaBackupModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8C824ACB75E176CDCA69C09 /* MfaBackupModels.swift */; };
 		05878C5C8E399C090798F11C /* AiModelsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F77B56211ABB8F304D0D5CD1 /* AiModelsViewModel.swift */; };
+		07F5E0A32ABA61A29D546CCE /* RegionWorldMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03906DA691D658994FB39444 /* RegionWorldMapView.swift */; };
 		0AB2CE3D8F46F3288ACDF846 /* TenantCostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 961823899CD82F4A64E6C42C /* TenantCostView.swift */; };
 		0AC8F06B502C828BF1AA1795 /* EdgeOneViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A52CFBC200F8E46D152CB396 /* EdgeOneViewModel.swift */; };
 		0D04CEBB032B48FC1950FC5D /* InstanceVnicView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A60B63F9E1AA298F2E8221A1 /* InstanceVnicView.swift */; };
@@ -194,6 +195,7 @@
 		02427C37B7278AE1313A9DF1 /* MigrationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigrationModels.swift; sourceTree = "<group>"; };
 		03132EB885153D365E92EA7C /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
 		0358BCCB9C05DB278F262E15 /* MemoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoView.swift; sourceTree = "<group>"; };
+		03906DA691D658994FB39444 /* RegionWorldMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegionWorldMapView.swift; sourceTree = "<group>"; };
 		0CC02B0032EDCA73DF171581 /* BootSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BootSheets.swift; sourceTree = "<group>"; };
 		0DC1354DC22B7EF43519C39E /* TenantsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TenantsModels.swift; sourceTree = "<group>"; };
 		0E840EC0CF667084D1338035 /* MigrationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigrationViewModel.swift; sourceTree = "<group>"; };
@@ -419,6 +421,7 @@
 				A0E093E542493B41F5EF82CC /* RegionsModels.swift */,
 				345A38D425F245E68B09BAEC /* RegionsView.swift */,
 				57CCEB2C5E9DA6959FAFA537 /* RegionsViewModel.swift */,
+				03906DA691D658994FB39444 /* RegionWorldMapView.swift */,
 			);
 			path = Regions;
 			sourceTree = "<group>";
@@ -1045,6 +1048,7 @@
 				039B56049EE635D68D513F6A /* ProxyConfigView.swift in Sources */,
 				2F66B287B6F4214350C2579F /* ProxyConfigViewModel.swift in Sources */,
 				D66AF341F10BE840877F82A0 /* RSAHelper.swift in Sources */,
+				07F5E0A32ABA61A29D546CCE /* RegionWorldMapView.swift in Sources */,
 				C5B96BDDA0788B1915873131 /* RegionsModels.swift in Sources */,
 				B57FF8F6AB85CC9AB616B9B0 /* RegionsView.swift in Sources */,
 				8204175D797A70EA09471DF3 /* RegionsViewModel.swift in Sources */,

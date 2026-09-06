@@ -32,6 +32,13 @@ enum AppTheme {
     static func navIcon(_ dark: Bool) -> Color {
         dark ? Color(hex: "f6f9fb") : Color(hex: "0c1217")
     }
+
+    /// Web `var(--info)`（oklch(0.68 0.13 260)），light/dark 同值。
+    static let info = Color(hex: "6898e8")
+    /// Web `var(--orange)`（oklch(0.72 0.16 55)）。
+    static let orange = Color(hex: "ef852e")
+    /// Web `var(--danger)`（oklch(0.66 0.19 25)）。
+    static let danger = Color(hex: "f05653")
 }
 
 /// 强调色预设，对齐 Web `ACCENT_PRESETS`（green/cyan/violet/orange/blue）。

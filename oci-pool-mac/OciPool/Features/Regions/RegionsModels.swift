@@ -76,6 +76,9 @@ struct RegionRow: Identifiable, Equatable {
     let monthlyOpenCount: Int
     let lastNotifyTime: String?
     let continent: String
+    let isMine: Bool
+    /// Web：openTime 为今日 → todayGrabs = openCount，否则 0
+    let todayGrabs: Int
 }
 
 enum RegionContinent: String, CaseIterable, Identifiable {
@@ -130,6 +133,7 @@ enum RegionStatusFilter: String, CaseIterable, Identifiable {
 enum RegionsMapViewMode: String {
     case arm   // ARM 放货区域
     case mine  // 我的区域
+    case map   // 显示地图
 }
 
 // MARK: - Known region codes (web arm_records.js REGION_COORDINATES keys)
