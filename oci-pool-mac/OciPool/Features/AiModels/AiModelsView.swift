@@ -10,7 +10,7 @@ struct AiModelsView: View {
     var body: some View {
         PageScaffold(
             title: "OCI AI 管理",
-            subtitle: "可用模型与已配置模型",
+            subtitle: "OCI Generative AI · 模型配置与对话管理",
             systemImage: "sparkles",
             toolbar: {
                 HStack(spacing: 8) {
@@ -30,7 +30,7 @@ struct AiModelsView: View {
                     if let err = model.errorText, !err.isEmpty {
                         Text(err)
                             .font(.system(size: 12))
-                            .foregroundColor(Color(hex: "f85149"))
+                            .foregroundColor(AppTheme.danger)
                             .padding(.horizontal, 16)
                             .padding(.top, 8)
                     }
@@ -73,7 +73,7 @@ struct AiModelsView: View {
             },
             trailing: {
                 Toggle(isOn: $model.linkTenantFilter) {
-                    Text("仅显示当前租户配置")
+                    Text("关联租户")
                         .font(.system(size: 12))
                 }
                 .toggleStyle(SwitchToggleStyle(tint: AppTheme.sidebarActive))
@@ -140,7 +140,7 @@ struct AiModelsView: View {
             if added {
                 Text("已添加")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(Color(hex: "3fb950"))
+                    .foregroundColor(AppTheme.sidebarActive)
             } else {
                 AppButton(title: "添加", kind: .primary) { model.addModel(m) }
             }

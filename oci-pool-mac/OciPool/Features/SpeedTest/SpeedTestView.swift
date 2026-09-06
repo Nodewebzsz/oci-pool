@@ -14,9 +14,9 @@ struct SpeedTestView: View {
 
     var body: some View {
         PageScaffold(
-            title: "全球链路监控",
-            subtitle: "出口 IP · 区域延迟探测 · Top5 优选",
-            systemImage: "globe",
+            title: "OCI 链路测试",
+            subtitle: "OCI Speed Test · 从当前网络测到全球 45 个 OCI 区域的延迟",
+            systemImage: "wifi",
             toolbar: { toolbar },
             content: {
                 ScrollView {
@@ -85,14 +85,14 @@ struct SpeedTestView: View {
                 Task { await model.refresh() }
             }
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(10)
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(hex: "f85149").opacity(0.25), lineWidth: 1)
+                .stroke(AppTheme.danger.opacity(0.25), lineWidth: 1)
         )
     }
 
@@ -104,13 +104,13 @@ struct SpeedTestView: View {
                 label: "当前出口 IP",
                 value: model.clientIPText,
                 systemImage: "network",
-                accent: Color(hex: "4a9eff")
+                accent: AppTheme.info
             )
             metricCard(
                 label: "最优区域",
                 value: model.bestRegionText,
                 systemImage: "trophy.fill",
-                accent: Color(hex: "f0b429")
+                accent: AppTheme.sidebarActive
             )
             metricCard(
                 label: "平均延迟",

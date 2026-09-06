@@ -23,7 +23,7 @@ enum SpeedLatencyState: Equatable {
         case .idle: return "--"
         case .testing: return "..."
         case .ok(let ms): return "\(ms)"
-        case .timeout: return "timeOut"
+        case .timeout: return "timeout"
         }
     }
 
@@ -37,8 +37,9 @@ enum SpeedLatencyTone {
     case neutral, fast, mid, slow
 
     static func from(ms: Int) -> SpeedLatencyTone {
-        if ms < 150 { return .fast }
-        if ms < 300 { return .mid }
+        // Web 三档阈值：≤80 / 80-250 / >250
+        if ms <= 80 { return .fast }
+        if ms <= 250 { return .mid }
         return .slow
     }
 }
@@ -54,16 +55,16 @@ struct SpeedRankItem: Identifiable, Hashable {
 
 enum SpeedTestTheme {
     static func bg(_ dark: Bool) -> Color {
-        dark ? Color(hex: "0f1117") : Color(hex: "f4f6f9")
+        dark ? Color(hex: "060a0d") : Color(hex: "f4f6f9")
     }
     static func surface(_ dark: Bool) -> Color {
-        dark ? Color(hex: "1a1d27") : Color.white
+        dark ? Color(hex: "0d1216") : Color.white
     }
     static func surface2(_ dark: Bool) -> Color {
         dark ? Color(hex: "1f2233") : Color(hex: "f5f5f5")
     }
     static func border(_ dark: Bool) -> Color {
-        dark ? Color(hex: "2a2d3a") : Color(hex: "e9ecef")
+        dark ? Color(hex: "232a2f") : Color(hex: "e9ecef")
     }
     static func text(_ dark: Bool) -> Color {
         dark ? Color(hex: "e2e8f0") : Color(hex: "333333")
@@ -72,11 +73,11 @@ enum SpeedTestTheme {
         dark ? Color(hex: "8892a4") : Color(hex: "6c757d")
     }
     static func primary(_ dark: Bool) -> Color {
-        dark ? Color(hex: "4a9eff") : Color(hex: "2196f3")
+        dark ? AppTheme.info : AppTheme.info
     }
-    static let success = Color(hex: "00c853")
-    static let warning = Color(hex: "ffab00")
-    static let danger = Color(hex: "ff5252")
+    static let success = AppTheme.sidebarActive
+    static let warning = AppTheme.orange
+    static let danger = AppTheme.danger
     static func nodeCodeBg(_ dark: Bool) -> Color {
         dark ? Color(hex: "252838") : Color(hex: "f8f9fa")
     }
