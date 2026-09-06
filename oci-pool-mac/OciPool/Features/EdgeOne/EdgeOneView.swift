@@ -287,10 +287,10 @@ struct EdgeOneView: View {
                                    count: "\(model.filteredDomains.count)")
                     DataList {
                         DataListColumnHeader(title: "域名", width: nil)
-                        DataListColumnHeader(title: "状态", width: 90)
+                        DataListColumnHeader(title: "状态", width: 100)
                         DataListColumnHeader(title: "CNAME", width: nil)
-                        DataListColumnHeader(title: "协议", width: 100)
-                        DataListColumnHeader(title: "操作", width: 56)
+                        DataListColumnHeader(title: "协议", width: 130)
+                        DataListColumnHeader(title: "操作", width: 100)
                     } content: {
                         ForEach(model.filteredDomains) { item in
                             DataListRow {
@@ -335,20 +335,24 @@ struct EdgeOneView: View {
     private func domainRow(_ item: EoAccelDomain) -> some View {
         HStack(spacing: 0) {
             cell(item.domainName, width: nil)
-            StatusBadge(
-                text: item.statusLabel,
-                tone: item.statusTone
-            )
-            .frame(width: 90, alignment: .leading)
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                StatusBadge(
+                    text: item.statusLabel,
+                    tone: item.statusTone
+                )
+                Spacer(minLength: 0)
+            }
+            .frame(width: 100)
             cell(item.cname.isEmpty ? "—" : item.cname, width: nil)
-            cell(item.protocolLabel, width: 100)
+            cell(item.protocolLabel, width: 130)
             HStack {
                 Spacer(minLength: 0)
                 actionBtn("trash", color: AppTheme.danger, tip: "删除") {
                     model.deleteDomain(item)
                 }
             }
-            .frame(width: 56)
+            .frame(width: 100)
         }
     }
 

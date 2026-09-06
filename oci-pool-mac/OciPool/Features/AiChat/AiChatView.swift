@@ -632,12 +632,15 @@ struct AiChatView: View {
         .opacity(model.isConnected && !model.selectedModelId.isEmpty ? 1 : 0.45)
     }
 
+    /// Web 抽屉消息行：30 圆形头像（user=info-soft+person / AI=violet-soft+cpu）+ 气泡
     private func messageRow(_ msg: AiChatMessage) -> some View {
         HStack(alignment: .top, spacing: 10) {
             if msg.role == .user {
-                Spacer(minLength: 80)
+                Spacer(minLength: 40)
                 userBubble(msg)
+                chatAvatar(isUser: true)
             } else {
+                chatAvatar(isUser: false)
                 assistantBlock(msg)
                 Spacer(minLength: 40)
             }
@@ -647,22 +650,41 @@ struct AiChatView: View {
         .animation(.easeOut(duration: 0.16), value: msg.text)
     }
 
-    /// 用户：右侧浅底气泡（短句像 pill，多行自动圆角矩形）
+    private func chatAvatar(isUser: Bool) -> some View {
+        let color = isUser ? AppTheme.info : Color(hex: "b484e8")
+        return ZStack {
+            Circle()
+                .fill(isUser
+                      ? AppTheme.infoSoft(dark)
+                      : (dark ? Color(hex: "3b1959") : Color(hex: "f6e0ff")))
+                .frame(width: 30, height: 30)
+            Image(systemName: isUser ? "person.fill" : "cpu")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(color)
+        }
+    }
+
+    /// 用户：右侧 info-soft 气泡 + info 边框（Web 抽屉样式）
     private func userBubble(_ msg: AiChatMessage) -> some View {
         VStack(alignment: .trailing, spacing: 4) {
             Text(msg.text)
-                .font(.system(size: 13.5))
-                .foregroundColor(dark ? Color.white.opacity(0.95) : Color.primary)
+                .font(.system(size: 12.5))
+                .foregroundColor(AppTheme.navIcon(dark))
                 .lineSpacing(3)
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 9)
+                .frame(maxWidth: .infinity, alignment: .trailing)
                 .background(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(dark ? Color.white.opacity(0.12) : Color(hex: "f3f4f6"))
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(AppTheme.infoSoft(dark))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(AppTheme.info, lineWidth: 1)
                 )
             Text(timeString(msg.createdAt))
                 .font(.system(size: 10))
-                .foregroundColor(muted.opacity(0.75))
+                .foregroundColor(AppTheme.textTertiary(dark))
         }
         .frame(maxWidth: 480, alignment: .trailing)
     }
@@ -687,36 +709,48 @@ struct AiChatView: View {
                         .fill(AppTheme.orange.opacity(0.12))
                 )
             } else {
-                Text(msg.text)
-                    .font(.system(size: 14))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
-                    .lineSpacing(4)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            HStack(spacing: 10) {
-                Text(timeString(msg.createdAt))
-                    .font(.system(size: 10))
-                    .foregroundColor(muted.opacity(0.75))
-                if msg.isStreaming {
-                    Text("生成中")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(accent)
-                }
-                if msg.role == .assistant, !msg.isStreaming {
-                    Button {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(msg.text, forType: .string)
-                        ToastCenter.shared.success("已复制")
-                    } label: {
-                        Image(systemName: "doc.on.doc")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(muted.opacity(0.7))
+                // Web 抽屉 AI 气泡：bg-2 底 + border · 文本与时间都在气泡内
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(msg.text)
+                        .font(.system(size: 12.5))
+                        .foregroundColor(AppTheme.navIcon(dark))
+                        .lineSpacing(4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 10) {
+                        Text(timeString(msg.createdAt))
+                            .font(.system(size: 10))
+                            .foregroundColor(AppTheme.textTertiary(dark))
+                        if msg.isStreaming {
+                            Text("生成中")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(accent)
+                        }
+                        if !msg.isStreaming {
+                            Button {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(msg.text, forType: .string)
+                                ToastCenter.shared.success("已复制")
+                            } label: {
+                                Image(systemName: "doc.on.doc")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(AppTheme.textTertiary(dark))
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .help("复制本条")
+                        }
+                        Spacer(minLength: 0)
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    .help("复制本条")
                 }
-                Spacer(minLength: 0)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(AppTheme.sidebarHover(dark))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(AppTheme.border(dark), lineWidth: 1)
+                )
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

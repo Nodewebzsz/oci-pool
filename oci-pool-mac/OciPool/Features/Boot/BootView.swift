@@ -69,8 +69,8 @@ struct BootView: View {
     private var listPage: some View {
         PageScaffold(
             title: "预开列表",
-            subtitle: tenantSubPage ? tenantSubtitle : filterSubtitle,
-            systemImage: "zap.fill",
+            subtitle: tenantSubPage ? tenantSubtitle : nil,
+            systemImage: "bolt.fill",
             iconColor: AppTheme.orange,
             toolbar: { toolbar },
             content: {
@@ -78,9 +78,11 @@ struct BootView: View {
                     if tenantSubPage {
                         breadcrumbBar
                     }
-                    filterBar
                     if let err = model.errorText, !err.isEmpty { errorBanner(err) }
-                    summaryBar
+                    statsStrip
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .padding(.bottom, 14)
                     listBody
                         .padding(.horizontal, 16)
                         .padding(.bottom, 12)
@@ -127,9 +129,40 @@ struct BootView: View {
 
     // MARK: - Toolbar
 
+    /// Web 页头 actions：租户/区域 Select 160 + 搜索(primary) + eye 图标钮 + 预开(primary) + 批量停止(orange) + 重置(danger)
     private var toolbar: some View {
         HStack(spacing: 8) {
-            // Web：eye 图标按钮（脱敏切换）
+            SelectMenu(
+                options: model.parentTenants.map {
+                    SelectOption(id: $0.id, title: model.tenantLabel($0))
+                },
+                selection: Binding(
+                    get: { model.selectedParentId.isEmpty ? nil : model.selectedParentId },
+                    set: { model.onParentChanged($0) }
+                ),
+                placeholder: "请选择租户",
+                width: 160,
+                allowClear: true,
+                searchable: true
+            )
+            SelectMenu(
+                options: model.regions.map {
+                    SelectOption(id: $0.id, title: model.regionLabel($0))
+                },
+                selection: Binding(
+                    get: { model.selectedRegionId.isEmpty ? nil : model.selectedRegionId },
+                    set: { model.onRegionChanged($0) }
+                ),
+                placeholder: "请选择区域",
+                width: 160,
+                enabled: !model.selectedParentId.isEmpty,
+                allowClear: true,
+                searchable: true
+            )
+            AppButton(title: "搜索", systemImage: "magnifyingglass", kind: .primary) {
+                ToastCenter.shared.show("筛选结果 \(model.pageState.totalElements) 条", style: .info)
+            }
+            // eye 图标按钮：脱敏切换（显示完整时 accent 激活态）
             Button {
                 withAnimation(.easeInOut(duration: 0.15)) {
                     model.namesHidden.toggle()
@@ -137,14 +170,20 @@ struct BootView: View {
             } label: {
                 Image(systemName: model.namesHidden ? "eye" : "eye.slash")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(AppTheme.navIcon(dark))
+                    .foregroundColor(model.namesHidden ? AppTheme.navIcon(dark) : AppTheme.sidebarActive)
                     .frame(width: 30, height: 30)
-                    .background(RoundedRectangle(cornerRadius: 5).fill(AppTheme.sidebarHover(dark)))
+                    .background(
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(model.namesHidden ? AppTheme.sidebarHover(dark) : AppTheme.sidebarActive.opacity(0.14))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 5)
+                                    .stroke(model.namesHidden ? AppTheme.border(dark) : AppTheme.sidebarActive, lineWidth: 1)
+                            )
+                    )
             }
             .buttonStyle(PlainButtonStyle())
             .help("显示/隐藏脱敏")
 
-            // Web grab.action.create = 预开（primary）
             AppButton(title: "预开", systemImage: "play.circle", kind: .primary) {
                 model.openCreateBlank()
             }
@@ -155,6 +194,64 @@ struct BootView: View {
                 model.batchResetFail()
             }
         }
+    }
+
+    // MARK: - Stats strip（Web：7 列小卡 · icon 13 彩色 + label 10.5 + 数值 20/700 语义色）
+
+    private var statsStrip: some View {
+        let totalAttempts = model.rows.reduce(0) { $0 + $1.totalCount }
+        let yesterday = model.rows.reduce(0) { $0 + $1.yesterdayAttemptCount }
+        let today = model.rows.reduce(0) { $0 + $1.currentAttemptCount }
+        let failed = model.rows.reduce(0) { $0 + $1.failCount }
+        let success = model.rows.reduce(0) { $0 + $1.successCount }
+        return HStack(spacing: 10) {
+            grabStatCard(icon: "checklist", color: AppTheme.cyan, label: "总任务数",
+                         value: "\(model.pageState.totalElements)", pulse: false)
+            grabStatCard(icon: "hourglass", color: AppTheme.orange, label: "执行数量",
+                         value: "\(execSum)", pulse: execSum > 0)
+            grabStatCard(icon: "arrow.triangle.2.circlepath", color: AppTheme.info, label: "总抢机数",
+                         value: "\(totalAttempts)", pulse: false)
+            grabStatCard(icon: "clock", color: AppTheme.textSecondary(dark), label: "昨日次数",
+                         value: "\(yesterday)", pulse: false)
+            grabStatCard(icon: "chart.line.uptrend.xyaxis", color: AppTheme.cyan, label: "今日次数",
+                         value: "\(today)", pulse: false)
+            grabStatCard(icon: "xmark.octagon", color: AppTheme.danger, label: "失败次数",
+                         value: "\(failed)", pulse: false)
+            grabStatCard(icon: "checkmark.circle", color: AppTheme.sidebarActive, label: "成功次数",
+                         value: "\(success)", pulse: false)
+        }
+    }
+
+    private func grabStatCard(icon: String, color: Color, label: String, value: String, pulse: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(color)
+                Text(label)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundColor(AppTheme.textTertiary(dark))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                if pulse {
+                    Circle()
+                        .fill(AppTheme.sidebarActive)
+                        .frame(width: 5, height: 5)
+                        .shadow(color: AppTheme.sidebarActive.opacity(0.6), radius: 2)
+                }
+            }
+            Text(value)
+                .font(.system(size: 20, weight: .bold, design: .monospaced))
+                .foregroundColor(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.border(dark), lineWidth: 1))
+        .cornerRadius(8)
     }
 
     // MARK: - Filter
