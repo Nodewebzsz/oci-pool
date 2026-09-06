@@ -25,12 +25,12 @@
 | A5 | 租户·查看开机（子页） | page-tenant-grab.jsx | 复用 Boot/BootView（带 pendingBootFilter 预筛选） | ❓ 原生无独立子页，复用全局开机管理页；如需一比一（面包屑+预开列表 15 列）需新建页面，待确认 |
 | A6 | 租户·资源列表（子页） | page-tenant-resources.jsx | 复用 Instances 页（pendingInstancesFilter 预筛选） | ❓ 原生无独立子页（TenantRegionSubView 是「区域订阅」页）；如需一比一需新建，待确认 |
 | A7 | OCI 实例列表 | page-instances.jsx | Instances/InstancesView | ✅ 2026-09-06（标题 OCI 实例管理/表头 租户名·所属区域·主 IPv4/IPv6 已启用未启用/菜单 10 处文案/语义色 token/筛选 placeholder 与宽度/一键导出）。❓ accent 筛选条形态、租户区域下拉入页头待确认 |
-| A8 | OCI 开机管理 | page-grab.jsx | Boot/BootView | ⬜ |
+| A8 | OCI 开机管理 | page-grab.jsx | Boot/BootView | ✅ 2026-09-06（标题「预开列表」/zap 橙图标/页头按钮组（预开 primary+停止 orange+重置 danger+eye 钮）/筛选 placeholder/表头 15 列逐字（架构列移至成功后）/任务状态徽章 running+脉冲/执行中 accent/今日 cyan/失败 danger/架构 info chip/行单击详情/菜单文案/预开空白表单选租户/色板收敛）。❓ 确认弹窗 danger 样式+requireText（RESET/租户名）为共享 AppAlert 增强，待做；重置语义 Web 清零全部统计 vs 原生仅失败计数待确认 |
 | A9 | OCI 邮箱服务 | page-misc.jsx (MailPage) | Email/EmailView | ⬜ |
 | A10 | OCI 对象存储 | page-misc.jsx (ObjectPage) | Storage/StorageView | ⬜ |
 | A11 | OCI AI 管理 | page-misc.jsx (AIPage) | AiModels/AiModelsView | ⬜ |
 | A12 | OCI 链路测试 | page-misc.jsx (LinkPage) | SpeedTest/SpeedTestView | ⬜ |
-| A13 | OCI 开机日志 | page-logs.jsx (LogsPage) | OpenLogs/OpenLogsView | ⬜ |
+| A13 | OCI 开机日志 | page-logs.jsx (LogsPage) | OpenLogs/OpenLogsView | ⬜（旧 teal 已清理；其余待审计） |
 
 ## 批次 B · 代理管理（3 页）
 
@@ -90,3 +90,4 @@
   - 状态徽章 StatusTone 全局收敛主题色（success=accent/warning=orange/danger=danger/info=info）。
 - 2026-09-06（续 2）：A4/A7 完成「审计→修复→构建」，A5/A6 按结构性差异标记 ❓ 待确认（原生复用全局页+预筛选 vs Web 独立子页）。
 - 2026-09-06（续 3）：用户反馈区域管理页三处不一致（KPI1 图标应为 map-pin、tab 文字裁剪、缺少地图）→ MenuGlyph 新增 map-pin/map glyph，重构为 Web 的「数量+三分段 tab」卡 + 表格卡/地图卡切换，新增 RegionWorldMapView.swift（TopoJSON 解码 + geoNaturalEarth1 投影 + 节点大小 ∝ √开机数 + 今日橙色 + hover tooltip + 图例 hint），构建通过并运行时核验。
+- 2026-09-06（续 4）：A8 完成「审计→修复→构建→提交」。修复过程发现并顺带修复：A2 地图 antimeridian 直线（TopoJSON 反经线解缠绕）、悬停失效（NSEvent mouseMoved 最近节点判定 + 标题栏坐标偏移修正）、经纬线闭合弦直线（path closed:false）。
