@@ -28,7 +28,7 @@ struct RegionsView: View {
                 listCard
             }
         }
-        .padding(24)
+        .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(RegionsTheme.bg(dark).ignoresSafeArea())
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
@@ -50,35 +50,46 @@ struct RegionsView: View {
 
     // MARK: - Header
 
+    /// Web PageHeader：bg-1 卡 radius 8 padding 14px 20px · icon 32(18% info 底) · 标题 17/600
     private var header: some View {
-        HStack {
+        HStack(alignment: .center, spacing: 16) {
             HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(AppTheme.info.opacity(0.12))
-                        .frame(width: 38, height: 38)
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(AppTheme.info.opacity(0.18))
+                        .frame(width: 32, height: 32)
                     Image(systemName: "globe")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(AppTheme.info)
                 }
                 Text("区域管理")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundColor(RegionsTheme.text(dark))
+                    .tracking(-0.2)
             }
             Spacer()
-            HStack(spacing: 7) {
+            HStack(spacing: 6) {
                 RegionsPulseDot(color: AppTheme.sidebarActive)
                 Text(model.lastUpdateText)
-                    .font(.system(size: 12))
-                    .foregroundColor(RegionsTheme.muted(dark))
+                    .font(.system(size: 11.5, design: .monospaced))
+                    .foregroundColor(RegionsTheme.text(dark).opacity(0.86))
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 6)
-            .background(Capsule().fill(RegionsTheme.surface2(dark)))
-            .overlay(Capsule().stroke(RegionsTheme.border(dark), lineWidth: 1))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(RegionsTheme.surface2(dark))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(RegionsTheme.border(dark), lineWidth: 1))
+            )
         }
-        .padding(.bottom, 8)
-        .overlay(Rectangle().fill(RegionsTheme.border(dark)).frame(height: 1), alignment: .bottom)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .background(RegionsTheme.surface(dark))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(RegionsTheme.border(dark), lineWidth: 1)
+        )
+        .cornerRadius(8)
     }
 
     private func errorBanner(_ text: String) -> some View {
@@ -125,9 +136,9 @@ struct RegionsView: View {
                         .foregroundColor(color)
                 }
             }
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 11))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundColor(RegionsTheme.muted(dark))
                 Text(value)
                     .font(.system(size: 22, weight: .bold))
@@ -135,27 +146,29 @@ struct RegionsView: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(14)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RegionsTheme.surface2(dark))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(RegionsTheme.border(dark), lineWidth: 1))
-        .cornerRadius(12)
+        .background(RegionsTheme.surface(dark))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(RegionsTheme.border(dark), lineWidth: 1))
+        .cornerRadius(8)
     }
 
     /// Web：数量 + 三分段 tab（check-circle-2 / user-check / map）的独立卡片
     private var tabsCard: some View {
         HStack(spacing: 12) {
             ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(AppTheme.sidebarActive.opacity(0.14))
-                    .frame(width: 38, height: 38)
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(AppTheme.infoSoft(dark))
+                    .frame(width: 28, height: 28)
                 Image(systemName: "globe")
-                    .foregroundColor(AppTheme.sidebarActive)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(AppTheme.info)
             }
             HStack(spacing: 4) {
                 Text("数量:")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(RegionsTheme.text(dark).opacity(0.85))
+                    .foregroundColor(RegionsTheme.text(dark).opacity(0.86))
                 Text("\(model.filteredRows.count)")
                     .font(.system(size: 13, weight: .bold, design: .monospaced))
                     .foregroundColor(AppTheme.sidebarActive)
@@ -176,14 +189,15 @@ struct RegionsView: View {
                 )
             }
             .padding(3)
-            .background(RegionsTheme.surface(dark))
+            .background(RegionsTheme.surface2(dark))
             .cornerRadius(6)
             .overlay(RoundedRectangle(cornerRadius: 6).stroke(RegionsTheme.border(dark), lineWidth: 1))
         }
-        .padding(18)
-        .background(RegionsTheme.surface2(dark))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(RegionsTheme.border(dark), lineWidth: 1))
-        .cornerRadius(12)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(RegionsTheme.surface(dark))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(RegionsTheme.border(dark), lineWidth: 1))
+        .cornerRadius(8)
     }
 
     /// 三分段 tab：激活 = info 实心白字（对齐 Web page-regions.jsx:318-319）
@@ -268,9 +282,9 @@ struct RegionsView: View {
             .overlay(Rectangle().fill(RegionsTheme.border(dark)).frame(height: 1), alignment: .top)
         }
         .padding(20)
-        .background(RegionsTheme.surface2(dark))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(RegionsTheme.border(dark), lineWidth: 1))
-        .cornerRadius(12)
+        .background(RegionsTheme.surface(dark))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(RegionsTheme.border(dark), lineWidth: 1))
+        .cornerRadius(8)
     }
 
     /// Web：地图节点来自筛选后的行（搜索/大洲/状态联动）
@@ -378,11 +392,11 @@ struct RegionsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // Web：卡片自身无 padding，筛选/表格/分页通铺到卡片边缘
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(RegionsTheme.surface2(dark))
+            RoundedRectangle(cornerRadius: 8)
+                .fill(RegionsTheme.surface(dark))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 8)
                 .stroke(RegionsTheme.border(dark), lineWidth: 1)
         )
     }

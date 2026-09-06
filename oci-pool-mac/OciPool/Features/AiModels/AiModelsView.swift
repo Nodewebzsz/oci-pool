@@ -39,8 +39,8 @@ struct AiModelsView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(AppTheme.sidebarBg(dark)))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.border(dark), lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.sidebarBg(dark)))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.border(dark), lineWidth: 1))
     }
 
     /// Web 分类徽章：embed→向量(violet)、vision→视觉(cyan)、其余→对话(info)
@@ -363,7 +363,7 @@ struct AiModelsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(RoundedRectangle(cornerRadius: 12).fill(AppTheme.sidebarBg(dark)))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.sidebarBg(dark)))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1))
     }
 }

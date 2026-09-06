@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Standard page chrome: title header + optional toolbar + content + optional footer (pagination).
+/// Standard page chrome — Web `main(padding:16)` + `PageHeader` 卡（bg-1 · border · radius 8 · padding 14px 20px）。
+/// 内容区紧随其后；可选 footer（分页）通铺钉在页面最底部。
 struct PageScaffold<Toolbar: View, Content: View, Footer: View>: View {
     let title: String
     var subtitle: String? = nil
@@ -15,44 +16,57 @@ struct PageScaffold<Toolbar: View, Content: View, Footer: View>: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-            content()
-                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            VStack(spacing: 0) {
+                headerCard
+                content()
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
             footer()
         }
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         .background(AppTheme.pageBg(dark))
     }
 
-    private var header: some View {
-        HStack(alignment: .center, spacing: 12) {
-            if let systemImage = systemImage {
-                Image(systemName: systemImage)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(AppTheme.sidebarActive)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
-                if let subtitle = subtitle {
-                    Text(subtitle)
-                        .font(.system(size: 12))
-                        .foregroundColor(AppTheme.sidebarText(dark))
+    /// Web PageHeader（ui.jsx）：bg-1 卡 · border · radius 8 · padding 14px 20px · 图标 32(18% 底) · 标题 17/600
+    private var headerCard: some View {
+        HStack(alignment: .center, spacing: 16) {
+            HStack(spacing: 12) {
+                if let systemImage = systemImage {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(AppTheme.sidebarActive.opacity(0.18))
+                            .frame(width: 32, height: 32)
+                        Image(systemName: systemImage)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(AppTheme.sidebarActive)
+                    }
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(AppTheme.navIcon(dark))
+                        .tracking(-0.2)
+                    if let subtitle = subtitle {
+                        Text(subtitle)
+                            .font(.system(size: 12))
+                            .foregroundColor(AppTheme.textTertiary(dark))
+                    }
                 }
             }
             Spacer()
             toolbar()
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(AppTheme.sidebarBg(dark).opacity(0.4))
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .background(AppTheme.sidebarBg(dark))
         .overlay(
-            Rectangle()
-                .frame(height: 1)
-                .foregroundColor(AppTheme.border(dark).opacity(0.55)),
-            alignment: .bottom
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
         )
+        .cornerRadius(8)
+        .padding(.bottom, 14)
     }
 }
 

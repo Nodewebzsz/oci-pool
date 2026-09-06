@@ -310,16 +310,15 @@ struct BootView: View {
             PaginationBar(state: $model.pageState) {
                 model.onPageChange()
             }
-            .cornerRadius(12, corners: [.bottomLeft, .bottomRight])
+            .cornerRadius(8, corners: [.bottomLeft, .bottomRight])
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // 背景圆角单独画，避免 clipShape/cornerRadius 裁掉右侧操作按钮
         .background(tableCardBackground)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 8)
                 .stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(dark ? 0.22 : 0.06), radius: 8, x: 0, y: 2)
     }
 
     private var tableArea: some View {
@@ -368,7 +367,7 @@ struct BootView: View {
     }
 
     private var tableCardBackground: some View {
-        RoundedRectangle(cornerRadius: 12)
+        RoundedRectangle(cornerRadius: 8)
             .fill(AppTheme.sidebarBg(dark))
     }
 

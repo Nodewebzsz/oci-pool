@@ -123,11 +123,24 @@ struct TenantsView: View {
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
-                    if let err = model.errorText, !err.isEmpty { errorBanner(err) }
-                    listBody
-                    PaginationBar(state: $model.pageState) {
-                        Task { await model.reload() }
+                    if let err = model.errorText, !err.isEmpty {
+                        errorBanner(err)
+                            .padding(.bottom, 12)
                     }
+                    // Web 表格卡：bg-1 · border · radius 8 · 表格内部滚动 + 分页钉卡底
+                    VStack(spacing: 0) {
+                        listBody
+                        PaginationBar(state: $model.pageState) {
+                            Task { await model.reload() }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(AppTheme.sidebarBg(dark))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(AppTheme.border(dark), lineWidth: 1)
+                    )
+                    .cornerRadius(8)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -173,16 +186,35 @@ struct TenantsView: View {
         }
     }
 
+    /// Web：danger-soft 底 + danger 边框 radius 6 · padding 10px 14px
     private func errorBanner(_ text: String) -> some View {
-        HStack {
-            Image(systemName: "exclamationmark.triangle.fill")
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.circle")
+                .font(.system(size: 14))
             Text(text).font(.system(size: 12))
             Spacer()
-            Button("重试") { Task { await model.reload() } }.buttonStyle(PlainButtonStyle())
+            Button(action: { Task { await model.reload() } }) {
+                Text("重试")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5)
+                            .stroke(AppTheme.border(dark).opacity(1.6), lineWidth: 1)
+                    )
+            }
+            .buttonStyle(PlainButtonStyle())
         }
         .foregroundColor(AppTheme.danger)
-        .padding(12)
-        .background(AppTheme.danger.opacity(0.1))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(AppTheme.dangerSoft(dark))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(AppTheme.danger, lineWidth: 1)
+        )
+        .cornerRadius(6)
     }
 
     // MARK: - List（铺满内容区）

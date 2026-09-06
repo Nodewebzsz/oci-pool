@@ -314,16 +314,15 @@ struct InstancesView: View {
             PaginationBar(state: $model.pageState) {
                 model.onPageChange()
             }
-            .cornerRadius(12, corners: [.bottomLeft, .bottomRight])
+            .cornerRadius(8, corners: [.bottomLeft, .bottomRight])
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(tableCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 8)
                 .stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(dark ? 0.22 : 0.06), radius: 8, x: 0, y: 2)
     }
 
     private var tableArea: some View {
@@ -359,7 +358,7 @@ struct InstancesView: View {
     }
 
     private var tableCardBackground: some View {
-        RoundedRectangle(cornerRadius: 12)
+        RoundedRectangle(cornerRadius: 8)
             .fill(AppTheme.sidebarBg(dark))
     }
 

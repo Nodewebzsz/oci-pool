@@ -43,6 +43,18 @@ enum AppTheme {
     static let cyan = Color(hex: "00b6be")
     /// Web `var(--fg-2)`：次要文本（dark oklch(0.66 0.01 240) / light oklch(0.50 0.012 240)）。
     static func textSecondary(_ dark: Bool) -> Color { dark ? Color(hex: "8d9398") : Color(hex: "5d646a") }
+    /// Web `var(--fg-3)`：弱化文本/标签。
+    static func textTertiary(_ dark: Bool) -> Color { dark ? Color(hex: "5d646a") : Color(hex: "81878c") }
+    /// Web `var(--bg-3)`：仪表轨道/DEBUG 徽章底。
+    static func bg3(_ dark: Bool) -> Color { dark ? Color(hex: "1e252a") : Color(hex: "e7ecef") }
+    /// Web `--cyan-soft`。
+    static func cyanSoft(_ dark: Bool) -> Color { dark ? Color(hex: "003a3f") : Color(hex: "b9f5f8") }
+    /// Web `--orange-soft`。
+    static func orangeSoft(_ dark: Bool) -> Color { dark ? Color(hex: "511a00") : Color(hex: "ffe0bf") }
+    /// Web `--danger-soft`。
+    static func dangerSoft(_ dark: Bool) -> Color { dark ? Color(hex: "590a0e") : Color(hex: "ffdcd7") }
+    /// Web `--info-soft`。
+    static func infoSoft(_ dark: Bool) -> Color { dark ? Color(hex: "0b2b5f") : Color(hex: "d4edff") }
 }
 
 /// 强调色预设，对齐 Web `ACCENT_PRESETS`（green/cyan/violet/orange/blue）。

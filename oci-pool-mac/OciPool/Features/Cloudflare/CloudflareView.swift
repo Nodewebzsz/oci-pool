@@ -160,8 +160,15 @@ struct CloudflareView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 12)
+.padding(.horizontal, 12)
                 .padding(.top, 8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(AppTheme.sidebarBg(dark))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(AppTheme.border(dark), lineWidth: 1)
+                )
+                .cornerRadius(8)
                 .appLoading(model.isLoading)
             }
         }

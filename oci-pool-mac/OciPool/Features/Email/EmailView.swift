@@ -112,8 +112,8 @@ struct EmailView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(AppTheme.sidebarBg(dark)))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.border(dark), lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.sidebarBg(dark)))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.border(dark), lineWidth: 1))
     }
 
     private var sectionBusy: Bool {
@@ -651,12 +651,12 @@ struct EmailView: View {
     // MARK: - Shared chrome
 
     private var cardBackground: some View {
-        RoundedRectangle(cornerRadius: 14)
+        RoundedRectangle(cornerRadius: 8)
             .fill(AppTheme.sidebarBg(dark))
     }
 
     private func cardStroke(accent: Color, active: Bool) -> some View {
-        RoundedRectangle(cornerRadius: 14)
+        RoundedRectangle(cornerRadius: 8)
             .stroke(
                 active
                     ? accent.opacity(dark ? 0.35 : 0.28)

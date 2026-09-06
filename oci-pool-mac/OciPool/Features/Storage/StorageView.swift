@@ -388,7 +388,7 @@ struct StorageView: View {
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(AppTheme.sidebarBg(dark))
-        .cornerRadius(10)
+        .cornerRadius(8)
         .overlay(
             RoundedRectangle(cornerRadius: 10)
                 .stroke(AppTheme.border(dark).opacity(0.7), lineWidth: 1)
@@ -453,8 +453,8 @@ struct StorageView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(AppTheme.sidebarBg(dark)))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.border(dark), lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.sidebarBg(dark)))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.border(dark), lineWidth: 1))
     }
 
     private var loadingBox: some View {
