@@ -223,7 +223,7 @@ struct SpeedTestView: View {
     private var regionSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Text("区域节点")
+                Text("全球 OCI 区域")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
                 Text("\(model.regions.count)")
@@ -233,15 +233,36 @@ struct SpeedTestView: View {
                     .padding(.vertical, 2)
                     .background(AppTheme.sidebarHover(dark))
                     .cornerRadius(8)
-                if model.isTesting {
-                    HStack(spacing: 6) {
-                        ProgressView().scaleEffect(0.55)
-                        Text("探测中")
-                            .font(.system(size: 11, weight: .medium))
+                Spacer(minLength: 0)
+            }
+
+            // Web：测速中整条进度条区块（info 边框 + done/total + info→cyan 渐变）
+            if model.isTesting {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("正在测速中...")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(AppTheme.info)
+                        Spacer()
+                        Text("\(model.testedCount)/\(model.regions.count)")
+                            .font(.system(size: 11, design: .monospaced))
                             .foregroundColor(AppTheme.sidebarText(dark))
                     }
+                    GeometryReader { g in
+                        let progress = model.regions.isEmpty ? 0 : Double(model.testedCount) / Double(model.regions.count)
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 4).fill(AppTheme.sidebarHover(dark))
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(LinearGradient(colors: [AppTheme.info, Color(hex: "00b6be")],
+                                                     startPoint: .leading, endPoint: .trailing))
+                                .frame(width: g.size.width * progress)
+                        }
+                    }
+                    .frame(height: 8)
                 }
-                Spacer(minLength: 0)
+                .padding(14)
+                .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.sidebarBg(dark)))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.info.opacity(0.45), lineWidth: 1))
             }
 
             if model.regions.isEmpty && !model.isLoadingRegions {

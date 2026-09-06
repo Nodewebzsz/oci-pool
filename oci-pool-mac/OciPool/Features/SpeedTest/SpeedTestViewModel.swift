@@ -12,6 +12,11 @@ final class SpeedTestViewModel: ObservableObject {
     @Published private(set) var top5: [SpeedRankItem] = []
     @Published private(set) var isLoadingRegions = false
     @Published private(set) var isTesting = false
+    /// 测完一轮后置 true（按钮切「重新测速」）
+    @Published private(set) var hasCompleted = false
+    /// 已完成探测数 / 总数（进度条）
+    @Published private(set) var testedCount = 0
+    @Published private(set) var aborted = false
     @Published private(set) var errorText: String?
     /// Region currently mid-ping (border highlight like web).
     @Published private(set) var activeCode: String?
@@ -73,6 +78,31 @@ final class SpeedTestViewModel: ObservableObject {
         }
     }
 
+    /// Web 停止按钮：中止进行中的测速
+    func abortTest() {
+        guard isTesting else { return }
+        testGeneration += 1
+        isTesting = false
+        aborted = true
+        latency = latency.mapValues { state in
+            if case .testing = state { return .idle }
+            return state
+        }
+    }
+
+    /// Web 重置按钮：清空结果回未测状态
+    func resetResults() {
+        testGeneration += 1
+        isTesting = false
+        hasCompleted = false
+        aborted = false
+        latency = latency.mapValues { _ in .idle }
+        bestRegionText = "—"
+        avgLatencyText = "--"
+        top5 = []
+        activeCode = nil
+    }
+
     // MARK: - Test (web initTest)
 
     func runTest() async {
@@ -110,6 +140,7 @@ final class SpeedTestViewModel: ObservableObject {
 
             for await (code, simpleName, ms) in group {
                 guard gen == testGeneration else { continue }
+                testedCount += 1
 
                 if ms != -1 {
                     var lat = latency
@@ -147,6 +178,7 @@ final class SpeedTestViewModel: ObservableObject {
             bestRegionText = "--"
         }
         isTesting = false
+        hasCompleted = true
         activeCode = nil
     }
 
