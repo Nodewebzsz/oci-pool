@@ -11,6 +11,8 @@ enum NavID: String, CaseIterable, Hashable {
     case email
     case storage
     case boot
+    case tenantGrab
+    case tenantResources
     case ai
     case speedTest
     case openLogs
@@ -56,9 +58,11 @@ extension NavID {
         case .email: return "mail"
         case .storage: return "database"
         case .boot: return "zap"
+        case .tenantGrab, .tenantResources: return "users"
         case .ai: return "brain-circuit"
         case .speedTest: return "wifi"
         case .openLogs: return "terminal"
+        case .tenantGrab, .tenantResources: return "users"
         case .gcpAccounts: return "cloud"
         case .gcpInstances: return "server"
         case .azureVms: return "server"

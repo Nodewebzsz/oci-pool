@@ -368,7 +368,7 @@ struct SidebarView: View {
     }
 
     private func row(_ item: NavigationItem) -> some View {
-        let selected = navigation.selected == item.nav
+        let selected = navigation.sidebarActiveID == item.nav
         return Button(action: { navigation.select(item.nav) }) {
             ZStack(alignment: .leading) {
                 HStack(spacing: 10) {

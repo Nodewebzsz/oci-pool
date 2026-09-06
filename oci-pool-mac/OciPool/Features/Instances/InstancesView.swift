@@ -3,6 +3,8 @@ import AppKit
 
 /// 原生实例列表（对齐 Web `/oci/list` · `oci_machine_list.ftl`）。
 struct InstancesView: View {
+    /// 租户详情 → 资源列表子页（对齐 Web page-tenant-resources：面包屑 + 租户上下文）
+    var tenantSubPage: Bool = false
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appearance: AppearanceController
     @StateObject private var model = InstancesViewModel()
@@ -65,11 +67,14 @@ struct InstancesView: View {
     private var listPage: some View {
         PageScaffold(
             title: "OCI 实例管理",
-            subtitle: filterSubtitle,
+            subtitle: tenantSubPage ? tenantSubtitle : filterSubtitle,
             systemImage: "server",
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
+                    if tenantSubPage {
+                        breadcrumbBar
+                    }
                     filterBar
                     if let err = model.errorText, !err.isEmpty { errorBanner(err) }
                     summaryBar
@@ -85,6 +90,32 @@ struct InstancesView: View {
             }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+    }
+
+    /// 子页面包屑（对齐 Web：返回 + OCI 租户管理 > 详情 · 租户名 > 资源列表）
+    private var tenantSubtitle: String {
+        let name = NavigationState.shared.tenantSubPageName
+        return name.isEmpty ? "租户实例" : "\(name) · 共 \(model.pageState.totalElements) 个实例"
+    }
+
+    private var breadcrumbBar: some View {
+        HStack(spacing: 8) {
+            Button(action: { NavigationState.shared.closeTenantSubPage() }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.left").font(.system(size: 11, weight: .semibold))
+                    Text("返回").font(.system(size: 12, weight: .medium))
+                }
+                .foregroundColor(AppTheme.sidebarText(dark))
+            }
+            .buttonStyle(PlainButtonStyle())
+            Text("›").font(.system(size: 11)).foregroundColor(AppTheme.sidebarText(dark).opacity(0.5))
+            Text("OCI 租户管理").font(.system(size: 12)).foregroundColor(AppTheme.sidebarText(dark))
+            Text("›").font(.system(size: 11)).foregroundColor(AppTheme.sidebarText(dark).opacity(0.5))
+            Text("资源列表").font(.system(size: 12, weight: .medium)).foregroundColor(AppTheme.sidebarActive)
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 
     private var filterSubtitle: String {

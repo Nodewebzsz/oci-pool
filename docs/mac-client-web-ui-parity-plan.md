@@ -22,8 +22,8 @@
 | A2 | OCI 区域管理 | page-regions.jsx | Regions/RegionsView | ✅ 2026-09-06（标题/图标色/KPI 横排/表头/徽章/筛选/排序/配色已对齐并运行时核验；同日补充：三分段 tab 含图标、KPI1 改 Lucide map-pin、新增 RegionWorldMapView 真实世界地图（Natural Earth 1 投影 + 后端 vendor TopoJSON 110m + 节点脉冲/hover tooltip/图例），tab 联动筛选；二轮反馈修复：经纬网步长对齐 Web graticule.step([30,30])（去掉多余横竖线）、定位图标重绘、悬浮弹窗/行点击/节点点击详情抽屉运行时核验通过） |
 | A3 | OCI 租户管理 | page-tenants.jsx | Tenants/TenantsView | ✅ 2026-09-06（页头按钮组/彩色实心/表头列名/实例操作橙钮/单元格样式/分页/菜单文案已对齐并运行时核验） |
 | A4 | 租户详情（子页） | page-tenant-detail.jsx | Tenants/TenantDetailView | ✅ 2026-09-06（页头 diamond+租户名/副标题/KPI 语义色/列头 实例同步/未同步灰态/危险色 token）。❓ KPI 数据映射、RegionSwitcher、面包屑、7 按钮组待确认 |
-| A5 | 租户·查看开机（子页） | page-tenant-grab.jsx | 复用 Boot/BootView（带 pendingBootFilter 预筛选） | ❓ 原生无独立子页，复用全局开机管理页；如需一比一（面包屑+预开列表 15 列）需新建页面，待确认 |
-| A6 | 租户·资源列表（子页） | page-tenant-resources.jsx | 复用 Instances 页（pendingInstancesFilter 预筛选） | ❓ 原生无独立子页（TenantRegionSubView 是「区域订阅」页）；如需一比一需新建，待确认 |
+| A5 | 租户·查看开机（子页） | page-tenant-grab.jsx | Boot/BootView(tenantSubPage:true) | ✅ 2026-09-06 独立子页（新 NavID .tenantGrab + 面包屑 返回·OCI 租户管理·详情·租户名·查看开机 + 标题「预开列表」+ zap 橙图标 + 租户上下文副标题 + 预筛选表格复用）。❓ Web 表头 15 列逐字与页头按钮组（预开/停止/重置）在此子页复用全局页配置 |
+| A6 | 租户·资源列表（子页） | page-tenant-resources.jsx | Instances/InstancesView(tenantSubPage:true) | ✅ 2026-09-06 独立子页（新 NavID .tenantResources + 面包屑 返回·OCI 租户管理·详情·租户名·资源列表 + 副文案 {租户名} · 共 N 个实例 + 预筛选表格复用）。❓ Web 11 列逐字与明文密码导出警告待做 |
 | A7 | OCI 实例列表 | page-instances.jsx | Instances/InstancesView | ✅ 2026-09-06（标题 OCI 实例管理/表头 租户名·所属区域·主 IPv4/IPv6 已启用未启用/菜单 10 处文案/语义色 token/筛选 placeholder 与宽度/一键导出）。❓ accent 筛选条形态、租户区域下拉入页头待确认 |
 | A8 | OCI 开机管理 | page-grab.jsx | Boot/BootView | ✅ 2026-09-06（标题「预开列表」/zap 橙图标/页头按钮组（预开 primary+停止 orange+重置 danger+eye 钮）/筛选 placeholder/表头 15 列逐字（架构列移至成功后）/任务状态徽章 running+脉冲/执行中 accent/今日 cyan/失败 danger/架构 info chip/行单击详情/菜单文案/预开空白表单选租户/色板收敛）。❓ 确认弹窗 danger 样式+requireText（RESET/租户名）为共享 AppAlert 增强，待做；重置语义 Web 清零全部统计 vs 原生仅失败计数待确认 |
 | A9 | OCI 邮箱服务 | page-misc.jsx (MailPage) | Email/EmailView | ✅ 2026-09-06（标题/动态副标题/cyan 图标/写邮件按钮/4 KPI 卡/发送记录表头 主题·发件人·收件数·状态·发送时间+状态徽章/空态/添加联系人文案）。❓ 三区同屏布局（左租户/右联系人/下记录）与 Web 差异保留（原生 Tab 切换）、启用弹层 SMTP 凭据面板待补 |
@@ -93,3 +93,4 @@
 - 2026-09-06（续 4）：A8 完成「审计→修复→构建→提交」。修复过程发现并顺带修复：A2 地图 antimeridian 直线（TopoJSON 反经线解缠绕）、悬停失效（NSEvent mouseMoved 最近节点判定 + 标题栏坐标偏移修正）、经纬线闭合弦直线（path closed:false）。
 - 2026-09-06（续 5）：A13/D2 完成（terminal 图标、暂停/下载、级别色 token 化、footer 中文化）；A11/A12 一轮修复完成（副标题/标题/语义色/色板/阈值），二轮细项标记 ❓。
 - 2026-09-06（续 6）：批次 C/E/F 六页一轮对齐完成并提交（标题/副标题/文案/色板收敛），二轮细项已标记 ❓。至此对接计划全部页面一轮对齐完成。
+- 2026-09-06（续 7）：A5/A6 独立子页完成——新增 NavID .tenantGrab/.tenantResources、FeatureRouter 映射、BootView/InstancesView 增加 tenantSubPage 模式（面包屑 + 租户上下文副标题 + 侧栏高亮归属租户管理 + 返回租户列表）、分页下拉宽度 64→72、跳页输入居中。

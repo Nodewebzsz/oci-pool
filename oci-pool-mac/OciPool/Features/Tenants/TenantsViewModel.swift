@@ -1741,14 +1741,16 @@ final class TenantsViewModel: ObservableObject {
     func openInstancesList(_ item: TenantItem) {
         let parentId = detailParent.map { "\($0.id)" } ?? "\(item.id)"
         let regionId = "\(item.id)"
-        NavigationState.shared.openInstances(parentId: parentId, regionId: regionId)
+        let name = detailParent.map { $0.defName.isEmpty ? $0.userName : $0.defName } ?? item.userName
+        NavigationState.shared.openInstances(parentId: parentId, regionId: regionId, tenantName: name)
     }
 
     /// 详情页 → 抢机/开机任务（Web `/boot/fullBootList?tenantId=`）
     func openBootTaskList(_ item: TenantItem) {
         let parentId = detailParent.map { "\($0.id)" } ?? "\(item.id)"
         let regionId = "\(item.id)"
-        NavigationState.shared.openBootTasks(parentId: parentId, regionId: regionId)
+        let name = detailParent.map { $0.defName.isEmpty ? $0.userName : $0.defName } ?? item.userName
+        NavigationState.shared.openBootTasks(parentId: parentId, regionId: regionId, tenantName: name)
     }
 
     func openSecurityRules(_ item: TenantItem) {

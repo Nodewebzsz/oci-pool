@@ -5,6 +5,7 @@ import Combine
 struct PendingTenantListFilter: Equatable {
     var parentTenantId: String
     var regionTenantId: String
+    var tenantName: String = ""
 }
 
 /// Touched from AppKit + SwiftUI; create/use on main thread only (not type-isolated,
@@ -51,22 +52,42 @@ final class NavigationState: ObservableObject {
         selected = nav
     }
 
-    /// 租户详情 → 实例列表（对齐 Web `/oci/list?tenantId=`）
-    func openInstances(parentId: String, regionId: String) {
+    /// 子页面包屑显示的租户名（查看开机/资源列表共用）
+    @Published private(set) var tenantSubPageName: String = ""
+
+    /// 租户详情 → 实例列表子页（对齐 Web page-tenant-resources）
+    func openInstances(parentId: String, regionId: String, tenantName: String = "") {
         pendingInstancesFilter = PendingTenantListFilter(
             parentTenantId: parentId,
-            regionTenantId: regionId
+            regionTenantId: regionId,
+            tenantName: tenantName
         )
-        select(.instances)
+        tenantSubPageName = tenantName
+        select(.tenantResources)
     }
 
-    /// 租户详情 → 开机/抢机任务（对齐 Web `/boot/fullBootList?tenantId=`）
-    func openBootTasks(parentId: String, regionId: String) {
+    /// 租户详情 → 开机/抢机任务子页（对齐 Web page-tenant-grab）
+    func openBootTasks(parentId: String, regionId: String, tenantName: String = "") {
         pendingBootFilter = PendingTenantListFilter(
             parentTenantId: parentId,
-            regionTenantId: regionId
+            regionTenantId: regionId,
+            tenantName: tenantName
         )
-        select(.boot)
+        tenantSubPageName = tenantName
+        select(.tenantGrab)
+    }
+
+    /// 子页（查看开机/资源列表）→ 侧栏高亮归属租户管理
+    var sidebarActiveID: NavID {
+        switch selected {
+        case .tenantGrab, .tenantResources: return .tenants
+        default: return selected
+        }
+    }
+
+    /// 子页返回租户列表
+    func closeTenantSubPage() {
+        select(.tenants)
     }
 
     func takePendingInstancesFilter() -> PendingTenantListFilter? {

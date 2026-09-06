@@ -4,6 +4,8 @@ import AppKit
 /// 原生开机管理（对齐 Web `/boot/fullBootList` · `full_machine_list.ftl`）。
 /// 列表视觉对齐实例列表：摘要 chip · 卡片表 · 行悬停 · 三点操作菜单 · 窗内两列菜单。
 struct BootView: View {
+    /// 租户详情 → 查看开机子页（对齐 Web page-tenant-grab：面包屑 + 租户上下文）
+    var tenantSubPage: Bool = false
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appearance: AppearanceController
     @StateObject private var model = BootViewModel()
@@ -67,11 +69,14 @@ struct BootView: View {
     private var listPage: some View {
         PageScaffold(
             title: "预开列表",
-            subtitle: filterSubtitle,
+            subtitle: tenantSubPage ? tenantSubtitle : filterSubtitle,
             systemImage: "zap.fill",
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
+                    if tenantSubPage {
+                        breadcrumbBar
+                    }
                     filterBar
                     if let err = model.errorText, !err.isEmpty { errorBanner(err) }
                     summaryBar
@@ -87,6 +92,32 @@ struct BootView: View {
             }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+    }
+
+    /// 子页面包屑（对齐 Web：返回 + OCI 租户管理 > 详情 · 租户名 > 查看开机）
+    private var tenantSubtitle: String {
+        let name = NavigationState.shared.tenantSubPageName
+        return name.isEmpty ? "租户开机任务" : "\(name) · 开机任务"
+    }
+
+    private var breadcrumbBar: some View {
+        HStack(spacing: 8) {
+            Button(action: { NavigationState.shared.closeTenantSubPage() }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.left").font(.system(size: 11, weight: .semibold))
+                    Text("返回").font(.system(size: 12, weight: .medium))
+                }
+                .foregroundColor(AppTheme.sidebarText(dark))
+            }
+            .buttonStyle(PlainButtonStyle())
+            Text("›").font(.system(size: 11)).foregroundColor(AppTheme.sidebarText(dark).opacity(0.5))
+            Text("OCI 租户管理").font(.system(size: 12)).foregroundColor(AppTheme.sidebarText(dark))
+            Text("›").font(.system(size: 11)).foregroundColor(AppTheme.sidebarText(dark).opacity(0.5))
+            Text("查看开机").font(.system(size: 12, weight: .medium)).foregroundColor(AppTheme.sidebarActive)
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 
     private var filterSubtitle: String {
