@@ -119,12 +119,10 @@ struct TenantsView: View {
     private var listPage: some View {
         PageScaffold(
             title: "租户管理",
-            subtitle: "OCI API 配置与账号列表",
             systemImage: "person.2",
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
-                    filterBar
                     if let err = model.errorText, !err.isEmpty { errorBanner(err) }
                     listBody
                     PaginationBar(state: $model.pageState) {
@@ -136,55 +134,43 @@ struct TenantsView: View {
         )
     }
 
-    // MARK: - Toolbar
+    // MARK: - Toolbar（对齐 Web page-tenants 页头：搜索 → 眼睛 → API 导入 → 导出 → 导入 → 检测）
 
     private var toolbar: some View {
         HStack(spacing: 8) {
-            AppButton(
-                title: model.namesHidden ? "显示名称" : "隐藏名称",
-                systemImage: model.namesHidden ? "eye" : "eye.slash",
-                kind: .secondary
-            ) {
+            SearchField(
+                text: $model.searchText,
+                placeholder: "输入租户名或区域进行搜索...",
+                maxWidth: 280
+            )
+            .onChange(of: model.searchText) { _ in model.onSearchChanged() }
+
+            // Web：30px 图标按钮 · tooltip 显示/隐藏脱敏
+            Button {
                 model.namesHidden.toggle()
+            } label: {
+                Image(systemName: model.namesHidden ? "eye" : "eye.slash")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(AppTheme.navIcon(dark))
+                    .frame(width: 30, height: 30)
+                    .background(RoundedRectangle(cornerRadius: 5).fill(AppTheme.sidebarHover(dark)))
             }
+            .buttonStyle(PlainButtonStyle())
+            .help("显示/隐藏脱敏")
+
             AppButton(title: "API 导入", systemImage: "bolt.fill", kind: .primary) {
                 model.openAdd()
             }
-            AppButton(title: "导出", systemImage: "square.and.arrow.down", kind: .secondary) {
+            AppButton(title: "导出租户数据", systemImage: "square.and.arrow.down", kind: .cyan) {
                 model.openExportAll()
             }
-            AppButton(title: "导入", systemImage: "square.and.arrow.up", kind: .secondary) {
+            AppButton(title: "导入租户数据", systemImage: "square.and.arrow.up", kind: .info) {
                 model.importJSON()
             }
-            AppButton(title: "账号检测", systemImage: "checkmark.circle", kind: .secondary) {
+            AppButton(title: "账号批量检测", systemImage: "checkmark.circle", kind: .orange) {
                 model.startAccountCheck()
             }
-            AppButton(title: "刷新", systemImage: "arrow.clockwise", kind: .secondary) {
-                Task { await model.reload() }
-            }
         }
-    }
-
-    private var filterBar: some View {
-        FilterBar(
-            leading: {
-                SearchField(
-                    text: $model.searchText,
-                    placeholder: "搜索租户名称…",
-                    onSubmit: { model.onSearchSubmit() },
-                    maxWidth: 320
-                )
-                .onChange(of: model.searchText) { _ in model.onSearchChanged() }
-            },
-            trailing: {
-                if model.isLoading {
-                    ProgressView().scaleEffect(0.7).frame(width: 20, height: AppInputStyle.height)
-                } else {
-                    Color.clear.frame(width: 1, height: AppInputStyle.height)
-                }
-            }
-        )
-        .zIndex(40)
     }
 
     private func errorBanner(_ text: String) -> some View {
@@ -194,9 +180,9 @@ struct TenantsView: View {
             Spacer()
             Button("重试") { Task { await model.reload() } }.buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
     }
 
     // MARK: - List（铺满内容区）
@@ -272,19 +258,19 @@ struct TenantsView: View {
                     .foregroundColor(AppTheme.sidebarText(dark).opacity(0.55))
                     .frame(width: cols.proxy, alignment: .center)
                     .help("绑定代理")
-                colHeader("名称", cols.name)
-                colHeader("自定义名", cols.def)
-                colHeader("费用", cols.cost)
-                colHeader("活跃天", cols.days)
+                colHeader("租户名", cols.name)
+                colHeader("自定义名称", cols.def)
+                colHeader("账号成本", cols.cost)
+                colHeader("存活天数", cols.days)
                 colHeader("开机任务", cols.task)
                 colHeader("主区域", cols.region)
             }
             HStack(spacing: 0) {
-                colHeader("多区域", cols.multi)
-                colHeader("类型", cols.type)
-                colHeader("创建", cols.create)
+                colHeader("是否多区", cols.multi)
+                colHeader("账号类型", cols.type)
+                colHeader("实例操作", cols.create)
                 colHeader("创建时间", cols.time)
-                colHeader("状态", cols.status)
+                colHeader("账号状态", cols.status)
                 colHeader("操作", cols.action, align: .center)
             }
         }
@@ -305,18 +291,16 @@ struct TenantsView: View {
                 nameCell(item, width: cols.name)
                 defNameCell(item, width: cols.def)
                 costCell(item, width: cols.cost)
-                cell(item.activeDaysText, cols.days)
-                StatusBadge(text: item.openTaskText, tone: item.openBootFlag ? .success : .neutral)
-                    .frame(width: cols.task, alignment: .leading)
+                activeDaysCell(item, width: cols.days)
+                bootTaskCell(item, width: cols.task)
                 cell(item.region.isEmpty ? "—" : item.region, cols.region)
             }
             HStack(alignment: .center, spacing: 0) {
-                cell(item.multiRegionText, cols.multi)
+                multiRegionCell(item, width: cols.multi)
                 typeCell(item, width: cols.type)
                 bootCell(item, width: cols.create)
                 cell(item.createdAt.isEmpty ? "—" : item.createdAt, cols.time, muted: true)
-                StatusBadge(text: item.statusText, tone: item.isActive ? .success : .danger)
-                    .frame(width: cols.status, alignment: .leading)
+                statusCell(item, width: cols.status)
                 actionCell(item, width: cols.action)
             }
         }
@@ -382,32 +366,105 @@ struct TenantsView: View {
         Button(action: { model.openEditName(item) }) {
             Text(item.defNameText)
                 .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarActive)
+                // Web：自定义名 fg-1，未设置为空白
+                .foregroundColor(dark ? Color(hex: "ccd2d6") : Color(hex: "2d3439"))
+                .lineLimit(1)
+                .frame(width: width, alignment: .leading)
+                .frame(minHeight: 20)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    /// Web：账号成本 0=accent 绿，>0=橙 + dashed 下划线
+    private func costCell(_ item: TenantItem, width: CGFloat) -> some View {
+        let nonZero = item.costText != "—" && Double(item.costText.replacingOccurrences(of: "$", with: "")) != 0
+        return Button(action: { model.openEditCost(item) }) {
+            Text(nonZero ? "$\(item.costText)" : item.costText)
+                .font(.system(size: 12))
+                .foregroundColor(item.costText == "—" ? RegionsMuted : (nonZero ? AppTheme.orange : AppTheme.sidebarActive))
+                .underline(true, color: item.costText == "—" ? .clear : AppTheme.orange.opacity(0.6))
                 .lineLimit(1)
                 .frame(width: width, alignment: .leading)
         }
         .buttonStyle(PlainButtonStyle())
     }
 
-    private func costCell(_ item: TenantItem, width: CGFloat) -> some View {
-        Button(action: { model.openEditCost(item) }) {
-            Text(item.costText)
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarActive)
-                .lineLimit(1)
-                .frame(width: width, alignment: .leading)
+    private var RegionsMuted: Color { dark ? Color(hex: "8d9398") : Color(hex: "5d646a") }
+
+    /// Web：存活天数 info-soft 蓝色徽章
+    private func activeDaysCell(_ item: TenantItem, width: CGFloat) -> some View {
+        Text(item.activeDaysText)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundColor(AppTheme.info)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(RoundedRectangle(cornerRadius: 4).fill(AppTheme.info.opacity(0.14)))
+            .frame(width: width, alignment: .leading)
+    }
+
+    /// Web：有任务 = accent-soft + 脉冲圆点「进行中」，否则灰「无任务」
+    private func bootTaskCell(_ item: TenantItem, width: CGFloat) -> some View {
+        HStack(spacing: 5) {
+            if item.openBootFlag {
+                PulseDotSmall(color: AppTheme.sidebarActive)
+            }
+            Text(item.openTaskText)
+                .font(.system(size: 11))
+                .foregroundColor(item.openBootFlag ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
         }
-        .buttonStyle(PlainButtonStyle())
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(
+            RoundedRectangle(cornerRadius: 999)
+                .fill(item.openBootFlag ? AppTheme.sidebarActive.opacity(0.14) : Color.clear)
+        )
+        .frame(width: width, alignment: .leading)
+    }
+
+    /// Web：多区域 = 圆点（有子区 accent）+ 是/否
+    private func multiRegionCell(_ item: TenantItem, width: CGFloat) -> some View {
+        HStack(spacing: 5) {
+            if item.isMultiRegion {
+                Circle().fill(AppTheme.sidebarActive).frame(width: 6, height: 6)
+            }
+            Text(item.multiRegionText)
+        }
+        .font(.system(size: 12))
+        .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+        .frame(width: width, alignment: .leading)
+    }
+
+    /// Web StatusPill：圆点 + 文字，active=accent-soft/accent
+    private func statusCell(_ item: TenantItem, width: CGFloat) -> some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(item.isActive ? AppTheme.sidebarActive : AppTheme.danger)
+                .frame(width: 6, height: 6)
+            Text(item.statusText)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(item.isActive ? AppTheme.sidebarActive : AppTheme.danger)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(
+            Capsule().fill(
+                item.isActive ? AppTheme.sidebarActive.opacity(0.14) : AppTheme.danger.opacity(0.14)
+            )
+        )
+        .frame(width: width, alignment: .leading)
     }
 
     @ViewBuilder
     private func typeCell(_ item: TenantItem, width: CGFloat) -> some View {
         if item.accountTypeName != "未知", !item.accountTypeName.isEmpty {
             Button(action: { model.activeSheet = .accountDetail(item) }) {
+                // Web：trial=violet / official=cyan / 其他=orange 软底徽章
                 Text(item.typeText)
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarActive)
-                    .lineLimit(1)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(item.typeBadgeColor)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(RoundedRectangle(cornerRadius: 4).fill(item.typeBadgeColor.opacity(0.14)))
                     .frame(width: width, alignment: .leading)
             }
             .buttonStyle(PlainButtonStyle())
@@ -416,17 +473,21 @@ struct TenantsView: View {
         }
     }
 
+    /// Web 实例操作：橙色 zap「创建实例」按钮（color: oklch(0.14 0.02 55)）
     @ViewBuilder
     private func bootCell(_ item: TenantItem, width: CGFloat) -> some View {
         if item.cloudType == 1 {
             Button(action: { model.openBoot(item) }) {
-                Text("创建")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(AppTheme.sidebarActive)
-                    .cornerRadius(6)
+                HStack(spacing: 4) {
+                    Image(systemName: "zap.fill").font(.system(size: 10, weight: .semibold))
+                    Text("创建实例")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundColor(Color(hex: "2a1a04"))
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(AppTheme.orange)
+                .cornerRadius(5)
             }
             .buttonStyle(PlainButtonStyle())
             .frame(width: width, alignment: .leading)
@@ -751,15 +812,15 @@ enum TenantActionPanel {
                 })
             }
             list.append(contentsOf: [
-                TenantActionItem(id: "boot", title: "创建开机", systemImage: "plus.circle", isDanger: false) { model.openBoot(item) },
-                TenantActionItem(id: "upd", title: "更新信息", systemImage: "arrow.clockwise", isDanger: false) { model.updateTenantSSE(item) },
+                TenantActionItem(id: "boot", title: "添加开机", systemImage: "plus.circle", isDanger: false) { model.openBoot(item) },
+                TenantActionItem(id: "upd", title: "账号更新", systemImage: "arrow.clockwise", isDanger: false) { model.updateTenantSSE(item) },
                 TenantActionItem(id: "region", title: "租户详情", systemImage: "info.circle", isDanger: false) { model.openRegionList(item) },
                 TenantActionItem(id: "sub", title: "区域订阅", systemImage: "globe", isDanger: false) { model.openRegionSub(item) },
                 TenantActionItem(id: "users", title: "用户管理", systemImage: "person.2", isDanger: false) { model.openUsers(item) },
                 TenantActionItem(id: "traffic", title: "流量预警", systemImage: "bell", isDanger: false) { model.openTraffic(item) },
                 TenantActionItem(id: "tsearch", title: "流量查询", systemImage: "chart.bar", isDanger: false) { model.openTrafficPage(item) },
                 TenantActionItem(id: "audit", title: "审计日志", systemImage: "doc.text", isDanger: false) { model.openAudit(item) },
-                TenantActionItem(id: "cost", title: "账号费用", systemImage: "creditcard", isDanger: false) {
+                TenantActionItem(id: "cost", title: "账号花费", systemImage: "creditcard", isDanger: false) {
                     model.openCost(item)
                 },
                 TenantActionItem(id: "export", title: "导出租户", systemImage: "square.and.arrow.down", isDanger: false) { model.openExportOne(item) },
@@ -772,7 +833,7 @@ enum TenantActionPanel {
                 model.openRegionList(item)
             })
         }
-        list.append(TenantActionItem(id: "del", title: "删除", systemImage: "trash", isDanger: true) {
+        list.append(TenantActionItem(id: "del", title: "删除租户", systemImage: "trash", isDanger: true) {
             model.confirmDelete(item)
         })
         return list
@@ -791,7 +852,7 @@ enum TenantActionPanel {
                 TenantActionItem(id: "sync", title: "同步", systemImage: "arrow.2.circlepath", isDanger: false) {
                     model.syncDetailRow(item)
                 },
-                TenantActionItem(id: "boot", title: "创建开机", systemImage: "plus.circle", isDanger: false) {
+                TenantActionItem(id: "boot", title: "添加开机", systemImage: "plus.circle", isDanger: false) {
                     model.openBoot(item)
                 },
                 TenantActionItem(id: "findboot", title: "抢机任务", systemImage: "play.circle", isDanger: false) {
@@ -812,7 +873,7 @@ enum TenantActionPanel {
             ])
         } else if item.cloudType == 2 {
             list.append(contentsOf: [
-                TenantActionItem(id: "boot", title: "创建开机", systemImage: "plus.circle", isDanger: false) {
+                TenantActionItem(id: "boot", title: "添加开机", systemImage: "plus.circle", isDanger: false) {
                     model.openBoot(item)
                 },
                 TenantActionItem(id: "sync", title: "同步", systemImage: "arrow.2.circlepath", isDanger: false) {
@@ -867,14 +928,14 @@ struct TenantActionMenuContent: View {
                                     .lineLimit(1)
                                 Spacer(minLength: 0)
                             }
-                            .foregroundColor(act.isDanger ? Color(hex: "f85149") : (dark ? Color.white.opacity(0.9) : Color.primary))
+                            .foregroundColor(act.isDanger ? AppTheme.danger : (dark ? Color.white.opacity(0.9) : Color.primary))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 9)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
                                     .fill(act.isDanger
-                                          ? Color(hex: "f85149").opacity(0.1)
+                                          ? AppTheme.danger.opacity(0.1)
                                           : AppTheme.sidebarHover(dark).opacity(dark ? 0.55 : 0.7))
                             )
                             .overlay(
@@ -891,5 +952,21 @@ struct TenantActionMenuContent: View {
         .frame(width: TenantActionMenuLayout.width, height: panelHeight, alignment: .topLeading)
         .background(AppTheme.pageBg(dark))
         .cornerRadius(12)
+    }
+}
+
+/// 小号脉冲圆点（开机任务「进行中」等场景）。
+private struct PulseDotSmall: View {
+    var color: Color
+    @State private var pulse = false
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: 5, height: 5)
+            .scaleEffect(pulse ? 1.0 : 0.72)
+            .opacity(pulse ? 1.0 : 0.55)
+            .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
+            .onAppear { pulse = true }
     }
 }

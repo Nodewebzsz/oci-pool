@@ -40,19 +40,19 @@ struct RegionsView: View {
             HStack(spacing: 12) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(Color(hex: "4d9eff").opacity(0.12))
+                        .fill(AppTheme.info.opacity(0.12))
                         .frame(width: 38, height: 38)
                     Image(systemName: "globe")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(RegionsTheme.blue(dark))
+                        .foregroundColor(AppTheme.info)
                 }
-                Text("开机区域监控")
+                Text("区域管理")
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(RegionsTheme.text(dark))
             }
             Spacer()
             HStack(spacing: 7) {
-                Circle().fill(RegionsTheme.green(dark)).frame(width: 7, height: 7)
+                RegionsPulseDot(color: AppTheme.sidebarActive)
                 Text(model.lastUpdateText)
                     .font(.system(size: 12))
                     .foregroundColor(RegionsTheme.muted(dark))
@@ -84,39 +84,39 @@ struct RegionsView: View {
 
     private var statsGrid: some View {
         HStack(spacing: 14) {
-            statCard(icon: "mappin.and.ellipse", color: RegionsTheme.blue(dark),
+            statCard(icon: "mappin", color: AppTheme.info,
                      title: "总区域数", value: "\(model.totalRegions)")
-            statCard(icon: "cpu", color: RegionsTheme.green(dark),
-                     title: "已开ARM架构区域数", value: "\(model.openArmCount)")
-            statCard(icon: "bell.fill", color: RegionsTheme.orange(dark),
+            statCard(icon: "checkmark.circle", color: AppTheme.sidebarActive,
+                     title: "已开 ARM 架构区域数", value: "\(model.openArmCount)")
+            statCard(icon: "bell.fill",
+                     color: model.todayNewCount > 0 ? RegionsTheme.orange(dark) : RegionsTheme.muted(dark),
                      title: "今日新开机区域数", value: "\(model.todayNewCount)")
         }
     }
 
+    /// Web KPICard 布局：图标 36×36（18% 软底）+ 右侧「上标签 11 / 下数值 22·700」
     private func statCard(icon: String, color: Color, title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(color.opacity(0.14))
-                        .frame(width: 38, height: 38)
-                    Image(systemName: icon)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(color)
-                }
-                Spacer()
-                Text(title)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(RegionsTheme.muted(dark))
-                    .multilineTextAlignment(.trailing)
-                    .lineLimit(2)
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(color.opacity(0.18))
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(color)
             }
-            Text(value)
-                .font(.system(size: 28, weight: .bold))
-                .foregroundColor(RegionsTheme.text(dark))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 11))
+                    .foregroundColor(RegionsTheme.muted(dark))
+                Text(value)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(RegionsTheme.text(dark))
+            }
+            Spacer(minLength: 0)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, minHeight: 100, alignment: .topLeading)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(RegionsTheme.surface2(dark))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(RegionsTheme.border(dark), lineWidth: 1))
         .cornerRadius(12)
@@ -129,10 +129,10 @@ struct RegionsView: View {
             HStack(spacing: 12) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(RegionsTheme.green(dark).opacity(0.14))
+                        .fill(AppTheme.sidebarActive.opacity(0.14))
                         .frame(width: 38, height: 38)
                     Image(systemName: "globe")
-                        .foregroundColor(RegionsTheme.green(dark))
+                        .foregroundColor(AppTheme.sidebarActive)
                 }
                 Text("数量: \(model.mapCount)")
                     .font(.system(size: 14, weight: .semibold))
@@ -141,7 +141,7 @@ struct RegionsView: View {
                 Spacer(minLength: 8)
 
                 HStack(spacing: 0) {
-                    mapToggle("ARM放货区域", mode: .arm)
+                    mapToggle("ARM 放货区域", mode: .arm)
                     mapToggle("我的区域", mode: .mine)
                 }
                 .background(RegionsTheme.surface(dark))
@@ -157,7 +157,7 @@ struct RegionsView: View {
                     .foregroundColor(model.showMapBoard ? .white : RegionsTheme.text(dark))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(model.showMapBoard ? RegionsTheme.blue(dark) : RegionsTheme.surface(dark))
+                    .background(model.showMapBoard ? AppTheme.info : RegionsTheme.surface(dark))
                     .cornerRadius(8)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
@@ -184,13 +184,14 @@ struct RegionsView: View {
                 .foregroundColor(model.mapMode == mode ? .white : RegionsTheme.muted(dark))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(model.mapMode == mode ? RegionsTheme.blue(dark) : Color.clear)
+                .background(model.mapMode == mode ? AppTheme.info : Color.clear)
         }
         .buttonStyle(PlainButtonStyle())
     }
 
     private var regionBoard: some View {
         let openSet = Set(model.openRecords.filter { $0.openCount > 0 }.map(\.region))
+        let todaySet = Set(model.openRecords.filter { Self.isToday($0.lastNotifyTime) || Self.isToday($0.openTime) }.map(\.region))
         let mineSet = Set(model.myRecords.map(\.region))
         let groups: [(String, [String])] = [
             ("亚太", KnownRegions.codes.filter { $0.hasPrefix("ap-") }),
@@ -202,9 +203,9 @@ struct RegionsView: View {
 
         return VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 14) {
-                legendDot(RegionsTheme.orange(dark), "已放货")
-                legendDot(RegionsTheme.green(dark), "我的区域")
-                legendDot(RegionsTheme.muted(dark).opacity(0.45), "未放货")
+                legendDot(AppTheme.sidebarActive, "已放货区域")
+                legendDot(RegionsTheme.orange(dark), "今日新放货")
+                legendDot(RegionsTheme.muted(dark).opacity(0.45), "未放货区域")
                 Spacer()
                 Text("原生区域状态板（Web 端为 Leaflet 地图）")
                     .font(.system(size: 11))
@@ -220,6 +221,7 @@ struct RegionsView: View {
                             ForEach(codes, id: \.self) { code in
                                 let name = model.regionMap[code] ?? code
                                 let isOpen = openSet.contains(code)
+                                let isToday = todaySet.contains(code)
                                 let isMine = mineSet.contains(code)
                                 let active: Bool = {
                                     switch model.mapMode {
@@ -227,9 +229,10 @@ struct RegionsView: View {
                                     case .mine: return isMine
                                     }
                                 }()
+                                // Web 地图节点：已放货=accent、今日新增放货=orange
                                 let color: Color = {
-                                    if model.mapMode == .mine && isMine { return RegionsTheme.green(dark) }
-                                    if model.mapMode == .arm && isOpen { return RegionsTheme.orange(dark) }
+                                    if model.mapMode == .arm && isOpen && isToday { return RegionsTheme.orange(dark) }
+                                    if active { return AppTheme.sidebarActive }
                                     return RegionsTheme.muted(dark).opacity(0.35)
                                 }()
                                 HStack(spacing: 8) {
@@ -284,13 +287,13 @@ struct RegionsView: View {
 
                 HStack(spacing: 0) {
                     col("状态", 80)
-                    col("区域代码", 140)
+                    col("区域编码", 140)
                     col("区域名称", 140)
                     col("架构类型", 90)
                     col("开机时间", 140)
                     col("总开机数量", 90)
-                    col("当月开机数量", 100)
-                    col("最后开机时间", 140)
+                    col("本月开机数量", 100)
+                    col("最近开机时间", 140)
                 }
                 .padding(.vertical, 10)
                 .padding(.horizontal, 8)
@@ -305,21 +308,7 @@ struct RegionsView: View {
                         .padding(40)
                 } else {
                     ForEach(model.pageRows) { row in
-                        HStack(spacing: 0) {
-                            StatusBadge(text: row.isOpen ? "已放货" : "未放货",
-                                        tone: row.isOpen ? .success : .neutral)
-                                .frame(width: 80, alignment: .leading)
-                            cell(row.regionCode, 140)
-                            cell(row.name, 140)
-                            cell(row.architectureType, 90)
-                            cell(Self.fmt(row.openTime), 140)
-                            cell("\(row.openCount)", 90)
-                            cell("\(row.monthlyOpenCount)", 100)
-                            cell(Self.fmt(row.lastNotifyTime), 140)
-                        }
-                        .padding(.vertical, appearance.density.rowPadding)
-                        .padding(.horizontal, 8)
-                        .overlay(Rectangle().fill(RegionsTheme.border(dark).opacity(0.6)).frame(height: 1), alignment: .bottom)
+                        regionRow(row)
                     }
                 }
 
@@ -334,8 +323,8 @@ struct RegionsView: View {
             HStack(alignment: .top, spacing: 10) {
                 SearchField(
                     text: $model.searchText,
-                    placeholder: "搜索区域...",
-                    maxWidth: 260
+                    placeholder: "搜索区域…",
+                    maxWidth: 280
                 )
 
                 SelectMenu(
@@ -407,6 +396,90 @@ struct RegionsView: View {
         )
     }
 
+    // Web 行：状态徽章（accent-soft+脉冲）· 代码列 mono accent · 数量分级变色 · 架构徽章 · 本月橙色
+    @State private var hoveredRegion: String?
+
+    private func regionRow(_ row: RegionRow) -> some View {
+        HStack(spacing: 0) {
+            regionBadge(open: row.isOpen)
+                .frame(width: 80, alignment: .leading)
+            Text(row.regionCode)
+                .font(.system(size: 11.5, design: .monospaced))
+                .foregroundColor(AppTheme.sidebarActive)
+                .lineLimit(1)
+                .frame(width: 140, alignment: .leading)
+            cell(row.name, 140)
+            archBadge(row.architectureType)
+                .frame(width: 90, alignment: .leading)
+            cell(Self.fmt(row.openTime), 140)
+            grabCountCell(row.openCount, width: 90)
+            monthlyCell(row.monthlyOpenCount)
+                .frame(width: 100, alignment: .leading)
+            cell(Self.fmt(row.lastNotifyTime), 140)
+        }
+        .padding(.vertical, appearance.density.rowPadding)
+        .padding(.horizontal, 8)
+        .background(
+            // Web ui.jsx Table 行 hover：var(--bg-2)
+            Rectangle().fill(hoveredRegion == row.regionCode ? AppTheme.sidebarHover(dark) : Color.clear)
+        )
+        .overlay(Rectangle().fill(RegionsTheme.border(dark).opacity(0.6)).frame(height: 1), alignment: .bottom)
+        .onHover { hoveredRegion = $0 ? row.regionCode : nil }
+    }
+
+    /// Web StatusDot running pulse + accent-soft 底徽章（圆角 4）
+    private func regionBadge(open: Bool) -> some View {
+        HStack(spacing: 5) {
+            if open {
+                RegionsPulseDot(color: AppTheme.sidebarActive, size: 5)
+            } else {
+                Circle().fill(RegionsTheme.muted(dark).opacity(0.6)).frame(width: 5, height: 5)
+            }
+            Text(open ? "已放货" : "未放货")
+                .font(.system(size: 11))
+                .foregroundColor(open ? AppTheme.sidebarActive : RegionsTheme.muted(dark))
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(open ? AppTheme.sidebarActive.opacity(0.14) : RegionsTheme.muted(dark).opacity(0.12))
+        )
+    }
+
+    /// Web：info-soft 底 + info 色 mono 徽章
+    private func archBadge(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+            .foregroundColor(AppTheme.info)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(AppTheme.info.opacity(0.14))
+            )
+    }
+
+    /// Web 总开机数量分级：>100 accent · >20 fg-0 · >0 fg-1 · 0 fg-3
+    private func grabCountCell(_ count: Int, width: CGFloat) -> some View {
+        let color: Color = count > 100
+            ? AppTheme.sidebarActive
+            : (count > 20 ? RegionsTheme.text(dark) : (count > 0 ? RegionsTheme.text(dark).opacity(0.85) : RegionsTheme.muted(dark)))
+        return Text("\(count)")
+            .font(.system(size: 12, weight: count > 0 ? .semibold : .regular))
+            .foregroundColor(color)
+            .lineLimit(1)
+            .frame(width: width, alignment: .leading)
+    }
+
+    /// Web 本月开机数量：>0 orange 加粗，0 fg-3
+    private func monthlyCell(_ count: Int) -> some View {
+        Text("\(count)")
+            .font(.system(size: 12, weight: count > 0 ? .semibold : .regular))
+            .foregroundColor(count > 0 ? RegionsTheme.orange(dark) : RegionsTheme.muted(dark))
+            .lineLimit(1)
+    }
+
     private func col(_ title: String, _ w: CGFloat) -> some View {
         Text(title)
             .font(.system(size: 11, weight: .semibold))
@@ -423,22 +496,49 @@ struct RegionsView: View {
     }
 
     private static func fmt(_ s: String?) -> String {
-        guard let s = s, !s.isEmpty else { return "--" }
+        guard let s = s, !s.isEmpty else { return "—" }
         return s
+    }
+
+    private static func isToday(_ s: String?) -> Bool {
+        guard let s = s, let d = parseDate(s) else { return false }
+        return Calendar.current.isDateInToday(d)
+    }
+
+    private static func parseDate(_ s: String) -> Date? {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f.date(from: s)
     }
 }
 
-// MARK: - Theme (arm_records.css)
+/// Web StatusDot 的 pulse 动画圆点。
+private struct RegionsPulseDot: View {
+    var color: Color
+    var size: CGFloat = 6
+    @State private var pulse = false
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: size, height: size)
+            .scaleEffect(pulse ? 1.0 : 0.72)
+            .opacity(pulse ? 1.0 : 0.55)
+            .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
+            .onAppear { pulse = true }
+    }
+}
+
+// MARK: - Theme（对齐 Web index.html oklch CSS 变量）
 
 enum RegionsTheme {
-    static func bg(_ dark: Bool) -> Color { dark ? Color(hex: "1a1d21") : Color(hex: "f0f2f5") }
-    static func surface(_ dark: Bool) -> Color { dark ? Color(hex: "22262b") : Color.white }
-    static func surface2(_ dark: Bool) -> Color { dark ? Color(hex: "292d32") : Color(hex: "f8fafc") }
-    static func border(_ dark: Bool) -> Color { dark ? Color(hex: "31363d") : Color(hex: "e8ecf0") }
-    static func text(_ dark: Bool) -> Color { dark ? Color(hex: "cdd9e5") : Color(hex: "111827") }
-    static func muted(_ dark: Bool) -> Color { dark ? Color(hex: "768390") : Color(hex: "4b5563") }
-    static func blue(_ dark: Bool) -> Color { dark ? Color(hex: "4d9eff") : Color(hex: "3b82f6") }
-    static func green(_ dark: Bool) -> Color { dark ? Color(hex: "3fb950") : Color(hex: "22c55e") }
-    static func orange(_ dark: Bool) -> Color { dark ? Color(hex: "f78166") : Color(hex: "f97316") }
-    static func red(_ dark: Bool) -> Color { dark ? Color(hex: "ff6b6b") : Color(hex: "ef4444") }
+    static func bg(_ dark: Bool) -> Color { dark ? Color(hex: "060a0d") : Color(hex: "f8fafd") }
+    static func surface(_ dark: Bool) -> Color { dark ? Color(hex: "0d1216") : Color.white }
+    static func surface2(_ dark: Bool) -> Color { dark ? Color(hex: "151c21") : Color(hex: "f1f4f6") }
+    static func border(_ dark: Bool) -> Color { dark ? Color(hex: "232a2f") : Color(hex: "d9dfe3") }
+    static func text(_ dark: Bool) -> Color { dark ? Color(hex: "f6f9fb") : Color(hex: "0c1217") }
+    static func muted(_ dark: Bool) -> Color { dark ? Color(hex: "5d646a") : Color(hex: "81878c") }
+    static func orange(_ dark: Bool) -> Color { Color(hex: "ef852e") }
+    static func red(_ dark: Bool) -> Color { Color(hex: "f05653") }
 }

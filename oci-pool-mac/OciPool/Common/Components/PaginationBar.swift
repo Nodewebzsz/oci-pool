@@ -69,7 +69,7 @@ struct PaginationBar: View {
 
     private var sizeSelector: some View {
         HStack(spacing: 8) {
-            Text("每页")
+            Text("每页显示")
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.sidebarText(dark))
             SelectMenu(
@@ -80,9 +80,6 @@ struct PaginationBar: View {
                 allowClear: false,
                 searchable: false
             )
-            Text("条")
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarText(dark))
         }
     }
 
@@ -90,7 +87,7 @@ struct PaginationBar: View {
 
     private var navControls: some View {
         HStack(spacing: 4) {
-            pageButton(systemName: "chevron.left", disabled: state.isFirst) {
+            navButton(label: "上一页", systemName: "chevron.left", disabled: state.isFirst) {
                 state.goPrev()
                 onChange()
             }
@@ -107,9 +104,9 @@ struct PaginationBar: View {
                     }) {
                         Text("\(p + 1)")
                             .font(.system(size: 12, weight: p == state.page ? .bold : .regular))
-                            .frame(minWidth: controlHeight, minHeight: controlHeight)
+                            .frame(minWidth: 28, minHeight: controlHeight)
                             .background(
-                                RoundedRectangle(cornerRadius: 8)
+                                RoundedRectangle(cornerRadius: 4)
                                     .fill(p == state.page ? AppTheme.sidebarActive : AppInputStyle.fill(dark))
                             )
                             .overlay(
@@ -124,7 +121,7 @@ struct PaginationBar: View {
                     .buttonStyle(PlainButtonStyle())
                 }
             }
-            pageButton(systemName: "chevron.right", disabled: state.isLast) {
+            navButton(label: "下一页", systemName: "chevron.right", disabled: state.isLast) {
                 state.goNext()
                 onChange()
             }
@@ -148,30 +145,28 @@ struct PaginationBar: View {
                 AppCompactField(
                     text: $jumpText,
                     placeholder: "\(state.displayPage)",
-                    width: 56,
-                    height: controlHeight,
+                    width: 42,
+                    height: 26,
                     onCommit: { jump() }
                 )
 
-                Button(action: jump) {
-                    Text("Go")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .frame(height: controlHeight)
-                        .background(AppTheme.sidebarActive)
-                        .cornerRadius(8)
-                }
-                .buttonStyle(PlainButtonStyle())
+                Text("页")
+                    .font(.system(size: 12))
+                    .foregroundColor(AppTheme.sidebarText(dark))
             }
         }
     }
 
-    private func pageButton(systemName: String, disabled: Bool, action: @escaping () -> Void) -> some View {
+    private func navButton(label: String, systemName: String, disabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 11, weight: .semibold))
-                .frame(width: controlHeight, height: controlHeight)
+            HStack(spacing: 4) {
+                Image(systemName: systemName)
+                    .font(.system(size: 11, weight: .semibold))
+                Text(label)
+                    .font(.system(size: 12))
+            }
+            .padding(.horizontal, 8)
+            .frame(minWidth: controlHeight, minHeight: controlHeight)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
                         .fill(AppInputStyle.fill(dark))

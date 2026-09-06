@@ -97,7 +97,8 @@ final class RegionsViewModel: ObservableObject {
             regionMap = data.regionMap
             errorText = nil
         } catch {
-            errorText = error.localizedDescription
+            // 文案对齐 Web i18n regions.err.arm
+            errorText = "ARM 区域加载失败"
             openRecords = []
         }
     }
@@ -149,7 +150,18 @@ final class RegionsViewModel: ObservableObject {
             ))
         }
         closed.sort { $0.regionCode < $1.regionCode }
-        allRows = rows + closed
+        // Web page-regions：全部行按最近开机时间倒序，无时间的排最后
+        allRows = (rows + closed).sorted { (a: RegionRow, b: RegionRow) -> Bool in
+            let at = a.lastNotifyTime ?? a.openTime
+            let bt = b.lastNotifyTime ?? b.openTime
+            switch (at, bt) {
+            case (nil, nil): return false
+            case (nil, _): return false
+            case (_, nil): return true
+            case (let l?, let r?):
+                return (Self.parseDate(l) ?? .distantPast) > (Self.parseDate(r) ?? .distantPast)
+            }
+        }
         refilter()
     }
 

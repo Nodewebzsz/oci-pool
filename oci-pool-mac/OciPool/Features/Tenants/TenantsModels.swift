@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - List
 
@@ -141,17 +142,26 @@ struct TenantItem: Decodable, Identifiable, Equatable {
     }
 
     var isTransferred: Bool { transferStatus == 1 }
-    var openTaskText: String { openBootFlag ? "有任务" : "无任务" }
+    // Web i18n tenants.task.active = 「进行中」
+    var openTaskText: String { openBootFlag ? "进行中" : "无任务" }
     var syncStatusText: String { apiSynced ? "已同步" : "未同步" }
     var multiRegionText: String { isMultiRegion ? "是" : "否" }
     var typeText: String {
         if !accountTypeName.isEmpty, accountTypeName != "未知" { return accountTypeName }
-        return hasChildren ? "简易多区域" : "未知"
+        // Web i18n tenants.type.fallback = 「普通多区号」
+        return hasChildren ? "普通多区号" : "未知"
     }
     var statusText: String { isActive ? "有效" : "失效" }
     var activeDaysText: String { activeDays.isEmpty ? "0" : activeDays }
     var costText: String { accountCost.isEmpty ? "—" : accountCost }
-    var defNameText: String { defName.isEmpty ? "—" : defName }
+    var defNameText: String { defName.isEmpty ? "" : defName }
+    /// Web：trial=violet / official=cyan / 其他=orange 软底徽章
+    var typeBadgeColor: Color {
+        let n = accountTypeName.lowercased()
+        if n.contains("trial") || accountTypeName.contains("试用") { return Color(hex: "b484e8") }
+        if n.contains("official") || accountTypeName.contains("官方") { return Color(hex: "00b6be") }
+        return AppTheme.orange
+    }
 
     private static func str(_ c: KeyedDecodingContainer<CodingKeys>, _ k: CodingKeys) -> String {
         if let s = try? c.decode(String.self, forKey: k) { return s }

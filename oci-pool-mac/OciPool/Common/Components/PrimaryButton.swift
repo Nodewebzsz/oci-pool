@@ -2,6 +2,9 @@ import SwiftUI
 
 enum AppButtonStyleKind {
     case primary, secondary, danger, plain
+    case cyan   // Web Button cyan 实心
+    case info   // Web Button info 实心（蓝）
+    case orange // Web Button orange 实心
 }
 
 struct AppButton: View {
@@ -46,16 +49,19 @@ struct AppButton: View {
     private var background: Color {
         switch kind {
         case .primary: return AppTheme.sidebarActive
-        case .danger: return Color(hex: "f85149")
-        case .secondary: return dark ? Color(hex: "2c3136") : Color(hex: "eef2f6")
+        case .danger: return AppTheme.danger
+        case .cyan: return Color(hex: "00b6be")
+        case .info: return AppTheme.info
+        case .orange: return AppTheme.orange
+        case .secondary: return dark ? Color(hex: "151c21") : Color(hex: "f1f4f6")
         case .plain: return Color.clear
         }
     }
 
     private var foreground: Color {
         switch kind {
-        case .primary, .danger: return .white
-        case .secondary: return dark ? Color.white.opacity(0.92) : Color(hex: "1e2f42")
+        case .primary, .danger, .cyan, .info, .orange: return .white
+        case .secondary: return dark ? Color(hex: "f6f9fb") : Color(hex: "0c1217")
         case .plain: return AppTheme.sidebarActive
         }
     }
