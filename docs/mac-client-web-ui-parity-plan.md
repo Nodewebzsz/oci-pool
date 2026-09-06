@@ -26,8 +26,8 @@
 | A6 | 租户·资源列表（子页） | page-tenant-resources.jsx | 复用 Instances 页（pendingInstancesFilter 预筛选） | ❓ 原生无独立子页（TenantRegionSubView 是「区域订阅」页）；如需一比一需新建，待确认 |
 | A7 | OCI 实例列表 | page-instances.jsx | Instances/InstancesView | ✅ 2026-09-06（标题 OCI 实例管理/表头 租户名·所属区域·主 IPv4/IPv6 已启用未启用/菜单 10 处文案/语义色 token/筛选 placeholder 与宽度/一键导出）。❓ accent 筛选条形态、租户区域下拉入页头待确认 |
 | A8 | OCI 开机管理 | page-grab.jsx | Boot/BootView | ✅ 2026-09-06（标题「预开列表」/zap 橙图标/页头按钮组（预开 primary+停止 orange+重置 danger+eye 钮）/筛选 placeholder/表头 15 列逐字（架构列移至成功后）/任务状态徽章 running+脉冲/执行中 accent/今日 cyan/失败 danger/架构 info chip/行单击详情/菜单文案/预开空白表单选租户/色板收敛）。❓ 确认弹窗 danger 样式+requireText（RESET/租户名）为共享 AppAlert 增强，待做；重置语义 Web 清零全部统计 vs 原生仅失败计数待确认 |
-| A9 | OCI 邮箱服务 | page-misc.jsx (MailPage) | Email/EmailView | ⬜ |
-| A10 | OCI 对象存储 | page-misc.jsx (ObjectPage) | Storage/StorageView | ⬜ |
+| A9 | OCI 邮箱服务 | page-misc.jsx (MailPage) | Email/EmailView | ✅ 2026-09-06（标题/动态副标题/cyan 图标/写邮件按钮/4 KPI 卡/发送记录表头 主题·发件人·收件数·状态·发送时间+状态徽章/空态/添加联系人文案）。❓ 三区同屏布局（左租户/右联系人/下记录）与 Web 差异保留（原生 Tab 切换）、启用弹层 SMTP 凭据面板待补 |
+| A10 | OCI 对象存储 | page-misc.jsx (ObjectPage) | Storage/StorageView | ✅ 2026-09-06（标题/4 KPI 卡/新建按钮/搜索 placeholder/桶行摘要/对象列表标题/选中桶 accent 左边条/危险色 token）。❓ 对象总数 KPI 暂无接口显示 —；预签名有效期输入与删除 requireText 待补 |
 | A11 | OCI AI 管理 | page-misc.jsx (AIPage) | AiModels/AiModelsView | ⬜ |
 | A12 | OCI 链路测试 | page-misc.jsx (LinkPage) | SpeedTest/SpeedTestView | ⬜ |
 | A13 | OCI 开机日志 | page-logs.jsx (LogsPage) | OpenLogs/OpenLogsView | ⬜（旧 teal 已清理；其余待审计） |

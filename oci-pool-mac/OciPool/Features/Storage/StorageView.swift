@@ -10,7 +10,7 @@ struct StorageView: View {
 
     var body: some View {
         PageScaffold(
-            title: "对象存储",
+            title: "OCI 对象存储",
             subtitle: "OCI Object Storage · 存储桶与对象管理",
             systemImage: "externaldrive",
             toolbar: { toolbar },
@@ -19,6 +19,11 @@ struct StorageView: View {
                     filterBar
                     if let err = model.errorText, !err.isEmpty {
                         errorBanner(err)
+                    }
+                    if model.selectedTenantId.isEmpty == false {
+                        kpiGrid
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
                     }
                     HStack(alignment: .top, spacing: 14) {
                         bucketPanel
@@ -92,9 +97,9 @@ struct StorageView: View {
             Button("重试") { Task { await model.reloadAll() } }
                 .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(8)
         .padding(.horizontal, 16)
         .padding(.top, 8)
@@ -108,7 +113,7 @@ struct StorageView: View {
                 title: "存储桶",
                 systemImage: "externaldrive.fill",
                 trailing: {
-                    AppButton(title: "创建", systemImage: "plus", kind: .primary) {
+                    AppButton(title: "新建", systemImage: "plus", kind: .primary) {
                         model.openCreateBucket()
                     }
                 }
@@ -116,7 +121,7 @@ struct StorageView: View {
 
             SearchField(
                 text: $model.bucketSearch,
-                placeholder: "搜索存储桶…",
+                placeholder: "搜索存储桶名...",
                 fillsWidth: true
             )
 
@@ -172,10 +177,12 @@ struct StorageView: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                         .lineLimit(1)
-                    if !b.createdText.isEmpty {
-                        Text(b.createdText)
-                            .font(.system(size: 11))
-                            .foregroundColor(AppTheme.sidebarText(dark))
+                    HStack(spacing: 6) {
+                        if !b.createdText.isEmpty {
+                            Text(b.createdText)
+                                .font(.system(size: 11))
+                                .foregroundColor(AppTheme.sidebarText(dark))
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -188,7 +195,7 @@ struct StorageView: View {
             Button(action: { model.deleteBucket(b) }) {
                 Image(systemName: "trash")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(Color(hex: "f85149"))
+                    .foregroundColor(AppTheme.danger)
                     .padding(6)
                     .background(Color(hex: "f85149").opacity(0.12))
                     .cornerRadius(6)
@@ -198,6 +205,14 @@ struct StorageView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 10)
         .background(active ? AppTheme.sidebarActive.opacity(0.12) : Color.clear)
+        .overlay(
+            // Web：选中桶 3px accent 左边条
+            Rectangle()
+                .fill(active ? AppTheme.sidebarActive : Color.clear)
+                .frame(width: 3)
+                .padding(.vertical, 6),
+            alignment: .leading
+        )
         .cornerRadius(6)
     }
 
@@ -262,9 +277,9 @@ struct StorageView: View {
 
     private var objectTitle: String {
         if let b = model.selectedBucket {
-            return "对象 · \(b.name)"
+            return "对象列表 / \(b.name)"
         }
-        return "对象"
+        return "对象列表"
     }
 
     private var objectHeader: some View {
@@ -321,7 +336,7 @@ struct StorageView: View {
                 .foregroundColor(danger ? Color(hex: "f85149") : AppTheme.sidebarActive)
                 .padding(6)
                 .background(
-                    (danger ? Color(hex: "f85149") : AppTheme.sidebarActive).opacity(0.12)
+                    (danger ? AppTheme.danger : AppTheme.sidebarActive).opacity(0.12)
                 )
                 .cornerRadius(6)
         }
@@ -396,6 +411,50 @@ struct StorageView: View {
             Spacer()
             trailing()
         }
+    }
+
+    // MARK: - KPI（对齐 Web obj.kpi.* 4 卡）
+
+    private var kpiGrid: some View {
+        let buckets = model.buckets
+        let publicCount = buckets.filter { $0.publicAccess != "NoPublicAccess" && !$0.publicAccess.isEmpty }.count
+        return HStack(spacing: 14) {
+            kpiCard(icon: "database", color: AppTheme.info,
+                    label: "存储桶数量", value: "\(buckets.count)")
+            kpiCard(icon: "package", color: Color(hex: "00b6be"),
+                    label: "对象总数", value: "—")
+            kpiCard(icon: "globe",
+                    color: publicCount > 0 ? AppTheme.orange : AppTheme.sidebarText(dark),
+                    label: "公开访问桶", value: "\(publicCount)")
+            kpiCard(icon: "hash", color: Color(hex: "b484e8"),
+                    label: "Namespace", value: model.selectedBucket?.namespace ?? "—")
+        }
+    }
+
+    private func kpiCard(icon: String, color: Color, label: String, value: String) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(color.opacity(0.18))
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(color)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(label)
+                    .font(.system(size: 11))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                Text(value)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 12).fill(AppTheme.sidebarBg(dark)))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.border(dark), lineWidth: 1))
     }
 
     private var loadingBox: some View {

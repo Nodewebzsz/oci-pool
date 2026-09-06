@@ -11,8 +11,8 @@ struct EmailView: View {
 
     var body: some View {
         PageScaffold(
-            title: "邮件管理",
-            subtitle: "OCI Email Delivery · 租户服务 / 收件人 / 发送记录",
+            title: "OCI 邮箱服务",
+            subtitle: emailSubtitle,
             systemImage: "envelope",
             toolbar: { toolbar },
             content: {
@@ -22,6 +22,9 @@ struct EmailView: View {
                             .padding(.horizontal, 16)
                             .padding(.top, 12)
                     }
+                    kpiGrid
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
                     mainSectionBar
                         .padding(.horizontal, 16)
                         .padding(.top, 12)
@@ -62,18 +65,55 @@ struct EmailView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
-            AppButton(title: "发送邮件", systemImage: "square.and.pencil", kind: .primary) {
+            AppButton(title: "写邮件", systemImage: "edit", kind: .primary) {
                 model.openCompose()
             }
-            AppButton(
-                title: "刷新",
-                systemImage: "arrow.clockwise",
-                kind: .secondary,
-                isLoading: model.isLoading || sectionBusy
-            ) {
-                Task { await model.reloadAll() }
-            }
         }
+    }
+
+    /// Web mail.subtitle：Email Delivery Service · N 个租户已启用 · N 位联系人 · N 条发送记录
+    private var emailSubtitle: String {
+        "Email Delivery Service · \(model.enabledTotal) 个租户已启用 · \(model.contactPage.totalElements) 位联系人 · \(model.recordPage.totalElements) 条发送记录"
+    }
+
+    // MARK: - KPI（对齐 Web mail.kpi.* 4 卡）
+
+    private var kpiGrid: some View {
+        HStack(spacing: 14) {
+            kpiCard(icon: "checkmark.circle", color: AppTheme.sidebarActive,
+                    label: "已启用邮件服务的租户", value: "\(model.enabledTotal)")
+            kpiCard(icon: "circle", color: AppTheme.sidebarText(dark),
+                    label: "未启用", value: "\(model.disabledTotal)")
+            kpiCard(icon: "person.2", color: AppTheme.info,
+                    label: "联系人总数", value: "\(model.contactPage.totalElements)")
+            kpiCard(icon: "paperplane.fill", color: Color(hex: "00b6be"),
+                    label: "本月已发送", value: "\(model.recordPage.totalElements)")
+        }
+    }
+
+    private func kpiCard(icon: String, color: Color, label: String, value: String) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(color.opacity(0.18))
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(color)
+            }
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundColor(AppTheme.sidebarText(dark))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .multilineTextAlignment(.leading)
+            Text(value)
+                .font(.system(size: 22, weight: .bold))
+                .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 12).fill(AppTheme.sidebarBg(dark)))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.border(dark), lineWidth: 1))
     }
 
     private var sectionBusy: Bool {
@@ -190,7 +230,7 @@ struct EmailView: View {
                         }
                     case .contacts:
                         HStack(spacing: 8) {
-                            AppButton(title: "添加", systemImage: "plus", kind: .primary) {
+                            AppButton(title: "添加联系人", systemImage: "plus", kind: .primary) {
                                 model.openAddContact()
                             }
                             AppButton(
@@ -500,21 +540,16 @@ struct EmailView: View {
             } else if model.records.isEmpty {
                 EmptyStateView(
                     icon: "envelope",
-                    title: "暂无发送记录",
-                    subtitle: "发送邮件后将在此显示",
-                    actionTitle: "发送邮件",
-                    action: { model.openCompose() }
+                    title: "暂无发送记录"
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 DataList {
                     DataListColumnHeader(title: "主题", width: nil)
-                    DataListColumnHeader(title: "时间", width: 150)
-                    DataListColumnHeader(title: "租户", width: 120)
-                    DataListColumnHeader(title: "收件", width: 56)
-                    DataListColumnHeader(title: "成功", width: 56)
-                    DataListColumnHeader(title: "失败", width: 56)
-                    DataListColumnHeader(title: "操作", width: 120, alignment: .trailing)
+                    DataListColumnHeader(title: "发件人", width: 260)
+                    DataListColumnHeader(title: "收件数", width: 80, alignment: .center)
+                    DataListColumnHeader(title: "状态", width: 100, alignment: .center)
+                    DataListColumnHeader(title: "发送时间", width: 160)
                 } content: {
                     ForEach(model.records) { r in
                         DataListRow(action: { model.openRecordDetail(r) }) {
@@ -533,56 +568,59 @@ struct EmailView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                     .lineLimit(1)
-                if !r.senderEmail.isEmpty {
-                    Text(r.senderEmail)
-                        .font(.system(size: 11))
-                        .foregroundColor(AppTheme.sidebarText(dark))
-                        .lineLimit(1)
-                }
+                Text(r.tenantText)
+                    .font(.system(size: 11))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Text(r.createTime.isEmpty ? "—" : r.createTime)
-                .font(.system(size: 12))
+            // Web：发件人列（mono）
+            Text(r.senderEmail)
+                .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(AppTheme.sidebarText(dark))
-                .frame(width: 150, alignment: .leading)
+                .frame(width: 260, alignment: .leading)
                 .lineLimit(1)
 
-            Text(r.tenantText)
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarText(dark))
-                .frame(width: 120, alignment: .leading)
-                .lineLimit(1)
-
+            // Web：收件数（居中）
             Text("\(r.receiveTotal)")
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
-                .frame(width: 56, alignment: .leading)
+                .frame(width: 80, alignment: .center)
 
-            Text("\(r.receiveSuccessTotal)")
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                .foregroundColor(StatusTone.success.color(dark: dark))
-                .frame(width: 56, alignment: .leading)
+            // Web：状态徽章 sent=accent / failed=danger / pending=info
+            recordStatusBadge(r)
+                .frame(width: 100, alignment: .center)
 
-            Text("\(r.receiveFailTotal)")
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                .foregroundColor(
-                    r.receiveFailTotal > 0
-                        ? StatusTone.danger.color(dark: dark)
-                        : AppTheme.sidebarText(dark)
-                )
-                .frame(width: 56, alignment: .leading)
+            Text(r.createTime.isEmpty ? "—" : r.createTime)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(AppTheme.sidebarText(dark))
+                .frame(width: 160, alignment: .leading)
+                .lineLimit(1)
 
-            HStack(spacing: 6) {
-                AppButton(title: "详情", kind: .secondary) {
-                    model.openRecordDetail(r)
-                }
-                AppButton(title: "删除", systemImage: "trash", kind: .danger) {
-                    model.deleteRecord(r)
-                }
-            }
-            .frame(width: 120, alignment: .trailing)
         }
     }
+
+    /// Web 状态徽章：sent=accent / failed=danger / pending=info（含图标）
+    @ViewBuilder
+    private func recordStatusBadge(_ r: EmailBodyItem) -> some View {
+        let status = r.statusText
+        let (icon, text, color): (String, String, Color) = {
+            if status.contains("fail") || status.contains("失败") {
+                return ("xmark.circle", "发送失败", AppTheme.danger)
+            }
+            if status.contains("pend") || status.contains("等待") {
+                return ("clock", "待发送", AppTheme.info)
+            }
+            return ("checkmark.circle", "已发送", AppTheme.sidebarActive)
+        }()
+        HStack(spacing: 4) {
+            Image(systemName: icon).font(.system(size: 10))
+            Text(text).font(.system(size: 11, weight: .medium))
+        }
+        .foregroundColor(color)
+    }
+
+    // MARK: - Pagination
 
     // MARK: - Pagination
 
