@@ -21,10 +21,10 @@
 | A1 | 系统资源监控 | page-monitor.jsx | Dashboard/DashboardView | ✅ 已完成（含页头 Lucide 图标） |
 | A2 | OCI 区域管理 | page-regions.jsx | Regions/RegionsView | ✅ 2026-09-06（标题/图标色/KPI 横排/表头/徽章/筛选/排序/配色已对齐并运行时核验） |
 | A3 | OCI 租户管理 | page-tenants.jsx | Tenants/TenantsView | ✅ 2026-09-06（页头按钮组/彩色实心/表头列名/实例操作橙钮/单元格样式/分页/菜单文案已对齐并运行时核验） |
-| A4 | 租户详情（子页） | page-tenant-detail.jsx | Tenants/TenantDetailView | ⬜ |
-| A5 | 租户·查看开机（子页） | page-tenant-grab.jsx | Tenants/TenantGrabView | ⬜ |
-| A6 | 租户·资源列表（子页） | page-tenant-resources.jsx | Tenants/TenantRegionSubView | ⬜ |
-| A7 | OCI 实例列表 | page-instances.jsx | Instances/InstancesView | ⬜ |
+| A4 | 租户详情（子页） | page-tenant-detail.jsx | Tenants/TenantDetailView | ✅ 2026-09-06（页头 diamond+租户名/副标题/KPI 语义色/列头 实例同步/未同步灰态/危险色 token）。❓ KPI 数据映射、RegionSwitcher、面包屑、7 按钮组待确认 |
+| A5 | 租户·查看开机（子页） | page-tenant-grab.jsx | 复用 Boot/BootView（带 pendingBootFilter 预筛选） | ❓ 原生无独立子页，复用全局开机管理页；如需一比一（面包屑+预开列表 15 列）需新建页面，待确认 |
+| A6 | 租户·资源列表（子页） | page-tenant-resources.jsx | 复用 Instances 页（pendingInstancesFilter 预筛选） | ❓ 原生无独立子页（TenantRegionSubView 是「区域订阅」页）；如需一比一需新建，待确认 |
+| A7 | OCI 实例列表 | page-instances.jsx | Instances/InstancesView | ✅ 2026-09-06（标题 OCI 实例管理/表头 租户名·所属区域·主 IPv4/IPv6 已启用未启用/菜单 10 处文案/语义色 token/筛选 placeholder 与宽度/一键导出）。❓ accent 筛选条形态、租户区域下拉入页头待确认 |
 | A8 | OCI 开机管理 | page-grab.jsx | Boot/BootView | ⬜ |
 | A9 | OCI 邮箱服务 | page-misc.jsx (MailPage) | Email/EmailView | ⬜ |
 | A10 | OCI 对象存储 | page-misc.jsx (ObjectPage) | Storage/StorageView | ⬜ |
@@ -88,3 +88,4 @@
 - 2026-09-06：A2/A3 完成审计→修复→构建→运行时核验（详见上方标记）。
   - A3 修复要点：页头按钮文案全称+cyan/info/orange 彩色实心（AppButton 扩展 kind）、眼睛图标钮、移除刷新/副标题、表头列名对齐、「实例操作」橙底 zap「创建实例」、单元格样式（费用橙+$/存活天数 info 徽章/进行中+脉冲/类型软底徽章/状态 pill）、分页（每页显示/上一页下一页文字/共 n 条 page/totalPages/跳至+页/sizeOptions 10,20,50,100）、菜单文案（添加开机/账号花费/账号更新/删除租户）。
   - 状态徽章 StatusTone 全局收敛主题色（success=accent/warning=orange/danger=danger/info=info）。
+- 2026-09-06（续 2）：A4/A7 完成「审计→修复→构建」，A5/A6 按结构性差异标记 ❓ 待确认（原生复用全局页+预筛选 vs Web 独立子页）。

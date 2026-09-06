@@ -54,12 +54,10 @@ struct TenantDetailView: View {
 
     var body: some View {
         PageScaffold(
-            title: "租户详情",
-            subtitle: parent.map {
-                let region = $0.region.isEmpty ? "—" : $0.region
-                return "\($0.displayName) · \(region)"
-            },
-            systemImage: "key.fill",
+            // Web：diamond 图标 accent 底，标题为租户名
+            title: parent?.displayName.isEmpty == false ? (parent?.displayName ?? "租户详情") : "租户详情",
+            subtitle: subtitleText,
+            systemImage: "diamond.fill",
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
@@ -76,6 +74,14 @@ struct TenantDetailView: View {
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         .appLoading(model.detailLoading && !model.detailRows.isEmpty)
+    }
+
+    /// Web 副标题：多区域账号/单区域账号 · 账号类型 · 已运行 N 天
+    private var subtitleText: String? {
+        guard let p = parent else { return nil }
+        let multi = p.isMultiRegion ? "多区域账号" : "单区域账号"
+        let type = p.accountTypeName.isEmpty ? "未知" : p.accountTypeName
+        return "\(multi) · \(type) · 已运行 \(p.activeDaysText) 天"
     }
 
     // MARK: - Toolbar
@@ -112,29 +118,30 @@ struct TenantDetailView: View {
 
     private var summaryBar: some View {
         HStack(spacing: 10) {
+            // Web MiniMetric 语义色：实例总数(cyan)/运行中(accent)/开机任务(info)/本月花费(orange)
             summaryChip(
                 icon: "globe",
                 title: "区域",
                 value: "\(model.detailRows.count)",
-                accent: AppTheme.sidebarActive
+                accent: Color(hex: "00b6be")
             )
             summaryChip(
                 icon: "arrow.2.circlepath",
                 title: "已同步",
                 value: "\(syncedCount)",
-                accent: Color(hex: "3fb950")
+                accent: AppTheme.sidebarActive
             )
             summaryChip(
                 icon: "play.circle",
                 title: "开机任务",
                 value: "\(bootTaskCount)",
-                accent: Color(hex: "d29922")
+                accent: AppTheme.info
             )
             summaryChip(
                 icon: "house",
                 title: "主区域",
                 value: "\(homeCount)",
-                accent: Color(hex: "a371f7")
+                accent: AppTheme.orange
             )
             Spacer(minLength: 0)
             Text("行内快捷：同步 · 开机 · 实例 · 更多")
@@ -185,9 +192,9 @@ struct TenantDetailView: View {
                 .buttonStyle(PlainButtonStyle())
                 .font(.system(size: 12, weight: .semibold))
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(10)
         .padding(.horizontal, 16)
         .padding(.top, 4)
@@ -283,12 +290,12 @@ struct TenantDetailView: View {
     ) -> some View {
         HStack(spacing: 0) {
             colHeader("#", wIndex)
-            colHeader("名称", wName)
-            colHeader("自定义名", wDef)
+            colHeader("租户名", wName)
+            colHeader("名称", wDef)
             colHeader("开机任务", task)
             colHeader("区域", region)
             colHeader("主区域", home)
-            colHeader("同步", sync)
+            colHeader("实例同步", sync)
             colHeader("创建时间", time)
             colHeader("操作", action, align: .center)
         }
@@ -321,7 +328,8 @@ struct TenantDetailView: View {
                 .frame(width: home, alignment: .leading)
             StatusBadge(
                 text: item.syncStatusText,
-                tone: item.apiSynced ? .success : .danger
+                // Web：已同步=accent-soft，未同步=bg-3 灰（非红色）
+                tone: item.apiSynced ? .success : .neutral
             )
             .frame(width: sync, alignment: .leading)
             cell(item.createdAt.isEmpty ? "—" : item.createdAt, time, muted: true)

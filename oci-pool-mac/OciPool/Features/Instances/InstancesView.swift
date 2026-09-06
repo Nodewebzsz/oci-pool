@@ -64,9 +64,9 @@ struct InstancesView: View {
 
     private var listPage: some View {
         PageScaffold(
-            title: "实例列表",
+            title: "OCI 实例管理",
             subtitle: filterSubtitle,
-            systemImage: "server.rack",
+            systemImage: "server",
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
@@ -99,7 +99,7 @@ struct InstancesView: View {
     private var toolbar: some View {
         HStack(spacing: 8) {
             AppButton(
-                title: model.namesHidden ? "显示名称" : "隐藏名称",
+                title: model.namesHidden ? "显示完整租户名" : "隐藏租户名",
                 systemImage: model.namesHidden ? "eye" : "eye.slash",
                 kind: .secondary
             ) {
@@ -107,7 +107,7 @@ struct InstancesView: View {
                     model.namesHidden.toggle()
                 }
             }
-            AppButton(title: "导出", systemImage: "square.and.arrow.down", kind: .secondary) {
+            AppButton(title: "一键导出", systemImage: "square.and.arrow.down", kind: .orange) {
                 model.exportInstances()
             }
             AppButton(
@@ -133,8 +133,8 @@ struct InstancesView: View {
                             get: { model.selectedParentId.isEmpty ? nil : model.selectedParentId },
                             set: { model.onParentChanged($0) }
                         ),
-                        placeholder: "选择租户…",
-                        width: 200,
+                        placeholder: "请选择租户",
+                        width: 160,
                         allowClear: true,
                         searchable: true
                     )
@@ -144,8 +144,8 @@ struct InstancesView: View {
                             get: { model.selectedRegionId.isEmpty ? nil : model.selectedRegionId },
                             set: { model.onRegionChanged($0) }
                         ),
-                        placeholder: model.selectedParentId.isEmpty ? "先选租户" : "选择区域…",
-                        width: 200,
+                        placeholder: model.selectedParentId.isEmpty ? "请选择区域" : "请选择区域",
+                        width: 160,
                         enabled: !model.selectedParentId.isEmpty,
                         allowClear: true,
                         searchable: true
@@ -155,7 +155,7 @@ struct InstancesView: View {
             trailing: {
                 HStack(spacing: 8) {
                     if model.hasActiveFilter {
-                        AppButton(title: "重置", systemImage: "xmark", kind: .secondary) {
+                        AppButton(title: "清除筛选", systemImage: "xmark", kind: .secondary) {
                             model.resetFilter()
                         }
                     }
@@ -190,10 +190,10 @@ struct InstancesView: View {
     private var summaryBar: some View {
         HStack(spacing: 10) {
             summaryChip(icon: "server.rack", title: "本页", value: "\(model.rows.count)", accent: AppTheme.sidebarActive)
-            summaryChip(icon: "play.circle.fill", title: "运行中", value: "\(model.runningCount)", accent: Color(hex: "3fb950"))
-            summaryChip(icon: "stop.circle.fill", title: "已停止", value: "\(model.stoppedCount)", accent: Color(hex: "f85149"))
+            summaryChip(icon: "play.circle.fill", title: "运行中", value: "\(model.runningCount)", accent: AppTheme.sidebarActive)
+            summaryChip(icon: "stop.circle.fill", title: "已停止", value: "\(model.stoppedCount)", accent: AppTheme.danger)
             if model.otherStateCount > 0 {
-                summaryChip(icon: "ellipsis.circle", title: "其他", value: "\(model.otherStateCount)", accent: Color(hex: "d29922"))
+                summaryChip(icon: "ellipsis.circle", title: "其他", value: "\(model.otherStateCount)", accent: AppTheme.orange)
             }
             Spacer(minLength: 0)
             Text("快捷：启停 · 复制IP · SSH · 更多")
@@ -244,9 +244,9 @@ struct InstancesView: View {
                 .buttonStyle(PlainButtonStyle())
                 .font(.system(size: 12, weight: .semibold))
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(10)
         .padding(.horizontal, 16)
         .padding(.top, 4)
@@ -260,7 +260,7 @@ struct InstancesView: View {
             VStack(spacing: 10) {
                 Spacer()
                 ProgressView()
-                Text("加载实例…")
+                Text("正在加载实例数据…")
                     .font(.system(size: 12))
                     .foregroundColor(AppTheme.sidebarText(dark))
                 Spacer()
@@ -328,15 +328,15 @@ struct InstancesView: View {
         HStack(spacing: 0) {
             HStack(spacing: 0) {
                 colHeader("#", wIndex)
-                colHeader("租户", wTenant)
-                colHeader("区域", wRegion)
+                colHeader("租户名", wTenant)
+                colHeader("所属区域", wRegion)
                 colHeader("实例名称", wName)
                 colHeader("CPU/MEM", wCpu)
                 colHeader("架构", wArch)
             }
             HStack(spacing: 0) {
                 colHeader("磁盘/VPU", wVol)
-                colHeader("公网 IPv4", wIp)
+                colHeader("主 IPv4", wIp)
                 colHeader("IPv6", wIpv6, align: .center)
                 colHeader("创建时间", wTime)
                 colHeader("操作", wAction, align: .center)
@@ -513,18 +513,18 @@ struct InstancesView: View {
         Group {
             if item.hasIpv6 {
                 Button(action: { model.copyText(item.ipv6Addresses, label: "IPv6") }) {
-                    Text("已开")
+                    Text("已启用")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(Color(hex: "3fb950"))
+                        .foregroundColor(AppTheme.sidebarActive)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 2)
-                        .background(Capsule().fill(Color(hex: "3fb950").opacity(0.14)))
+                        .background(Capsule().fill(AppTheme.sidebarActive.opacity(0.14)))
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(PlainButtonStyle())
                 .help("点击复制 IPv6：\(item.ipv6Addresses)")
             } else {
-                Text("无")
+                Text("未启用")
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.sidebarText(dark))
             }
@@ -547,7 +547,7 @@ struct InstancesView: View {
             quickIcon(systemImage: "doc.on.doc", help: "复制 IPv4", accent: false) {
                 model.copyText(item.publicIps, label: "IPv4")
             }
-            quickIcon(systemImage: "terminal", help: "SSH 连接", accent: false) {
+            quickIcon(systemImage: "terminal", help: "终端连接", accent: false) {
                 model.openSSH(item)
             }
             InstanceActionMoreButton(dark: dark, item: item, model: model)
@@ -616,20 +616,20 @@ enum InstanceActionPanel {
 
         var items: [InstanceActionItem] = []
         if row.isStopped {
-            items.append(make("start", "启动", "play.fill") { model.confirmStart(row) })
+            items.append(make("start", "启动实例", "play.fill") { model.confirmStart(row) })
         } else if row.isRunning {
-            items.append(make("stop", "停止", "stop.fill") { model.confirmStop(row) })
+            items.append(make("stop", "停止实例", "stop.fill") { model.confirmStop(row) })
         }
         items.append(contentsOf: [
             make("remark", "修改备注", "note.text") { model.openUpdateRemark(row) },
-            make("name", "修改名称", "tag") { model.openUpdateName(row) },
+            make("name", "编辑名称", "tag") { model.openUpdateName(row) },
             make("cfg", "修改配置", "cpu") { model.openUpdateConfig(row) },
-            make("boot", "扩容引导卷", "externaldrive") { model.openUpdateBoot(row) },
-            make("vpu", "修改 VPU", "slider.horizontal.3") { model.openUpdateVpu(row) },
+            make("boot", "调整磁盘", "externaldrive") { model.openUpdateBoot(row) },
+            make("vpu", "调整 VPU", "slider.horizontal.3") { model.openUpdateVpu(row) },
             make("copy4", "复制 IPv4", "doc.on.doc") {
                 model.copyText(row.publicIps, label: "IPv4")
             },
-            make("chgip", "更换 IP", "arrow.triangle.2.circlepath") {
+            make("chgip", "切换IPv4", "arrow.triangle.2.circlepath") {
                 model.openChangeIp(row)
             }
         ])
@@ -651,14 +651,14 @@ enum InstanceActionPanel {
             })
         }
         items.append(contentsOf: [
-            make("ssh", "SSH 连接", "terminal") { model.openSSH(row) },
-            make("console", "控制台", "tv") { model.openConsole(row) },
+            make("ssh", "终端连接", "terminal") { model.openSSH(row) },
+            make("console", "控制终端", "tv") { model.openConsole(row) },
             make("vnic", "网络管理", "network") { model.openVnic(row) },
-            make("dd", "系统重装", "arrow.counterclockwise") { model.openOsReset(row) },
+            make("dd", "系统重置", "arrow.counterclockwise") { model.openOsReset(row) },
             make("term", "终止实例", "xmark.octagon", danger: true) {
                 model.openTerminate(row)
             },
-            make("del", "删除本地记录", "trash", danger: true) {
+            make("del", "删除记录", "trash", danger: true) {
                 model.confirmDeleteRecord(row)
             }
         ])
@@ -888,7 +888,7 @@ struct InstanceActionMenuContent: View {
             }
             .foregroundColor(
                 act.isDanger
-                    ? Color(hex: "f85149")
+                    ? AppTheme.danger
                     : (dark ? Color.white.opacity(0.92) : Color.primary)
             )
             .padding(.horizontal, 10)
@@ -903,7 +903,7 @@ struct InstanceActionMenuContent: View {
                     .stroke(
                         hovered
                             ? (act.isDanger
-                               ? Color(hex: "f85149").opacity(0.45)
+                               ? AppTheme.danger.opacity(0.45)
                                : AppTheme.sidebarActive.opacity(0.45))
                             : AppTheme.border(dark).opacity(0.4),
                         lineWidth: 1
@@ -922,13 +922,13 @@ struct InstanceActionMenuContent: View {
     private func buttonFill(act: InstanceActionItem, hovered: Bool) -> Color {
         if hovered {
             if act.isDanger {
-                return Color(hex: "f85149").opacity(dark ? 0.22 : 0.16)
+                return AppTheme.danger.opacity(dark ? 0.22 : 0.16)
             }
             return AppTheme.sidebarActive.opacity(dark ? 0.22 : 0.14)
         }
         // 默认轻底，悬停时明显高亮
         if act.isDanger {
-            return Color(hex: "f85149").opacity(0.06)
+            return AppTheme.danger.opacity(0.06)
         }
         return dark ? Color.white.opacity(0.04) : Color.black.opacity(0.03)
     }
