@@ -25,12 +25,13 @@ final class ProxyConfigViewModel: ObservableObject {
 
     let typeOptions = [
         SelectOption(id: "HTTP", title: "HTTP"),
-        SelectOption(id: "HTTPS", title: "HTTPS")
+        SelectOption(id: "HTTPS", title: "HTTPS"),
+        SelectOption(id: "SOCKS5", title: "SOCKS5")
     ]
 
     let statusOptions = [
-        SelectOption(id: "1", title: "启用"),
-        SelectOption(id: "0", title: "停用")
+        SelectOption(id: "1", title: "可用"),
+        SelectOption(id: "0", title: "不可用")
     ]
 
     let forceOptions = [

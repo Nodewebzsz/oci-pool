@@ -14,8 +14,8 @@ struct SecuritySettingsView: View {
 
     var body: some View {
         PageScaffold(
-            title: "安全管理",
-            subtitle: "账号安全 · OAuth · MFA · Turnstile · 频道通知",
+            title: "系统设置",
+            subtitle: "账号安全 · OAuth · MFA · 验证码 · 频道通知",
             systemImage: "slider.horizontal.3",
             toolbar: { toolbar },
             content: {
@@ -243,7 +243,7 @@ struct SecuritySettingsView: View {
 
     private var mfaCard: some View {
         ModuleSettingsCard(
-            title: "MFA 验证",
+            title: "MFA 多因子认证",
             subtitle: "TOTP 多因子认证",
             systemImage: "iphone",
             accent: Color(hex: "1abc9c"),
@@ -356,7 +356,7 @@ struct SecuritySettingsView: View {
 
     private var turnstileCard: some View {
         ModuleSettingsCard(
-            title: "Cloudflare Turnstile",
+            title: "Cloudflare Turnstile 验证码",
             subtitle: "登录人机验证",
             systemImage: "shield.lefthalf.fill",
             accent: Color(hex: "f0881a"),
@@ -419,15 +419,15 @@ struct SecuritySettingsView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
+                .foregroundColor(AppTheme.danger)
             Text(text).font(.system(size: 12))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(8)
     }
 }

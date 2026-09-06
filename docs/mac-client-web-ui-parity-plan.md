@@ -52,8 +52,8 @@
 |---|---|---|---|---|
 | D1 | IP 质量管理 | page-misc.jsx (SysIpQualityPage) | IpQuality/IpQualityView | ⬜ |
 | D2 | 系统日志 | page-logs.jsx (SysLogsPage) | SystemLogs/SystemLogsView | ✅ 2026-09-06（副标题/terminal 图标/终端卡去 4fc3f7/标题「控制台输出」/空态/footer/清空确认文案/maxLines 300） |
-| D3 | 安全管理 | page-misc.jsx (SysSettingPage) | SecuritySettings/SecuritySettingsView | ⬜ |
-| D4 | 代理配置 | page-proxy.jsx (SysVpnProxyPage) | ProxyConfig/ProxyConfigView | ⬜ |
+| D3 | 安全管理 | page-misc.jsx (SysSettingPage) | SecuritySettings/SecuritySettingsView | 🔄 一轮完成（标题「系统设置」/副标题/MFA 卡标题/Turnstile 卡全称/危险色）。❓ 字段 placeholder/label 逐字、保存确认弹窗、卡片自适应高待做 |
+| D4 | 代理配置 | page-proxy.jsx (SysVpnProxyPage) | ProxyConfig/ProxyConfigView | ✅ 2026-09-06（副标题/测试全部/列头 自定义名称·URL·连接状态/类型软底徽章/状态 已连接·不可用/按钮 info 分色/弹窗标题与文案/SOCKS5）。❓ 租户搜索分页为原生增强待确认 |
 
 ## 批次 E · 我的工具（5 页）
 

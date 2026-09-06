@@ -13,7 +13,7 @@ struct ProxyConfigView: View {
     var body: some View {
         PageScaffold(
             title: "代理配置",
-            subtitle: "HTTP/HTTPS 代理池 · 强制代理 · 按租户绑定或全局共享",
+            subtitle: "Proxy Configuration · 全局代理池 · 各租户可绑定不同出口",
             systemImage: "arrow.left.arrow.right",
             toolbar: { toolbar },
             content: {
@@ -139,13 +139,13 @@ struct ProxyConfigView: View {
                     Image(systemName: "shield.fill")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(item.isForce
-                                         ? Color(hex: "e67e22")
+                                         ? AppTheme.orange
                                          : AppTheme.sidebarActive)
                         .frame(width: 28, height: 28)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
                                 .fill((item.isForce
-                                       ? Color(hex: "e67e22")
+                                       ? AppTheme.orange
                                        : AppTheme.sidebarActive).opacity(0.12))
                         )
                 }
@@ -166,11 +166,11 @@ struct ProxyConfigView: View {
                 Button(action: { model.delete(item) }) {
                     Image(systemName: "trash")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(Color(hex: "f85149"))
+                        .foregroundColor(AppTheme.danger)
                         .frame(width: 28, height: 28)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
-                                .fill(Color(hex: "f85149").opacity(0.12))
+                                .fill(AppTheme.danger.opacity(0.12))
                         )
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -201,7 +201,7 @@ struct ProxyConfigView: View {
             .background(
                 RoundedRectangle(cornerRadius: 6)
                     .fill((item.isForce
-                           ? Color(hex: "e67e22")
+                           ? AppTheme.orange
                            : AppTheme.sidebarActive).opacity(0.12))
             )
             .frame(width: 72, alignment: .leading)
@@ -254,15 +254,15 @@ struct ProxyConfigView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
+                .foregroundColor(AppTheme.danger)
             Text(text).font(.system(size: 12))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(8)
     }
 }
