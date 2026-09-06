@@ -165,7 +165,7 @@ struct SpeedTestView: View {
                 Image(systemName: "medal.fill")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(SpeedTestTheme.success)
-                Text("延迟 Top 5（< 150ms）")
+                Text("Top 5 最优线路")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
                 Spacer(minLength: 0)
@@ -178,33 +178,10 @@ struct SpeedTestView: View {
                     .cornerRadius(8)
             }
 
-            // 用自适应流式布局，避免单行 Spacer 撑出空洞
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 120, maximum: 220), spacing: 8)],
-                alignment: .leading,
-                spacing: 8
-            ) {
-                ForEach(Array(model.top5.enumerated()), id: \.element.id) { index, item in
-                    HStack(spacing: 6) {
-                        Text("#\(index + 1)")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(SpeedTestTheme.success.opacity(0.85))
-                        Text(item.name)
-                            .font(.system(size: 12, weight: .semibold))
-                            .lineLimit(1)
-                        Text("\(item.ms)ms")
-                            .font(Font.system(size: 12, weight: .bold).monospacedDigit())
-                    }
-                    .foregroundColor(SpeedTestTheme.success)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(SpeedTestTheme.success.opacity(0.08))
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(SpeedTestTheme.success.opacity(0.45), lineWidth: 1)
-                    )
+            // Web：5 列奖牌卡（🥇🥈🥉4️⃣5️⃣ + 名称 + code + ms），第 1 名 accent-soft 高亮
+            HStack(spacing: 10) {
+                ForEach(Array(model.top5.enumerated().prefix(5)), id: \.element.id) { index, item in
+                    top5Card(index: index, item: item)
                 }
             }
         }
@@ -215,6 +192,39 @@ struct SpeedTestView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(AppTheme.border(dark).opacity(0.7), lineWidth: 1)
+        )
+    }
+
+    private func top5Card(index: Int, item: SpeedRankItem) -> some View {
+        let medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
+        let medal = medals[min(index, medals.count - 1)]
+        let tone = SpeedTestTheme.toneColor(SpeedLatencyTone.from(ms: item.ms), dark: dark)
+        let isFirst = index == 0
+        return VStack(spacing: 6) {
+            Text(medal).font(.system(size: 18))
+            Text(item.name)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                .lineLimit(1)
+            Text("\(item.ms) ms")
+                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                .foregroundColor(tone)
+            Text(item.id)
+                .font(.system(size: 9.5, design: .monospaced))
+                .foregroundColor(AppTheme.sidebarText(dark))
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isFirst ? AppTheme.sidebarActive.opacity(0.14) : AppTheme.sidebarBg(dark))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(isFirst
+                        ? AppTheme.sidebarActive.opacity(0.55)
+                        : AppTheme.border(dark).opacity(0.6), lineWidth: 1)
         )
     }
 
