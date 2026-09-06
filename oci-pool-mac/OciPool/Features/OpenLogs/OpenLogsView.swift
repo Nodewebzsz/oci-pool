@@ -13,8 +13,8 @@ struct OpenLogsView: View {
     var body: some View {
         PageScaffold(
             title: "开机日志",
-            subtitle: "OCI 抢机实时日志 · 历史 + SSE 尾随",
-            systemImage: "doc.text",
+            subtitle: "实时抢机日志流",
+            systemImage: "terminal",
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
@@ -40,19 +40,20 @@ struct OpenLogsView: View {
     private var toolbar: some View {
         HStack(spacing: 8) {
             connectionBadge
+            // Web logs.action.pause/resume：暂停时断开 SSE 并切徽章
+            AppButton(
+                title: model.paused ? "恢复滚动" : "暂停滚动",
+                systemImage: model.paused ? "play" : "pause",
+                kind: .secondary
+            ) {
+                model.paused.toggle()
+            }
+            // Web logs.action.download：导出日志文件
+            AppButton(title: "下载日志", systemImage: "arrow.down", kind: .secondary) {
+                model.exportLogs()
+            }
             AppButton(title: "清空", systemImage: "trash", kind: .secondary) {
                 model.clearLogs()
-            }
-            AppButton(title: "重连", systemImage: "bolt.horizontal.circle", kind: .secondary) {
-                model.reconnectNow()
-            }
-            AppButton(
-                title: "刷新",
-                systemImage: "arrow.clockwise",
-                kind: .secondary,
-                isLoading: model.isLoadingHistory
-            ) {
-                model.reloadHistory()
             }
         }
     }
@@ -94,24 +95,24 @@ struct OpenLogsView: View {
         .background(Color.black)
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(Color(hex: "00ff00").opacity(0.45), lineWidth: 1)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
         )
         .cornerRadius(6)
-        .shadow(color: Color(hex: "00ff00").opacity(0.12), radius: 8, x: 0, y: 2)
+        .shadow(color: Color.black.opacity(dark ? 0.35 : 0.12), radius: 8, x: 0, y: 2)
     }
 
     private var terminalHeader: some View {
         HStack(spacing: 10) {
             Image(systemName: "desktopcomputer")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Color(hex: "33ff66"))
+                .foregroundColor(AppTheme.sidebarActive)
             Text("OCI 开机日志")
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                .foregroundColor(Color(hex: "33ff66"))
+                .foregroundColor(AppTheme.sidebarActive)
             // Blinking cursor affordance
             Text("▌")
                 .font(.system(size: 12, design: .monospaced))
-                .foregroundColor(Color(hex: "33ff66").opacity(0.7))
+                .foregroundColor(AppTheme.sidebarActive.opacity(0.7))
             Spacer()
             HStack(spacing: 6) {
                 Circle()
@@ -128,7 +129,7 @@ struct OpenLogsView: View {
         .overlay(
             Rectangle()
                 .frame(height: 1)
-                .foregroundColor(Color(hex: "00ff00").opacity(0.25)),
+                .foregroundColor(AppTheme.border(dark).opacity(0.5)),
             alignment: .bottom
         )
     }
@@ -138,7 +139,7 @@ struct OpenLogsView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     if model.entries.isEmpty && !model.isLoadingHistory {
-                        Text("// 暂无日志 — 等待抢机任务输出…")
+                        Text("没有匹配的日志")
                             .font(.system(size: 12, design: .monospaced))
                             .foregroundColor(Color.white.opacity(0.35))
                             .padding(.vertical, 8)
@@ -186,7 +187,7 @@ struct OpenLogsView: View {
             HStack(spacing: 6) {
                 Image(systemName: "list.bullet")
                     .font(.system(size: 10))
-                Text("\(model.entries.count) log entries")
+                Text("共 \(model.entries.count) 条")
                     .font(.system(size: 11, design: .monospaced))
             }
             .foregroundColor(Color.white.opacity(0.55))
@@ -201,7 +202,7 @@ struct OpenLogsView: View {
             .toggleStyle(CheckboxToggleStyle())
             .foregroundColor(Color.white.opacity(0.7))
 
-            Text(model.connection == .connected ? "实时更新中" : "等待连接")
+            Text(model.paused ? "已暂停接收" : "实时接收中")
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(Color.white.opacity(0.45))
         }
@@ -211,7 +212,7 @@ struct OpenLogsView: View {
         .overlay(
             Rectangle()
                 .frame(height: 1)
-                .foregroundColor(Color(hex: "00ff00").opacity(0.2)),
+                .foregroundColor(AppTheme.sidebarActive.opacity(0.15)),
             alignment: .top
         )
     }
@@ -250,7 +251,7 @@ private struct CheckboxToggleStyle: ToggleStyle {
             HStack(spacing: 6) {
                 Image(systemName: configuration.isOn ? "checkmark.square.fill" : "square")
                     .font(.system(size: 12))
-                    .foregroundColor(configuration.isOn ? Color(hex: "33ff66") : Color.white.opacity(0.45))
+                    .foregroundColor(configuration.isOn ? AppTheme.sidebarActive : Color.white.opacity(0.45))
                 configuration.label
             }
         }

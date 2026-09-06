@@ -13,6 +13,19 @@ final class OpenLogsViewModel: ObservableObject {
     @Published private(set) var isLoadingHistory = false
     @Published private(set) var errorText: String?
     @Published var autoScroll = true
+    /// Web logs.action.pause：暂停时断开 SSE，恢复时重连
+    @Published var paused = false {
+        didSet {
+            if paused != oldValue {
+                if paused {
+                    OpenLogsSSEClient.shared.stop(notify: false)
+                    connection = .disconnected
+                } else if active {
+                    Task { await connectStream() }
+                }
+            }
+        }
+    }
     @Published private(set) var clockText: String = ""
     /// Bumped when a new line arrives so ScrollView can pin to bottom.
     @Published private(set) var scrollToken: Int = 0
@@ -35,7 +48,11 @@ final class OpenLogsViewModel: ObservableObject {
         active = true
         errorText = nil
         startClock()
-        Task { await loadHistoryAndConnect() }
+        if !paused {
+            Task { await loadHistoryAndConnect() }
+        } else {
+            Task { await loadHistoryOnly() }
+        }
     }
 
     func stop() {
@@ -50,6 +67,50 @@ final class OpenLogsViewModel: ObservableObject {
     func clearLogs() {
         entries = []
         errorText = nil
+    }
+
+    /// Web logs.action.download：导出日志为 .txt 并 toast
+    func exportLogs() {
+        guard !entries.isEmpty else { return }
+        let text = entries.map { $0.text }.joined(separator: "\n")
+        let fname = "boot-logs-\(Int(Date().timeIntervalSince1970)).txt"
+        let dir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
+        let url = dir.appendingPathComponent(fname)
+        do {
+            try text.write(to: url, atomically: true, encoding: .utf8)
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } catch {
+            Self.exportFail(error)
+        }
+    }
+
+    private static func exportFail(_ error: Error) {
+        let line = "\(error)\n"
+        fputs(line, stderr)
+    }
+
+    private func loadHistoryOnly() async {
+        isLoadingHistory = true
+        errorText = nil
+        defer { isLoadingHistory = false }
+        do {
+            let lines = try await service.fetchHistory(lines: 300)
+            var built: [OpenLogEntry] = []
+            built.reserveCapacity(lines.count)
+            for line in lines {
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+                let id = nextId
+                nextId += 1
+                built.append(OpenLogEntry.make(id: id, raw: trimmed))
+            }
+            if built.count > Self.maxLines {
+                built = Array(built.suffix(Self.maxLines))
+            }
+            entries = built
+        } catch {
+            errorText = "开机日志加载失败"
+        }
     }
 
     func reconnectNow() {

@@ -10,7 +10,7 @@ enum OpenLogsConnectionState: Equatable {
 
     var label: String {
         switch self {
-        case .disconnected: return "未连接"
+        case .disconnected: return "已断开"
         case .connecting: return "连接中…"
         case .connected: return "已连接"
         }
@@ -44,12 +44,13 @@ enum OpenLogLevel: Equatable {
     }
 
     var color: Color {
+        // 对齐 Web page-monitor.jsx logColor：INFO=cyan/WARN=orange/ERROR=danger/SUCCESS=accent
         switch self {
-        case .plain: return Color(hex: "33ff66")
-        case .success: return Color(hex: "00e676")
-        case .warn: return Color(hex: "ffd54f")
-        case .error: return Color(hex: "ff6b6b")
-        case .info: return Color(hex: "4fc3f7")
+        case .plain: return Color(hex: "8d9398")
+        case .success: return AppTheme.sidebarActive
+        case .warn: return AppTheme.orange
+        case .error: return AppTheme.danger
+        case .info: return Color(hex: "00b6be")
         }
     }
 }
