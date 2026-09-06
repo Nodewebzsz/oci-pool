@@ -41,15 +41,15 @@ private struct MenuGlyphShape: Shape {
         path.move(to: p(3, 12))
         path.addLine(to: p(21, 12))
         case "map-pin":
-        // lucide map-pin：泪滴定位针 + 中心圆点
+        // lucide map-pin：泪滴定位针（顶部圆弧用半圆贝塞尔近似）+ 中心圆点
         path.move(to: p(20, 10))
         path.addCurve(to: p(12.601, 21.799), control1: p(20, 14.993), control2: p(14.539, 20.193))
         path.addCurve(to: p(11.399, 21.799), control1: p(12.351, 22.106), control2: p(11.649, 22.106))
         path.addCurve(to: p(4, 10), control1: p(9.461, 20.193), control2: p(4, 14.993))
-        // a8 8 0 0 1 16 0 → 顶部圆弧（贝塞尔近似）
+        // a8 8 0 0 1 16 0 → 半圆拱顶，控制点 = 弦端 ± (8 × 4/3)
         path.move(to: p(4, 10))
-        path.addCurve(to: p(20, 10), control1: p(4, 4.9), control2: p(20, 4.9))
-        path.addEllipse(in: r(9, 7, 6, 6))
+        path.addCurve(to: p(20, 10), control1: p(4, -0.667), control2: p(20, -0.667))
+        path.addEllipse(in: r(9.1, 7.1, 5.8, 5.8))
         case "map":
         // lucide map：三折地图轮廓 + 两条折线
         path.move(to: p(14.106, 5.553))

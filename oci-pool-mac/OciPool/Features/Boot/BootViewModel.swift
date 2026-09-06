@@ -53,7 +53,7 @@ final class BootViewModel: ObservableObject {
     @Published var createSelectedVersion = ""
     @Published var createImageId = ""
     @Published var createLoadingImages = false
-    private var createTenantId: Int64 = 0
+    var createTenantId: Int64 = 0
 
     // Boot log（详情页下方内嵌，web full_machine_list.js openBootLogDrawer）
     @Published private(set) var bootLogLines: [BootLogLine] = []
@@ -357,6 +357,13 @@ final class BootViewModel: ObservableObject {
             detailItems = []
             ToastCenter.shared.error(error.localizedDescription)
         }
+    }
+
+    /// 工具栏「预开」：空白配置，租户在表单内选择（对齐 Web addBoot(null)）
+    func openCreateBlank() {
+        let blank = BootTaskItem()
+        openAddConfig(blank)
+        createTenantId = 0
     }
 
     func openAddConfig(_ item: BootTaskItem) {

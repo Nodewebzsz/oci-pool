@@ -106,8 +106,13 @@ struct BootTaskItem: Identifiable, Equatable {
         defName.isEmpty ? "—" : defName
     }
 
-    var taskStatusText: String { openBootFlag ? "有任务" : "无任务" }
+    var taskStatusText: String { openBootFlag ? "运行中" : "无任务" }
     var taskStatusTone: StatusTone { openBootFlag ? .success : .neutral }
+
+    /// 工具栏「预开」入口的空白配置（租户在表单内选择）
+    init() {}
+    /// Web：任务状态 running=有任务/idle=无任务（openBootFlag 派生）
+    var webStatus: String { openBootFlag ? "running" : "idle" }
 
     var archText: String { architecture.isEmpty ? "—" : architecture }
     var createText: String { createAtStr.isEmpty ? "—" : createAtStr }

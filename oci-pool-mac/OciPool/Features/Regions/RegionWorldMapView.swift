@@ -157,7 +157,20 @@ final class WorldMapData: ObservableObject {
                abs(first.x - last.x) < 1e-9, abs(first.y - last.y) < 1e-9 {
                 pts.removeLast()
             }
-            return pts
+            // 反经线解缠绕：相邻点经度差 >180 时就近 ±360，
+            // 使楚科奇/南极洲等跨 180° 多边形投影连续（等效 d3 投影管线的 antimeridian clipping）
+            var unwrapped: [CGPoint] = []
+            var prevLon: Double?
+            for pt in pts {
+                var lon = Double(pt.x)
+                if let prev = prevLon {
+                    while lon - prev > 180 { lon -= 360 }
+                    while lon - prev < -180 { lon += 360 }
+                }
+                unwrapped.append(CGPoint(x: CGFloat(lon), y: pt.y))
+                prevLon = lon
+            }
+            return unwrapped
         }
 
         func polygons(of geo: [String: Any]) -> [[[CGPoint]]] {
@@ -298,9 +311,10 @@ struct RegionWorldMapView: View {
         guard hoverMonitor == nil else { return }
         let box = hoverBox
         hoverMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { event in
-            guard let content = event.window?.contentView else { return event }
+            guard let window = event.window else { return event }
             let p = event.locationInWindow
-            let globalPoint = CGPoint(x: p.x, y: content.bounds.height - p.y)
+            // SwiftUI .global 原点 = 窗口 frame（含标题栏）左上角
+            let globalPoint = CGPoint(x: p.x, y: window.frame.height - p.y)
             let lx = globalPoint.x - box.origin.x
             let ly = globalPoint.y - box.origin.y
             let mapW = WorldMapData.mapW * box.scale

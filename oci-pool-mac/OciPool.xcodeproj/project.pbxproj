@@ -181,6 +181,7 @@
 		FAD6DDCF496E93DD778BD048 /* MfaBackupViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0129EA0DCE5DF80AAFAA2754 /* MfaBackupViewModel.swift */; };
 		FB083A58EEF205FF8C8BF771 /* StorageViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98F34F578956918E87473D11 /* StorageViewModel.swift */; };
 		FC42BA5FCECC1F910E2B0B23 /* BootService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E0652DCB1FFCB8A13EC37A5 /* BootService.swift */; };
+		FCD34789E35EF283F41D0B2B /* RegionDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 862473A1FB81D7426AB93224 /* RegionDetailSheet.swift */; };
 		FEB0475B36D25F6714FDF31B /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F8EC706B3C75EB8BAE77E1C /* EmptyStateView.swift */; };
 /* End PBXBuildFile section */
 
@@ -265,6 +266,7 @@
 		83CD8904CA13BDE5C146E1C0 /* IpQualityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IpQualityView.swift; sourceTree = "<group>"; };
 		8425C1FDE338958A0F98E6DD /* ModuleSettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSettingsCard.swift; sourceTree = "<group>"; };
 		851FC71FE3C4AD1E297412A6 /* SpeedTestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedTestView.swift; sourceTree = "<group>"; };
+		862473A1FB81D7426AB93224 /* RegionDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegionDetailSheet.swift; sourceTree = "<group>"; };
 		86C688ECFAB33376BCE4FF46 /* NavID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavID.swift; sourceTree = "<group>"; };
 		89FC141D0A5B0998A0C92BB6 /* OpenLogsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenLogsModels.swift; sourceTree = "<group>"; };
 		8B920763223EA42CE9B71AAB /* MfaBackupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MfaBackupView.swift; sourceTree = "<group>"; };
@@ -418,6 +420,7 @@
 		065F8CB3FB35D75393465530 /* Regions */ = {
 			isa = PBXGroup;
 			children = (
+				862473A1FB81D7426AB93224 /* RegionDetailSheet.swift */,
 				A0E093E542493B41F5EF82CC /* RegionsModels.swift */,
 				345A38D425F245E68B09BAEC /* RegionsView.swift */,
 				57CCEB2C5E9DA6959FAFA537 /* RegionsViewModel.swift */,
@@ -1048,6 +1051,7 @@
 				039B56049EE635D68D513F6A /* ProxyConfigView.swift in Sources */,
 				2F66B287B6F4214350C2579F /* ProxyConfigViewModel.swift in Sources */,
 				D66AF341F10BE840877F82A0 /* RSAHelper.swift in Sources */,
+				FCD34789E35EF283F41D0B2B /* RegionDetailSheet.swift in Sources */,
 				07F5E0A32ABA61A29D546CCE /* RegionWorldMapView.swift in Sources */,
 				C5B96BDDA0788B1915873131 /* RegionsModels.swift in Sources */,
 				B57FF8F6AB85CC9AB616B9B0 /* RegionsView.swift in Sources */,
