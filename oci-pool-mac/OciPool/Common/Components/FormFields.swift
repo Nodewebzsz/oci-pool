@@ -183,6 +183,7 @@ struct AppCompactField: View {
     var placeholder: String = ""
     var width: CGFloat = 56
     var height: CGFloat = 32
+    var alignCenter: Bool = false
     var onCommit: (() -> Void)? = nil
 
     @EnvironmentObject private var appearance: AppearanceController
@@ -201,6 +202,7 @@ struct AppCompactField: View {
                 enabled: true,
                 fontSize: 12,
                 isFocused: $focused,
+                alignCenter: alignCenter,
                 onCommit: onCommit
             )
             .frame(maxWidth: .infinity)

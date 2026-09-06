@@ -76,7 +76,7 @@ struct PaginationBar: View {
                 options: sizeOptions,
                 selection: sizeSelection,
                 placeholder: "\(state.size)",
-                width: 78,
+                width: 64,
                 allowClear: false,
                 searchable: false,
                 controlHeight: controlHeight
@@ -148,6 +148,7 @@ struct PaginationBar: View {
                     placeholder: "\(state.displayPage)",
                     width: 42,
                     height: 26,
+                    alignCenter: true,
                     onCommit: { jump() }
                 )
 

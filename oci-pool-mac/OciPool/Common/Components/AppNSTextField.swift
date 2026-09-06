@@ -10,6 +10,7 @@ struct AppNSTextField: NSViewRepresentable {
     var enabled: Bool = true
     var fontSize: CGFloat = AppInputStyle.fontSize
     @Binding var isFocused: Bool
+    var alignCenter: Bool = false
     var onCommit: (() -> Void)? = nil
     var onEscape: (() -> Void)? = nil
     var onMoveUp: (() -> Void)? = nil
@@ -33,6 +34,7 @@ struct AppNSTextField: NSViewRepresentable {
             field.centerYAnchor.constraint(equalTo: container.centerYAnchor)
         ])
         applyStyle(field)
+        if alignCenter { field.alignment = .center }
         field.stringValue = text
         return container
     }
@@ -59,6 +61,7 @@ struct AppNSTextField: NSViewRepresentable {
 
         guard let field = coord.field else { return }
         applyStyle(field)
+        if alignCenter { field.alignment = .center }
         field.isEditable = enabled
         field.isSelectable = enabled
         if field.stringValue != text {
