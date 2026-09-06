@@ -13,6 +13,7 @@ struct CloudflareView: View {
             title: "CF 管理",
             subtitle: "Cloudflare · DNS 记录管理与代理配置",
             systemImage: "globe",
+            iconColor: AppTheme.orange,
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
@@ -21,19 +22,15 @@ struct CloudflareView: View {
                             .padding(.horizontal, 16)
                             .padding(.top, 12)
                     }
-                    filterBar
+                    searchBar
                         .padding(.horizontal, 16)
                         .padding(.top, 12)
+                        .padding(.bottom, 12)
                     listBody
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .appLoading((model.isLoading || model.isZonesLoading) && model.records.isEmpty && model.zones.isEmpty)
             },
-            footer: {
-                PaginationBar(state: $model.pageState) {
-                    model.onPageChange()
-                }
-            }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         .onAppear { model.start() }
@@ -53,25 +50,43 @@ struct CloudflareView: View {
 
     // MARK: - Toolbar
 
+    private var hasZone: Bool { !(model.selectedZoneId ?? "").isEmpty }
+
+    /// Web 页头 actions：域名: label + zone 下拉 220 + 秘钥配置(orange) + 添加记录(primary) + 同步记录(info) + 刷新列表(outline)
     private var toolbar: some View {
         HStack(spacing: 8) {
+            Text("域名:")
+                .font(.system(size: 12))
+                .foregroundColor(AppTheme.textTertiary(dark))
+            SelectMenu(
+                options: model.zoneOptions,
+                selection: Binding(
+                    get: { model.selectedZoneId },
+                    set: { model.onZoneChange($0) }
+                ),
+                placeholder: "请选择域名",
+                width: 220,
+                allowClear: true,
+                searchable: true
+            )
             AppButton(title: "秘钥配置", systemImage: "key", kind: .orange) {
                 model.openConfig()
             }
-            AppButton(title: "添加记录", systemImage: "plus", kind: .primary) {
+            AppButton(title: "添加记录", systemImage: "plus", kind: .primary, enabled: hasZone) {
                 model.openAdd()
             }
             AppButton(
                 title: "同步记录",
                 systemImage: "arrow.triangle.2.circlepath",
-                kind: .secondary,
-                isLoading: model.isSyncing
+                kind: .info,
+                isLoading: model.isSyncing,
+                enabled: hasZone
             ) {
                 model.syncRecords()
             }
             AppButton(
-                title: "刷新",
-                systemImage: "arrow.clockwise",
+                title: "刷新列表",
+                systemImage: "arrow.counterclockwise",
                 kind: .secondary,
                 isLoading: model.isLoading
             ) {
@@ -82,43 +97,29 @@ struct CloudflareView: View {
 
     // MARK: - Filter
 
-    private var filterBar: some View {
-        FilterBar {
-            HStack(spacing: 10) {
-                Text("域名")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
-                SelectMenu(
-                    options: model.zoneOptions,
-                    selection: Binding(
-                        get: { model.selectedZoneId },
-                        set: { model.onZoneChange($0) }
-                    ),
-                    placeholder: model.zones.isEmpty ? "暂无域名" : "选择域名",
-                    width: 220,
-                    allowClear: false,
-                    searchable: true
-                )
-                AppButton(
-                    title: "刷新域名",
-                    systemImage: "arrow.clockwise",
-                    kind: .secondary,
-                    isLoading: model.isZonesLoading
-                ) {
-                    Task { await model.loadZones(selectFirst: false) }
-                }
-
-                SearchField(text: $model.searchName, placeholder: "记录名")
-                    .frame(width: 140)
-                SearchField(text: $model.searchContent, placeholder: "记录值")
-                    .frame(width: 140)
-                if !model.searchName.isEmpty || !model.searchContent.isEmpty {
-                    AppButton(title: "清除", systemImage: "xmark", kind: .secondary) {
-                        model.clearSearch()
-                    }
-                }
+    /// Web 搜索卡（bg-1 border radius 8 padding 10）：按名称: 输入 + 按值: 输入 + 搜索(info) + 清除(danger-soft)
+    private var searchBar: some View {
+        HStack(spacing: 10) {
+            Text("按名称:")
+                .font(.system(size: 11))
+                .foregroundColor(AppTheme.textTertiary(dark))
+            SearchField(text: $model.searchName, placeholder: "e.g. www")
+            Text("按值:")
+                .font(.system(size: 11))
+                .foregroundColor(AppTheme.textTertiary(dark))
+            SearchField(text: $model.searchContent, placeholder: "e.g. 192.9")
+            AppButton(title: "搜索", systemImage: "magnifyingglass", kind: .info) {
+                ToastCenter.shared.show("匹配 \(model.filteredRecords.count) 条", style: .info)
+            }
+            AppButton(title: "清除", systemImage: "xmark", kind: .danger,
+                      enabled: !model.searchName.isEmpty || !model.searchContent.isEmpty) {
+                model.clearSearch()
             }
         }
+        .padding(10)
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.border(dark), lineWidth: 1))
+        .cornerRadius(8)
     }
 
     // MARK: - List
@@ -146,22 +147,40 @@ struct CloudflareView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                DataList {
-                    DataListColumnHeader(title: "类型", width: 72)
-                    DataListColumnHeader(title: "记录名", width: nil)
-                    DataListColumnHeader(title: "记录值", width: nil)
-                    DataListColumnHeader(title: "TTL", width: 72)
-                    DataListColumnHeader(title: "代理", width: 80)
-                    DataListColumnHeader(title: "操作", width: 88, alignment: .trailing)
-                } content: {
-                    ForEach(model.filteredRecords) { item in
-                        DataListRow {
-                            row(item)
+                VStack(spacing: 0) {
+                    // Web 标题条：bg-2 · list 图标 + DNS 记录 + (filtered/total)
+                    HStack(spacing: 6) {
+                        Image(systemName: "list.bullet")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(AppTheme.textSecondary(dark))
+                        Text("DNS 记录")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(AppTheme.navIcon(dark))
+                        Text("(\(model.filteredRecords.count)/\(model.records.count))")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundColor(AppTheme.textTertiary(dark))
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(AppTheme.sidebarHover(dark))
+                    .overlay(Rectangle().fill(AppTheme.border(dark)).frame(height: 1), alignment: .bottom)
+
+                    DataList {
+                        DataListColumnHeader(title: "类型", width: 80)
+                        DataListColumnHeader(title: "记录名", width: 200)
+                        DataListColumnHeader(title: "记录值", width: nil)
+                        DataListColumnHeader(title: "TTL", width: 100)
+                        DataListColumnHeader(title: "代理状态", width: 110)
+                        DataListColumnHeader(title: "操作", width: 100)
+                    } content: {
+                        ForEach(model.filteredRecords) { item in
+                            DataListRow {
+                                row(item)
+                            }
                         }
                     }
                 }
-.padding(.horizontal, 12)
-                .padding(.top, 8)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(AppTheme.sidebarBg(dark))
                 .overlay(

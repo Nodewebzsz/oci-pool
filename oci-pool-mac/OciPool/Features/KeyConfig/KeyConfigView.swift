@@ -1,41 +1,31 @@
 import SwiftUI
 
-/// 原生密钥配置（对齐 Web `/system/domainSettings` · `domain_settings.ftl`）。
-/// UI 标准：`ModuleSettingsCard` + `EqualHeightCardRow`（同质量管理页）。
+/// 原生密钥配置（对齐 Web `/system/domainSettings` · `ProxyKeyConfigPage`）。
+/// 结构：PageHeader(图标 key · orange) → 分组容器「域名服务商配置」→ 3 卡网格（CF / EO / 更多服务商占位）。
 struct KeyConfigView: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appearance: AppearanceController
     @StateObject private var model = KeyConfigViewModel()
 
     private var dark: Bool { appearance.isDarkEffective }
-    private let cardMinHeight: CGFloat = 420
 
     var body: some View {
         PageScaffold(
             title: "Token 配置",
             subtitle: "域名服务商配置 · 管理 DNS/CDN 服务商的 API 秘钥",
-            systemImage: "key.fill",
+            systemImage: "key",
+            iconColor: AppTheme.orange,
             toolbar: { toolbar },
             content: {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 10) {
                         if let err = model.errorText, !err.isEmpty {
                             errorBanner(err)
                         }
-                        VStack(spacing: 14) {
-                            EqualHeightCardRow(minHeight: cardMinHeight) {
-                                cloudflareCard
-                            } second: {
-                                edgeOneCard
-                            }
-                            EqualHeightCardRow(minHeight: 200) {
-                                tipCard
-                            } second: {
-                                comingSoonCard
-                            }
-                        }
+                        providerGroup
                     }
-                    .padding(16)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -61,232 +51,257 @@ struct KeyConfigView: View {
         }
     }
 
-    // MARK: - Cloudflare
+    // MARK: - 分组容器（Web：bg-1 · border · radius 8 · padding 16 · 组标题 globe info）
 
-    private var cloudflareCard: some View {
-        ModuleSettingsCard(
-            title: "Cloudflare",
-            subtitle: "",
-                        systemImage: "cloud",
-            accent: AppTheme.orange,
-            enabled: $model.cloudflare.enabled,
-            minHeight: cardMinHeight
-        ) {
-            FormFieldRow(label: "API Key", required: true) {
-                HStack(spacing: 8) {
-                    AppTextField(
-                        text: $model.cloudflare.apiToken,
-                        placeholder: "输入 Cloudflare API Key",
-                        secure: true,
-                        leadingSystemImage: "key"
-                    )
-                    iconBtn("doc.on.doc", tip: "复制") {
-                        model.copy(model.cloudflare.apiToken, label: "API Key")
-                    }
-                }
+    private var providerGroup: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 6) {
+                Image(systemName: "globe")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(AppTheme.info)
+                Text("域名服务商配置")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.navIcon(dark))
             }
-            Text("在 Cloudflare Dashboard > My Profile > API Keys 中创建")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
-
-            FormFieldRow(label: "账户邮箱", required: true) {
-                AppTextField(
-                    text: $model.cloudflare.email,
-                    placeholder: "your@email.com",
-                    leadingSystemImage: "envelope"
+            // 3 卡并排：CF + EO + 占位（Web .provider-grid: repeat(3,1fr) gap 12）
+            HStack(alignment: .top, spacing: 12) {
+                providerCard(
+                    name: "Cloudflare",
+                    icon: "cloud",
+                    iconColor: AppTheme.orange,
+                    enabled: $model.cloudflare.enabled,
+                    fields: {
+                        secretField(
+                            label: "API Key",
+                            text: $model.cloudflare.apiToken,
+                            placeholder: "输入 Cloudflare API Key",
+                            hint: "在 Cloudflare Dashboard > My Profile > API Keys 中创建"
+                        )
+                        inputField(
+                            label: "邮箱地址",
+                            text: $model.cloudflare.email,
+                            placeholder: "your@email.com",
+                            hint: "用于某些 API 操作的身份验证",
+                            mono: true
+                        )
+                    },
+                    footer: {
+                        AppButton(title: "测试连接", systemImage: "bolt", kind: .info,
+                                  isLoading: model.savingKey == "cf-test") {
+                            model.testCloudflare()
+                        }
+                        AppButton(title: "保存配置", systemImage: "square.and.arrow.down", kind: .primary,
+                                  isLoading: model.savingKey == "cf-save") {
+                            model.saveCloudflare()
+                        }
+                    }
                 )
-            }
-            Text("用于某些 API 操作的身份验证")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
-        } footer: {
-            HStack(spacing: 8) {
-                if model.cloudflare.enabled {
-                    StatusBadge(text: "已连接", tone: .success)
-                } else {
-                    StatusBadge(text: "未连接", tone: .neutral)
-                }
-                Spacer(minLength: 8)
-                AppButton(
-                    title: "测试连接",
-                    systemImage: "bolt.horizontal.circle",
-                    kind: .info,
-                    isLoading: model.savingKey == "cf-test"
-                ) {
-                    model.testCloudflare()
-                }
-                AppButton(
-                    title: "保存配置",
-                    systemImage: "square.and.arrow.down",
-                    kind: .primary,
-                    isLoading: model.savingKey == "cf-save"
-                ) {
-                    model.saveCloudflare()
-                }
-            }
-        }
-    }
-
-    // MARK: - EdgeOne
-
-    private var edgeOneCard: some View {
-        ModuleSettingsCard(
-            title: "腾讯云 EdgeOne",
-            subtitle: "",
-                        systemImage: "globe",
-            accent: AppTheme.info,
-            enabled: $model.edgeOne.enabled,
-            minHeight: cardMinHeight
-        ) {
-            FormFieldRow(label: "SecretId", required: true) {
-                HStack(spacing: 8) {
-                    AppTextField(
-                        text: $model.edgeOne.secretId,
-                        placeholder: "输入腾讯云 SecretId",
-                        secure: true,
-                        leadingSystemImage: "person"
-                    )
-                    iconBtn("doc.on.doc", tip: "复制") {
-                        model.copy(model.edgeOne.secretId, label: "SecretId")
+                providerCard(
+                    name: "腾讯云 EdgeOne",
+                    icon: "drop.fill",
+                    iconColor: AppTheme.info,
+                    enabled: $model.edgeOne.enabled,
+                    fields: {
+                        secretField(
+                            label: "SecretId",
+                            text: $model.edgeOne.secretId,
+                            placeholder: "输入腾讯云 SecretId",
+                            hint: "在腾讯云控制台 > 访问管理 > API 密钥管理中获取"
+                        )
+                        secretField(
+                            label: "SecretKey",
+                            text: $model.edgeOne.secretKey,
+                            placeholder: "输入腾讯云 SecretKey",
+                            hint: "SecretKey 用于 API 签名，请妥善保管"
+                        )
+                    },
+                    footer: {
+                        AppButton(title: "测试连接", systemImage: "bolt", kind: .info,
+                                  isLoading: model.savingKey == "eo-test") {
+                            model.testEdgeOne()
+                        }
+                        AppButton(title: "保存配置", systemImage: "square.and.arrow.down", kind: .primary,
+                                  isLoading: model.savingKey == "eo-save") {
+                            model.saveEdgeOne()
+                        }
                     }
-                }
+                )
+                comingSoonCard
             }
-            Text("在腾讯云控制台 > 访问管理 > API 密钥管理中获取")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
+        }
+        .padding(16)
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.border(dark), lineWidth: 1))
+        .cornerRadius(8)
+    }
 
-            FormFieldRow(label: "SecretKey", required: true) {
-                HStack(spacing: 8) {
-                    AppTextField(
-                        text: $model.edgeOne.secretKey,
-                        placeholder: "输入腾讯云 SecretKey",
-                        secure: true,
-                        leadingSystemImage: "key"
-                    )
-                    iconBtn("doc.on.doc", tip: "复制") {
-                        model.copy(model.edgeOne.secretKey, label: "SecretKey")
-                    }
+    // MARK: - 服务商卡（Web ProviderHeader + 表单体 + footer 右对齐按钮）
+
+    private func providerCard<Fields: View, Footer: View>(
+        name: String,
+        icon: String,
+        iconColor: Color,
+        enabled: Binding<Bool>,
+        @ViewBuilder fields: () -> Fields,
+        @ViewBuilder footer: () -> Footer
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // ProviderHeader：icon 26(22% 底) + 名称 + 连接徽章 + 启用开关
+            HStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(iconColor.opacity(0.22))
+                        .frame(width: 26, height: 26)
+                    Image(systemName: icon)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(iconColor)
                 }
-            }
-            Text("SecretKey 用于 API 签名，请妥善保管")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
-        } footer: {
-            HStack(spacing: 8) {
-                if model.edgeOne.enabled {
-                    StatusBadge(text: "已连接", tone: .success)
-                } else {
-                    StatusBadge(text: "未连接", tone: .neutral)
-                }
+                Text(name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.navIcon(dark))
+                connectedBadge(connected: enabled.wrappedValue)
                 Spacer(minLength: 8)
-                AppButton(
-                    title: "测试连接",
-                    systemImage: "bolt.horizontal.circle",
-                    kind: .info,
-                    isLoading: model.savingKey == "eo-test"
-                ) {
-                    model.testEdgeOne()
-                }
-                AppButton(
-                    title: "保存配置",
-                    systemImage: "square.and.arrow.down",
-                    kind: .primary,
-                    isLoading: model.savingKey == "eo-save"
-                ) {
-                    model.saveEdgeOne()
-                }
+                Toggle("", isOn: enabled)
+                    .toggleStyle(SwitchToggleStyle(tint: AppTheme.sidebarActive))
+                    .labelsHidden()
             }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .overlay(Rectangle().fill(AppTheme.border(dark)).frame(height: 1), alignment: .bottom)
+
+            VStack(alignment: .leading, spacing: 12) {
+                fields()
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+            // footer：上边框 bg-1 · 按钮右对齐
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
+                footer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(AppTheme.sidebarBg(dark))
+            .overlay(Rectangle().fill(AppTheme.border(dark)).frame(height: 1), alignment: .top)
         }
+        .frame(maxWidth: .infinity, minHeight: 340, alignment: .top)
+        .background(AppTheme.sidebarHover(dark))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.border(dark), lineWidth: 1))
+        .cornerRadius(8)
+        .opacity(enabled.wrappedValue ? 1 : 0.6)
+        .animation(.easeInOut(duration: 0.2), value: enabled.wrappedValue)
     }
 
-    // MARK: - Tip / Coming soon
-
-    private var tipCard: some View {
-        ModuleSettingsCard(
-            title: "使用说明",
-            subtitle: "配置后可在 DNS 管理页操作解析",
-            systemImage: "lightbulb",
-            accent: Color(hex: "9b59b6"),
-            enabled: nil,
-            minHeight: 200
-        ) {
-            tipRow(icon: "1.circle.fill", text: "填写并启用服务商密钥，先点「测试连接」确认可用")
-            tipRow(icon: "2.circle.fill", text: "保存成功后，前往 Cloudflare / EdgeOne 菜单管理 DNS")
-            tipRow(icon: "3.circle.fill", text: "API Key 权限不足时，列表与同步会失败")
-        } footer: {
-            StatusBadge(text: "安全提示：勿泄露密钥", tone: .warning)
+    /// 连接徽章：accent-soft/danger-soft 底 + 描边 + 圆点
+    private func connectedBadge(connected: Bool) -> some View {
+        let color = connected ? AppTheme.sidebarActive : AppTheme.danger
+        return HStack(spacing: 4) {
+            Circle().fill(color).frame(width: 5, height: 5)
+            Text(connected ? "已连接" : "未连接")
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundColor(color)
         }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 2)
+        .background(
+            Capsule().fill(connected ? AppearanceController.shared.accent.accentSoft(dark) : AppTheme.dangerSoft(dark))
+        )
+        .overlay(Capsule().stroke(color, lineWidth: 1))
     }
 
-    private var comingSoonCard: some View {
-        ModuleSettingsCard(
-            title: "更多服务商",
-            subtitle: "敬请期待",
-            systemImage: "plus.circle",
-            accent: AppTheme.textSecondary(dark),
-            enabled: nil,
-            minHeight: 200
-        ) {
-            VStack(spacing: 10) {
-                Image(systemName: "shippingbox")
-                    .font(.system(size: 28, weight: .light))
-                    .foregroundColor(AppTheme.sidebarText(dark).opacity(0.55))
-                Text("后续将支持更多 DNS / CDN 服务商")
+    /// 密码型字段：label(12 fg-1)+红* → 安全输入 + 复制钮 → hint(10.5 fg-3)
+    private func secretField(label: String, text: Binding<String>, placeholder: String, hint: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Text(label)
                     .font(.system(size: 12))
                     .foregroundColor(AppTheme.sidebarText(dark))
-                    .multilineTextAlignment(.center)
+                Text("*")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppTheme.danger)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-        } footer: {
-            StatusBadge(text: "Coming soon", tone: .neutral)
+            HStack(spacing: 8) {
+                AppTextField(text: text, placeholder: placeholder, secure: true)
+                Button {
+                    model.copy(text.wrappedValue, label: label)
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(AppTheme.sidebarActive)
+                        .frame(width: 30, height: 30)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(AppTheme.sidebarActive.opacity(0.12))
+                        )
+                }
+                .buttonStyle(PlainButtonStyle())
+                .help("复制")
+            }
+            Text(hint)
+                .font(.system(size: 10.5))
+                .foregroundColor(AppTheme.textTertiary(dark))
         }
     }
 
-    private func tipRow(icon: String, text: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 13))
-                .foregroundColor(Color(hex: "9b59b6"))
-                .frame(width: 18)
-            Text(text)
-                .font(.system(size: 12))
-                .foregroundColor(dark ? Color.white.opacity(0.88) : Color.primary)
-                .fixedSize(horizontal: false, vertical: true)
+    /// 普通输入字段（Web 邮箱输入为 mono）
+    private func inputField(label: String, text: Binding<String>, placeholder: String, hint: String, mono: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Text(label)
+                    .font(.system(size: 12))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                Text("*")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppTheme.danger)
+            }
+            AppTextField(text: text, placeholder: placeholder)
+            Text(hint)
+                .font(.system(size: 10.5))
+                .foregroundColor(AppTheme.textTertiary(dark))
         }
     }
 
-    private func iconBtn(_ systemImage: String, tip: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(AppTheme.sidebarActive)
-                .frame(width: 32, height: 32)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(AppTheme.sidebarActive.opacity(0.12))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppTheme.border(dark).opacity(0.5), lineWidth: 1)
-                )
+    /// 占位卡：虚线边框 + 圆形加号 + 更多服务商/敬请期待...
+    private var comingSoonCard: some View {
+        VStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(AppTheme.bg3(dark))
+                    .frame(width: 44, height: 44)
+                Text("+")
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundColor(AppTheme.textTertiary(dark))
+            }
+            Text("更多服务商")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(AppTheme.textSecondary(dark))
+            Text("敬请期待...")
+                .font(.system(size: 11))
+                .foregroundColor(AppTheme.textTertiary(dark))
         }
-        .buttonStyle(PlainButtonStyle())
-        .help(tip)
+        .frame(maxWidth: .infinity, minHeight: 340, maxHeight: .infinity, alignment: .center)
+        .padding(40)
+        .background(AppTheme.sidebarHover(dark))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark).opacity(1.6), style: StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
+        )
+        .cornerRadius(8)
     }
 
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(AppTheme.danger)
+            Image(systemName: "exclamationmark.circle")
+                .font(.system(size: 14))
             Text(text).font(.system(size: 12))
             Spacer()
-            Button("重试") { Task { await model.reload() } }
-                .buttonStyle(PlainButtonStyle())
         }
         .foregroundColor(AppTheme.danger)
-        .padding(12)
-        .background(AppTheme.danger.opacity(0.1))
-        .cornerRadius(8)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(AppTheme.dangerSoft(dark))
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(AppTheme.danger, lineWidth: 1))
+        .cornerRadius(6)
     }
 }

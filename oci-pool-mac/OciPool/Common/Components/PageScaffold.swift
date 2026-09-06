@@ -56,11 +56,13 @@ struct PageScaffold<Toolbar: View, Content: View, Footer: View>: View {
                         Text(subtitle)
                             .font(.system(size: 12))
                             .foregroundColor(AppTheme.textTertiary(dark))
+                            .lineLimit(1)
                     }
                 }
             }
-            Spacer()
+            Spacer(minLength: 16)
             toolbar()
+                .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
