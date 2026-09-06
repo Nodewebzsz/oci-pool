@@ -9,6 +9,12 @@ struct SidebarView: View {
     private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
     private var collapsed: Bool { navigation.sidebarCollapsed }
 
+    @State private var hoveredSection: NavSection?
+    @State private var hoveredItem: NavID?
+    @State private var searchCursor = 0
+    @State private var searchFieldFocused = false
+    @State private var escMonitor: Any?
+
     var body: some View {
         VStack(spacing: 0) {
             brandHeader
@@ -27,12 +33,15 @@ struct SidebarView: View {
                     .padding(.horizontal, 10)
                     .padding(.top, 10)
                     .padding(.bottom, 4)
+                    // 下拉面板要盖住后面的 ScrollView 兄弟节点
+                    .zIndex(10)
             }
 
             ScrollView {
                 VStack(alignment: collapsed ? .center : .leading, spacing: 2) {
+                    // Web: 搜索走下拉结果面板，侧栏列表本身不做内联过滤
                     let catalog = NavigationCatalog.filtered(
-                        search: navigation.searchText,
+                        search: "",
                         cloudType: session.cloudProvider
                     )
                     if catalog.isEmpty {
@@ -80,6 +89,15 @@ struct SidebarView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppTheme.sidebarBg(dark))
+        // 聚焦期间装载事件监听器：ESC 清空 + 点击搜索框以外区域失焦
+        .onChange(of: searchFieldFocused) { focused in
+            if focused {
+                installEscMonitor()
+            } else {
+                removeEscMonitor()
+            }
+        }
+        .onDisappear { removeEscMonitor() }
     }
 
     // Web sidebar 顶部品牌区:logo mark + 名称 + tagline;折叠时仅居中 mark
@@ -107,12 +125,201 @@ struct SidebarView: View {
     }
 
     private var searchBar: some View {
-        SearchField(
-            text: $navigation.searchText,
-            placeholder: "搜索菜单…",
-            fillsWidth: true,
-            compact: true
-        )
+        ZStack(alignment: .topLeading) {
+            SearchField(
+                text: $navigation.searchText,
+                placeholder: "搜索菜单...",
+                // Web MenuSearch 键盘行为：↵ 跳转光标项 · ↑↓ 移动光标 · ESC 清空关闭
+                onSubmit: {
+                    let results = searchResults
+                    guard !results.isEmpty else { return }
+                    commitSearch(results[min(searchCursor, results.count - 1)])
+                },
+                onEscape: { navigation.searchText = "" },
+                onMoveUp: { searchCursor = max(searchCursor - 1, 0) },
+                onMoveDown: {
+                    let last = max(searchResults.count - 1, 0)
+                    searchCursor = min(searchCursor + 1, last)
+                },
+                fillsWidth: true,
+                compact: true,
+                onFocusChange: { searchFieldFocused = $0 }
+            )
+            .onChange(of: navigation.searchText) { _ in searchCursor = 0 }
+
+            if searchDropdownVisible {
+                searchDropdown
+                    .offset(y: 34)
+                    .zIndex(50)
+            }
+        }
+    }
+
+    // MARK: - 搜索下拉结果面板（Web MenuSearch）
+
+    private var searchDropdownVisible: Bool {
+        searchFieldFocused && !navigation.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// 模糊匹配（对齐 Web）：label 开头 > label 包含 > section 包含 > id 包含，取前 12。
+    private var searchResults: [NavigationItem] {
+        let q = navigation.searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !q.isEmpty else { return [] }
+        var scored: [(NavigationItem, Int)] = []
+        for (section, items) in NavigationCatalog.sections {
+            for it in items {
+                let label = it.title.lowercased()
+                let sec = section.title.lowercased()
+                let id = it.nav.rawValue.lowercased()
+                var score = 0
+                if label.hasPrefix(q) { score = 100 }
+                else if label.contains(q) { score = 70 }
+                else if sec.contains(q) { score = 40 }
+                else if id.contains(q) { score = 30 }
+                if score > 0 { scored.append((it, score)) }
+            }
+        }
+        return scored.sorted { $0.1 > $1.1 }.prefix(12).map { $0.0 }
+    }
+
+    private var searchPanelBg: Color { Color(hex: dark ? "0d1216" : "ffffff") }
+    private var searchPanelBorder: Color { Color(hex: dark ? "363e45" : "bfc5ca") }
+    private var searchHoverBg: Color { AppTheme.sidebarHover(dark) }
+
+    private var searchDropdown: some View {
+        VStack(spacing: 0) {
+            let results = searchResults
+            if results.isEmpty {
+                VStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(Color(hex: dark ? "5d646a" : "81878c").opacity(0.5))
+                    Text("没有找到匹配的菜单")
+                        .font(.system(size: 11.5))
+                        .foregroundColor(Color(hex: dark ? "5d646a" : "81878c"))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 18)
+            } else {
+                ScrollView {
+                    VStack(spacing: 2) {
+                        ForEach(Array(results.enumerated()), id: \.element.nav) { idx, item in
+                            searchResultRow(item, active: idx == searchCursor)
+                        }
+                    }
+                    .padding(4)
+                }
+                // 高度自适应内容（Web maxHeight 320 只是滚动上限）
+                .frame(height: min(CGFloat(results.count) * 44 + 8, 320))
+
+                Divider()
+                    .overlay(AppTheme.border(dark))
+
+                HStack(spacing: 6) {
+                    Text("\(results.count) 项")
+                        .lineLimit(1)
+                        .fixedSize()
+                    Spacer(minLength: 4)
+                    Text("↑↓选择 ↵跳转 ESC关闭")
+                        .lineLimit(1)
+                        .fixedSize()
+                }
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundColor(Color(hex: dark ? "5d646a" : "81878c"))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+            }
+        }
+        .background(searchPanelBg)
+        .cornerRadius(8)
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(searchPanelBorder, lineWidth: 1))
+        .shadow(color: Color.black.opacity(dark ? 0.4 : 0.08), radius: 10, y: 6)
+    }
+
+    private func searchResultRow(_ item: NavigationItem, active: Bool) -> some View {
+        let section = NavigationCatalog.section(for: item.nav)
+        let color = section.map { sectionColor($0) } ?? AppTheme.sidebarText(dark)
+        return Button(action: { commitSearch(item) }) {
+            HStack(spacing: 10) {
+                RoundedRectangle(cornerRadius: 999)
+                    .fill(color)
+                    .frame(width: 3)
+                MenuGlyph(name: item.nav.lucideIcon, size: 13, color: color)
+                    .frame(width: 16)
+                VStack(alignment: .leading, spacing: 1) {
+                    highlightedTitle(item.title)
+                        .font(.system(size: 12, weight: active ? .semibold : .medium))
+                        .foregroundColor(Color(hex: dark ? "f6f9fb" : "0c1217"))
+                        .lineLimit(1)
+                    Text(section?.title ?? "")
+                        .font(.system(size: 10))
+                        .foregroundColor(Color(hex: dark ? "5d646a" : "81878c"))
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                if active {
+                    // Web 活动行右侧的 ↵ 徽章（mono / 边框 / bg-1 底）
+                    Text("↵")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundColor(Color(hex: dark ? "5d646a" : "81878c"))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Color(hex: dark ? "0d1216" : "ffffff"))
+                        .overlay(RoundedRectangle(cornerRadius: 3).stroke(AppTheme.border(dark), lineWidth: 1))
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(active ? searchHoverBg : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
+        .onHover { hovering in
+            if hovering, let idx = searchResults.firstIndex(where: { $0.nav == item.nav }) {
+                searchCursor = idx
+            }
+        }
+    }
+
+    /// 命中片段高亮（Web mark：accent + semibold）。
+    private func highlightedTitle(_ text: String) -> Text {
+        let q = navigation.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty, let range = text.range(of: q, options: .caseInsensitive) else {
+            return Text(text)
+        }
+        return Text(text[text.startIndex..<range.lowerBound])
+            + Text(text[range]).foregroundColor(AppTheme.sidebarActive).fontWeight(.semibold)
+            + Text(text[range.upperBound...])
+    }
+
+    private func commitSearch(_ item: NavigationItem) {
+        withAnimation(.easeInOut(duration: 0.18)) {
+            navigation.select(item.nav)
+            navigation.searchText = ""
+        }
+    }
+
+    private func installEscMonitor() {
+        guard escMonitor == nil else { return }
+        let nav = navigation
+        // ESC 清空（点击失焦由 AppDelegate 全局监听器统一处理）
+        escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if event.keyCode == 53 {
+                DispatchQueue.main.async { nav.searchText = "" }
+                return nil
+            }
+            return event
+        }
+    }
+
+    private func removeEscMonitor() {
+        if let monitor = escMonitor {
+            NSEvent.removeMonitor(monitor)
+            escMonitor = nil
+        }
     }
 
     private func sectionHeader(_ section: NavSection, firstItem: NavigationItem?) -> some View {
@@ -145,10 +352,18 @@ struct SidebarView: View {
             .padding(.horizontal, collapsed ? 0 : 10)
             .padding(.vertical, collapsed ? 10 : 8)
             .frame(maxWidth: .infinity, alignment: collapsed ? .center : .leading)
+            .background(
+                // Web: .sidebar-section-hoverable:hover { background: var(--bg-2) }
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(hoveredSection == section ? AppTheme.sidebarHover(dark) : Color.clear)
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(collapsed)
+        .onHover { hovering in
+            hoveredSection = hovering ? section : nil
+        }
         .padding(.bottom, 4)
     }
 
@@ -188,12 +403,17 @@ struct SidebarView: View {
                         .padding(.leading, 8)
                 }
             }
+            .background(
+                // Web: .sidebar-item:not(.active):hover { background: var(--bg-2) }
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(hoveredItem == item.nav && !selected ? AppTheme.sidebarHover(dark) : Color.clear)
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
         .padding(.leading, collapsed ? 0 : 6)
         .onHover { hovering in
-            _ = hovering
+            hoveredItem = hovering ? item.nav : nil
         }
     }
 

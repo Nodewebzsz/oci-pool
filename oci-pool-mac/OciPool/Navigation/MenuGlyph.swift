@@ -30,6 +30,16 @@ private struct MenuGlyphShape: Shape {
         }
         var path = Path()
         switch name {
+        case "rows-3":
+        path.addRoundedRect(in: r(3, 3, 18, 18), cornerSize: CGSize(width: 2 * sx, height: 2 * sy))
+        path.move(to: p(3, 9))
+        path.addLine(to: p(21, 9))
+        path.move(to: p(3, 15))
+        path.addLine(to: p(21, 15))
+        case "rows-2":
+        path.addRoundedRect(in: r(3, 3, 18, 18), cornerSize: CGSize(width: 2 * sx, height: 2 * sy))
+        path.move(to: p(3, 12))
+        path.addLine(to: p(21, 12))
         case "layers":
         path.move(to: p(12.83, 2.18))
         path.addCurve(to: p(12, 2), control1: p(12.569, 2.061), control2: p(12.286, 2))

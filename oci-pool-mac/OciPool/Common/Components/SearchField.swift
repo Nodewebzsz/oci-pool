@@ -5,11 +5,16 @@ struct SearchField: View {
     @Binding var text: String
     var placeholder: String = "搜索…"
     var onSubmit: (() -> Void)? = nil
+    var onEscape: (() -> Void)? = nil
+    var onMoveUp: (() -> Void)? = nil
+    var onMoveDown: (() -> Void)? = nil
     var maxWidth: CGFloat? = 280
     /// When true, expand to parent width (sidebar).
     var fillsWidth: Bool = false
     /// Sidebar-compatible dense chrome: 28pt tall, 5pt radius, 12pt text.
     var compact: Bool = false
+    /// 焦点变化回调（侧栏搜索下拉面板用）。
+    var onFocusChange: ((Bool) -> Void)? = nil
 
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme
@@ -55,11 +60,15 @@ struct SearchField: View {
                 enabled: true,
                 fontSize: unitFontSize,
                 isFocused: $focused,
-                onCommit: onSubmit
+                onCommit: onSubmit,
+                onEscape: onEscape,
+                onMoveUp: onMoveUp,
+                onMoveDown: onMoveDown
             )
             .frame(maxWidth: .infinity)
             .frame(height: compact ? 18 : 20)
         }
+        .onChange(of: focused) { onFocusChange?($0) }
         .frame(
             minWidth: fillsWidth ? 0 : 140,
             idealWidth: fillsWidth ? nil : 220,

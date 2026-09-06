@@ -191,28 +191,15 @@ struct TopNavDropdownOverlay: View {
 
             HStack(spacing: 8) {
                 ForEach(AccentPreset.allCases) { preset in
-                    Button(action: {
-                        appearance.accent = preset
-                        closeAll()
-                    }) {
-                        ZStack {
-                            Circle()
-                                .fill(preset.color)
-                                .frame(width: 26, height: 26)
-                            if appearance.accent == preset {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(preset.fg)
-                            }
+                    AccentDot(
+                        preset: preset,
+                        selected: appearance.accent == preset,
+                        dark: dark,
+                        onSelect: {
+                            appearance.accent = preset
+                            closeAll()
                         }
-                        .frame(width: 30, height: 30)
-                        .overlay(
-                            Circle()
-                                .stroke(appearance.accent == preset ? Color.white.opacity(0.9) : Color.clear, lineWidth: 2)
-                        )
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .help(preset.title)
+                    )
                 }
             }
             .padding(.horizontal, 4)
@@ -455,4 +442,43 @@ private struct NotificationDropdownPanel: View {
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         return formatter
     }()
+}
+
+// Web AccentSwitcher 圆点：30×30 命中区，26 圆点；
+// 选中 = 2px var(--fg-0) 外圈 + 同色光晕 + 深色勾，hover 放大 1.1。
+private struct AccentDot: View {
+    var preset: AccentPreset
+    var selected: Bool
+    var dark: Bool
+    var onSelect: () -> Void
+
+    @State private var hovering = false
+
+    private var fg0: Color { Color(hex: dark ? "f6f9fb" : "0c1217") }
+
+    var body: some View {
+        Button(action: onSelect) {
+            ZStack {
+                Circle()
+                    .fill(preset.color)
+                    .frame(width: 26, height: 26)
+                if selected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(preset.fg)
+                }
+            }
+            .frame(width: 30, height: 30)
+            .overlay(
+                Circle()
+                    .stroke(selected ? fg0 : Color.clear, lineWidth: 2)
+            )
+            .shadow(color: selected ? preset.color.opacity(0.55) : .clear, radius: 8)
+            .scaleEffect(hovering ? 1.1 : 1.0)
+            .animation(.easeOut(duration: 0.12), value: hovering)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .onHover { hovering = $0 }
+        .help(preset.title)
+    }
 }

@@ -108,12 +108,10 @@ struct TopNavView: View {
         .help(navigation.sidebarCollapsed ? "展开侧栏（⌘⌥S）" : "收起侧栏（⌘⌥S）")
     }
 
-    // Web topbar 引擎状态 pill:运行点 + 引擎 + 运行中
+    // Web topbar 引擎状态 pill:运行点(pulse) + 引擎 + 运行中
     private var engineStatus: some View {
         HStack(spacing: 8) {
-            Circle()
-                .fill(AppTheme.sidebarActive)
-                .frame(width: 7, height: 7)
+            PulseDotView(color: AppTheme.sidebarActive)
             Text("抢机引擎")
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.navIcon(dark))
@@ -253,9 +251,7 @@ struct TopNavView: View {
             chrome.close()
             appearance.density = appearance.density == .compact ? .comfortable : .compact
         } label: {
-            Image(systemName: appearance.density == .compact ? "list.bullet" : "square.grid.2x2")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(AppTheme.navIcon(dark))
+            MenuGlyph(name: appearance.density == .compact ? "rows-3" : "rows-2", size: 15, color: AppTheme.navIcon(dark))
                 .frame(width: 30, height: 30)
                 .background(
                     RoundedRectangle(cornerRadius: 5)
@@ -315,12 +311,17 @@ struct TopNavView: View {
         }) {
             HStack(spacing: 6) {
                 ZStack {
+                    // Web UserAvatar：26px linear-gradient(135deg, accent, cyan) 底 + 深色字
                     Circle()
-                        .fill(AppTheme.brand(dark).opacity(0.25))
+                        .fill(LinearGradient(
+                            gradient: Gradient(colors: [AppTheme.brand(dark), Color(hex: "2fd0cc")]),
+                            startPoint: .topLeading, endPoint: .bottomTrailing
+                        ))
                         .frame(width: 26, height: 26)
                     Text(avatarLetter)
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(AppTheme.brand(dark))
+                        .font(.system(size: 10.5, weight: .bold))
+                        .foregroundColor(Color(hex: "0e2a22"))
+                        .tracking(-0.2)
                 }
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8, weight: .bold))
@@ -1149,5 +1150,22 @@ private struct VersionUpdateProgressSheet: View {
         .padding(28)
         .frame(width: 400, height: 300)
         .background(dark ? Color(hex: "1e2430") : Color.white)
+    }
+}
+
+// Web pulse-dot：持续呼吸的状态圆点（pulse-dot 1.8s）。
+private struct PulseDotView: View {
+    var color: Color
+    var size: CGFloat = 7
+    @State private var pulse = false
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: size, height: size)
+            .scaleEffect(pulse ? 1.0 : 0.72)
+            .opacity(pulse ? 1.0 : 0.55)
+            .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
+            .onAppear { pulse = true }
     }
 }

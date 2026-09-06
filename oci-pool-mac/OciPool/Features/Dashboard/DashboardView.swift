@@ -42,9 +42,8 @@ struct DashboardView: View {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(DashboardTheme.green(dark).opacity(0.18))
                         .frame(width: 32, height: 32)
-                    Image(systemName: "activity")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(DashboardTheme.green(dark))
+                    // Web 页头图标为 Lucide activity 描边（SF Symbol 在部分系统上不渲染）
+                    MenuGlyph(name: "activity", size: 17, color: DashboardTheme.green(dark))
                 }
                 Text("系统监控")
                     .font(.system(size: 17, weight: .semibold))
