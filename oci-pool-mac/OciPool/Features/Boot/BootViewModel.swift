@@ -227,33 +227,40 @@ final class BootViewModel: ObservableObject {
             do {
                 let n = try await service.startingCount()
                 guard AppAlert.confirm(
-                    title: "批量停止",
-                    message: "将停止全部开机中任务（当前约 \(n) 条），确定继续？"
+                    title: "停止全部运行中任务?",
+                    message: "\(n) 个正在运行的任务将被停止，当前正在进行的抢机请求会完成后停止。",
+                    confirmTitle: "全部停止"
                 ) else {
                     LoadingHUD.shared.end()
                     return
                 }
                 try await service.batchStop()
                 await reload()
+                ToastCenter.shared.success("已停止全部运行中任务")
             } catch {
-                ToastCenter.shared.error(error.localizedDescription)
+                ToastCenter.shared.error("停止失败: \(error.localizedDescription)")
             }
             LoadingHUD.shared.end()
         }
     }
 
     func batchResetFail() {
-        guard AppAlert.confirm(
-            title: "重置失败次数",
-            message: "将清空全部任务的失败计数，确定继续？"
-        ) else { return }
+        // Web：重置所有任务统计（次数/失败/成功清零）+ requireText RESET
+        guard let input = AppAlert.confirmRequireText(
+            title: "重置所有任务统计?",
+            message: "所有任务的抢机次数、失败数、成功数将被清零，且无法恢复。",
+            requiredText: "RESET",
+            placeholder: "输入 RESET 以确认",
+            confirmTitle: "重置"
+        ), input == "RESET" else { return }
         Task {
             LoadingHUD.shared.begin()
             do {
                 try await service.batchInitFailCount()
                 await reload()
+                ToastCenter.shared.success("已重置所有任务统计")
             } catch {
-                ToastCenter.shared.error(error.localizedDescription)
+                ToastCenter.shared.error("重置失败: \(error.localizedDescription)")
             }
             LoadingHUD.shared.end()
         }
@@ -268,22 +275,26 @@ final class BootViewModel: ObservableObject {
             do {
                 try await service.startBoot(bootId: item.id)
                 await reload()
+                ToastCenter.shared.success("任务 \(item.displayTenant) 已启动")
             } catch {
-                ToastCenter.shared.error(error.localizedDescription)
+                ToastCenter.shared.error("启动失败: \(error.localizedDescription)")
             }
             LoadingHUD.shared.end()
         }
     }
 
     func confirmStop(_ item: BootTaskItem) {
-        guard AppAlert.confirm(title: "停止任务", message: "停止 \(item.displayTenant) · \(item.archText) 下开机中任务？") else { return }
+        guard AppAlert.confirm(title: "停止任务 \(item.displayTenant)?",
+                               message: "已抢到的实例不会被删除，仅停止后续抢机尝试。",
+                               confirmTitle: "停止") else { return }
         Task {
             LoadingHUD.shared.begin()
             do {
                 try await service.stopBoot(bootId: item.id)
                 await reload()
+                ToastCenter.shared.success("任务 \(item.displayTenant) 已停止")
             } catch {
-                ToastCenter.shared.error(error.localizedDescription)
+                ToastCenter.shared.error("停止失败: \(error.localizedDescription)")
             }
             LoadingHUD.shared.end()
         }
@@ -304,10 +315,14 @@ final class BootViewModel: ObservableObject {
     }
 
     func confirmDelete(_ item: BootTaskItem) {
-        guard AppAlert.confirm(
-            title: "删除开机任务",
-            message: "将删除该租户+架构下全部抢机配置，确定？"
-        ) else { return }
+        // Web：requireText = 租户名 + 确认按钮「永久删除」
+        guard let input = AppAlert.confirmRequireText(
+            title: "删除任务 \(item.displayTenant)?",
+            message: "该任务将从队列中永久移除。已抢到的实例不会被删除。",
+            requiredText: item.displayTenant,
+            placeholder: "输入租户名以确认",
+            confirmTitle: "永久删除"
+        ), input == item.displayTenant else { return }
         Task {
             LoadingHUD.shared.begin()
             do {

@@ -226,25 +226,27 @@ final class StorageViewModel: ObservableObject {
     }
 
     func deleteBucket(_ item: StorageBucketItem) {
-        guard let tenantId = tenantIdValue else { return }
-        guard AppAlert.confirm(
-            title: "删除存储桶",
-            message: "确定删除「\(item.name)」？桶必须为空才能删除。"
-        ) else { return }
+        // Web：requireText = 桶名 +「永久删除」
+        guard let input = AppAlert.confirmRequireText(
+            title: "删除存储桶 \(item.name)?",
+            message: "该操作不可撤销。",
+            requiredText: item.name,
+            placeholder: "输入桶名以确认",
+            confirmTitle: "永久删除"
+        ), input == item.name else { return }
         Task {
             LoadingHUD.shared.begin()
             do {
                 try await service.deleteBucket(
-                    tenantId: tenantId,
+                    tenantId: tenantIdValue ?? 0,
                     namespace: item.namespace,
                     bucketName: item.name
                 )
-                if selectedBucket?.name == item.name {
-                    clearObjectPanel()
-                }
-                await loadBuckets(reset: true)
+                if selectedBucket?.name == item.name { clearObjectPanel() }
+                refreshBuckets()
+                ToastCenter.shared.warn("✓ 已删除存储桶 \(item.name)")
             } catch {
-                ToastCenter.shared.error(error.localizedDescription)
+                ToastCenter.shared.error("删除失败: \(error.localizedDescription)")
             }
             LoadingHUD.shared.end()
         }
