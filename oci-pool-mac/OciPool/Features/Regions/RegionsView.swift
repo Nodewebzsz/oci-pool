@@ -306,7 +306,7 @@ struct RegionsView: View {
                     col("开机时间", 140)
                     col("总开机数量", 90)
                     col("本月开机数量", 100)
-                    col("最近开机时间", 140)
+                    colFlexible("最近开机时间")
                 }
                 .padding(.vertical, 10)
                 .padding(.horizontal, 8)
@@ -428,7 +428,7 @@ struct RegionsView: View {
             grabCountCell(row.openCount, width: 90)
             monthlyCell(row.monthlyOpenCount)
                 .frame(width: 100, alignment: .leading)
-            cell(Self.fmt(row.lastNotifyTime), 140)
+            cellFlexible(Self.fmt(row.lastNotifyTime))
         }
         .padding(.vertical, appearance.density.rowPadding)
         .padding(.horizontal, 8)
@@ -493,6 +493,22 @@ struct RegionsView: View {
             .font(.system(size: 12, weight: count > 0 ? .semibold : .regular))
             .foregroundColor(count > 0 ? RegionsTheme.orange(dark) : RegionsTheme.muted(dark))
             .lineLimit(1)
+    }
+
+    /// 最后一列弹性撑满剩余宽度（对齐 Web 表格 width:100%）
+    private func colFlexible(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundColor(RegionsTheme.muted(dark))
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func cellFlexible(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 12, design: .monospaced))
+            .foregroundColor(RegionsTheme.text(dark).opacity(0.75))
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func col(_ title: String, _ w: CGFloat) -> some View {
