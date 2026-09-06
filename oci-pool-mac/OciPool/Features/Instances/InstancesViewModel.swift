@@ -51,6 +51,9 @@ final class InstancesViewModel: ObservableObject {
     var runningCount: Int { rows.filter(\.isRunning).count }
     var stoppedCount: Int { rows.filter(\.isStopped).count }
     var otherStateCount: Int { rows.count - runningCount - stoppedCount }
+    /// Web KPI：ARM 架构实例数 / 覆盖区域数（按当前加载实例去重）
+    var armCount: Int { rows.filter { $0.architecture.uppercased().contains("ARM") || $0.shape.uppercased().contains("ARM") }.count }
+    var regionsCount: Int { Set(rows.map(\.regionCode).filter { !$0.isEmpty }).count }
 
     init(session: AppSession = .shared) {
         self.session = session

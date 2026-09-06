@@ -67,7 +67,7 @@ struct InstancesView: View {
     private var listPage: some View {
         PageScaffold(
             title: "OCI 实例管理",
-            subtitle: tenantSubPage ? tenantSubtitle : filterSubtitle,
+            subtitle: tenantSubPage ? tenantSubtitle : nil,
             systemImage: "server.rack",
             iconColor: AppTheme.cyan,
             toolbar: { toolbar },
@@ -76,12 +76,14 @@ struct InstancesView: View {
                     if tenantSubPage {
                         breadcrumbBar
                     }
-                    filterBar
                     if let err = model.errorText, !err.isEmpty { errorBanner(err) }
-                    summaryBar
-                    listBody
-                        .padding(.horizontal, 16)
+                    // Web：筛选状态条（accent-soft 底 + accent 边框 radius 6）
+                    filterStatusBar
                         .padding(.bottom, 12)
+                    // Web KPI：4 卡（总实例数/运行中/ARM 架构/覆盖区域）gap 12
+                    kpiGrid
+                        .padding(.bottom, 14)
+                    listBody
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .appLoading(model.isLoading && !model.rows.isEmpty)
@@ -125,80 +127,165 @@ struct InstancesView: View {
 
     // MARK: - Toolbar
 
+    /// Web 页头 actions：`请选择:` + 租户/区域 Select(160) + eye 图标钮 + 查看实例(primary) + 一键导出(orange)
     private var toolbar: some View {
         HStack(spacing: 8) {
-            AppButton(
-                title: model.namesHidden ? "显示完整租户名" : "隐藏租户名",
-                systemImage: model.namesHidden ? "eye" : "eye.slash",
-                kind: .secondary
-            ) {
+            Text("请选择:")
+                .font(.system(size: 12))
+                .foregroundColor(AppTheme.textTertiary(dark))
+            SelectMenu(
+                options: model.parentTenants.map { SelectOption(id: $0.id, title: parentLabel($0)) },
+                selection: Binding(
+                    get: { model.selectedParentId.isEmpty ? nil : model.selectedParentId },
+                    set: { model.onParentChanged($0) }
+                ),
+                placeholder: "请选择租户",
+                width: 160,
+                allowClear: true,
+                searchable: true
+            )
+            SelectMenu(
+                options: model.regions.map { SelectOption(id: $0.id, title: regionLabel($0)) },
+                selection: Binding(
+                    get: { model.selectedRegionId.isEmpty ? nil : model.selectedRegionId },
+                    set: { model.onRegionChanged($0) }
+                ),
+                placeholder: "请选择区域",
+                width: 160,
+                enabled: !model.selectedParentId.isEmpty,
+                allowClear: true,
+                searchable: true
+            )
+            Button {
                 withAnimation(.easeInOut(duration: 0.15)) {
                     model.namesHidden.toggle()
                 }
+            } label: {
+                Image(systemName: model.namesHidden ? "eye" : "eye.slash")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(AppTheme.navIcon(dark))
+                    .frame(width: 30, height: 30)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(AppTheme.sidebarHover(dark))
+                            .overlay(RoundedRectangle(cornerRadius: 5).stroke(AppTheme.border(dark), lineWidth: 1))
+                    )
+            }
+            .buttonStyle(PlainButtonStyle())
+            .help(model.namesHidden ? "显示完整租户名" : "隐藏租户名")
+            AppButton(title: "查看实例", systemImage: "magnifyingglass", kind: .primary,
+                      enabled: !model.selectedRegionId.isEmpty) {
+                model.applyFilter()
             }
             AppButton(title: "一键导出", systemImage: "square.and.arrow.down", kind: .orange) {
                 model.exportInstances()
-            }
-            AppButton(
-                title: "刷新",
-                systemImage: "arrow.clockwise",
-                kind: .secondary,
-                isLoading: model.isLoading
-            ) {
-                Task { await model.reload() }
             }
         }
     }
 
     // MARK: - Filter
 
-    private var filterBar: some View {
-        FilterBar(
-            leading: {
-                HStack(spacing: 10) {
-                    SelectMenu(
-                        options: model.parentTenants.map { SelectOption(id: $0.id, title: parentLabel($0)) },
-                        selection: Binding(
-                            get: { model.selectedParentId.isEmpty ? nil : model.selectedParentId },
-                            set: { model.onParentChanged($0) }
-                        ),
-                        placeholder: "请选择租户",
-                        width: 160,
-                        allowClear: true,
-                        searchable: true
-                    )
-                    SelectMenu(
-                        options: model.regions.map { SelectOption(id: $0.id, title: regionLabel($0)) },
-                        selection: Binding(
-                            get: { model.selectedRegionId.isEmpty ? nil : model.selectedRegionId },
-                            set: { model.onRegionChanged($0) }
-                        ),
-                        placeholder: model.selectedParentId.isEmpty ? "请选择区域" : "请选择区域",
-                        width: 160,
-                        enabled: !model.selectedParentId.isEmpty,
-                        allowClear: true,
-                        searchable: true
-                    )
-                }
-            },
-            trailing: {
-                HStack(spacing: 8) {
-                    if model.hasActiveFilter {
-                        AppButton(title: "清除筛选", systemImage: "xmark", kind: .secondary) {
-                            model.resetFilter()
-                        }
-                    }
-                    AppButton(
-                        title: "查询",
-                        systemImage: "magnifyingglass",
-                        kind: .primary,
-                        enabled: model.canQuery || model.hasActiveFilter
-                    ) {
-                        model.applyFilter()
-                    }
-                }
+    /// Web 筛选状态条：accent-soft 底 + accent 45% 边框 · filter 图标 + 当前筛选: + 租户/区域 chips + 匹配 N 条 + 清除筛选
+    private var filterStatusBar: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "line.3.horizontal.decrease")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(AppTheme.sidebarActive)
+            Text("当前筛选:")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(AppTheme.sidebarActive)
+            filterChip(label: "租户", value: model.selectedParentId.isEmpty
+                ? nil
+                : (model.parentTenants.first(where: { $0.id == model.selectedParentId }).flatMap { parentAlias($0) } ?? model.selectedParentId))
+            filterChip(label: "区域", value: model.selectedRegionId.isEmpty
+                ? nil
+                : (model.regions.first(where: { $0.id == model.selectedRegionId }).map { regionLabel($0) } ?? model.selectedRegionId))
+            Text("· 匹配 \(model.pageState.totalElements) 条")
+                .font(.system(size: 12))
+                .foregroundColor(AppTheme.textSecondary(dark))
+            Spacer(minLength: 12)
+            AppButton(title: "清除筛选", systemImage: "arrow.counterclockwise", kind: .secondary,
+                      enabled: model.hasActiveFilter) {
+                model.resetFilter()
             }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(AppTheme.sidebarActive.opacity(0.14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(AppTheme.sidebarActive.opacity(0.45), lineWidth: 1)
         )
+        .cornerRadius(6)
+    }
+
+    /// 筛选 chip：`标签 值`（bg-1 底 radius 3；未选择时值=未选择）
+    private func filterChip(label: String, value: String?) -> some View {
+        HStack(spacing: 5) {
+            Text(label)
+                .font(.system(size: 10.5))
+                .foregroundColor(AppTheme.textTertiary(dark))
+            Text(value ?? "未选择")
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(AppTheme.navIcon(dark))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 2)
+        .background(AppTheme.sidebarBg(dark))
+        .cornerRadius(3)
+    }
+
+    /// Web `parentLabel` 的短名（别名/用户名）
+    private func parentAlias(_ t: TenantRegionOption) -> String {
+        if !t.userName.isEmpty { return t.userName }
+        if !t.tenancyName.isEmpty { return t.tenancyName }
+        return t.id
+    }
+
+    /// Web KPI：4 卡 gap 12（总实例数 cyan / 运行中 accent / ARM 架构 info / 覆盖区域 violet）
+    private var kpiGrid: some View {
+        HStack(alignment: .top, spacing: 12) {
+            instanceKpiCard(icon: "server.rack", color: AppTheme.cyan, label: "总实例数",
+                            value: "\(model.pageState.totalElements)")
+            instanceKpiCard(icon: "play.circle", color: AppTheme.sidebarActive, label: "运行中",
+                            value: "\(model.runningCount)")
+            instanceKpiCard(icon: "cpu", color: AppTheme.info, label: "ARM 架构",
+                            value: "\(model.armCount)")
+            instanceKpiCard(icon: "globe", color: Color(hex: "b484e8"), label: "覆盖区域",
+                            value: "\(model.regionsCount)")
+        }
+    }
+
+    private func instanceKpiCard(icon: String, color: Color, label: String, value: String) -> some View {
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(color.opacity(0.18))
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundColor(color)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(AppTheme.textTertiary(dark))
+                    .lineLimit(1)
+                Text(value)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(AppTheme.navIcon(dark))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.border(dark), lineWidth: 1))
+        .cornerRadius(8)
     }
 
     /// 对齐 Web：`userName || tenancyName || id`
