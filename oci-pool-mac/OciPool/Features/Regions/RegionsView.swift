@@ -11,23 +11,25 @@ struct RegionsView: View {
     private var dark: Bool { appearance.isDarkEffective }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                header
-                if let err = model.errorText, !err.isEmpty {
-                    errorBanner(err)
-                }
-                statsGrid
-                tabsCard
-                if model.mapMode == .map {
-                    mapCard
-                } else {
-                    listCard
-                }
+        // Web：整页 flex column，卡片占满剩余高度（minHeight:0），分页钉在卡片底部
+        VStack(alignment: .leading, spacing: 20) {
+            header
+            if let err = model.errorText, !err.isEmpty {
+                errorBanner(err)
             }
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            statsGrid
+            tabsCard
+            if model.mapMode == .map {
+                ScrollView {
+                    mapCard
+                }
+                .frame(maxHeight: .infinity, alignment: .top)
+            } else {
+                listCard
+            }
         }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(RegionsTheme.bg(dark).ignoresSafeArea())
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         .onAppear {
@@ -290,6 +292,7 @@ struct RegionsView: View {
     }
 
     private var listCard: some View {
+        // Web 结构：卡片 = flex column（占满剩余高度）— 筛选栏固定 / 表格区 flex:1 内部滚动 / 分页 flexShrink:0 钉底
         // ZStack so filter dropdown can float above the table without pushing rows.
         ZStack(alignment: .topLeading) {
             // Table block (full card content, with top inset for the filter row)
@@ -313,23 +316,31 @@ struct RegionsView: View {
                 .background(RegionsTheme.surface(dark))
                 .overlay(Rectangle().fill(RegionsTheme.border(dark)).frame(height: 1), alignment: .bottom)
 
-                if model.pageRows.isEmpty {
-                    Text(model.isLoading ? "加载中..." : "没有找到匹配的区域")
-                        .font(.system(size: 13))
-                        .foregroundColor(RegionsTheme.muted(dark))
-                        .frame(maxWidth: .infinity)
-                        .padding(40)
-                } else {
-                    ForEach(model.pageRows) { row in
-                        regionRow(row)
+                // 表格区 — 占剩余空间，内部滚动（Web: flex:1 + overflow auto）
+                ScrollView(.vertical, showsIndicators: true) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        if model.pageRows.isEmpty {
+                            Text(model.isLoading ? "加载中..." : "没有找到匹配的区域")
+                                .font(.system(size: 13))
+                                .foregroundColor(RegionsTheme.muted(dark))
+                                .frame(maxWidth: .infinity)
+                                .padding(40)
+                        } else {
+                            ForEach(model.pageRows) { row in
+                                regionRow(row)
+                            }
+                        }
                     }
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
+                .frame(maxHeight: .infinity, alignment: .top)
 
-                // Common drop-in pagination (SelectMenu size + AppInputStyle jump)
+                // 分页 — 固定卡片底部（Web: flexShrink 0 + borderTop）
                 PaginationBar(state: $model.pageState) {
                     model.goPage { _ in }
                 }
-                .padding(.top, 8)
+                .padding(.top, 10)
+                .overlay(Rectangle().fill(RegionsTheme.border(dark)).frame(height: 1), alignment: .top)
             }
 
             // Filter row on top layer — SelectMenu panel floats over the table
