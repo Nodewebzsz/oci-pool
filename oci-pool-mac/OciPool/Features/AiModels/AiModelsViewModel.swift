@@ -42,10 +42,7 @@ final class AiModelsViewModel: ObservableObject {
         defer { isLoadingTenants = false }
         do {
             tenants = try await service.listTenants()
-            if selectedTenantId.isEmpty, let first = tenants.first {
-                selectedTenantId = first.id
-                await loadModels()
-            }
+            // 对齐 Web：默认不选中任何租户，由用户手动选择
         } catch {
             tenants = []
             errorText = error.localizedDescription
