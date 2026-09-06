@@ -26,7 +26,7 @@ struct PaginationBar: View {
     @Environment(\.colorScheme) private var colorScheme
     private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
 
-    private let controlHeight: CGFloat = 32
+    private let controlHeight: CGFloat = 26
 
     private var sizeOptions: [SelectOption] {
         PageState.sizeOptions.map { SelectOption(id: "\($0)", title: "\($0)") }
@@ -78,7 +78,8 @@ struct PaginationBar: View {
                 placeholder: "\(state.size)",
                 width: 78,
                 allowClear: false,
-                searchable: false
+                searchable: false,
+                controlHeight: controlHeight
             )
         }
     }

@@ -479,6 +479,8 @@ struct SelectMenu: View {
     /// Search box: `nil` = auto when options ≥ 8.
     var searchable: Bool? = nil
     var maxPanelHeight: CGFloat = 240
+    /// nil = 使用全局 AppInputStyle.height（紧凑场景如分页条可传 26）
+    var controlHeight: CGFloat? = nil
 
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme
@@ -491,6 +493,7 @@ struct SelectMenu: View {
     }
 
     private var resolvedWidth: CGFloat { width ?? 160 }
+    private var resolvedHeight: CGFloat { controlHeight ?? AppInputStyle.height }
     private var panelWidth: CGFloat { resolvedWidth }
 
     private var displayTitle: String {
@@ -512,7 +515,7 @@ struct SelectMenu: View {
 
     var body: some View {
         trigger
-            .frame(width: resolvedWidth, height: AppInputStyle.height, alignment: .topLeading)
+            .frame(width: resolvedWidth, height: resolvedHeight, alignment: .topLeading)
             .background(
                 SelectMenuFloatBridge(panelState: panelState, panelWidth: panelWidth)
             )
@@ -567,7 +570,7 @@ struct SelectMenu: View {
                     .frame(width: 14, height: 14)
             }
             .padding(.horizontal, AppInputStyle.hPad)
-            .frame(width: resolvedWidth, height: AppInputStyle.height)
+            .frame(width: resolvedWidth, height: resolvedHeight)
             .background(
                 RoundedRectangle(cornerRadius: AppInputStyle.radius)
                     .fill(AppInputStyle.fill(dark, focused: panelState.isOpen))
