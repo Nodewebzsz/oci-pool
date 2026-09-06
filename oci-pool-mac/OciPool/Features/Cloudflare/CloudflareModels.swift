@@ -167,13 +167,13 @@ enum CloudflareJSON {
 
     // MARK: - Display helpers
 
+    // Web 下拉仅 5 项（无 NS）
     static let typeOptions: [SelectOption] = [
-        SelectOption(id: "A", title: "A · IPv4"),
-        SelectOption(id: "AAAA", title: "AAAA · IPv6"),
+        SelectOption(id: "A", title: "A"),
+        SelectOption(id: "AAAA", title: "AAAA"),
         SelectOption(id: "CNAME", title: "CNAME"),
         SelectOption(id: "MX", title: "MX"),
-        SelectOption(id: "TXT", title: "TXT"),
-        SelectOption(id: "NS", title: "NS")
+        SelectOption(id: "TXT", title: "TXT")
     ]
 
     static let ttlOptions: [SelectOption] = [

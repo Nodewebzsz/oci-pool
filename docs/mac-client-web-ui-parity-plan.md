@@ -36,9 +36,9 @@
 
 | # | 页面 | Web 源 | 原生视图 | 状态 |
 |---|---|---|---|---|
-| B1 | 秘钥配置（域名服务商） | page-proxy.jsx | KeyConfig/KeyConfigView | ⬜ |
-| B2 | CF 管理 | page-proxy.jsx | Cloudflare/CloudflareView | ⬜ |
-| B3 | EO 管理 | page-proxy.jsx | EdgeOne/EdgeOneView | ⬜ |
+| B1 | 秘钥配置（域名服务商） | page-proxy.jsx | KeyConfig/KeyConfigView | ✅ 2026-09-06（标题 Token 配置/副标题/占位符与 hint 逐字/CF orange+EO info/测试连接 info/徽章 已连接未连接/toast ✓ 前缀）。❓ 分组标题「域名服务商配置」、显隐切换待做 |
+| B2 | CF 管理 | page-proxy.jsx | Cloudflare/CloudflareView | ✅ 2026-09-06（标题/副标题/工具栏颜色与文案/表头/代理徽章 🟠⚪ 限 A·AAAA·CNAME/类型 5 项/TTL 中文单位/删除色）。❓ 搜索栏标签+搜索按钮、MX 优先级字段待做 |
+| B3 | EO 管理 | page-proxy.jsx | EdgeOne/EdgeOneView | ✅ 2026-09-06（标题/副标题/工具栏颜色/表头 名称·值/TTL 5 档 60 秒起/域名状态 3 态中文/tab accent/删除色）。❓ 优先级必填、加速域名状态下拉待做 |
 
 ## 批次 C · 资源管理（1 页）
 

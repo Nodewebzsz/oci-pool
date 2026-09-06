@@ -10,9 +10,9 @@ struct CloudflareView: View {
 
     var body: some View {
         PageScaffold(
-            title: "Cloudflare",
-            subtitle: "DNS 解析管理 · 代理状态 · 同步记录",
-            systemImage: "cloud.fill",
+            title: "CF 管理",
+            subtitle: "Cloudflare · DNS 记录管理与代理配置",
+            systemImage: "globe",
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
@@ -55,7 +55,7 @@ struct CloudflareView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
-            AppButton(title: "密钥配置", systemImage: "key", kind: .secondary) {
+            AppButton(title: "秘钥配置", systemImage: "key", kind: .orange) {
                 model.openConfig()
             }
             AppButton(title: "添加记录", systemImage: "plus", kind: .primary) {
@@ -167,6 +167,32 @@ struct CloudflareView: View {
         }
     }
 
+    /// Web 代理状态徽章：仅 A/AAAA/CNAME 显示（🟠 已代理 = orange-soft / ⚪ 仅 DNS = 灰），其他类型「—」
+    @ViewBuilder
+    private func proxyBadge(_ item: CfDnsRecord) -> some View {
+        let badgeTypes = ["A", "AAAA", "CNAME"]
+        if badgeTypes.contains(item.type.uppercased()) {
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(item.proxied ? AppTheme.orange : AppTheme.sidebarText(dark).opacity(0.5))
+                    .frame(width: 5, height: 5)
+                Text(item.proxied ? "已代理" : "仅 DNS")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(item.proxied ? AppTheme.orange : AppTheme.sidebarText(dark))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(item.proxied ? AppTheme.orange.opacity(0.14) : AppTheme.sidebarHover(dark).opacity(0.6))
+            )
+        } else {
+            Text("—")
+                .font(.system(size: 11))
+                .foregroundColor(AppTheme.sidebarText(dark))
+        }
+    }
+
     private func row(_ item: CfDnsRecord) -> some View {
         HStack(spacing: 0) {
             typeChip(item.type)
@@ -174,17 +200,14 @@ struct CloudflareView: View {
             cell(item.name, width: nil)
             cell(item.content, width: nil)
             cell(CloudflareJSON.formatTTL(item.ttl), width: 72)
-            StatusBadge(
-                text: item.proxied ? "已代理" : "仅 DNS",
-                tone: item.proxied ? .warning : .info
-            )
-            .frame(width: 80, alignment: .leading)
+            proxyBadge(item)
+                .frame(width: 80, alignment: .leading)
             HStack(spacing: 6) {
                 Spacer(minLength: 0)
                 actionBtn("pencil", color: AppTheme.sidebarActive, tip: "编辑") {
                     model.openEdit(item)
                 }
-                actionBtn("trash", color: Color(hex: "f85149"), tip: "删除") {
+                actionBtn("trash", color: AppTheme.danger, tip: "删除") {
                     model.delete(item)
                 }
             }
@@ -229,7 +252,7 @@ struct CloudflareView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
+                .foregroundColor(AppTheme.danger)
             Text(text).font(.system(size: 12))
             Spacer()
             Button("密钥配置") { model.openConfig() }
@@ -239,9 +262,9 @@ struct CloudflareView: View {
             }
             .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(8)
     }
 }

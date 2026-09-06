@@ -161,11 +161,11 @@ final class KeyConfigViewModel: ObservableObject {
     func copy(_ text: String, label: String) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else {
-            ToastCenter.shared.error("暂无 \(label) 可复制")
+            ToastCenter.shared.error("内容为空，无法复制")
             return
         }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(t, forType: .string)
-        ToastCenter.shared.success("已复制 \(label)")
+        ToastCenter.shared.success("✓ 已复制 · \(label)")
     }
 }

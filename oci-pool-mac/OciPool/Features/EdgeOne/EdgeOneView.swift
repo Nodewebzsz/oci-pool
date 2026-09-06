@@ -10,8 +10,8 @@ struct EdgeOneView: View {
 
     var body: some View {
         PageScaffold(
-            title: "EdgeOne",
-            subtitle: "腾讯云 DNS 记录 · 加速域名 · 同步管理",
+            title: "EO 管理",
+            subtitle: "Tencent EdgeOne · DNS 记录管理与加速域名",
             systemImage: "globe",
             toolbar: { toolbar },
             content: {
@@ -60,7 +60,7 @@ struct EdgeOneView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
-            AppButton(title: "密钥配置", systemImage: "key", kind: .secondary) {
+            AppButton(title: "秘钥配置", systemImage: "key", kind: .orange) {
                 model.openConfig()
             }
             if model.mode == .dns {
@@ -111,7 +111,7 @@ struct EdgeOneView: View {
                     .background(
                         RoundedRectangle(cornerRadius: 8)
                             .fill(model.mode == m
-                                  ? Color(hex: "00b9ff")
+                                  ? AppTheme.sidebarActive
                                   : Color.clear)
                     )
                 }
@@ -241,7 +241,7 @@ struct EdgeOneView: View {
         Group {
             if model.pagedDomains.isEmpty && !model.isLoading {
                 EmptyStateView(
-                    icon: "speedometer",
+                    icon: "zap",
                     title: model.filteredDomains.isEmpty && !model.accelDomains.isEmpty
                         ? "无匹配结果"
                         : "暂无加速域名",
@@ -286,7 +286,7 @@ struct EdgeOneView: View {
                 actionBtn("pencil", color: AppTheme.sidebarActive, tip: "编辑") {
                     model.openEdit(item)
                 }
-                actionBtn("trash", color: Color(hex: "f85149"), tip: "删除") {
+                actionBtn("trash", color: AppTheme.danger, tip: "删除") {
                     model.deleteDns(item)
                 }
             }
@@ -298,7 +298,7 @@ struct EdgeOneView: View {
         HStack(spacing: 0) {
             cell(item.domainName, width: nil)
             StatusBadge(
-                text: item.status.isEmpty ? "—" : item.status,
+                text: item.statusLabel,
                 tone: item.statusTone
             )
             .frame(width: 90, alignment: .leading)
@@ -306,7 +306,7 @@ struct EdgeOneView: View {
             cell(item.protocolLabel, width: 100)
             HStack {
                 Spacer(minLength: 0)
-                actionBtn("trash", color: Color(hex: "f85149"), tip: "删除") {
+                actionBtn("trash", color: AppTheme.danger, tip: "删除") {
                     model.deleteDomain(item)
                 }
             }
@@ -351,7 +351,7 @@ struct EdgeOneView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
+                .foregroundColor(AppTheme.danger)
             Text(text).font(.system(size: 12))
             Spacer()
             Button("密钥配置") { model.openConfig() }
@@ -361,9 +361,9 @@ struct EdgeOneView: View {
             }
             .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(8)
     }
 }

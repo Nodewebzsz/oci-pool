@@ -12,8 +12,8 @@ struct KeyConfigView: View {
 
     var body: some View {
         PageScaffold(
-            title: "密钥配置",
-            subtitle: "域名服务商密钥 · Cloudflare / 腾讯云 EdgeOne",
+            title: "Token 配置",
+            subtitle: "域名服务商配置 · 管理 DNS/CDN 服务商的 API 秘钥",
             systemImage: "key.fill",
             toolbar: { toolbar },
             content: {
@@ -66,9 +66,9 @@ struct KeyConfigView: View {
     private var cloudflareCard: some View {
         ModuleSettingsCard(
             title: "Cloudflare",
-            subtitle: "Global API Key · 域名 DNS 管理",
-            systemImage: "cloud",
-            accent: Color(hex: "f38020"),
+            subtitle: "",
+                        systemImage: "cloud",
+            accent: AppTheme.orange,
             enabled: $model.cloudflare.enabled,
             minHeight: cardMinHeight
         ) {
@@ -76,7 +76,7 @@ struct KeyConfigView: View {
                 HStack(spacing: 8) {
                     AppTextField(
                         text: $model.cloudflare.apiToken,
-                        placeholder: "Cloudflare Global API Key",
+                        placeholder: "输入 Cloudflare API Key",
                         secure: true,
                         leadingSystemImage: "key"
                     )
@@ -85,32 +85,32 @@ struct KeyConfigView: View {
                     }
                 }
             }
-            Text("My Profile → API Tokens → Global API Key")
+            Text("在 Cloudflare Dashboard > My Profile > API Keys 中创建")
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.sidebarText(dark))
 
             FormFieldRow(label: "账户邮箱", required: true) {
                 AppTextField(
                     text: $model.cloudflare.email,
-                    placeholder: "Cloudflare 账户邮箱",
+                    placeholder: "your@email.com",
                     leadingSystemImage: "envelope"
                 )
             }
-            Text("与 API Key 配套的账户邮箱，用于身份校验")
+            Text("用于某些 API 操作的身份验证")
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.sidebarText(dark))
         } footer: {
             HStack(spacing: 8) {
                 if model.cloudflare.enabled {
-                    StatusBadge(text: "已启用", tone: .success)
+                    StatusBadge(text: "已连接", tone: .success)
                 } else {
-                    StatusBadge(text: "未启用", tone: .neutral)
+                    StatusBadge(text: "未连接", tone: .neutral)
                 }
                 Spacer(minLength: 8)
                 AppButton(
                     title: "测试连接",
                     systemImage: "bolt.horizontal.circle",
-                    kind: .secondary,
+                    kind: .info,
                     isLoading: model.savingKey == "cf-test"
                 ) {
                     model.testCloudflare()
@@ -132,9 +132,9 @@ struct KeyConfigView: View {
     private var edgeOneCard: some View {
         ModuleSettingsCard(
             title: "腾讯云 EdgeOne",
-            subtitle: "SecretId / SecretKey · DNS 与加速域名",
-            systemImage: "globe",
-            accent: Color(hex: "00b9ff"),
+            subtitle: "",
+                        systemImage: "globe",
+            accent: AppTheme.info,
             enabled: $model.edgeOne.enabled,
             minHeight: cardMinHeight
         ) {
@@ -142,7 +142,7 @@ struct KeyConfigView: View {
                 HStack(spacing: 8) {
                     AppTextField(
                         text: $model.edgeOne.secretId,
-                        placeholder: "腾讯云 SecretId",
+                        placeholder: "输入腾讯云 SecretId",
                         secure: true,
                         leadingSystemImage: "person"
                     )
@@ -151,7 +151,7 @@ struct KeyConfigView: View {
                     }
                 }
             }
-            Text("访问管理 → API 密钥管理")
+            Text("在腾讯云控制台 > 访问管理 > API 密钥管理中获取")
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.sidebarText(dark))
 
@@ -159,7 +159,7 @@ struct KeyConfigView: View {
                 HStack(spacing: 8) {
                     AppTextField(
                         text: $model.edgeOne.secretKey,
-                        placeholder: "腾讯云 SecretKey",
+                        placeholder: "输入腾讯云 SecretKey",
                         secure: true,
                         leadingSystemImage: "key"
                     )
@@ -168,21 +168,21 @@ struct KeyConfigView: View {
                     }
                 }
             }
-            Text("密钥仅保存在服务端，请妥善保管")
+            Text("SecretKey 用于 API 签名，请妥善保管")
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.sidebarText(dark))
         } footer: {
             HStack(spacing: 8) {
                 if model.edgeOne.enabled {
-                    StatusBadge(text: "已启用", tone: .success)
+                    StatusBadge(text: "已连接", tone: .success)
                 } else {
-                    StatusBadge(text: "未启用", tone: .neutral)
+                    StatusBadge(text: "未连接", tone: .neutral)
                 }
                 Spacer(minLength: 8)
                 AppButton(
                     title: "测试连接",
                     systemImage: "bolt.horizontal.circle",
-                    kind: .secondary,
+                    kind: .info,
                     isLoading: model.savingKey == "eo-test"
                 ) {
                     model.testEdgeOne()
@@ -278,15 +278,15 @@ struct KeyConfigView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
+                .foregroundColor(AppTheme.danger)
             Text(text).font(.system(size: 12))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(8)
     }
 }
