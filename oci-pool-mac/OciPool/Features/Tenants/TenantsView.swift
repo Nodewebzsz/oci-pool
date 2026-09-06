@@ -36,10 +36,10 @@ struct TenantsView: View {
         minName: CGFloat, minDef: CGFloat, minRegion: CGFloat
     ) {
         if namesHidden {
-            return (wCost, wDays, wTask, wMulti, wType, wCreate, wTime,
+            return (wCost, wDays, wTask, wMulti, wType, max(wCreate, 96), wTime,
                     minNameHidden, minDefHidden, minRegionHidden)
         }
-        return (48, 48, 64, 44, 72, 52, 100,
+        return (48, 48, 64, 44, 72, 96, 100,
                 minNameShownFloor, minDefShown, minRegionShown)
     }
 
@@ -241,6 +241,8 @@ struct TenantsView: View {
                             }
                         }
                     }
+                    // 双向 ScrollView 会在内容少于视口时垂直居中；强制顶部对齐（对齐 Web 表格顶格）
+                    .frame(minHeight: geo.size.height, alignment: .topLeading)
                     .frame(width: totalW, alignment: .topLeading)
                 }
                 .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
