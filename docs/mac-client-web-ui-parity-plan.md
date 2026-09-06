@@ -28,7 +28,7 @@
 | A8 | OCI 开机管理 | page-grab.jsx | Boot/BootView | ✅ 2026-09-06（标题「预开列表」/zap 橙图标/页头按钮组（预开 primary+停止 orange+重置 danger+eye 钮）/筛选 placeholder/表头 15 列逐字（架构列移至成功后）/任务状态徽章 running+脉冲/执行中 accent/今日 cyan/失败 danger/架构 info chip/行单击详情/菜单文案/预开空白表单选租户/色板收敛）。❓ 确认弹窗 danger 样式+requireText（RESET/租户名）为共享 AppAlert 增强，待做；重置语义 Web 清零全部统计 vs 原生仅失败计数待确认 |
 | A9 | OCI 邮箱服务 | page-misc.jsx (MailPage) | Email/EmailView | ✅ 2026-09-06（标题/动态副标题/cyan 图标/写邮件按钮/4 KPI 卡/发送记录表头 主题·发件人·收件数·状态·发送时间+状态徽章/空态/添加联系人文案）。❓ 三区同屏布局（左租户/右联系人/下记录）与 Web 差异保留（原生 Tab 切换）、启用弹层 SMTP 凭据面板待补 |
 | A10 | OCI 对象存储 | page-misc.jsx (ObjectPage) | Storage/StorageView | ✅ 2026-09-06（标题/4 KPI 卡/新建按钮/搜索 placeholder/桶行摘要/对象列表标题/选中桶 accent 左边条/危险色 token）。✅ 预签名弹层对齐 Web（获取预签名链接/有效期(小时) 1-168/预签名 URL(只读)/复制链接）+ 删除桶 requireText=桶名。❓ 对象总数 KPI 暂无接口显示 — |
-| A11 | OCI AI 管理 | page-misc.jsx (AIPage) | AiModels/AiModelsView | 🔄 一轮完成（副标题/语义色/文案），❓ 页头按钮组重构+4KPI+双栏分页+AI 对话入口待做 |
+| A11 | OCI AI 管理 | page-misc.jsx (AIPage) | AiModels/AiModelsView | ✅ 二轮完成 2026-09-06（页头 租户下拉+AI 对话按钮/4 KPI 卡/模型行 分类徽章+mono id+provider 色块+添加配置/配置行 已启用徽章+左边条+60% 透明+orange 切换+28 删除钮/双栏 pageSize=4 分页/启用全部-禁用全部-刷新 迁右栏头/删除确认与 toast 逐字）。❓ Web 右栏 关联租户/启用全部 checkbox 形态待做 |
 | A12 | OCI 链路测试 | page-misc.jsx (LinkPage) | SpeedTest/SpeedTestView | ✅ 二轮完成 2026-09-06（按钮组四态 停止danger/重新测速/开始测速 + 中止 toast、进度条区块 done/total+渐变、网格标题「全球 OCI 区域」、色板/阈值/timeout）。❓ Top5 卡布局（奖牌/国旗）、IP 四级兜底链待做 |
 | A13 | OCI 开机日志 | page-logs.jsx (LogsPage) | OpenLogs/OpenLogsView | ✅ 2026-09-06（副标题/terminal 图标/暂停恢复滚动/下载日志/终端卡主题色/级别色 logColor 对齐/空态/footer/断开态「已断开」）。❓ 级别筛选 chips+关键字搜索、行 hover 详情待做 |
 
