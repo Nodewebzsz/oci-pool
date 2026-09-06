@@ -44,6 +44,10 @@ final class StorageViewModel: ObservableObject {
 
     // Presigned
     @Published var presignedURLText = ""
+    @Published var presignedHoursText: String = "24"
+    var presignedHours: Int { min(max(Int(presignedHoursText) ?? 24, 1), 168) }
+    @Published var presignedLoading = false
+    @Published var presignedItem: StorageObjectItem?
 
     // Upload
     @Published var uploadTasks: [StorageUploadTask] = []
@@ -359,27 +363,38 @@ final class StorageViewModel: ObservableObject {
     }
 
     func openPresigned(_ item: StorageObjectItem) {
-        guard let tenantId = tenantIdValue, let bucket = selectedBucket else { return }
-        let ns = bucket.namespace.isEmpty ? namespace : bucket.namespace
+        presignedItem = item
         presignedURLText = ""
+        presignedHoursText = "24"
         activeSheet = .presigned(item)
+        generatePresigned()
+    }
+
+    /// Web：POST validitySeconds（小时 × 3600，默认 24h，可选 1-168h）
+    func generatePresigned() {
+        guard let item = presignedItem,
+              let tenantId = tenantIdValue,
+              let bucket = selectedBucket else { return }
+        let ns = bucket.namespace.isEmpty ? namespace : bucket.namespace
+        let hours = presignedHours
+        presignedURLText = ""
+        presignedLoading = true
         Task {
-            LoadingHUD.shared.begin()
             do {
                 let url = try await service.presignedURL(
                     tenantId: tenantId,
                     namespace: ns,
                     bucketName: bucket.name,
-                    objectName: item.name
+                    objectName: item.name,
+                    validitySeconds: Int64(hours) * 3600
                 )
                 presignedURLText = url
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(url, forType: .string)
             } catch {
-                ToastCenter.shared.error(error.localizedDescription)
-                activeSheet = nil
+                ToastCenter.shared.error("获取预签名链接失败: \(error.localizedDescription)")
             }
-            LoadingHUD.shared.end()
+            presignedLoading = false
         }
     }
 

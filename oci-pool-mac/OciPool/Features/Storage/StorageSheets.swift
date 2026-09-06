@@ -91,19 +91,27 @@ struct StorageSheetHost: View {
     // MARK: - Presigned
 
     private var presignedSheet: some View {
-        chrome(title: "预签名链接", systemImage: "link", width: 520, height: 280, footer: {
+        chrome(title: "获取预签名链接", systemImage: "link", width: 520, height: 320, footer: {
             HStack(spacing: 10) {
-                AppButton(title: "复制", kind: .secondary, enabled: !model.presignedURLText.isEmpty) {
+                AppButton(title: "复制链接", kind: .secondary, enabled: !model.presignedURLText.isEmpty) {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(model.presignedURLText, forType: .string)
-                    AppAlert.info(title: "已复制", message: "预签名链接已复制到剪贴板")
                 }
                 AppButton(title: "关闭", kind: .primary) { presentationMode.wrappedValue.dismiss() }
             }
         }) {
             VStack(alignment: .leading, spacing: 12) {
-                Text("链接有效期约 1 小时。已自动复制到剪贴板。")
-                    .font(.system(size: 12))
+                // Web：有效期(小时) 1-168 + hint
+                HStack(spacing: 10) {
+                    Text("有效期(小时)").font(.system(size: 12, weight: .medium)).foregroundColor(primaryText)
+                    AppTextField(text: $model.presignedHoursText, placeholder: "24")
+                        .frame(width: 80)
+                    Text("建议 ≤ 168 小时(7 天)· 超时后链接自动失效")
+                        .font(.system(size: 11))
+                        .foregroundColor(mutedText)
+                }
+                Text("预签名 URL(只读)")
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundColor(mutedText)
                 if model.presignedURLText.isEmpty {
                     HStack {
