@@ -54,7 +54,7 @@ enum RegionLngLat {
 
 // MARK: - 地图节点
 
-struct RegionMapNode: Identifiable {
+struct RegionMapNode: Identifiable, Equatable {
     var id: String { code }
     let code: String
     let name: String
@@ -226,6 +226,8 @@ struct RegionWorldMapView: View {
     var onNodeTap: (RegionMapNode) -> Void = { _ in }
 
     @State private var hoveredCode: String?
+    @State private var hoverMonitor: Any?
+    @State private var hoverBox = MapHoverBox()
 
     private var bg0: Color { dark ? Color(hex: "060a0d") : Color(hex: "f8fafd") }
     private var landFill: Color { dark ? Color(hex: "151c21") : Color(hex: "f1f4f6") }
@@ -271,8 +273,61 @@ struct RegionWorldMapView: View {
             }
             .frame(width: geo.size.width, height: geo.size.width / 2)
             .clipped()
+            .background(
+                GeometryReader { g in
+                    Color.clear
+                        .onAppear { syncHoverBox(g) }
+                        .onChange(of: g.frame(in: .global)) { _ in syncHoverBox(g) }
+                        .onChange(of: nodes) { _ in syncHoverBox(g) }
+                }
+            )
         }
         // 高度由调用方 aspectRatio(2, contentMode: .fit) 给出，避免 GeometryReader 撑满视口导致裁切
+        .onAppear { installHoverMonitor() }
+        .onDisappear { removeHoverMonitor() }
+    }
+
+    private func syncHoverBox(_ g: GeometryProxy) {
+        hoverBox.origin = g.frame(in: .global).origin
+        hoverBox.scale = g.size.width / WorldMapData.mapW
+        hoverBox.nodes = nodes
+    }
+
+    /// 全局 mouseMoved → 最近节点判定（比逐节点 onHover 更稳，滚动/快速移动均有效）
+    private func installHoverMonitor() {
+        guard hoverMonitor == nil else { return }
+        let box = hoverBox
+        hoverMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { event in
+            guard let content = event.window?.contentView else { return event }
+            let p = event.locationInWindow
+            let globalPoint = CGPoint(x: p.x, y: content.bounds.height - p.y)
+            let lx = globalPoint.x - box.origin.x
+            let ly = globalPoint.y - box.origin.y
+            let mapW = WorldMapData.mapW * box.scale
+            let mapH = mapW / 2
+            var nearest: RegionMapNode?
+            if lx >= 0, ly >= 0, lx <= mapW, ly <= mapH {
+                var best: CGFloat = 14
+                for n in box.nodes {
+                    let d = hypot(n.position.x * box.scale - lx, n.position.y * box.scale - ly)
+                    if d < best { best = d; nearest = n }
+                }
+            }
+            let code = nearest?.code ?? ""
+            if code != box.currentCode {
+                box.currentCode = code
+                DispatchQueue.main.async { hoveredCode = code.isEmpty ? nil : code }
+            }
+            return event
+        }
+    }
+
+    private func removeHoverMonitor() {
+        if let monitor = hoverMonitor {
+            NSEvent.removeMonitor(monitor)
+            hoverMonitor = nil
+        }
+        hoverBox.currentCode = ""
     }
 
     // MARK: 大陆 + 经纬网
@@ -286,13 +341,13 @@ struct RegionWorldMapView: View {
                 .fill(landFill)
             landPath
                 .stroke(landStroke, style: StrokeStyle(lineWidth: 0.5 * scale, lineJoin: .round))
-            let gratPath = path(from: world.graticuleRings, scale: scale)
+            let gratPath = path(from: world.graticuleRings, scale: scale, closed: false)
             gratPath
                 .stroke(fg3.opacity(0.3), style: StrokeStyle(lineWidth: 0.5 * scale))
         }
     }
 
-    private func path(from rings: [[CGPoint]], scale: CGFloat) -> Path {
+    private func path(from rings: [[CGPoint]], scale: CGFloat, closed: Bool = true) -> Path {
         var path = Path()
         for ring in rings {
             guard let first = ring.first else { continue }
@@ -300,7 +355,8 @@ struct RegionWorldMapView: View {
             for pt in ring.dropFirst() {
                 path.addLine(to: CGPoint(x: pt.x * scale, y: pt.y * scale))
             }
-            path.closeSubpath()
+            // 经纬线是开放曲线：closeSubpath 会画出首尾直线弦（多余的横竖线），只有多边形才闭合
+            if closed { path.closeSubpath() }
         }
         return path
     }
@@ -340,9 +396,6 @@ struct RegionWorldMapView: View {
                 .contentShape(Rectangle())
         }
         .position(x: node.position.x * scale, y: node.position.y * scale)
-        .onHover { inside in
-            if inside { hoveredCode = node.code } else if hoveredCode == node.code { hoveredCode = nil }
-        }
         .onTapGesture { onNodeTap(node) }
     }
 
@@ -403,7 +456,7 @@ struct RegionWorldMapView: View {
         )
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(hex: dark ? "363e45" : "bfc5ca"), lineWidth: 1))
         .position(x: min(max(tipX + viewWidth / 2, viewWidth / 2 + 4), WorldMapData.mapW * scale - viewWidth / 2 - 4),
-                  y: tipY + 60)
+                  y: min(tipY + 60, WorldMapData.mapH * scale - 70))
         .allowsHitTesting(false)
         .zIndex(20)
     }
@@ -437,4 +490,12 @@ private struct HaloCircle: View {
             .fill(color.opacity(opacity))
             .frame(width: radius * 2, height: radius * 2)
     }
+}
+
+/// 地图 hover 判定的缓存（原点/缩放/节点，供全局 mouseMoved 监听器使用）。
+final class MapHoverBox {
+    var origin: CGPoint = .zero
+    var scale: CGFloat = 1
+    var nodes: [RegionMapNode] = []
+    var currentCode: String = ""
 }
