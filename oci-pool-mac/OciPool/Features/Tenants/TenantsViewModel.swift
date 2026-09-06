@@ -427,7 +427,7 @@ final class TenantsViewModel: ObservableObject {
     }
 
     func openEditName(_ item: TenantItem) {
-        editText = item.defName
+        editText = item.editNameDefault
         activeSheet = .editName(item)
     }
 

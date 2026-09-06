@@ -154,7 +154,25 @@ struct TenantItem: Decodable, Identifiable, Equatable {
     var statusText: String { isActive ? "有效" : "失效" }
     var activeDaysText: String { activeDays.isEmpty ? "0" : activeDays }
     var costText: String { accountCost.isEmpty ? "—" : accountCost }
-    var defNameText: String { defName.isEmpty ? "" : defName }
+    /// Web getTenantAlias：defName 等于 userName/租户ID 时视为「未设置」（后端历史数据回填），返回空
+    var customAlias: String {
+        let raw = defName
+        guard !raw.isEmpty else { return "" }
+        if raw == userName { return "" }
+        if raw == tenantId { return "" }
+        if raw == String(id) { return "" }
+        return raw
+    }
+
+    /// Web 表格展示：未设置为空白；有值截断 14 字符（truncateDisplayName(alias, 14)）
+    var defNameText: String {
+        let alias = customAlias
+        guard alias.count > 14 else { return alias }
+        return String(alias.prefix(14)) + "…"
+    }
+
+    /// 编辑弹窗默认值：未设置过自定义名称时输入框默认为空（Web editCustomName 同款逻辑）
+    var editNameDefault: String { customAlias }
     /// Web：trial=violet / official=cyan / 其他=orange 软底徽章
     var typeBadgeColor: Color {
         let n = accountTypeName.lowercased()
