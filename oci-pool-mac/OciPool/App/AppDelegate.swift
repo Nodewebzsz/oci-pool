@@ -5,11 +5,13 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var mainWindowController: MainWindowController?
     private var showWindowObserver: NSObjectProtocol?
+    private var clickAwayMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.log("didFinishLaunching begin pid=\(ProcessInfo.processInfo.processIdentifier)")
 
         NSApp.setActivationPolicy(.regular)
+        installClickAwayFromEditingMonitor()
 
         // Second-instance / Dock re-open signal
         showWindowObserver = DistributedNotificationCenter.default().addObserver(
@@ -48,6 +50,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// 全局「点击编辑区之外自动失焦」：任意文本框处于编辑态时，
+    /// 鼠标按下落点不在其编辑区内（含所属字段），即结束第一响应者。
+    /// 覆盖全部 SwiftUI/AppKit 输入框（搜索、登录表单、6 格验证码、各页表单）。
+    private func installClickAwayFromEditingMonitor() {
+        clickAwayMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { event in
+            guard let window = event.window,
+                  let contentView = window.contentView,
+                  let first = window.firstResponder,
+                  let editor = first as? NSTextView,
+                  editor.isFieldEditor else {
+                return event
+            }
+            // field editor 的编辑宿主（NSTextField / NSTextView 等）
+            let hostView = editor.delegate as? NSView
+            let point = contentView.convert(event.locationInWindow, from: nil)
+            let hitView = contentView.hitTest(point)
+
+            func isInsideEditingArea(_ view: NSView?) -> Bool {
+                guard let target = view else { return false }
+                var current: NSView? = hitView
+                while let node = current {
+                    if node === target { return true }
+                    current = node.superview
+                }
+                return false
+            }
+
+            if !isInsideEditingArea(editor) && !isInsideEditingArea(hostView) {
+                window.makeFirstResponder(nil)
+            }
+            return event
+        }
+    }
+
     /// Menu bar「退出 OCI-POOL」/ ⌘Q：先关页面，再停后端，最后允许进程退出。
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         Self.log("shouldTerminate — close UI first")
@@ -79,6 +115,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Self.log("willTerminate")
         if let showWindowObserver = showWindowObserver {
             DistributedNotificationCenter.default().removeObserver(showWindowObserver)
+        }
+        if let monitor = clickAwayMonitor {
+            NSEvent.removeMonitor(monitor)
+            clickAwayMonitor = nil
         }
     }
 
