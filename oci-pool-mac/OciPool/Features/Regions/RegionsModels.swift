@@ -136,6 +136,26 @@ enum RegionsMapViewMode: String {
     case map   // 显示地图
 }
 
+// MARK: - 区域详情抽屉数据（对齐 Web useRegionDetailDrawer）
+
+struct RegionRelatedTenant: Identifiable, Equatable {
+    let id: Int64
+    let chipName: String   // userName（mono chip）
+    let displayName: String // defName || userName || tenancyName
+    let region: String
+    let activeDays: String
+    let isActive: Bool
+}
+
+struct RegionRelatedInstance: Identifiable, Equatable {
+    let id: Int64
+    let name: String
+    let state: String
+    let cpu: Int
+    let mem: Int
+    let ip: String
+}
+
 // MARK: - Known region codes (web arm_records.js REGION_COORDINATES keys)
 
 enum KnownRegions {

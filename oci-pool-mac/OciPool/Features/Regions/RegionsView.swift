@@ -38,6 +38,11 @@ struct RegionsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .ociReloadCurrentPage)) { _ in
             Task { await model.refresh() }
         }
+        .sheet(item: $model.detailRegion) { row in
+            RegionDetailSheet(row: row, model: model, dark: dark) {
+                model.closeRegionDetail()
+            }
+        }
         .environmentObject(appearance)
     }
 
@@ -220,8 +225,17 @@ struct RegionsView: View {
                 }
             }
 
-            RegionWorldMapView(world: worldMap, nodes: mapNodes, dark: dark)
-                .frame(minHeight: 320)
+            RegionWorldMapView(
+                world: worldMap,
+                nodes: mapNodes,
+                dark: dark,
+                onNodeTap: { node in
+                    if let row = model.filteredRows.first(where: { $0.regionCode == node.code }) {
+                        model.openRegionDetail(row)
+                    }
+                }
+            )
+            .aspectRatio(2, contentMode: .fit)
 
             // Web 图例：已放货=accent 光晕 · 今日新放货=orange 光环 · 未放货=fg-3 小点
             HStack(spacing: 20) {
@@ -423,6 +437,8 @@ struct RegionsView: View {
             Rectangle().fill(hoveredRegion == row.regionCode ? AppTheme.sidebarHover(dark) : Color.clear)
         )
         .overlay(Rectangle().fill(RegionsTheme.border(dark).opacity(0.6)).frame(height: 1), alignment: .bottom)
+        .contentShape(Rectangle())
+        .onTapGesture { model.openRegionDetail(row) }
         .onHover { hoveredRegion = $0 ? row.regionCode : nil }
     }
 

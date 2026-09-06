@@ -180,18 +180,18 @@ final class WorldMapData: ObservableObject {
             }
         }
 
-        // 经纬网（每 30°，对齐 Web d3 graticule step [30,30]）
+        // 经纬网（对齐 Web d3 geoGraticule().step([30,30])：经线每 30° 弯曲、纬线每 30° 平直）
         var grat: [[CGPoint]] = []
-        for lon in stride(from: -180.0, through: 180.0, by: 30) {
+        for lon in stride(from: -150.0, through: 180.0, by: 30) {
             var line: [CGPoint] = []
-            for lat in stride(from: -90.0, through: 90.0, by: 5) {
+            for lat in stride(from: -90.0, through: 90.0, by: 3) {
                 line.append(Self.project(lon: lon, lat: lat))
             }
             grat.append(line)
         }
-        for lat in stride(from: -80.0, through: 80.0, by: 20) {
+        for lat in stride(from: -60.0, through: 60.0, by: 30) {
             var line: [CGPoint] = []
-            for lon in stride(from: -180.0, through: 180.0, by: 5) {
+            for lon in stride(from: -180.0, through: 180.0, by: 3) {
                 line.append(Self.project(lon: lon, lat: lat))
             }
             grat.append(line)
@@ -223,6 +223,7 @@ struct RegionWorldMapView: View {
     @ObservedObject var world: WorldMapData
     let nodes: [RegionMapNode]
     var dark: Bool
+    var onNodeTap: (RegionMapNode) -> Void = { _ in }
 
     @State private var hoveredCode: String?
 
@@ -268,9 +269,10 @@ struct RegionWorldMapView: View {
                         .foregroundColor(fg3)
                 }
             }
-            .frame(width: geo.size.width, height: geo.size.width * WorldMapData.mapH / WorldMapData.mapW, alignment: .topLeading)
-            .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
+            .frame(width: geo.size.width, height: geo.size.width / 2)
+            .clipped()
         }
+        // 高度由调用方 aspectRatio(2, contentMode: .fit) 给出，避免 GeometryReader 撑满视口导致裁切
     }
 
     // MARK: 大陆 + 经纬网
@@ -341,6 +343,7 @@ struct RegionWorldMapView: View {
         .onHover { inside in
             if inside { hoveredCode = node.code } else if hoveredCode == node.code { hoveredCode = nil }
         }
+        .onTapGesture { onNodeTap(node) }
     }
 
     // MARK: Tooltip（对齐 Web hover 卡片）

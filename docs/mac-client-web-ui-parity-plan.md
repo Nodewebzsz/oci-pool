@@ -19,7 +19,7 @@
 | # | 页面 | Web 源 | 原生视图 | 状态 |
 |---|---|---|---|---|
 | A1 | 系统资源监控 | page-monitor.jsx | Dashboard/DashboardView | ✅ 已完成（含页头 Lucide 图标） |
-| A2 | OCI 区域管理 | page-regions.jsx | Regions/RegionsView | ✅ 2026-09-06（标题/图标色/KPI 横排/表头/徽章/筛选/排序/配色已对齐并运行时核验；同日补充：三分段 tab 含图标、KPI1 改 Lucide map-pin、新增 RegionWorldMapView 真实世界地图（Natural Earth 1 投影 + 后端 vendor TopoJSON 110m + 节点脉冲/hover tooltip/图例），tab 联动筛选） |
+| A2 | OCI 区域管理 | page-regions.jsx | Regions/RegionsView | ✅ 2026-09-06（标题/图标色/KPI 横排/表头/徽章/筛选/排序/配色已对齐并运行时核验；同日补充：三分段 tab 含图标、KPI1 改 Lucide map-pin、新增 RegionWorldMapView 真实世界地图（Natural Earth 1 投影 + 后端 vendor TopoJSON 110m + 节点脉冲/hover tooltip/图例），tab 联动筛选；二轮反馈修复：经纬网步长对齐 Web graticule.step([30,30])（去掉多余横竖线）、定位图标重绘、悬浮弹窗/行点击/节点点击详情抽屉运行时核验通过） |
 | A3 | OCI 租户管理 | page-tenants.jsx | Tenants/TenantsView | ✅ 2026-09-06（页头按钮组/彩色实心/表头列名/实例操作橙钮/单元格样式/分页/菜单文案已对齐并运行时核验） |
 | A4 | 租户详情（子页） | page-tenant-detail.jsx | Tenants/TenantDetailView | ✅ 2026-09-06（页头 diamond+租户名/副标题/KPI 语义色/列头 实例同步/未同步灰态/危险色 token）。❓ KPI 数据映射、RegionSwitcher、面包屑、7 按钮组待确认 |
 | A5 | 租户·查看开机（子页） | page-tenant-grab.jsx | 复用 Boot/BootView（带 pendingBootFilter 预筛选） | ❓ 原生无独立子页，复用全局开机管理页；如需一比一（面包屑+预开列表 15 列）需新建页面，待确认 |
