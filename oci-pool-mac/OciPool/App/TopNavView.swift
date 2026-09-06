@@ -279,7 +279,7 @@ struct TopNavView: View {
             ZStack(alignment: .topTrailing) {
                 Image(systemName: "bell")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(chrome.open == .notifications ? Color(hex: "f59e0b") : AppTheme.navIcon(dark))
+                    .foregroundColor(chrome.open == .notifications ? AppTheme.orange : AppTheme.navIcon(dark))
                     .frame(width: 30, height: 30)
                     .background(
                         RoundedRectangle(cornerRadius: 5)
@@ -287,10 +287,10 @@ struct TopNavView: View {
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 5)
-                            .stroke(chrome.open == .notifications ? Color(hex: "f59e0b") : AppTheme.border(dark), lineWidth: 1)
+                            .stroke(chrome.open == .notifications ? AppTheme.orange : AppTheme.border(dark), lineWidth: 1)
                     )
                 Circle()
-                    .fill(Color(hex: "f59e0b"))
+                    .fill(AppTheme.orange)
                     .frame(width: 7, height: 7)
                     .padding(.top, 4)
                     .padding(.trailing, 5)
@@ -508,11 +508,11 @@ struct UserDropdownPanel: View {
             HStack(spacing: 9) {
                 Image(systemName: icon)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(danger ? Color(hex: "f85149") : (selected ? AppTheme.sidebarActive : textMuted))
+                    .foregroundColor(danger ? AppTheme.danger : (selected ? AppTheme.sidebarActive : textMuted))
                     .frame(width: 14)
                 Text(title)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(danger ? Color(hex: "f85149") : textPrimary)
+                    .foregroundColor(danger ? AppTheme.danger : textPrimary)
                 Spacer(minLength: 0)
                 if let trailing = trailing {
                     Text(trailing)
@@ -830,14 +830,14 @@ private struct AboutSheet: View {
                         .font(.system(size: 9, weight: .bold))
                         .foregroundColor(header.version.needUpdate
                             ? (dark ? Color(hex: "fbbf24") : Color(hex: "854d0e"))
-                            : (dark ? Color(hex: "4ade80") : Color(hex: "166534")))
+                            : (dark ? AppTheme.sidebarActive : AppTheme.sidebarActive))
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
                         .background(
                             RoundedRectangle(cornerRadius: 4)
                                 .fill(header.version.needUpdate
                                     ? (dark ? Color(hex: "eab308").opacity(0.15) : Color(hex: "fef9c3"))
-                                    : (dark ? Color(hex: "22c55e").opacity(0.15) : Color(hex: "dcfce7")))
+                                    : (dark ? AppTheme.sidebarActive.opacity(0.15) : Color(hex: "dcfce7")))
                         )
                 }
             }
@@ -970,7 +970,7 @@ private struct AboutSheet: View {
                             Text(copied ? "已复制" : "TRC20 复制地址")
                                 .font(.system(size: 11, weight: .medium))
                         }
-                        .foregroundColor(copied ? Color(hex: "10b981") : textSecondary)
+                        .foregroundColor(copied ? AppTheme.sidebarActive : textSecondary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
                         .background(
@@ -1113,8 +1113,8 @@ private struct VersionUpdateProgressSheet: View {
                   : (finished ? "checkmark.circle.fill" : "arrow.down.circle.fill"))
                 .font(.system(size: 32, weight: .medium))
                 .foregroundColor(failed
-                                 ? Color(hex: "f59e0b")
-                                 : (finished ? Color(hex: "10b981") : Color(hex: "1890ff")))
+                                 ? AppTheme.orange
+                                 : (finished ? AppTheme.sidebarActive : AppTheme.info))
 
             Text(title)
                 .font(.system(size: 16, weight: .bold))

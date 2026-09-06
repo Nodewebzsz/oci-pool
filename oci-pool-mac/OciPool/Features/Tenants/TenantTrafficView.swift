@@ -13,7 +13,7 @@ struct TenantTrafficView: View {
 
     // Web CSS tokens (oci_monitor.css)
     private var accentGreen: Color { AppTheme.sidebarActive }
-    private var accentBlue: Color { Color(hex: "4d9eff") }
+    private var accentBlue: Color { AppTheme.info }
     private var accentRed: Color { Color(hex: "f87171") }
     private var surface: Color { dark ? Color(hex: "1a1d27") : Color.white }
     private var surface2: Color { dark ? Color(hex: "1f2233") : Color(hex: "f8f9fa") }

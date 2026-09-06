@@ -271,9 +271,9 @@ struct BootDetailView: View {
 
     private func bootLogColor(_ tone: BootLogLine.BootLogTone) -> Color {
         switch tone {
-        case .success: return Color(hex: "3fb950")
-        case .warn: return Color(hex: "d29922")
-        case .error: return Color(hex: "f85149")
+        case .success: return AppTheme.sidebarActive
+        case .warn: return AppTheme.orange
+        case .error: return AppTheme.danger
         case .normal: return primaryText
         }
     }
@@ -281,7 +281,7 @@ struct BootDetailView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f0881a"))
+                .foregroundColor(AppTheme.orange)
             Text(text)
                 .font(.system(size: 12))
                 .foregroundColor(primaryText)
@@ -290,7 +290,7 @@ struct BootDetailView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background(Color(hex: "f0881a").opacity(dark ? 0.14 : 0.1))
+        .background(AppTheme.orange.opacity(dark ? 0.14 : 0.1))
     }
 }
 

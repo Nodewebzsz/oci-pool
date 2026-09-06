@@ -75,7 +75,7 @@ struct SecuritySettingsView: View {
             title: "账号安全",
             subtitle: "用户名 / 密码 / 站点 Logo",
             systemImage: "lock.shield",
-            accent: Color(hex: "4a9eff"),
+            accent: AppTheme.info,
             enabled: nil,
             minHeight: cardMinHeight
         ) {
@@ -359,7 +359,7 @@ struct SecuritySettingsView: View {
             title: "Cloudflare Turnstile 验证码",
             subtitle: "登录人机验证",
             systemImage: "shield.lefthalf.fill",
-            accent: Color(hex: "f0881a"),
+            accent: AppTheme.orange,
             enabled: $model.turnstile.enabled,
             minHeight: cardMinHeight
         ) {

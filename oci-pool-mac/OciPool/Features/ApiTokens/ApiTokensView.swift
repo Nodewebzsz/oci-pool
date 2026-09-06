@@ -112,7 +112,7 @@ struct ApiTokensView: View {
             title: "Token 配置",
             subtitle: "生成或撤销 API 访问令牌",
             systemImage: "gearshape",
-            accent: Color(hex: "4a9eff"),
+            accent: AppTheme.info,
             enabled: nil,
             minHeight: cardMinHeight
         ) {

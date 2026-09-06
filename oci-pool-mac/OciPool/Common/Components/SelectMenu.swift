@@ -115,7 +115,7 @@ private struct SelectMenuPanelView: View {
 
     private var dark: Bool { state.dark }
     private var accent: Color {
-        dark ? Color(hex: "4d9eff") : Color(hex: "2563eb")
+        dark ? AppTheme.info : Color(hex: "2563eb")
     }
     private var panelBg: Color {
         dark ? Color(hex: "22262b") : Color.white
@@ -489,7 +489,7 @@ struct SelectMenu: View {
     @StateObject private var panelState = SelectMenuPanelState()
 
     private var accent: Color {
-        dark ? Color(hex: "4d9eff") : Color(hex: "2563eb")
+        dark ? AppTheme.info : Color(hex: "2563eb")
     }
 
     private var resolvedWidth: CGFloat { width ?? 160 }

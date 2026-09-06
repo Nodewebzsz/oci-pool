@@ -81,7 +81,7 @@ struct NotifyView: View {
             title: "通知任务",
             subtitle: "每天固定时刻执行所选检测任务",
             systemImage: "clock",
-            accent: Color(hex: "4a9eff"),
+            accent: AppTheme.info,
             enabled: $model.task.enabled,
             minHeight: taskMinHeight
         ) {
@@ -119,14 +119,14 @@ struct NotifyView: View {
                         title: "抢机日志",
                         subtitle: "汇总抢机/开机日志",
                         systemImage: "doc.text",
-                        accent: Color(hex: "4a9eff"),
+                        accent: AppTheme.info,
                         isOn: $model.task.enableBootLog
                     )
                     taskOptionTile(
                         title: "OCI 花费 (Payg)",
                         subtitle: "检查账单与费用异常",
                         systemImage: "creditcard",
-                        accent: Color(hex: "f0881a"),
+                        accent: AppTheme.orange,
                         isOn: $model.task.enableCostCheck
                     )
                 }
@@ -323,7 +323,7 @@ struct NotifyView: View {
             title: "Bark 通知",
             subtitle: "iOS 推送通知",
             systemImage: "bell.badge",
-            accent: Color(hex: "f0881a"),
+            accent: AppTheme.orange,
             enabled: $model.bark.enabled,
             minHeight: channelMinHeight
         ) {
@@ -405,7 +405,7 @@ struct NotifyView: View {
             title: "飞书机器人",
             subtitle: "群机器人 Webhook",
             systemImage: "bubble.left.and.bubble.right",
-            accent: Color(hex: "00d6b9"),
+            accent: AppTheme.cyan,
             enabled: $model.feishu.enabled,
             minHeight: channelMinHeight
         ) {

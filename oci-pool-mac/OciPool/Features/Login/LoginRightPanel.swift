@@ -104,7 +104,7 @@ struct LoginRightPanel: View {
             VStack(spacing: 14) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 30, weight: .medium))
-                    .foregroundColor(Color(hex: "f59e0b"))
+                    .foregroundColor(AppTheme.orange)
                 Text(model.locale == .enUS ? "Service failed to start" : "服务启动失败")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(LoginPalette.text(dark))
@@ -278,7 +278,7 @@ struct LoginRightPanel: View {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 11))
-                        .foregroundColor(Color(hex: "22c55e"))
+                        .foregroundColor(AppTheme.sidebarActive)
                     Text(info)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(LoginPalette.muted(dark))
@@ -752,7 +752,7 @@ struct LoginRightPanel: View {
             HStack(spacing: 6) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 11))
-                    .foregroundColor(Color(hex: "22c55e"))
+                    .foregroundColor(AppTheme.sidebarActive)
                 Text(model.locale == .enUS ? "Local backend ready" : "本机服务已就绪，请登录")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(LoginPalette.muted(dark))

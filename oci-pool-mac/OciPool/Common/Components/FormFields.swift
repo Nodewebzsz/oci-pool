@@ -20,10 +20,10 @@ enum AppInputStyle {
 
     static func border(_ dark: Bool, focused: Bool = false, hovering: Bool = false) -> Color {
         if focused {
-            return dark ? Color(hex: "4d9eff") : Color(hex: "42b983")
+            return dark ? AppTheme.info : AppTheme.sidebarActive
         }
         if hovering {
-            return dark ? Color(hex: "4d9eff").opacity(0.45) : Color(hex: "42b983").opacity(0.45)
+            return dark ? AppTheme.info.opacity(0.45) : AppTheme.sidebarActive.opacity(0.45)
         }
         return dark ? Color(hex: "31363d") : Color(hex: "e4e7ed")
     }
@@ -31,8 +31,8 @@ enum AppInputStyle {
     static func glow(_ dark: Bool, focused: Bool) -> Color {
         guard focused else { return .clear }
         return dark
-            ? Color(hex: "4d9eff").opacity(0.18)
-            : Color(hex: "42b983").opacity(0.14)
+            ? AppTheme.info.opacity(0.18)
+            : AppTheme.sidebarActive.opacity(0.14)
     }
 
     static func text(_ dark: Bool) -> Color {
@@ -115,7 +115,7 @@ struct FormFieldRow<Content: View>: View {
                 if required {
                     Text("*")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(Color(hex: "f85149"))
+                        .foregroundColor(AppTheme.danger)
                 }
             }
             content()

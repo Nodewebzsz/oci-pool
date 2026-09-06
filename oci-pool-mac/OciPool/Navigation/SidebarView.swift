@@ -384,7 +384,7 @@ struct SidebarView: View {
                             .lineLimit(1)
                         Spacer(minLength: 0)
                         if selected {
-                            PulseDot(color: Color(hex: "f59e0b"))
+                            PulseDot(color: AppTheme.orange)
                         }
                     }
                 }
@@ -446,7 +446,7 @@ struct SidebarView: View {
         case .service: return AppTheme.sidebarActive
         case .proxy: return Color(hex: "2fd0cc")
         case .resource: return Color(hex: "a78bfa")
-        case .system: return Color(hex: "f59e0b")
+        case .system: return AppTheme.orange
         case .tools: return Color(hex: "3b82f6")
         case .devConfig: return Color(hex: "a78bfa")
         }

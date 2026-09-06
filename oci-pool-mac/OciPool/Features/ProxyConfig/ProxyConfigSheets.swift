@@ -188,7 +188,7 @@ struct ProxyConfigSheet: View {
                     .font(.system(size: 11))
                     .foregroundColor(
                         (model.activeForm?.forceProxy == 1)
-                            ? Color(hex: "e67e22")
+                            ? AppTheme.orange
                             : AppTheme.sidebarActive
                     )
                 Text(

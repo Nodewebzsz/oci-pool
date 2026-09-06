@@ -33,13 +33,13 @@ enum LoginPalette {
     static func line(_ dark: Bool) -> Color {
         dark ? Color(hex: "31363d") : Color(hex: "D1D5DB")
     }
-    /// Primary CTA + brand badge — Web 基准 light/dark 均为绿色 oklch(0.72 0.16 155)。
+    /// Primary CTA + brand badge — 跟随当前强调色预设（Web `--accent` oklch(0.72 0.16 hue)）。
     static func primary(_ dark: Bool) -> Color {
-        Color(hex: "34d399")
+        AppearanceController.shared.accent.color
     }
-    /// 主按钮文字色（对齐 Web `--accent-fg`：dark 深绿字 / light 白字）。
+    /// 主按钮文字色（对齐 Web `--accent-fg`：dark 深色字 / light 白字）。
     static func buttonFg(_ dark: Bool) -> Color {
-        dark ? Color(hex: "0e2a22") : Color.white
+        AppearanceController.shared.accent.accentFg(dark)
     }
     static func oauthBg(_ dark: Bool) -> Color {
         dark ? Color(hex: "292d32") : Color(hex: "F3F4F6")
@@ -48,10 +48,10 @@ enum LoginPalette {
         dark ? Color(hex: "31363d") : Color(hex: "E5E7EB")
     }
     static func tabActiveBg(_ dark: Bool) -> Color {
-        Color(hex: "34d399").opacity(0.15)
+        AppearanceController.shared.accent.accentSoft(dark)
     }
     static func tabActiveText(_ dark: Bool) -> Color {
-        Color(hex: "34d399")
+        AppearanceController.shared.accent.color
     }
     static func divider(_ dark: Bool) -> Color {
         dark ? Color.white.opacity(0.06) : Color.black.opacity(0.06)

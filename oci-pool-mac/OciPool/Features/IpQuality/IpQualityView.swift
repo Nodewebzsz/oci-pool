@@ -73,7 +73,7 @@ struct IpQualityView: View {
             title: "IP 质量检测",
             subtitle: "定时检测实例公网 IP 质量",
             systemImage: "network",
-            accent: Color(hex: "4a9eff"),
+            accent: AppTheme.info,
             enabled: $model.ipCheckEnabled,
             minHeight: cardMinHeight
         ) {
@@ -210,15 +210,15 @@ struct IpQualityView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
+                .foregroundColor(AppTheme.danger)
             Text(text).font(.system(size: 12))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(8)
     }
 }

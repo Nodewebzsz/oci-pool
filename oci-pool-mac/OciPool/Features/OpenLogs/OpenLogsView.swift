@@ -222,7 +222,7 @@ struct OpenLogsView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f39c12"))
+                .foregroundColor(AppTheme.orange)
             Text(text)
                 .font(.system(size: 12))
                 .foregroundColor(dark ? Color.white.opacity(0.85) : Color(hex: "1e2f42"))
@@ -237,7 +237,7 @@ struct OpenLogsView: View {
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color(hex: "f39c12").opacity(0.12))
+                .fill(AppTheme.orange.opacity(0.12))
         )
         .padding(.bottom, 8)
     }

@@ -163,9 +163,9 @@ struct TenantCostView: View {
             }
             .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(8)
     }
 

@@ -29,7 +29,7 @@ struct LoginForgotPasswordSheet: View {
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(model.resetMessageIsError
                                          ? Color(hex: "ef4444")
-                                         : Color(hex: "22c55e"))
+                                         : AppTheme.sidebarActive)
                         .padding(.horizontal, 28)
                         .padding(.bottom, 8)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -193,7 +193,7 @@ struct LoginForgotPasswordSheet: View {
             VStack(spacing: 12) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 42))
-                    .foregroundColor(Color(hex: "22c55e"))
+                    .foregroundColor(AppTheme.sidebarActive)
                 Text("密码重置成功")
                     .font(.system(size: 16, weight: .heavy))
                     .foregroundColor(LoginPalette.text(dark))

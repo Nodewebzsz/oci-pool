@@ -416,10 +416,10 @@ struct AiChatView: View {
             } else if model.selectedTenantId != nil {
                 Text("暂无可用模型")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(Color(hex: "f59e0b"))
+                    .foregroundColor(AppTheme.orange)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(Capsule().fill(Color(hex: "f59e0b").opacity(0.12)))
+                    .background(Capsule().fill(AppTheme.orange.opacity(0.12)))
             }
 
             // Context toggle chip
@@ -459,9 +459,9 @@ struct AiChatView: View {
     }
 
     private var statusColor: Color {
-        if model.isConnected { return Color(hex: "10b981") }
+        if model.isConnected { return AppTheme.sidebarActive }
         if model.isLoadingModels || model.statusText.contains("连接") || model.statusText.contains("加载") {
-            return Color(hex: "f59e0b")
+            return AppTheme.orange
         }
         return Color(hex: "94a3b8")
     }
@@ -684,7 +684,7 @@ struct AiChatView: View {
                 .padding(.vertical, 10)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color(hex: "f59e0b").opacity(0.12))
+                        .fill(AppTheme.orange.opacity(0.12))
                 )
             } else {
                 Text(msg.text)
@@ -741,10 +741,10 @@ struct AiChatView: View {
             if let err = model.errorText, !err.isEmpty {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundColor(Color(hex: "f85149"))
+                        .foregroundColor(AppTheme.danger)
                     Text(err)
                         .font(.system(size: 11))
-                        .foregroundColor(Color(hex: "f85149"))
+                        .foregroundColor(AppTheme.danger)
                     Spacer()
                 }
                 .padding(.horizontal, 4)

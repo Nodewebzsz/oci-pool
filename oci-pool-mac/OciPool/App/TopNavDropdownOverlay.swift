@@ -275,7 +275,7 @@ private struct NotificationDropdownPanel: View {
         HStack(spacing: 8) {
             Image(systemName: "bell")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Color(hex: "f59e0b"))
+                .foregroundColor(AppTheme.orange)
             Text("通知中心")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(textPrimary)
@@ -294,7 +294,7 @@ private struct NotificationDropdownPanel: View {
             }
             .buttonStyle(PlainButtonStyle())
             .font(.system(size: 10.5, weight: .medium))
-            .foregroundColor(Color(hex: "5b9cf6"))
+            .foregroundColor(AppTheme.info)
             .disabled(header.unreadCount == 0)
             .opacity(header.unreadCount == 0 ? 0.55 : 1)
         }
@@ -401,12 +401,12 @@ private struct NotificationDropdownPanel: View {
             return (AppTheme.sidebarActive, "checkmark.circle")
         }
         if text.contains("预警") || text.contains("提醒") || text.contains("warning") {
-            return (Color(hex: "f59e0b"), "exclamationmark.triangle")
+            return (AppTheme.orange, "exclamationmark.triangle")
         }
         if text.contains("异常") || text.contains("失败") || text.contains("error") || text.contains("failed") {
             return (Color(hex: "ef4444"), "exclamationmark.octagon")
         }
-        return (Color(hex: "5b9cf6"), "info.circle")
+        return (AppTheme.info, "info.circle")
     }
 
     private func relativeTime(_ raw: String) -> String {
@@ -465,7 +465,7 @@ private struct AccentDot: View {
                 if selected {
                     Image(systemName: "checkmark")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(preset.fg)
+                        .foregroundColor(preset.accentFg(dark))
                 }
             }
             .frame(width: 30, height: 30)

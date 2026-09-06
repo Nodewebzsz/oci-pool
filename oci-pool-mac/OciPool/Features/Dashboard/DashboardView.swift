@@ -538,7 +538,7 @@ struct DashboardGauge: View {
 
     private var accent: Color {
         if let color = color { return color }
-        if clamped <= 60 { return Color(hex: "22c55e") }
+        if clamped <= 60 { return AppTheme.sidebarActive }
         if clamped <= 80 { return Color(hex: "f97316") }
         return Color(hex: "ef4444")
     }
@@ -576,7 +576,7 @@ enum DashboardTheme {
     static func muted(_ dark: Bool) -> Color { dark ? Color(hex: "a2a5ab") : Color(hex: "64748b") }
     static func green(_ dark: Bool) -> Color { AppTheme.sidebarActive }
     static func cyan(_ dark: Bool) -> Color { dark ? Color(hex: "2ed3cc") : Color(hex: "0891b2") }
-    static func orange(_ dark: Bool) -> Color { dark ? Color(hex: "f59e0b") : Color(hex: "d97706") }
+    static func orange(_ dark: Bool) -> Color { dark ? AppTheme.orange : Color(hex: "d97706") }
     static func red(_ dark: Bool) -> Color { dark ? Color(hex: "f0524f") : Color(hex: "dc2626") }
     static func info(_ dark: Bool) -> Color { dark ? Color(hex: "7d8df0") : Color(hex: "4f6ef0") }
     static func gaugeTrack(_ dark: Bool) -> Color { dark ? Color(hex: "252a30") : Color(hex: "e8edf3") }

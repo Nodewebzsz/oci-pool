@@ -35,11 +35,11 @@ enum AppSheetSurface {
     static func cardBg(_ dark: Bool) -> Color { surface(dark) }
 
     static func accentBlue(_ dark: Bool) -> Color {
-        dark ? Color(hex: "4d9eff") : Color(hex: "2563eb")
+        dark ? AppTheme.info : Color(hex: "2563eb")
     }
 
     static func accentGreen(_ dark: Bool) -> Color {
-        dark ? Color(hex: "3fb950") : Color(hex: "16a34a")
+        dark ? AppTheme.sidebarActive : AppTheme.sidebarActive
     }
 
     static func accentRed(_ dark: Bool) -> Color {

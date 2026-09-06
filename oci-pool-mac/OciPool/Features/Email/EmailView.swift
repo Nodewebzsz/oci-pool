@@ -361,11 +361,11 @@ struct EmailView: View {
         HStack(alignment: .center, spacing: 14) {
             ZStack {
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(Color(hex: "4a9eff").opacity(0.14))
+                    .fill(AppTheme.info.opacity(0.14))
                     .frame(width: 40, height: 40)
                 Image(systemName: "envelope.fill")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(Color(hex: "4a9eff"))
+                    .foregroundColor(AppTheme.info)
             }
 
             VStack(alignment: .leading, spacing: 8) {
@@ -394,7 +394,7 @@ struct EmailView: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(cardBackground)
-        .overlay(cardStroke(accent: Color(hex: "4a9eff"), active: true))
+        .overlay(cardStroke(accent: AppTheme.info, active: true))
         .shadow(color: Color.black.opacity(dark ? 0.18 : 0.05), radius: 8, y: 2)
     }
 
@@ -489,11 +489,11 @@ struct EmailView: View {
         HStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(Color(hex: "3fb950").opacity(0.15))
+                    .fill(AppTheme.sidebarActive.opacity(0.15))
                     .frame(width: 40, height: 40)
                 Text(avatarLetter(c))
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(Color(hex: "3fb950"))
+                    .foregroundColor(AppTheme.sidebarActive)
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -522,7 +522,7 @@ struct EmailView: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(cardBackground)
-        .overlay(cardStroke(accent: Color(hex: "3fb950"), active: false))
+        .overlay(cardStroke(accent: AppTheme.sidebarActive, active: false))
         .shadow(color: Color.black.opacity(dark ? 0.18 : 0.05), radius: 8, y: 2)
     }
 
@@ -680,15 +680,15 @@ struct EmailView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
+                .foregroundColor(AppTheme.danger)
             Text(text).font(.system(size: 12))
             Spacer()
             Button("重试") { Task { await model.reloadAll() } }
                 .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(8)
     }
 }

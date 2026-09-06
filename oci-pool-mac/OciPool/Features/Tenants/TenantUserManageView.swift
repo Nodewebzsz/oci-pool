@@ -73,7 +73,7 @@ struct TenantUserManageView: View {
                 }
                 .padding(.horizontal, 12).padding(.vertical, 7)
                 .foregroundColor(.white)
-                .background(Color(hex: "f39c12"))
+                .background(AppTheme.orange)
                 .cornerRadius(8)
             }
             .buttonStyle(PlainButtonStyle())
@@ -271,8 +271,8 @@ struct TenantUserManageView: View {
             }
         }
         .padding(16)
-        .background(Color(hex: "f39c12").opacity(0.06))
-        .overlay(Rectangle().frame(height: 1).foregroundColor(Color(hex: "f39c12").opacity(0.3)), alignment: .bottom)
+        .background(AppTheme.orange.opacity(0.06))
+        .overlay(Rectangle().frame(height: 1).foregroundColor(AppTheme.orange.opacity(0.3)), alignment: .bottom)
     }
 
     private var usersTable: some View {

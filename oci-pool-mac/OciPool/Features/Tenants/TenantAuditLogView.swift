@@ -113,9 +113,9 @@ struct TenantAuditLogView: View {
             }
             .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
     }
 
     // MARK: - Table
@@ -201,7 +201,7 @@ struct TenantAuditLogView: View {
         wEnv: CGFloat,
         width: CGFloat
     ) -> some View {
-        let errorTint = Color(hex: "f85149").opacity(dark ? 0.12 : 0.08)
+        let errorTint = AppTheme.danger.opacity(dark ? 0.12 : 0.08)
         let stripe = index % 2 == 1 ? AppTheme.sidebarHover(dark).opacity(0.18) : Color.clear
         return HStack(spacing: 0) {
             cell("\(displayIndex)", wIndex, muted: true)

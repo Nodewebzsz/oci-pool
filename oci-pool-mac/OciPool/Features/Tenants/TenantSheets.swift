@@ -244,7 +244,7 @@ struct TenantSheetHost: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
                     .foregroundColor(.white)
-                    .background(Color(hex: "f39c12"))
+                    .background(AppTheme.orange)
                     .cornerRadius(8)
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -686,7 +686,7 @@ struct TenantSheetHost: View {
                         ForEach(r.inactiveAccountNames, id: \.self) { name in
                             Text("· \(name)")
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(Color(hex: "f85149"))
+                                .foregroundColor(AppTheme.danger)
                         }
                     }
                 }
@@ -861,9 +861,9 @@ struct TenantSheetHost: View {
     private func syncPhaseColor(_ phase: TenantSyncPhase) -> Color {
         switch phase {
         case .running: return AppTheme.sidebarActive
-        case .waitingLong: return Color(hex: "d29922")
-        case .success: return Color(hex: "3fb950")
-        case .error: return Color(hex: "f85149")
+        case .waitingLong: return AppTheme.orange
+        case .success: return AppTheme.sidebarActive
+        case .error: return AppTheme.danger
         }
     }
 

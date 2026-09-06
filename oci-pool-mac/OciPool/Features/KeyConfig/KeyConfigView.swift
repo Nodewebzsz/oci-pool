@@ -223,7 +223,7 @@ struct KeyConfigView: View {
             title: "更多服务商",
             subtitle: "敬请期待",
             systemImage: "plus.circle",
-            accent: Color(hex: "8b949e"),
+            accent: AppTheme.textSecondary(dark),
             enabled: nil,
             minHeight: 200
         ) {

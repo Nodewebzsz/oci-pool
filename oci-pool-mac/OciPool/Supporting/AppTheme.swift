@@ -39,6 +39,10 @@ enum AppTheme {
     static let orange = Color(hex: "ef852e")
     /// Web `var(--danger)`（oklch(0.66 0.19 25)）。
     static let danger = Color(hex: "f05653")
+    /// Web `var(--cyan)`（oklch(0.70 0.13 200)）。
+    static let cyan = Color(hex: "00b6be")
+    /// Web `var(--fg-2)`：次要文本（dark oklch(0.66 0.01 240) / light oklch(0.50 0.012 240)）。
+    static func textSecondary(_ dark: Bool) -> Color { dark ? Color(hex: "8d9398") : Color(hex: "5d646a") }
 }
 
 /// 强调色预设，对齐 Web `ACCENT_PRESETS`（green/cyan/violet/orange/blue）。
@@ -71,25 +75,37 @@ enum AccentPreset: String, CaseIterable, Identifiable {
         }
     }
 
-    /// 主强调色（近似 Web `oklch(0.72 0.16 hue)`）。
+    /// 主强调色 — Web `getAccentColor` = `oklch(0.72 0.16 hue)`（精确换算 sRGB）。
     var color: Color {
         switch self {
-        case .green: return Color(hex: "34d399")
-        case .cyan: return Color(hex: "2fd0cc")
-        case .violet: return Color(hex: "b784ff")
-        case .orange: return Color(hex: "f5a524")
-        case .blue: return Color(hex: "4d8dff")
+        case .green: return Color(hex: "35c177")
+        case .cyan: return Color(hex: "00c1cc")
+        case .violet: return Color(hex: "bc88f4")
+        case .orange: return Color(hex: "ef852e")
+        case .blue: return Color(hex: "19affe")
         }
     }
 
-    /// 用作背景时的前景色/符号色（对齐 Web `--accent-fg`）。
-    var fg: Color {
+    /// Web `--accent-soft`：dark `oklch(0.30 0.10 hue)` / light `oklch(0.93 0.06 hue)`。
+    func accentSoft(_ dark: Bool) -> Color {
         switch self {
-        case .green: return Color(hex: "0e2a22")
-        case .cyan: return Color(hex: "0e2a2a")
-        case .violet: return Color(hex: "2a0e3a")
-        case .orange: return Color(hex: "3a240e")
-        case .blue: return Color(hex: "0e1a3a")
+        case .green: return dark ? Color(hex: "003b15") : Color(hex: "c9f4d7")
+        case .cyan: return dark ? Color(hex: "003b41") : Color(hex: "b9f5f8")
+        case .violet: return dark ? Color(hex: "3a1c55") : Color(hex: "f1deff")
+        case .orange: return dark ? Color(hex: "511a00") : Color(hex: "ffdec2")
+        case .blue: return dark ? Color(hex: "00315a") : Color(hex: "c4eeff")
+        }
+    }
+
+    /// Web `--accent-fg`：强调色底上的前景（dark `oklch(0.14 0.02 hue)` / light `white`）。
+    func accentFg(_ dark: Bool) -> Color {
+        if !dark { return .white }
+        switch self {
+        case .green: return Color(hex: "040c06")
+        case .cyan: return Color(hex: "010c0c")
+        case .violet: return Color(hex: "0b0710")
+        case .orange: return Color(hex: "0f0703")
+        case .blue: return Color(hex: "030a11")
         }
     }
 }

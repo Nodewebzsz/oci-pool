@@ -19,7 +19,7 @@ struct LoginHeroView: View {
 
     private var accent: Color { Color(hex: "34d399") }
     private var cyanAccent: Color { Color(hex: "22d3ee") }
-    private var orangeAccent: Color { Color(hex: "f59e0b") }
+    private var orangeAccent: Color { AppTheme.orange }
     private var coreFill: Color { Color(hex: dark ? "272c34" : "f2f4f7") }
     private var grid: Color { Color(hex: dark ? "7c848f" : "c8ced6").opacity(0.10) }
 

@@ -164,9 +164,9 @@ struct TenantQuotaView: View {
             }
             .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
     }
 
     // MARK: - Table
@@ -424,7 +424,7 @@ struct TenantQuotaView: View {
     private func usageColor(_ pct: Int) -> Color {
         if pct >= 90 { return Color(hex: "dc2626") }
         if pct >= 60 { return Color(hex: "d97706") }
-        return Color(hex: "16a34a")
+        return AppTheme.sidebarActive
     }
 
     private func pctColor(_ pct: Int) -> Color {
@@ -438,7 +438,7 @@ struct TenantQuotaView: View {
         if row.totalValue > 0, row.availableValue < row.totalValue * 0.2 {
             return Color(hex: "d97706")
         }
-        return Color(hex: "16a34a")
+        return AppTheme.sidebarActive
     }
 }
 

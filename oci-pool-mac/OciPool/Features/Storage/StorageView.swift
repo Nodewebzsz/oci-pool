@@ -197,7 +197,7 @@ struct StorageView: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(AppTheme.danger)
                     .padding(6)
-                    .background(Color(hex: "f85149").opacity(0.12))
+                    .background(AppTheme.danger.opacity(0.12))
                     .cornerRadius(6)
             }
             .buttonStyle(PlainButtonStyle())
@@ -333,7 +333,7 @@ struct StorageView: View {
         Button(action: action) {
             Image(systemName: system)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(danger ? Color(hex: "f85149") : AppTheme.sidebarActive)
+                .foregroundColor(danger ? AppTheme.danger : AppTheme.sidebarActive)
                 .padding(6)
                 .background(
                     (danger ? AppTheme.danger : AppTheme.sidebarActive).opacity(0.12)
