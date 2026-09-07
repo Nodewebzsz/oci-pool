@@ -315,7 +315,7 @@ function TenantsPage({ density }) {
   };
 
   const columns = [
-    { key: 'proxy', label: tr('tenants.col.proxy'), width: 40, align: 'center', render: r => {
+    { key: 'proxy', label: tr('tenants.col.proxy'), width: 48, minWidth: 48, align: 'center', ellipsis: false, render: r => {
       const forced = r.proxyForce === true || r.proxyForce === 1 || r.proxyForce === '1';
       const bound = forced || r.proxyBound === true || r.proxyBound === 1 || r.proxyBound === '1';
       return (
@@ -439,7 +439,7 @@ function TenantsPage({ density }) {
     { key: 'status', label: tr('tenants.col.status'),
       render: r => <StatusPill status={r._ui.status === 'active' ? 'active' : r._ui.status} label={tr('status.' + r._ui.status)} />,
     },
-    { key: 'actions', label: tr('common.operation'), width: 40, align: 'center',
+    { key: 'actions', label: tr('common.operation'), width: 48, minWidth: 48, align: 'center', ellipsis: false,
       render: r => {
         const isOpen = menuFor?.tenant === r;
         return (

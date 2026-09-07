@@ -297,7 +297,7 @@ function InstancesPage({ density }) {
     },
     { key: 'createdAt', label: tr('instances.col.createdAt'),
       render: r => <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>{r.createdAt}</span> },
-    { key: 'actions', label: tr('common.operation'), width: 40, align: 'center',
+    { key: 'actions', label: tr('common.operation'), width: 48, minWidth: 48, align: 'center', ellipsis: false,
       render: r => (
         <button
           type="button"

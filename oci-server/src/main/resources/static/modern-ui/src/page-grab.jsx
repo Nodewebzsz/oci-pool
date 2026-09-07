@@ -352,7 +352,7 @@ function GrabPage({ density }) {
       render: r => <span style={{ padding: '1px 6px', background: 'var(--info-soft)', color: 'var(--info)', borderRadius: 3, fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{getInstanceArch(r)}</span> },
     { key: 'createdAt', label: tr('common.createdAt'),
       render: r => <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>{r.createdAt}</span> },
-    { key: 'actions', label: tr('common.operation'), width: 40, align: 'center',
+    { key: 'actions', label: tr('common.operation'), width: 48, minWidth: 48, align: 'center', ellipsis: false,
       render: r => {
         const isOpen = menuFor?.task === r;
         return (
