@@ -108,7 +108,9 @@ window.getTenantAlias     = t => {
   if (value == null) return '';
   const raw = String(value);
   // 未设置过自定义名称时 defName 会被后端回填为 userName(OCID)/ID；这些仍应按“未设置”显示为空
-  const fallbacks = [t?._ui?.name, t?.userName, t?.idStr, t?.id, t?.tenantId, t?.tenancyName]
+  // 仅当 defName 是 OCID/租户ID 这类“未设置回填值”时才判为空；
+  // 不要把 tenancyName(租户名) 判为空——后端会把未设置自定义名的 defName 兜底为租户名，此时应显示租户名。
+  const fallbacks = [t?.userName, t?.idStr, t?.id, t?.tenantId]
     .filter(v => v !== null && v !== undefined && String(v) !== '').map(String);
   return fallbacks.includes(raw) ? '' : raw;
 };   // 自定义显示名

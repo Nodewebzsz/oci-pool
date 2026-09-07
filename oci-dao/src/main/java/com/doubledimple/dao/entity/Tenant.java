@@ -136,6 +136,7 @@ public class Tenant {
     private RegisterDetail registerDetail;
 
     @Transient
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
     private String defName;
 
     @Transient
