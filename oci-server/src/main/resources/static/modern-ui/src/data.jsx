@@ -115,11 +115,17 @@ window.getTenantHasTask   = t => t?._ui?.hasBootTask ?? (t?.openBootFlag === tru
 window.getTenantActive    = t => t?._ui?.isActive ?? (typeof t?.isActive === 'boolean' ? t.isActive : t?.status === 'active');
 window.getTenantRegion    = t => t?._ui?.regionCode ?? t?.region ?? t?.mainRegion;
 
-// 租户下拉统一显示（对齐 AI 管理 tname 风格）：租户名(defName 自定义名优先/其次 tenancyName) + 区域
+// 租户下拉统一显示（对齐 AI 管理 tname 风格）：租户名(defName 自定义名优先/其次 tenancyName) + 中文区域
 window.getTenantLabel    = t => {
   const alias = window.getTenantAlias(t);
   const name  = window.getTenantName(t);
-  const region = window.getTenantRegion(t) ? window.getTenantRegion(t) : '';
+  const regionCode = window.getTenantRegion(t);
+  // 区域编码 → 中文城市短名（simpleName/cn）；不在表内时兜底显示原编码
+  let region = '';
+  if (regionCode) {
+    const r = REGION_MAP[regionCode];
+    region = r ? (r.simpleName || r.cn || r.name) : regionCode;
+  }
   // 若 alias 等于 name（未设置自定义名时 normalize 会把 alias 回填为 name），则只用名字
   const base = alias && alias !== name ? `${alias}` : `${name}`;
   return region ? `${base} · ${region}` : base;
