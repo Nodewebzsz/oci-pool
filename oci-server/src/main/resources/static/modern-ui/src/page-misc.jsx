@@ -67,7 +67,7 @@ function PlaceholderPage({ title, subtitle, icon, iconColor = 'var(--fg-2)', des
 //   与 useMailModal 的核心差异:此处不预选任何租户,发件人在写信时选
 // ═══════════════════════════════════════════════════════════════════════
 function MailPage() {
-  const { t: tr } = useT();
+  const { t: tr, lang } = useT();
   const shell = useShell();
 
   // ─── 真实后端 · 全部租户(含未开启) + 已开启邮件配置 ─────────────
@@ -76,12 +76,12 @@ function MailPage() {
     let alive = true;
     (async () => {
       try {
-        const [tenantPage, emailJson] = await Promise.all([
-          window.ociApi.getPage('/tenants/list/json', { page: 0, size: 500, cloudType: 1 }).catch(() => ({ content: [] })),
+        const [tenantRows, emailJson] = await Promise.all([
+          window.ociServices.tenant.listParentTenants().catch(() => []),
           window.ociServices.mail.tenantList({ pageNum: 1, pageSize: 500, sort: 'createdTime', order: 'desc' }),
         ]);
         if (!alive) return;
-        const allTenants = (tenantPage.content || []).map(t => ({ ...t, id: String(t.idStr || t.id), name: t.tenancyName || t.userName || '', tname: (t.defName && t.defName !== t.userName && t.defName !== t.tenancyName ? t.defName : (t.tenancyName || t.userName)) + (t.region ? ` · ${t.region}` : '') }));
+        const allTenants = (Array.isArray(tenantRows) ? tenantRows : []).map(t => ({ ...t, id: String(t.id), name: t.tenancyName || t.userName || '', tname: window.getTenantLabel(t, lang) }));
         const content = (emailJson && emailJson.data && Array.isArray(emailJson.data.content)) ? emailJson.data.content : [];
         const byTenant = new Map(content.map(c => [String(c.tenantId), c]));
         setTenants(allTenants.map(t => {
@@ -755,8 +755,10 @@ function ObjectPage() {
   const [tenants, setTenants] = React.useState([]);
   React.useEffect(() => {
     let alive = true;
-    window.ociApi.getPage('/tenants/list/json', { page: 0, size: 500, cloudType: 1 })
-      .then(page => { if (alive) setTenants((page.content || []).map(t => ({ ...t, id: String(t.idStr || t.id) }))); })
+    // 与实例列表一致：走 listParentTenants（TenantResp：id/tenancyName/region编码），
+    // 避免 /tenants/list/json 的 region 被覆盖成中文导致下拉无法匹配。
+    window.ociServices.tenant.listParentTenants()
+      .then(rows => { if (alive) setTenants((Array.isArray(rows) ? rows : []).map(t => ({ ...t, id: String(t.id) }))); })
       .catch(() => { if (alive) setTenants([]); });
     return () => { alive = false; };
   }, []);
