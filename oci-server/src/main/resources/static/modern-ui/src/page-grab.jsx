@@ -58,6 +58,35 @@ function GrabPage({ density }) {
       .catch(() => { if (alive) setTenantOptions([]); });
     return () => { alive = false; };
   }, []);
+  // 区域下拉：与实例管理一致 —— 选中租户后调 listRegions 重建区域选项
+  const [regionOptions, setRegionOptions] = useStateG([]);
+  const [regionLoading, setRegionLoading] = useStateG(false);
+  useEffectG(() => {
+    let alive = true;
+    setRegionOptions([]);
+    if (!tenantFilter) { setRegionLoading(false); setRegionFilter(''); return () => { alive = false; }; }
+    setRegionLoading(true);
+    (async () => {
+      try {
+        const rows = await window.ociServices.tenant.listRegions({ parentId: tenantFilter });
+        if (!alive) return;
+        const options = (Array.isArray(rows) ? rows : [])
+          .map(row => ({ id: String(row.id ?? ''), label: row.region || row.tenancyName || row.userName || row.id || '', region: row.region || '' }))
+          .filter(row => row.id);
+        setRegionOptions(options);
+        const requested = String(regionFilter || '');
+        if (requested && options.some(row => row.id === requested)) return;
+        if (options.length === 1) { const only = options[0].id; setRegionFilter(only); writeRouteQuery({ regionId: only, page: 1 }); }
+        else if (requested) { setRegionFilter(''); writeRouteQuery({ regionId: '', page: 1 }); }
+      } catch (err) {
+        if (!alive) return;
+        setRegionOptions([]); setRegionFilter('');
+      } finally {
+        if (alive) setRegionLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [tenantFilter]);
   const [totalElements, setTotalElements] = useStateG(0);
   const [loading, setLoading] = useStateG(true);
   const [loadError, setLoadError] = useStateG('');
@@ -365,7 +394,7 @@ function GrabPage({ density }) {
           <>
             <Select
               value={tenantFilter}
-              onChange={v => { setTenantFilter(v); setRegionFilter(''); setPage(1); writeRouteQuery({ tenantId: v, regionId: '', page: 1 }); }}
+              onChange={v => { setTenantFilter(v); setRegionOptions([]); setRegionFilter(''); setPage(1); writeRouteQuery({ tenantId: v, regionId: '', page: 1 }); }}
               placeholder={tr('common.selectTenant')}
               width={220}
               options={Array.from(new Map(tenantOptions.map(t => [t.id, { value: t.id, label: getTenantLabel(t, lang) }])).values())}
@@ -375,7 +404,9 @@ function GrabPage({ density }) {
               onChange={v => { setRegionFilter(v); setPage(1); writeRouteQuery({ regionId: v, page: 1 }); }}
               placeholder={tr('common.selectRegion')}
               width={160}
-              options={[...new Set(tenantOptions.filter(t => !tenantFilter || t.id === tenantFilter).map(t => t.region).filter(Boolean))].map(region => ({ value: region, label: region }))}
+              disabled={!tenantFilter || regionLoading || regionOptions.length === 0}
+              searchable={regionOptions.length > 1}
+              options={regionOptions.map(r => ({ value: r.id, label: r.label }))}
             />
             <Button variant="primary" size="md" icon="search" onClick={() => shell.showToast(`${tr('grab.filter.result')}${filtered.length}${tr('grab.filter.count')}`, { kind: 'info' })}>{tr('common.search')}</Button>
             <IconButton
