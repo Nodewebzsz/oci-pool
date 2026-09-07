@@ -3068,7 +3068,7 @@ function showResourceModal(shell, tenant, row) {
                       <span className="mono" style={{
                         padding: '2px 6px', background: 'var(--bg-3)',
                         borderRadius: 3, fontSize: 11, color: 'var(--fg-1)',
-                      }}>{state.masked ? inst.tenantName : (inst.tenantName || '').replace(/\*/g, 'a')}</span>
+                      }}>{state.masked ? window.maskName(inst.tenantName) : (inst.tenantName || '')}</span>
                     </td>
                     <td style={{ padding: '10px 12px', color: 'var(--fg-0)', borderBottom: '1px solid var(--border)' }}>
                       {regionLabel(inst.region)}

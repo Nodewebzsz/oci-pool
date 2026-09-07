@@ -329,7 +329,7 @@ function TenantResourcesPage({ density, ctx, navigate, updateDetailCtx }) {
                     <span className="mono" style={{
                       padding: '2px 6px', background: 'var(--bg-3)',
                       borderRadius: 3, fontSize: 11, color: 'var(--fg-1)',
-                    }}>{inst.tenantName}</span>
+                    }}>{masked ? window.maskName(inst.tenantName) : inst.tenantName}</span>
                   </td>
                   <td style={{ padding: '11px 12px', color: 'var(--fg-0)', borderBottom: '1px solid var(--border)' }}>
                     {regionShortLabel(inst.region || getTenantRegion(tenant))}

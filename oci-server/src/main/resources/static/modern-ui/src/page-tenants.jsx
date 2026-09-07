@@ -328,8 +328,8 @@ function TenantsPage({ density }) {
         ><Icon name="shield" size={15} /></button>
       );
     } },
-    { key: 'name', label: tr('tenants.col.name'),
-      render: r => <span className="mono" style={{ padding: '2px 6px', background: 'var(--bg-3)', borderRadius: 4, fontSize: 11, color: 'var(--fg-1)', fontWeight: 500 }}>{masked ? window.maskName(r._ui.name) : r._ui.name}</span>,
+    { key: 'name', label: tr('tenants.col.name'), width: 110,
+      render: r => <span className="mono" style={{ padding: '2px 6px', background: 'var(--bg-3)', borderRadius: 4, fontSize: 11, color: 'var(--fg-1)', fontWeight: 500, display: 'inline-block', maxWidth: 96, overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'middle' }}>{masked ? window.maskName(r._ui.name) : r._ui.name}</span>,
     },
     { key: 'custom', label: tr('tenants.col.custom'), render: r => {
       const alias = getTenantAlias(r);

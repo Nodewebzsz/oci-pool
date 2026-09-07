@@ -260,15 +260,15 @@ function GrabPage({ density }) {
   const columns = [
     { key: 'seq', label: tr('grab.col.seq'), width: 40,
       render: r => <span className="mono" style={{ color: 'var(--fg-3)', fontSize: 11 }}>{r.seq}</span> },
-    { key: 'tenantName', label: tr('grab.col.tenant'),
+    { key: 'tenantName', label: tr('grab.col.tenant'), width: 110,
       render: r => {
         // 与租户管理/实例列表页一致 · 展开时把 *** 替换为 user(z***n → zusern)
-        const shownName = unmask ? r.tenantName.replace('***', 'user') : r.tenantName;
+        const shownName = unmask ? r.tenantName : window.maskName(r.tenantName);
         return (
           <span className="mono" style={{
             padding: '2px 6px', background: 'var(--bg-3)',
             borderRadius: 4, fontSize: 11, color: 'var(--fg-1)',
-          }}>{shownName}</span>
+          }} style={{ display: 'inline-block', maxWidth: 96, overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'middle' }}>{shownName}</span>
         );
       } },
     { key: 'custom', label: tr('grab.col.custom'), width: 120,

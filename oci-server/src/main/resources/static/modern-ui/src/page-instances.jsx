@@ -249,15 +249,15 @@ function InstancesPage({ density }) {
   const columns = [
     { key: 'seq', label: tr('instances.col.seq'), width: 40,
       render: r => <span className="mono" style={{ color: 'var(--fg-3)', fontSize: 11 }}>{r.seq}</span> },
-    { key: 'tenantName', label: tr('instances.col.tenant'),
+    { key: 'tenantName', label: tr('instances.col.tenant'), width: 110,
       render: r => {
         // 展开时显示反脱敏名 + 自定义名（对齐租户页的行为）
         const t = tenantOptions.find(x => String(x.id) === String(r.tenantId));
         // 后端只返回一个租户显示字段；未提供明文时不能在前端猜测或拼接名称。
-        const shownName = r.tenantName;
+        const shownName = masked ? window.maskName(r.tenantName) : r.tenantName;
         return (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }} title={t ? `${r.tenantName} · ${getTenantName(t)}` : r.tenantName}>
-            <span className="mono" style={{ padding: '2px 6px', background: 'var(--bg-3)', borderRadius: 4, fontSize: 11, color: 'var(--fg-1)' }}>{shownName}</span>
+            <span className="mono" style={{ padding: '2px 6px', background: 'var(--bg-3)', borderRadius: 4, fontSize: 11, color: 'var(--fg-1)', display: 'inline-block', maxWidth: 96, overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'middle' }}>{shownName}</span>
             <Icon name="link" size={11} style={{ color: 'var(--fg-3)' }} />
           </span>
         );

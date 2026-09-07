@@ -224,7 +224,7 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
           </a>
           <Icon name="chevron-right" size={12} style={{ color: 'var(--fg-3)' }} />
           <span style={{ color: 'var(--fg-1)', fontWeight: 500 }}>
-            {tr('td.detail')} · <span className="mono">{masked ? (getTenantName(tenant) || '') : (getTenantName(tenant) || '').replace('***', 'user')}</span>
+            {tr('td.detail')} · <span className="mono">{masked ? window.maskName(getTenantName(tenant) || '') : (getTenantName(tenant) || '')}</span>
           </span>
         </nav>
       </div>
@@ -254,13 +254,13 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
               <h1 style={{ fontSize: 18, fontWeight: 600, margin: 0, color: 'var(--fg-0)', letterSpacing: -0.2 }}>
-                {getTenantName(tenant)}
+                {masked ? window.maskName(getTenantName(tenant) || '') : (getTenantName(tenant) || '')}
               </h1>
               <span className="mono" style={{
                 padding: '2px 8px', background: 'var(--bg-3)',
                 borderRadius: 4, fontSize: 11, color: 'var(--fg-1)', fontWeight: 500,
               }}>
-                {masked ? (getTenantName(tenant) || '') : (getTenantName(tenant) || '').replace('***', 'user')}
+                {masked ? window.maskName(getTenantName(tenant) || '') : (getTenantName(tenant) || '')}
               </span>
               <StatusPill status={tenant._ui.status === 'active' ? 'active' : tenant._ui.status} label={tr('status.' + tenant._ui.status)} />
             </div>
@@ -379,7 +379,7 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
                   <span className="mono" style={{
                     padding: '2px 6px', background: 'var(--bg-3)',
                     borderRadius: 3, fontSize: 11, color: 'var(--fg-1)',
-                  }}>{masked ? (activeRow.name || '') : (activeRow.name || '').replace('***', 'user')}</span>
+                  }}>{masked ? window.maskName(activeRow.name || '') : (activeRow.name || '')}</span>
                 </td>
                 <td style={{ padding: '12px 14px', color: 'var(--fg-0)' }}>{getTenantName(activeRow)}</td>
                 <td style={{ padding: '12px 14px' }}>
