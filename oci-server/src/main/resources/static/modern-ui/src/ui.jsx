@@ -263,6 +263,7 @@ function Table({ columns, rows, onRowClick, density = 'compact', empty, striped 
               position: 'sticky', top: 0,
               whiteSpace: 'nowrap',
               width: c.width,
+              minWidth: c.minWidth || c.width,
               zIndex: 1
             }}>{c.label}</th>
             )}
@@ -286,12 +287,19 @@ function Table({ columns, rows, onRowClick, density = 'compact', empty, striped 
             onMouseLeave={(e) => e.currentTarget.style.background = striped && i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 40%, transparent)' : 'transparent'}>
             
               {columns.map((c, ci) =>
-            <td key={c.key || ci} style={{
+            <td key={c.key || ci}
+                title={((c.tooltip && c.tooltip(r)) || (c.render === undefined ? String(r[c.key] ?? '') : '')) || undefined}
+                style={{
               padding: `${py}px 12px`,
               textAlign: c.align || 'left',
               color: 'var(--fg-1)',
               verticalAlign: 'middle',
-              whiteSpace: c.wrap ? 'normal' : 'nowrap'
+              whiteSpace: c.wrap ? 'normal' : 'nowrap',
+              ...(c.ellipsis === false ? {} : {
+                maxWidth: c.maxWidth || c.width || 240,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              })
             }}>
                   {c.render ? c.render(r, i) : r[c.key]}
                 </td>

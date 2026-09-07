@@ -264,7 +264,7 @@ function InstancesPage({ density }) {
       },
     },
     { key: 'region', label: tr('instances.col.region'), width: 100, render: r => <RegionBadge code={r.region} lang={lang} /> },
-    { key: 'name', label: tr('instances.col.name'), width: 160,
+    { key: 'name', label: tr('instances.col.name'), width: 160, tooltip: r => r.name || '',
       render: r => (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           <StatusDot status={r.status} size={7} pulse={r.status === 'running'} />

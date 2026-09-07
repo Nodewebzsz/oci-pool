@@ -331,7 +331,7 @@ function TenantsPage({ density }) {
     { key: 'name', label: tr('tenants.col.name'), width: 110,
       render: r => <span className="mono" style={{ padding: '2px 6px', background: 'var(--bg-3)', borderRadius: 4, fontSize: 11, color: 'var(--fg-1)', fontWeight: 500, display: 'inline-block', maxWidth: 96, overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'middle' }}>{masked ? window.maskName(r._ui.name) : r._ui.name}</span>,
     },
-    { key: 'custom', label: tr('tenants.col.custom'), render: r => {
+    { key: 'custom', label: tr('tenants.col.custom'), tooltip: r => getTenantAlias(r) || '', render: r => {
       const alias = getTenantAlias(r);
       // 未设置过自定义名称时(defName 缺失或回落为 userName/OCID),显示为空(—)
       // 后端历史数据会把未设置的 defName 回填为 userName/OCID；这些值仍应按“未设置”显示为空。

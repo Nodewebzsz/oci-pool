@@ -260,7 +260,7 @@ function GrabPage({ density }) {
   const columns = [
     { key: 'seq', label: tr('grab.col.seq'), width: 40,
       render: r => <span className="mono" style={{ color: 'var(--fg-3)', fontSize: 11 }}>{r.seq}</span> },
-    { key: 'tenantName', label: tr('grab.col.tenant'), width: 110,
+    { key: 'tenantName', label: tr('grab.col.tenant'), width: 110, tooltip: r => r.tenantName || '',
       render: r => {
         // 与租户管理/实例列表页一致 · 展开时把 *** 替换为 user(z***n → zusern)
         const shownName = unmask ? r.tenantName : window.maskName(r.tenantName);
@@ -271,7 +271,7 @@ function GrabPage({ density }) {
           }} style={{ display: 'inline-block', maxWidth: 96, overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'middle' }}>{shownName}</span>
         );
       } },
-    { key: 'custom', label: tr('grab.col.custom'), width: 120,
+    { key: 'custom', label: tr('grab.col.custom'), width: 120, tooltip: r => r.custom || '',
       render: r => <span style={{ color: 'var(--fg-1)', fontWeight: 500 }}>{getTenantAlias(r) || '-'}</span> },
     { key: 'region', label: tr('grab.col.region'), width: 90,
       render: r => <RegionBadge code={r.region} lang={lang} /> },
