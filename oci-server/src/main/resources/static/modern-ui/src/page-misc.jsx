@@ -945,7 +945,7 @@ function ObjectPage() {
             <CustomDropdown value={tenantId} onChange={e => setTenantId(e)} height={32} width="240px">
               <option value="">{tr('obj.selectTenantPh')}</option>
               {tenants.map(t => (
-                <option key={t.id} value={t.id}>{t.name} · {getTenantName(t)}</option>
+                <option key={t.id} value={t.id}>{t.tname || `${t.name} · ${getTenantName(t)}`}</option>
               ))}
             </CustomDropdown>
             <Button variant="outline" size="md" icon="refresh-cw"
@@ -1469,7 +1469,7 @@ function AIPage() {
             <CustomDropdown value={tenantId} onChange={e => setTenantId(e)} height={32} width="240px">
               <option value="">{tr('pageMisc.6c7d53')}</option>
               {tenants.map(t => (
-                <option key={t.id} value={t.id}>{t.name} · {getTenantName(t)}</option>
+                <option key={t.id} value={t.id}>{t.tname || `${t.name} · ${getTenantName(t)}`}</option>
               ))}
             </CustomDropdown>
             <Button variant="violet" size="md" icon="message-square" disabled={!currentTenant}

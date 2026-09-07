@@ -319,7 +319,7 @@ function Pagination({ total, page = 1, perPage = 10, onPageChange, onPerPageChan
           value={perPage}
           onChange={v => onPerPageChange && onPerPageChange(+v)}
           options={[10, 20, 50, 100].map(n => ({ value: n, label: String(n) }))}
-          width={64}
+          width={72}
           height={26}
         />
       </div>
