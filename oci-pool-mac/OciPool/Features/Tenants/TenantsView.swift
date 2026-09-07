@@ -22,11 +22,8 @@ struct TenantsView: View {
     private let wStatus: CGFloat = 56
     private let wAction: CGFloat = 52
     private let hPad: CGFloat = 12
-    private let minNameHidden: CGFloat = 88
     private let minNameShownFloor: CGFloat = 160
-    private let minDefHidden: CGFloat = 96
     private let minDefShown: CGFloat = 72
-    private let minRegionHidden: CGFloat = 88
     private let minRegionShown: CGFloat = 68
 
     /// 显示全名时压缩固定列，把宽度让给名称（单行不换行）
@@ -35,11 +32,9 @@ struct TenantsView: View {
         type: CGFloat, create: CGFloat, time: CGFloat,
         minName: CGFloat, minDef: CGFloat, minRegion: CGFloat
     ) {
-        if namesHidden {
-            return (wCost, wDays, wTask, wMulti, wType, max(wCreate, 96), wTime,
-                    minNameHidden, minDefHidden, minRegionHidden)
-        }
-        return (48, 48, 64, 44, 72, 96, 100,
+        // 名称/自定义名/区域列宽不随脱敏切换变化（对齐 Web：固定列宽防抖动）
+        // 名称列固定用完整名宽度；脱敏时内容省略但列宽恒定
+        return (wCost, wDays, wTask, wMulti, wType, max(wCreate, 96), wTime,
                 minNameShownFloor, minDefShown, minRegionShown)
     }
 
@@ -244,16 +239,15 @@ struct TenantsView: View {
         } else {
             GeometryReader { geo in
                 let m = colMetrics(namesHidden: model.namesHidden)
-                let nameNeed: CGFloat = model.namesHidden
-                    ? m.minName
-                    : estimatedNameWidth(for: model.rows, floor: m.minName)
+                // 名称列始终按完整名估宽（脱敏切换不改变列宽，防抖动）
+                let nameNeed: CGFloat = estimatedNameWidth(for: model.rows, floor: m.minName)
                 // 固定列用压缩后的值；名称列至少吃到单行全名所需宽度
                 let baseFixed = fixedColsWidth(m: m) - m.minName + nameNeed
                 let totalW = max(geo.size.width, baseFixed)
                 let flexPool = max(0, totalW - baseFixed)
                 // 剩余宽度：遮罩时名称/自定义名/区域分；展开时优先名称
-                let nameShare: CGFloat = model.namesHidden ? 0.40 : 0.70
-                let defShare: CGFloat = model.namesHidden ? 0.35 : 0.18
+                let nameShare: CGFloat = 0.70
+                let defShare: CGFloat = 0.18
                 let regionShare: CGFloat = 1 - nameShare - defShare
                 let wName = nameNeed + flexPool * nameShare
                 let wDef = m.minDef + flexPool * defShare

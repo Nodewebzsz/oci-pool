@@ -238,8 +238,8 @@ struct InstancesView: View {
 
     /// Web `parentLabel` 的短名（别名/用户名）
     private func parentAlias(_ t: TenantRegionOption) -> String {
-        if !t.userName.isEmpty { return t.userName }
         if !t.tenancyName.isEmpty { return t.tenancyName }
+        if !t.userName.isEmpty { return t.userName }
         return t.id
     }
 
@@ -290,8 +290,8 @@ struct InstancesView: View {
 
     /// 对齐 Web：`userName || tenancyName || id`
     private func parentLabel(_ t: TenantRegionOption) -> String {
-        if !t.userName.isEmpty { return t.userName }
         if !t.tenancyName.isEmpty { return t.tenancyName }
+        if !t.userName.isEmpty { return t.userName }
         return t.id
     }
 

@@ -601,8 +601,8 @@ final class BootViewModel: ObservableObject {
     }
 
     func tenantLabel(_ t: TenantRegionOption) -> String {
-        if !t.userName.isEmpty { return t.userName }
         if !t.tenancyName.isEmpty { return t.tenancyName }
+        if !t.userName.isEmpty { return t.userName }
         return t.id
     }
 
