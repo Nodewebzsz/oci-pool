@@ -245,7 +245,7 @@ public class TenantServiceImpl implements TenantService {
                     parent.setDefName(cloudTenancy.getDefName());
                     parent.setAccountCost(cost);
                 }else {
-                    parent.setDefName(parent.getUserName());
+                    parent.setDefName(parent.getTenancyName() != null && !parent.getTenancyName().isEmpty() ? parent.getTenancyName() : parent.getUserName());
                     parent.setAccountCost("0");
                 }
                 // 设置区域名称
@@ -428,7 +428,7 @@ public class TenantServiceImpl implements TenantService {
         if (byTenancyNameAndCloudType.isPresent()){
             parent.setDefName(byTenancyNameAndCloudType.get().getDefName());
         }else {
-            parent.setDefName(parent.getUserName());
+            parent.setDefName(parent.getTenancyName() != null && !parent.getTenancyName().isEmpty() ? parent.getTenancyName() : parent.getUserName());
         }
         // 设置区域名称
         parent.setIdStr(parent.getId().toString());
@@ -551,6 +551,8 @@ public class TenantServiceImpl implements TenantService {
             tenantAdd.setIsHomeRegion(true);
             tenantAdd.setTenancyName(tenancyName);
             tenantAdd.setTenancyDes(description);
+            // 自定义名称默认与租户名一致（导入时设置，后期可单独修改）
+            tenantAdd.setDefName(tenancyName);
             tenants.add(tenantAdd);
         }else{
             for (RegionSubscription regionSubscription : regionSubscriptions) {
@@ -618,6 +620,8 @@ public class TenantServiceImpl implements TenantService {
             tenantAdd.setIsHomeRegion(true);
             tenantAdd.setTenancyName(tenancyName);
             tenantAdd.setTenancyDes(description);
+            // 自定义名称默认与租户名一致（导入时设置，后期可单独修改）
+            tenantAdd.setDefName(tenancyName);
             tenants.add(tenantAdd);
         }else{
             for (RegionSubscription regionSubscription : regionSubscriptions) {
@@ -1790,7 +1794,9 @@ public class TenantServiceImpl implements TenantService {
             if (parentCloudTenancy.isPresent()){
                 defName = parentCloudTenancy.get().getDefName();
             }else{
-                defName = parentTenant.getUserName();
+                // 未设置自定义名称时，回填为租户名（与导入时默认一致），而非 OCID
+                defName = parentTenant.getTenancyName() != null && !parentTenant.getTenancyName().isEmpty()
+                        ? parentTenant.getTenancyName() : parentTenant.getUserName();
             }
             parentTenant.setDefName(defName);
             boolean childConSu = RegionEnum.getSupportAiRegion().contains(RegionEnum.getCodeByName(parentTenant.getRegion()));
@@ -1871,7 +1877,7 @@ public class TenantServiceImpl implements TenantService {
                     parent.setDefName(cloudTenancy.getDefName());
                     parent.setAccountCost(cost);
                 }else {
-                    parent.setDefName(parent.getUserName());
+                    parent.setDefName(parent.getTenancyName() != null && !parent.getTenancyName().isEmpty() ? parent.getTenancyName() : parent.getUserName());
                     parent.setAccountCost("0");
                 }
                 // 设置区域名称
@@ -1950,7 +1956,7 @@ public class TenantServiceImpl implements TenantService {
             if (ct.isPresent()) {
                 t.setDefName(ct.get().getDefName());
             } else if (t.getDefName() == null || t.getDefName().isEmpty()) {
-                t.setDefName(t.getUserName());
+                t.setDefName(t.getTenancyName() != null && !t.getTenancyName().isEmpty() ? t.getTenancyName() : t.getUserName());
             }
             String regionName = RegionEnum.getNameByCode(t.getRegion());
             if (regionName != null) t.setRegion(regionName);
@@ -2143,7 +2149,7 @@ public class TenantServiceImpl implements TenantService {
             if (byTenancyNameAndCloudType.isPresent()){
                 tenant.setDefName(byTenancyNameAndCloudType.get().getDefName());
             }else {
-                tenant.setDefName(tenant.getUserName());
+                tenant.setDefName(tenant.getTenancyName() != null && !tenant.getTenancyName().isEmpty() ? tenant.getTenancyName() : tenant.getUserName());
             }
             return tenant;
         }else{

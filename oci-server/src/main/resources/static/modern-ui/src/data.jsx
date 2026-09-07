@@ -105,7 +105,12 @@ window.getTenantName      = t => {
 window.getTenantAlias     = t => {
   const value = [t?._ui?.alias, t?.defName, t?.custom]
     .find(v => v !== null && v !== undefined && String(v) !== '');
-  return value == null ? '' : String(value);
+  if (value == null) return '';
+  const raw = String(value);
+  // 未设置过自定义名称时 defName 会被后端回填为 userName(OCID)/ID；这些仍应按“未设置”显示为空
+  const fallbacks = [t?._ui?.name, t?.userName, t?.idStr, t?.id, t?.tenantId, t?.tenancyName]
+    .filter(v => v !== null && v !== undefined && String(v) !== '').map(String);
+  return fallbacks.includes(raw) ? '' : raw;
 };   // 自定义显示名
 window.getTenantDays      = t => {
   const v = t?._ui?.activeDays ?? t?.activeDays ?? t?.days;
