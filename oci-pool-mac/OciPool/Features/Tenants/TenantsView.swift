@@ -397,10 +397,13 @@ struct TenantsView: View {
                 // Web：自定义名 fg-1，未设置为空白
                 .foregroundColor(dark ? Color(hex: "ccd2d6") : Color(hex: "2d3439"))
                 .lineLimit(1)
+                .truncationMode(.tail)
                 .frame(width: width, alignment: .leading)
                 .frame(minHeight: 20)
+                .clipped()
         }
         .buttonStyle(PlainButtonStyle())
+        .help(item.defNameText)
     }
 
     /// Web：账号成本 0=accent 绿，>0=橙 + dashed 下划线
