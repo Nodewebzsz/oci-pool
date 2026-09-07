@@ -115,6 +115,16 @@ window.getTenantHasTask   = t => t?._ui?.hasBootTask ?? (t?.openBootFlag === tru
 window.getTenantActive    = t => t?._ui?.isActive ?? (typeof t?.isActive === 'boolean' ? t.isActive : t?.status === 'active');
 window.getTenantRegion    = t => t?._ui?.regionCode ?? t?.region ?? t?.mainRegion;
 
+// 租户下拉统一显示（对齐 AI 管理 tname 风格）：租户名(defName 自定义名优先/其次 tenancyName) + 区域
+window.getTenantLabel    = t => {
+  const alias = window.getTenantAlias(t);
+  const name  = window.getTenantName(t);
+  const region = window.getTenantRegion(t) ? window.getTenantRegion(t) : '';
+  // 若 alias 等于 name（未设置自定义名时 normalize 会把 alias 回填为 name），则只用名字
+  const base = alias && alias !== name ? `${alias}` : `${name}`;
+  return region ? `${base} · ${region}` : base;
+};
+
 // 自定义名称显示截断 · 与原项目 tlTruncateName 一致(ASCII 算 1 宽,其它算 2 宽,上限 14)
 window.truncateDisplayName = (str, maxVisualLen = 14) => {
   if (!str) return '';

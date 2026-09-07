@@ -81,7 +81,7 @@ function MailPage() {
           window.ociServices.mail.tenantList({ pageNum: 1, pageSize: 500, sort: 'createdTime', order: 'desc' }),
         ]);
         if (!alive) return;
-        const allTenants = (tenantPage.content || []).map(t => ({ ...t, id: String(t.idStr || t.id), name: t.tenancyName || t.userName || '' }));
+        const allTenants = (tenantPage.content || []).map(t => ({ ...t, id: String(t.idStr || t.id), name: t.tenancyName || t.userName || '', tname: (t.defName && t.defName !== t.userName && t.defName !== t.tenancyName ? t.defName : (t.tenancyName || t.userName)) + (t.region ? ` · ${t.region}` : '') }));
         const content = (emailJson && emailJson.data && Array.isArray(emailJson.data.content)) ? emailJson.data.content : [];
         const byTenant = new Map(content.map(c => [String(c.tenantId), c]));
         setTenants(allTenants.map(t => {
@@ -324,7 +324,7 @@ function MailPage() {
             <CustomDropdown value={s2.senderId == null ? '' : String(s2.senderId)} onChange={e => { s2.senderId = e; paint(); }} height={32} width="100%">
               {enabledSenders.length === 0 && <option value="">{tr('mail.noSender')}</option>}
               {enabledSenders.map(t => (
-                <option key={t.configId} value={t.configId}>{getTenantName(t.tenant)} · {t.senderEmail}</option>
+                <option key={t.configId} value={t.configId}>{getTenantLabel(t.tenant)} · {t.senderEmail}</option>
               ))}
             </CustomDropdown>
           </FormRow>
@@ -756,7 +756,7 @@ function ObjectPage() {
   React.useEffect(() => {
     let alive = true;
     window.ociApi.getPage('/tenants/list/json', { page: 0, size: 500, cloudType: 1 })
-      .then(page => { if (alive) setTenants((page.content || []).map(t => ({ ...t, id: String(t.idStr || t.id), name: t.tenancyName || t.userName || '' }))); })
+      .then(page => { if (alive) setTenants((page.content || []).map(t => ({ ...t, id: String(t.idStr || t.id), name: t.tenancyName || t.userName || '', tname: window.getTenantLabel(t) }))); })
       .catch(() => { if (alive) setTenants([]); });
     return () => { alive = false; };
   }, []);

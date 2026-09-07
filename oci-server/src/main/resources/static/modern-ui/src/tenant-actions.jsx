@@ -293,14 +293,15 @@ function useAddBootModal() {
                 const suffix = state.mode === 'quick'
                   ? (QUICK_PRESETS.find(p => p.id === state.quickPreset)?.id || 'arm-max')
                   : state.customTemplate;
-                state.remark = `${getTenantName(picked)}-${suffix}`;
+                const nm = window.getTenantAlias(picked) || getTenantName(picked);
+                state.remark = `${nm}-${suffix}`;
               }
               render();
             }} height={32} width="100%">
             <option value="" disabled>{tr('tenant.6c7d53')}</option>
             {state.tenantOptions.filter(t => getTenantActive(t) !== false).map(t => (
               <option key={getTenantDbId(t)} value={getTenantDbId(t)}>
-                {getTenantName(t)} · {getTenantAlias(t) || '-'} · {regionLabel(t)}
+                {getTenantLabel(t)}
               </option>
             ))}
           </CustomDropdown>

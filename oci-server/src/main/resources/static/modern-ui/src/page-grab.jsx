@@ -359,7 +359,7 @@ function GrabPage({ density }) {
               onChange={v => { setTenantFilter(v); setRegionFilter(''); setPage(1); writeRouteQuery({ tenantId: v, regionId: '', page: 1 }); }}
               placeholder={tr('common.selectTenant')}
               width={160}
-              options={Array.from(new Map(tasks.map(t => [t.tenantId, { value: t.tenantId, label: `${t.tenantName} · ${getTenantAlias(t) || '-'}` }])).values())}
+              options={Array.from(new Map(tasks.map(t => [t.tenantId, { value: t.tenantId, label: getTenantLabel(t) }])).values())}
             />
             <Select
               value={regionFilter}
