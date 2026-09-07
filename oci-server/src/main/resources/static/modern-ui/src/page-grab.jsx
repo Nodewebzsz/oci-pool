@@ -49,6 +49,15 @@ function GrabPage({ density }) {
   const showInsts = useTaskInstancesDrawer();
 
   const [tasks, setTasks] = useStateG([]);
+  // 租户/区域筛选下拉独立加载（对齐实例管理：listParentTenants → TenantResp）
+  const [tenantOptions, setTenantOptions] = useStateG([]);
+  useEffectG(() => {
+    let alive = true;
+    window.ociServices.tenant.listParentTenants()
+      .then(rows => { if (alive) setTenantOptions((Array.isArray(rows) ? rows : []).map(t => ({ id: String(t.id), name: t.tenancyName || t.userName || '', region: t.region || '' }))); })
+      .catch(() => { if (alive) setTenantOptions([]); });
+    return () => { alive = false; };
+  }, []);
   const [totalElements, setTotalElements] = useStateG(0);
   const [loading, setLoading] = useStateG(true);
   const [loadError, setLoadError] = useStateG('');
@@ -359,14 +368,14 @@ function GrabPage({ density }) {
               onChange={v => { setTenantFilter(v); setRegionFilter(''); setPage(1); writeRouteQuery({ tenantId: v, regionId: '', page: 1 }); }}
               placeholder={tr('common.selectTenant')}
               width={220}
-              options={Array.from(new Map(tasks.map(t => [t.tenantId, { value: t.tenantId, label: getTenantLabel(t, lang) }])).values())}
+              options={Array.from(new Map(tenantOptions.map(t => [t.id, { value: t.id, label: getTenantLabel(t, lang) }])).values())}
             />
             <Select
               value={regionFilter}
               onChange={v => { setRegionFilter(v); setPage(1); writeRouteQuery({ regionId: v, page: 1 }); }}
               placeholder={tr('common.selectRegion')}
               width={160}
-              options={[...new Set(tasks.map(t => t.region).filter(Boolean))].map(region => ({ value: region, label: region }))}
+              options={[...new Set(tenantOptions.filter(t => !tenantFilter || t.id === tenantFilter).map(t => t.region).filter(Boolean))].map(region => ({ value: region, label: region }))}
             />
             <Button variant="primary" size="md" icon="search" onClick={() => shell.showToast(`${tr('grab.filter.result')}${filtered.length}${tr('grab.filter.count')}`, { kind: 'info' })}>{tr('common.search')}</Button>
             <IconButton

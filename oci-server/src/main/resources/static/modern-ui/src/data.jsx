@@ -98,7 +98,7 @@ window.getTenantDbId      = t => {
   return value == null ? '' : String(value);
 };
 window.getTenantName      = t => {
-  const value = [t?._ui?.name, t?.tenancyName, t?.userName, t?.name, t?.custom]
+  const value = [t?._ui?.name, t?.tenancyName, t?.userName, t?.tenantName, t?.name, t?.custom]
     .find(v => v !== null && v !== undefined && String(v) !== '');
   return value == null ? '' : String(value);
 };
@@ -113,7 +113,7 @@ window.getTenantDays      = t => {
 };
 window.getTenantHasTask   = t => t?._ui?.hasBootTask ?? (t?.openBootFlag === true || t?.openInsFlag === '1' || t?.task === 'running');
 window.getTenantActive    = t => t?._ui?.isActive ?? (typeof t?.isActive === 'boolean' ? t.isActive : t?.status === 'active');
-window.getTenantRegion    = t => t?._ui?.regionCode ?? t?.region ?? t?.mainRegion;
+window.getTenantRegion    = t => t?._ui?.regionCode ?? t?.region ?? t?.regionName ?? t?.mainRegion;
 
 // 租户下拉统一显示：租户名(defName 自定义名优先/其次 tenancyName) + 区域。
 // lang: 'en' → 区域用英文名(r.en)，否则中文城市名(simpleName/cn)。
