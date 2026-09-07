@@ -301,7 +301,7 @@ function useAddBootModal() {
             <option value="" disabled>{tr('tenant.6c7d53')}</option>
             {state.tenantOptions.filter(t => getTenantActive(t) !== false).map(t => (
               <option key={getTenantDbId(t)} value={getTenantDbId(t)}>
-                {getTenantLabel(t)}
+                {getTenantLabel(t, lang)}
               </option>
             ))}
           </CustomDropdown>

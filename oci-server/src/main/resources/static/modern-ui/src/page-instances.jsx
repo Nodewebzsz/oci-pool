@@ -349,7 +349,7 @@ function InstancesPage({ density }) {
               width={220}
             options={tenantOptions.map(t => ({
               value: getTenantDbId(t),
-              label: getTenantLabel(t),
+              label: getTenantLabel(t, lang),
             }))}
             />
             <Select

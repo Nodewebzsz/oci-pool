@@ -324,7 +324,7 @@ function MailPage() {
             <CustomDropdown value={s2.senderId == null ? '' : String(s2.senderId)} onChange={e => { s2.senderId = e; paint(); }} height={32} width="100%">
               {enabledSenders.length === 0 && <option value="">{tr('mail.noSender')}</option>}
               {enabledSenders.map(t => (
-                <option key={t.configId} value={t.configId}>{getTenantLabel(t.tenant)} · {t.senderEmail}</option>
+                <option key={t.configId} value={t.configId}>{getTenantLabel(t.tenant, lang)} · {t.senderEmail}</option>
               ))}
             </CustomDropdown>
           </FormRow>
@@ -749,14 +749,14 @@ function MailPage() {
 //   与租户菜单 showStorageModal 差异:此处允许用户切换任意租户,不预选
 // ═══════════════════════════════════════════════════════════════════════
 function ObjectPage() {
-  const { t: tr } = useT();
+  const { t: tr, lang } = useT();
   const shell = useShell();
 
   const [tenants, setTenants] = React.useState([]);
   React.useEffect(() => {
     let alive = true;
     window.ociApi.getPage('/tenants/list/json', { page: 0, size: 500, cloudType: 1 })
-      .then(page => { if (alive) setTenants((page.content || []).map(t => ({ ...t, id: String(t.idStr || t.id), name: t.tenancyName || t.userName || '', tname: window.getTenantLabel(t) }))); })
+      .then(page => { if (alive) setTenants((page.content || []).map(t => ({ ...t, id: String(t.idStr || t.id) }))); })
       .catch(() => { if (alive) setTenants([]); });
     return () => { alive = false; };
   }, []);
@@ -945,7 +945,7 @@ function ObjectPage() {
             <CustomDropdown value={tenantId} onChange={e => setTenantId(e)} height={32} width="240px">
               <option value="">{tr('obj.selectTenantPh')}</option>
               {tenants.map(t => (
-                <option key={t.id} value={t.id}>{t.tname || `${t.name} · ${getTenantName(t)}`}</option>
+                <option key={t.id} value={t.id}>{getTenantLabel(t, lang)}</option>
               ))}
             </CustomDropdown>
             <Button variant="outline" size="md" icon="refresh-cw"
@@ -1329,7 +1329,7 @@ function AIPage() {
   React.useEffect(() => {
     let alive = true;
     window.ociServices.ai.tenants()
-      .then(rows => { if (alive) setTenants((Array.isArray(rows) ? rows : []).map(t => ({ ...t, id: String(t.id), name: t.name || '' }))); })
+      .then(rows => { if (alive) setTenants((Array.isArray(rows) ? rows : []).map(t => ({ ...t, id: String(t.id), name: t.name || '', tname: t.tname || '' }))); })
       .catch(() => { if (alive) setTenants([]); });
     return () => { alive = false; };
   }, []);
@@ -1469,7 +1469,7 @@ function AIPage() {
             <CustomDropdown value={tenantId} onChange={e => setTenantId(e)} height={32} width="240px">
               <option value="">{tr('pageMisc.6c7d53')}</option>
               {tenants.map(t => (
-                <option key={t.id} value={t.id}>{t.tname || `${t.name} · ${getTenantName(t)}`}</option>
+                <option key={t.id} value={t.id}>{t.tname || getTenantLabel(t, lang)}</option>
               ))}
             </CustomDropdown>
             <Button variant="violet" size="md" icon="message-square" disabled={!currentTenant}

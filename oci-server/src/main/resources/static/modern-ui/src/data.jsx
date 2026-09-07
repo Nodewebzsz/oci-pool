@@ -115,16 +115,19 @@ window.getTenantHasTask   = t => t?._ui?.hasBootTask ?? (t?.openBootFlag === tru
 window.getTenantActive    = t => t?._ui?.isActive ?? (typeof t?.isActive === 'boolean' ? t.isActive : t?.status === 'active');
 window.getTenantRegion    = t => t?._ui?.regionCode ?? t?.region ?? t?.mainRegion;
 
-// 租户下拉统一显示（对齐 AI 管理 tname 风格）：租户名(defName 自定义名优先/其次 tenancyName) + 中文区域
-window.getTenantLabel    = t => {
-  const alias = window.getTenantAlias(t);
-  const name  = window.getTenantName(t);
-  const regionCode = window.getTenantRegion(t);
-  // 区域编码 → 中文城市短名（simpleName/cn）；不在表内时兜底显示原编码
+// 租户下拉统一显示：租户名(defName 自定义名优先/其次 tenancyName) + 区域。
+// lang: 'en' → 区域用英文名(r.en)，否则中文城市名(simpleName/cn)。
+// 先 normalize（缺 _ui 时自动根据后端原始字段补齐），避免对象存储等页拿到原始分页对象时回落成 OCID。
+window.getTenantLabel    = (t, lang) => {
+  const src = (t && t._ui) ? t : (window.ociTenantRow ? window.ociTenantRow.normalize(t, REGIONS) : (t || {}));
+  const alias = window.getTenantAlias(src);
+  const name  = window.getTenantName(src);
+  const regionCode = window.getTenantRegion(src);
   let region = '';
   if (regionCode) {
     const r = REGION_MAP[regionCode];
-    region = r ? (r.simpleName || r.cn || r.name) : regionCode;
+    if (r) region = lang === 'en' ? r.en : (r.simpleName || r.cn || r.name);
+    else region = regionCode;
   }
   // 若 alias 等于 name（未设置自定义名时 normalize 会把 alias 回填为 name），则只用名字
   const base = alias && alias !== name ? `${alias}` : `${name}`;

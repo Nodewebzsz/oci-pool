@@ -4,7 +4,7 @@
 
 function useProxyEditModal(onSaved) {
   const shell = useShell();
-  const { t: tr } = useT();
+  const { t: tr, lang } = useT();
   return React.useCallback(async (existing) => {
     const isNew = !existing;
     const state = existing ? { ...existing, username: existing.proxyUsername || '', password: '', tenants: existing.tenantIds || [], tenantOptions: [], loadingTenants: true } : {
@@ -60,7 +60,7 @@ function useProxyEditModal(onSaved) {
                 onChange={v => { state.tenants = v; render(); }}
                 columns={2}
                 options={state.loadingTenants ? [] : state.tenantOptions.map(t => ({
-                  value: t.id, label: getTenantLabel(t),
+                  value: t.id, label: getTenantLabel(t, lang),
                 }))}
               />
             </FormRow>
