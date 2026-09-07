@@ -141,7 +141,7 @@ struct BootView: View {
                     set: { model.onParentChanged($0) }
                 ),
                 placeholder: "请选择租户",
-                width: 160,
+                width: 220,
                 allowClear: true,
                 searchable: true
             )

@@ -346,7 +346,7 @@ function InstancesPage({ density }) {
                 writeRouteQuery({ tenantId: v, regionId: '', page: 1 });
               }}
               placeholder={tr('common.selectTenant')}
-              width={160}
+              width={220}
             options={tenantOptions.map(t => ({
               value: getTenantDbId(t),
               label: getTenantLabel(t),
@@ -356,7 +356,7 @@ function InstancesPage({ density }) {
               value={regionFilter}
               onChange={v => { setRegionFilter(v); setPage(1); writeRouteQuery({ regionId: v, page: 1 }); }}
               placeholder={tr('common.selectRegion')}
-              width={160}
+              width={200}
               disabled={!tenantFilter || regionLoading || regionOptions.length === 0}
               searchable={regionOptions.length > 1}
               options={regionOptions.map(r => ({ value: r.id, label: r.label }))}
