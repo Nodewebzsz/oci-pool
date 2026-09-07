@@ -557,7 +557,10 @@ struct InstancesView: View {
                     : (dark ? Color.white.opacity(0.9) : Color.primary)
             )
             .lineLimit(1)
+            .truncationMode(.tail)
             .frame(width: width, alignment: .leading)
+            .clipped()
+            .help(text)
     }
 
     private func tenantCell(_ item: InstanceItem, width: CGFloat) -> some View {
@@ -568,6 +571,7 @@ struct InstancesView: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(dark ? Color.white.opacity(0.88) : Color.primary)
                 .lineLimit(1)
+                .truncationMode(.tail)
                 .frame(width: width, alignment: .leading)
                 .contentShape(Rectangle())
         }

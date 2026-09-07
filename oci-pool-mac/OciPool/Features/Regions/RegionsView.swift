@@ -549,7 +549,10 @@ struct RegionsView: View {
             .font(.system(size: 12))
             .foregroundColor(RegionsTheme.text(dark))
             .lineLimit(1)
+            .truncationMode(.tail)
             .frame(width: w, alignment: .leading)
+            .clipped()
+            .help(text)
     }
 
     private static func fmt(_ s: String?) -> String {

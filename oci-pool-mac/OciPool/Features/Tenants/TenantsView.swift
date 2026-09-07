@@ -543,7 +543,10 @@ struct TenantsView: View {
             .font(.system(size: 12, weight: bold ? .semibold : .regular))
             .foregroundColor(muted ? AppTheme.sidebarText(dark) : (dark ? Color.white.opacity(0.9) : Color.primary))
             .lineLimit(1)
+            .truncationMode(.tail)
             .frame(width: w, alignment: .leading)
+            .clipped()
+            .help(text)
     }
 }
 

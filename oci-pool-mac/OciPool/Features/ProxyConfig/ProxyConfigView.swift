@@ -255,8 +255,11 @@ struct ProxyConfigView: View {
             .font(.system(size: 12, weight: weight))
             .foregroundColor(dark ? Color.white.opacity(0.88) : Color(hex: "1e2f42"))
             .lineLimit(1)
+            .truncationMode(.tail)
             .frame(width: width, alignment: .leading)
             .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
+            .clipped()
+            .help(text)
     }
 
     private func errorBanner(_ text: String) -> some View {
