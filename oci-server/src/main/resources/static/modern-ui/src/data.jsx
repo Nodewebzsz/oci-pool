@@ -134,6 +134,13 @@ window.getTenantLabel    = (t, lang) => {
   return region ? `${base} · ${region}` : base;
 };
 
+// 租户名脱敏：首字符 + '***' + 末字符（对齐开机任务 z***c）。
+window.maskName = (name) => {
+  const s = String(name || '');
+  if (s.length <= 1) return s;
+  return s.charAt(0) + '***' + s.charAt(s.length - 1);
+};
+
 // 自定义名称显示截断 · 与原项目 tlTruncateName 一致(ASCII 算 1 宽,其它算 2 宽,上限 14)
 window.truncateDisplayName = (str, maxVisualLen = 14) => {
   if (!str) return '';
