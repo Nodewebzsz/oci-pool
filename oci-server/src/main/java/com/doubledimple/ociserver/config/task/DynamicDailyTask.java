@@ -312,6 +312,7 @@ public class DynamicDailyTask {
             int inactiveAccounts = 0;
             List<String> inactiveAccountNames = new ArrayList<>();
             List<Long> inactiveTenantIds = new ArrayList<>();
+            List<String> failedCheckNames = new ArrayList<>();
 
             for (Tenant tenant : all) {
                 try {
@@ -319,15 +320,18 @@ public class DynamicDailyTask {
                     boolean isActive = isStatusSuccess(responseEntity);
                     if (isActive) {
                         activeAccounts++;
-                    } else {
+                    } else if ("auth".equals(probeErrorKind(responseEntity))) {
+                        // 认证类失败(401/NotAuthenticated)才是真死账号，才置为失效
                         inactiveAccounts++;
                         inactiveAccountNames.add(tenant.getUserName());
                         inactiveTenantIds.add(tenant.getId());
+                    } else {
+                        // 瞬时故障(网络/代理/服务端错误)不判死，避免网络抖动把健康账号批量标红
+                        failedCheckNames.add(tenant.getUserName());
                     }
                 } catch (Exception e) {
-                    log.warn("检查账号状态失败，租户ID: {}, 错误: {}", tenant.getId(), e.getMessage());
-                    inactiveAccounts++;
-                    inactiveAccountNames.add(tenant.getUserName());
+                    log.warn("检查账号状态失败(不判死)，租户ID: {}, 错误: {}", tenant.getId(), e.getMessage());
+                    failedCheckNames.add(tenant.getUserName());
                 }
             }
 
@@ -338,6 +342,9 @@ public class DynamicDailyTask {
                 } catch (Exception e) {
                     log.error("批量更新账号失效状态失败", e);
                 }
+            }
+            if (!CollectionUtils.isEmpty(failedCheckNames)) {
+                log.warn("有 {} 个账号因网络原因检测失败(未判死，保持原状态)：{}", failedCheckNames.size(), String.join(",", failedCheckNames));
             }
 
             accountNotify.setTotalAccount(totalAccounts);
@@ -393,6 +400,18 @@ public class DynamicDailyTask {
             log.warn("解析状态响应失败", e);
         }
         return false;
+    }
+
+    private String probeErrorKind(ResponseEntity<?> responseEntity) {
+        try {
+            if (responseEntity != null && responseEntity.getBody() instanceof Map) {
+                Object kind = ((Map<String, Object>) responseEntity.getBody()).get("errorKind");
+                return kind == null ? null : String.valueOf(kind);
+            }
+        } catch (Exception e) {
+            log.warn("解析 errorKind 失败", e);
+        }
+        return "transient";
     }
 
     public Page<BootInstanceRes> getBootList(Pageable pageable) {

@@ -114,6 +114,7 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -1068,6 +1069,7 @@ public class TenantServiceImpl implements TenantService {
 
                 // 3. 遍历检测
                 List<Long> noActiveIds = new ArrayList<>();
+                List<String> failedCheckNames = new ArrayList<>();
                 if (!CollectionUtils.isEmpty(all)) {
                     for (int i = 0; i < all.size(); i++) {
                         Tenant tenant = all.get(i);
@@ -1081,13 +1083,20 @@ public class TenantServiceImpl implements TenantService {
                                 emitter.send(SseEmitter.event()
                                         .name("progress")
                                         .data(String.format("✅ [%d/%d] %s 正常", i + 1, totalAccounts, username)));
-                            } else {
+                            } else if ("auth".equals(probeErrorKind(responseEntity))) {
+                                // 认证类失败(401/NotAuthenticated)才是真死账号，才置为失效
                                 noActiveIds.add(tenant.getId());
                                 inactiveAccounts++;
                                 inactiveAccountNames.add(username);
                                 emitter.send(SseEmitter.event()
                                         .name("progress")
-                                        .data(String.format("❌ [%d/%d] %s 异常", i + 1, totalAccounts, username)));
+                                        .data(String.format("❌ [%d/%d] %s 异常(账号已失效或已被封禁)", i + 1, totalAccounts, username)));
+                            } else {
+                                // 瞬时故障(网络/代理/服务端错误)不判死，状态保持不变，下次检测再确认
+                                failedCheckNames.add(username);
+                                emitter.send(SseEmitter.event()
+                                        .name("progress")
+                                        .data(String.format("⚠️ [%d/%d] %s 检测失败(网络原因，本次不判死)", i + 1, totalAccounts, username)));
                             }
 
                             // 轻微延迟，避免过快推送导致前端无法及时显示
@@ -1120,6 +1129,13 @@ public class TenantServiceImpl implements TenantService {
                     } else {
                         messageFactory.getType(MessageEnum.TELEGRAM)
                                 .sendMessageTemplate(String.format(MESSAGE_CONFIG_SUCCESS_ACCOUNT_TEMPLATE, totalAccounts));
+                    }
+
+                    // 网络类失败单独提示，不与死亡账号混淆
+                    if (!failedCheckNames.isEmpty()) {
+                        messageFactory.getType(MessageEnum.TELEGRAM)
+                                .sendMessageTemplate(String.format("⚠️ 有 %d 个账号因网络原因检测失败(未判死，保持原状态)：%s",
+                                        failedCheckNames.size(), StringUtils.join(failedCheckNames, ",")));
                     }
                 } catch (Exception e) {
                     log.warn("发送消息失败: {}", e.getMessage(), e);
@@ -1681,13 +1697,15 @@ public class TenantServiceImpl implements TenantService {
         int inactiveAccounts = 0;
         List<Long> noActiveIds = new ArrayList<>();
         List<String> inactiveAccountNames = new ArrayList<>();
+        List<String> failedCheckNames = new ArrayList<>();
         if (!CollectionUtils.isEmpty(all)){
             for (Tenant tenant : all) {
                 ResponseEntity<?> responseEntity = oracleInstanceService.checkAccountStatus(tenant.getId());
                 boolean isActive = isStatusSuccess(responseEntity);
                 if (isActive) {
                     activeAccounts++;
-                } else {
+                } else if ("auth".equals(probeErrorKind(responseEntity))) {
+                    // 认证类失败(401/NotAuthenticated)才是真死账号，才置为失效
                     noActiveIds.add(tenant.getId());
                     inactiveAccounts++;
                     String tenancyName = tenant.getTenancyName();
@@ -1695,6 +1713,13 @@ public class TenantServiceImpl implements TenantService {
                         tenancyName = tenant.getUserName();
                     }
                     inactiveAccountNames.add(tenancyName);
+                } else {
+                    // 瞬时故障(网络/代理/服务端错误)不判死，避免网络抖动把健康账号批量标红
+                    String tenancyName = tenant.getTenancyName();
+                    if (StringUtils.isBlank(tenancyName)){
+                        tenancyName = tenant.getUserName();
+                    }
+                    failedCheckNames.add(tenancyName);
                 }
             }
         }
@@ -1709,6 +1734,10 @@ public class TenantServiceImpl implements TenantService {
                 messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplate(String.format(MESSAGE_CONFIG_DEAD_ACCOUNT_TEMPLATE,totalAccounts,inactiveAccounts,StringUtils.join(inactiveAccountNames, ",")));
             }else {
                 messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplate(String.format(MESSAGE_CONFIG_SUCCESS_ACCOUNT_TEMPLATE,totalAccounts));
+            }
+            // 网络类失败单独提示，不与死亡账号混淆
+            if (failedCheckNames.size() > 0){
+                messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplate(String.format("⚠️ 有 %d 个账号因网络原因检测失败(未判死，保持原状态)：%s",failedCheckNames.size(),StringUtils.join(failedCheckNames, ",")));
             }
         } catch (Exception e) {
             log.warn("发送消息失败: {}", e.getMessage(), e);
@@ -2255,6 +2284,18 @@ public class TenantServiceImpl implements TenantService {
         return false;
     }
 
+    /**
+     * 读取健康探测结果的错误分类: auth=认证失效(账号被封/密钥失效), transient=网络/代理/服务端等瞬时故障, null=探测成功。
+     * 批量检测/定时任务据此决定是否将租户置为失效——只有 auth 才判死，瞬时故障保持原状态。
+     */
+    private String probeErrorKind(ResponseEntity<?> responseEntity) {
+        if (responseEntity == null || !(responseEntity.getBody() instanceof Map)) {
+            return "transient";
+        }
+        Object kind = ((Map<String, Object>) responseEntity.getBody()).get("errorKind");
+        return kind == null ? null : String.valueOf(kind);
+    }
+
     @Override
     public ApiResponse assetAnalysis(Integer cloudType) {
         if (cloudType == null) {
@@ -2323,7 +2364,29 @@ public class TenantServiceImpl implements TenantService {
     public void updateTenantWithSSE(String tenantId, SseEmitter emitter) {
         CompletableFuture.runAsync(() -> {
             try {
-                sendSseEvent(emitter, "progress", "开始更新租户及资源信息...");
+                // 0. 前置健康探测：账号已被封禁时立即终止，不再执行虚假的实例/数据库同步
+                sendSseEvent(emitter, "progress", "正在探测账号健康状态...");
+                Long tid = Long.valueOf(tenantId);
+                ResponseEntity<?> probe = oracleInstanceService.checkAccountStatus(tid);
+                Map<String, Object> probeBody = (probe != null && probe.getBody() instanceof Map)
+                        ? (Map<String, Object>) probe.getBody() : null;
+                if (probeBody == null || !"success".equals(probeBody.get("status"))) {
+                    boolean authFailure = probeBody != null && "auth".equals(probeBody.get("errorKind"));
+                    if (authFailure) {
+                        // 认证类失败(401/NotAuthenticated)判定账号死亡，置为失效让列表/详情页胶囊变红
+                        tenantRepository.batchUpdateStatusToInactive(Collections.singletonList(tid));
+                        log.warn("租户[{}]健康探测判定账号失效(401)，已置为Inactive", tenantId);
+                    }
+                    String detail = probeBody == null ? "健康探测无响应" : String.valueOf(probeBody.get("message"));
+                    String reason = authFailure
+                            ? "账号已失效或已被封禁(401 NotAuthenticated)，更新终止"
+                            : "无法连接Oracle Cloud(" + detail + ")，更新终止，请检查网络或代理后重试";
+                    log.warn("租户[{}]账户更新中止: {}", tenantId, detail);
+                    sendSseEvent(emitter, "error", reason);
+                    emitter.complete();
+                    return;
+                }
+                sendSseEvent(emitter, "progress", "账号状态正常，开始更新租户及资源信息...");
                 List<Tenant> tenants = self.updateTenancyDetail(tenantId);
                 for (Tenant tenant : tenants) {
                     sendSseEvent(emitter, "progress", "开始更新租户[" + tenant.getUserName() + "]区域:["+tenant.getRegion()+"]实例资源...");

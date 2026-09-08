@@ -47,6 +47,10 @@ import com.oracle.bmc.core.model.UpdateInstanceSourceViaBootVolumeDetails;
 import com.oracle.bmc.core.model.UpdateInternetGatewayDetails;
 import com.oracle.bmc.core.model.UpdateRouteTableDetails;
 import com.oracle.bmc.core.model.UpdateSecurityListDetails;
+import com.oracle.bmc.core.model.CapacityReportInstanceShapeConfig;
+import com.oracle.bmc.core.model.CapacityReportShapeAvailability;
+import com.oracle.bmc.core.model.CreateCapacityReportShapeAvailabilityDetails;
+import com.oracle.bmc.core.model.CreateComputeCapacityReportDetails;
 import com.oracle.bmc.core.model.Vcn;
 import com.oracle.bmc.core.model.Vnic;
 import com.oracle.bmc.core.model.VnicAttachment;
@@ -55,6 +59,7 @@ import com.oracle.bmc.core.requests.AddIpv6SubnetCidrRequest;
 import com.oracle.bmc.core.requests.AttachBootVolumeRequest;
 import com.oracle.bmc.core.requests.AttachVolumeRequest;
 import com.oracle.bmc.core.requests.CreateBootVolumeRequest;
+import com.oracle.bmc.core.requests.CreateComputeCapacityReportRequest;
 import com.oracle.bmc.core.requests.CreateInternetGatewayRequest;
 import com.oracle.bmc.core.requests.CreateSubnetRequest;
 import com.oracle.bmc.core.requests.DeleteBootVolumeRequest;
@@ -83,6 +88,7 @@ import com.oracle.bmc.core.requests.UpdateInternetGatewayRequest;
 import com.oracle.bmc.core.requests.UpdateRouteTableRequest;
 import com.oracle.bmc.core.requests.UpdateSecurityListRequest;
 import com.oracle.bmc.core.responses.AttachBootVolumeResponse;
+import com.oracle.bmc.core.responses.CreateComputeCapacityReportResponse;
 import com.oracle.bmc.core.responses.CreateInternetGatewayResponse;
 import com.oracle.bmc.core.responses.CreateSubnetResponse;
 import com.oracle.bmc.core.responses.GetBootVolumeResponse;
@@ -121,6 +127,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -2702,5 +2709,112 @@ public class OciUtils {
             log.error("生成 Auth Token 失败, 用户 ID: {}, 错误信息: {}", userId, e.getMessage(), e);
             throw new RuntimeException("生成 Auth Token 失败", e);
         }
+    }
+
+    /**
+     * 容量检查轻量内存缓存：key -> 过期时间戳(ms)
+     * 仅当 OCI 明确返回 OUT_OF_HOST_CAPACITY 时缓存 30 秒，避免开机循环短时间内高频冲击 OCI API 触发 429 限流
+     */
+    private static final java.util.concurrent.ConcurrentHashMap<String, Long> CAPACITY_OUT_CACHE =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long CAPACITY_CACHE_TTL_MS = 30_000L;
+
+    /**
+     * 开机前容量预检：调用 OCI createComputeCapacityReport 接口判断当前 AD/Shape 是否有容量
+     * 遵循 Fail-Open 原则：遇到任何异常（网络超时、429 限流、权限不足、解析异常等）一律返回 true（放行去尝试创建）
+     *
+     * @param computeClient      已配置的 ComputeClient
+     * @param compartmentId      区间 OCID
+     * @param availabilityDomain 可用性域名称
+     * @param shape              机型形状名称
+     * @param ocpus              CPU 核心数
+     * @param memoryInGBs        内存大小(GB)
+     * @return true=有可用容量或未知/异常放行；false=明确返回无可用容量
+     */
+    public static boolean hasComputeCapacity(ComputeClient computeClient,
+                                            String compartmentId,
+                                            String availabilityDomain,
+                                            String shape,
+                                            Float ocpus,
+                                            Float memoryInGBs) {
+        if (computeClient == null || StringUtils.isBlank(compartmentId)
+                || StringUtils.isBlank(availabilityDomain) || StringUtils.isBlank(shape)) {
+            return true;
+        }
+
+        String cacheKey = compartmentId + ":" + availabilityDomain + ":" + shape + ":"
+                + (ocpus == null ? 0 : ocpus) + ":" + (memoryInGBs == null ? 0 : memoryInGBs);
+        Long expiredAt = CAPACITY_OUT_CACHE.get(cacheKey);
+        long now = System.currentTimeMillis();
+        if (expiredAt != null) {
+            if (now < expiredAt) {
+                log.debug("[容量检查-缓存命中] AD:{} shape:{} 处于无容量缓存期(剩余{}s)，跳过创建",
+                        availabilityDomain, shape, (expiredAt - now) / 1000);
+                return false;
+            } else {
+                CAPACITY_OUT_CACHE.remove(cacheKey);
+            }
+        }
+
+        try {
+            CreateCapacityReportShapeAvailabilityDetails.Builder shapeBuilder =
+                    CreateCapacityReportShapeAvailabilityDetails.builder()
+                            .instanceShape(shape);
+            CapacityReportInstanceShapeConfig shapeConfig = buildCapacityShapeConfig(shape, ocpus, memoryInGBs);
+            if (shapeConfig != null) {
+                shapeBuilder.instanceShapeConfig(shapeConfig);
+            }
+
+            CreateComputeCapacityReportResponse response = computeClient.createComputeCapacityReport(
+                    CreateComputeCapacityReportRequest.builder()
+                            .createComputeCapacityReportDetails(
+                                    CreateComputeCapacityReportDetails.builder()
+                                            .compartmentId(compartmentId)
+                                            .availabilityDomain(availabilityDomain)
+                                            .shapeAvailabilities(Collections.singletonList(shapeBuilder.build()))
+                                            .build())
+                            .build());
+
+            if (response == null || response.getComputeCapacityReport() == null
+                    || CollectionUtils.isEmpty(response.getComputeCapacityReport().getShapeAvailabilities())) {
+                return true;
+            }
+
+            for (CapacityReportShapeAvailability item : response.getComputeCapacityReport().getShapeAvailabilities()) {
+                CapacityReportShapeAvailability.AvailabilityStatus status = item.getAvailabilityStatus();
+                if (status == CapacityReportShapeAvailability.AvailabilityStatus.Available
+                        || status == CapacityReportShapeAvailability.AvailabilityStatus.UnknownEnumValue) {
+                    return true;
+                }
+            }
+
+            // 明确无可用容量，记录短 TTL 缓存
+            CAPACITY_OUT_CACHE.put(cacheKey, now + CAPACITY_CACHE_TTL_MS);
+            log.info("[容量检查] AD:{} shape:{} OCI 返回无可用主机容量(OutOfHostCapacity)，跳过创建并缓存30s",
+                    availabilityDomain, shape);
+            return false;
+        } catch (Exception e) {
+            // Fail-Open 原则：报错不阻断开机
+            log.debug("容量报告查询失败，放行去创建. AD:{} shape:{} reason:{}", availabilityDomain, shape, e.getMessage());
+            return true;
+        }
+    }
+
+    private static CapacityReportInstanceShapeConfig buildCapacityShapeConfig(String shape,
+                                                                              Float ocpus,
+                                                                              Float memoryInGBs) {
+        if (shape.contains("E2.1.Micro")) {
+            return CapacityReportInstanceShapeConfig.builder()
+                    .ocpus(1F)
+                    .memoryInGBs(1F)
+                    .build();
+        }
+        if (shape.contains("Flex") && ocpus != null && memoryInGBs != null) {
+            return CapacityReportInstanceShapeConfig.builder()
+                    .ocpus(ocpus)
+                    .memoryInGBs(memoryInGBs)
+                    .build();
+        }
+        return null;
     }
 }

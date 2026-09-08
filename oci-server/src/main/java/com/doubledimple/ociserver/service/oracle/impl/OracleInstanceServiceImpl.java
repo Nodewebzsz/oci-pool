@@ -1287,7 +1287,7 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
         Tenant tenant = tenantRepository.findById(tenantId).get();
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
         Map<String, String> checks = new HashMap<>();
-        try(IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
+        try(IdentityClient identityClient = IdentityClient.builder().httpProvider(JerseyHttpProvider.getInstance()).clientConfigurator(ProxyContext.get()).build(provider)) {
 
             try {
                 // todo 暂时不做shape测活了 0. 尝试列出shape,
@@ -1321,13 +1321,30 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
                 result.put("status", "error");
                 result.put("message", "账号状态异常");
                 result.put("checks", checks);
+                result.put("statusCode", e instanceof BmcException ? ((BmcException) e).getStatusCode() : -1);
+                result.put("errorKind", isAuthFailure(e) ? "auth" : "transient");
             }
 
         } catch (Exception e) {
             result.put("status", "error");
             result.put("message", "检测过程发生错误: " + e.getMessage());
+            result.put("statusCode", -1);
+            // 客户端构建失败(代理/网络问题)统一视为瞬时故障，不据此判死账号
+            result.put("errorKind", "transient");
         }
         return ResponseEntity.ok(result);
+    }
+
+    /**
+     * 区分认证类失败(账号被封/密钥失效, OCI 返回 401 NotAuthenticated)与瞬时故障(网络/代理/服务端错误)。
+     * 账户更新等调用方据此决定是否将租户置为失效。
+     */
+    static boolean isAuthFailure(Exception e) {
+        if (e instanceof BmcException && ((BmcException) e).getStatusCode() == 401) {
+            return true;
+        }
+        String msg = e == null ? "" : String.valueOf(e.getMessage());
+        return msg.contains("NotAuthenticated") || msg.contains("401");
     }
 
     private String getTenantName(long tenantId) {

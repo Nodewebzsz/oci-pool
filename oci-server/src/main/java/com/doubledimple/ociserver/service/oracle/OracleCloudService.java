@@ -209,6 +209,14 @@ public class OracleCloudService {
                     size --;
                     for (Shape shape : shapes) {
                         Shape.BillingType billingType = shape.getBillingType();
+                        // 开机前容量检查：若 OCI 明确返回无可用容量，跳过创建 VCN/子网等开销，避免抛异常打断节奏
+                        if (!OciUtils.hasComputeCapacity(computeClient, compartmentId, availablityDomain.getName(),
+                                shape.getShape(), user.getOcpus(), user.getMemory())) {
+                            log.info("[开机容量检查] 用户:[{}] AD:{} shape:{} 暂无可用主机容量，跳过尝试",
+                                    user.getUserName(), availablityDomain.getName(), shape.getShape());
+                            continue;
+                        }
+
                         Image image = getImage(computeClient, compartmentId, shape, user);
                         if (image == null){
                             log.warn("用户:[{}] 的当前可用性域:{} 没有镜像,切换后再次执行", user.getUserName(),availablityDomain.getName());
@@ -288,6 +296,13 @@ public class OracleCloudService {
              for (LaunchInstanceDetails launchInstanceDetails : dbInstanceDetails) {
                  size --;
                  availabilityDomain = launchInstanceDetails.getAvailabilityDomain();
+                 // 开机前容量检查：若 OCI 明确返回无可用容量，跳过当前尝试
+                 if (!OciUtils.hasComputeCapacity(computeClient, launchInstanceDetails.getCompartmentId(),
+                         availabilityDomain, launchInstanceDetails.getShape(), user.getOcpus(), user.getMemory())) {
+                     log.info("[开机容量检查] 用户:[{}] AD:{} shape:{} 暂无可用主机容量，跳过尝试",
+                             user.getUserName(), availabilityDomain, launchInstanceDetails.getShape());
+                     continue;
+                 }
                  Instance instance = null;
                  try {
                      instance = createInstance(computeClient,user,computeWaiters, launchInstanceDetails);

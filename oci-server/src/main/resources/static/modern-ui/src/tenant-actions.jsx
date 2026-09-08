@@ -7548,12 +7548,14 @@ function useUpdateAccountModal() {
           render();
           shell.showToast(tr('tenant.3996cc').replace('{0}',getTenantName(tenant)), { kind: 'success' });
         });
-        es.addEventListener('error', () => {
-          state.lines.push('[System] event: error · SSE failed');
+        es.addEventListener('error', (e) => {
+          state.lines.push(e.data ? '[error] ' + e.data : '[System] event: error · SSE failed');
           state.running = false;
-          try { es.close(); } catch (e) {}
+          try { es.close(); } catch (err) {}
           render();
-          shell.showToast(tr('tenant.930442'), { kind: 'error' });
+          // 后端前置健康探测失败(账号封禁/网络故障)会通过 error 事件推送真实原因
+          shell.showToast(e.data || tr('tenant.930442'), { kind: 'error' });
+          window.dispatchEvent(new CustomEvent('ocip-refresh-page', { detail: 'tenants' }));
         });
         es.onerror = () => {
           if (es && es.readyState === EventSource.CLOSED) {

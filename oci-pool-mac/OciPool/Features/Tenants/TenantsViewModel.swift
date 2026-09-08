@@ -337,7 +337,8 @@ final class TenantsViewModel: ObservableObject {
                             ToastCenter.shared.error(data)
                         }
                     }
-                    if event == "success" {
+                    // success/error 后都刷新列表：后端探测判定账号失效时已置为Inactive，让状态胶囊立即变红
+                    if event == "success" || event == "error" {
                         Task { @MainActor in
                             await self.reload()
                         }
