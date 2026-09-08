@@ -47,6 +47,9 @@ public class EdgeOneController  extends BaseController {
     private TencentEdgeOneService edgeOneService;
 
     @Resource
+    private com.doubledimple.ociserver.mock.MockDataService mockDataService;
+
+    @Resource
     private DnsRecordRepository dnsRecordRepository;
 
     @Resource
@@ -149,9 +152,17 @@ public class EdgeOneController  extends BaseController {
     public ApiResponse getZones() {
         try {
             List<Map<String, Object>> zones = edgeOneService.listAllZones();
+            // 模拟数据：无域名且开关开启时返回 demo 域名
+            if (zones.isEmpty() && mockDataService.isMockEnabled()) {
+                zones = mockDataService.edgeOneZones();
+            }
             return ApiResponse.success( zones);
         } catch (Exception e) {
             log.warn("获取EdgeOne Zone列表失败: {}", e.getMessage());
+            // 模拟数据：EdgeOne API 调用失败且开关开启时返回 demo 域名
+            if (mockDataService.isMockEnabled()) {
+                return ApiResponse.success(mockDataService.edgeOneZones());
+            }
             return ApiResponse.error("获取域名列表失败: " + e.getMessage());
         }
     }

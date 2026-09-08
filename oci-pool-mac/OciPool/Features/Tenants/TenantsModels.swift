@@ -414,11 +414,12 @@ struct TenantRegionOption: Decodable, Identifiable, Equatable {
     var userName: String = ""
     var region: String = ""
     var tenantId: String = ""
+    var defName: String = ""        // 自定义/显示名（对齐 Web getTenantAlias：自定义名优先）
     var isHomeRegion: Bool = false
     var hasChildren: Bool = false
 
     enum CodingKeys: String, CodingKey {
-        case id, tenancyName, userName, region, tenantId, isHomeRegion, hasChildren
+        case id, tenancyName, userName, region, tenantId, defName, isHomeRegion, hasChildren
     }
 
     init(
@@ -427,6 +428,7 @@ struct TenantRegionOption: Decodable, Identifiable, Equatable {
         userName: String = "",
         region: String = "",
         tenantId: String = "",
+        defName: String = "",
         isHomeRegion: Bool = false,
         hasChildren: Bool = false
     ) {
@@ -435,6 +437,7 @@ struct TenantRegionOption: Decodable, Identifiable, Equatable {
         self.userName = userName
         self.region = region
         self.tenantId = tenantId
+        self.defName = defName
         self.isHomeRegion = isHomeRegion
         self.hasChildren = hasChildren
     }
@@ -450,14 +453,52 @@ struct TenantRegionOption: Decodable, Identifiable, Equatable {
         userName = (try? c.decode(String.self, forKey: .userName)) ?? ""
         region = (try? c.decode(String.self, forKey: .region)) ?? ""
         tenantId = (try? c.decode(String.self, forKey: .tenantId)) ?? ""
+        defName = (try? c.decode(String.self, forKey: .defName)) ?? ""
         isHomeRegion = (try? c.decode(Bool.self, forKey: .isHomeRegion)) ?? false
         hasChildren = (try? c.decode(Bool.self, forKey: .hasChildren)) ?? false
     }
 
+    /// 自定义显示名：优先 defName；若回落为 OCID/ID 则视为未设置（对齐 Web getTenantAlias）
+    var customName: String {
+        let raw = defName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if raw.isEmpty { return "" }
+        let fallbacks = [userName, tenantId, id].filter { !$0.isEmpty }
+        if fallbacks.contains(raw) { return "" }
+        return raw
+    }
+
+    /// 租户展示名：自定义名优先，其次租户名，再用户名/ID（对齐 Web getTenantName）
+    var displayName: String {
+        if !customName.isEmpty { return customName }
+        if !tenancyName.isEmpty { return tenancyName }
+        if !userName.isEmpty { return userName }
+        return id
+    }
+
+    /// 区域中文名：code → RegionCnName；未知则返回原始 code（对齐 Web REGION_MAP 回落）
+    var regionNameText: String {
+        if region.isEmpty { return "" }
+        return RegionCnName.table[region] ?? region
+    }
+
+    /// 二级区域下拉显示：区域名(中文名或原始区码) + 主区域标识。
+    /// 主区域标识跟随系统语言：zh→"主" / en→"Home"（对齐 Web tenants.col.mainRegion）。
+    var regionDropdownLabel: String {
+        var base = region
+        if base.isEmpty {
+            base = tenancyName.isEmpty ? (userName.isEmpty ? id : userName) : tenancyName
+        }
+        guard isHomeRegion else { return base }
+        let isZh = (Locale.preferredLanguages.first ?? "").hasPrefix("zh")
+        return base + " · " + (isZh ? "主" : "Home")
+    }
+
+    /// 租户下拉统一显示：租户名(自定义名优先) · 中文区域（对齐 Web getTenantLabel）
     var label: String {
-        var s = tenancyName.isEmpty ? (userName.isEmpty ? tenantId : userName) : tenancyName
+        var s = displayName
         if s.isEmpty { s = id }
-        if !region.isEmpty { s += " (\(region))" }
+        let rn = regionNameText
+        if !rn.isEmpty { s += " · \(rn)" }
         return s
     }
 

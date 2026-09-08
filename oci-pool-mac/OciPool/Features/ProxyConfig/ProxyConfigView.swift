@@ -94,7 +94,7 @@ struct ProxyConfigView: View {
                     DataListColumnHeader(title: "租户", width: 110)
                     DataListColumnHeader(title: "强制", width: 72)
                     DataListColumnHeader(title: "连通状态", width: 80)
-                    DataListColumnHeader(title: "操作", width: 170, alignment: .trailing)
+                    DataListColumnHeader(title: "操作", width: 170, alignment: .center)
                 } content: {
                     ForEach(model.items) { item in
                         DataListRow {
@@ -127,7 +127,7 @@ struct ProxyConfigView: View {
             // 强制列可点切换（橙=强制 / 绿=非强制）
             forceShieldCell(item)
             StatusBadge(text: item.statusLabel, tone: item.statusTone)
-                .frame(width: 80, alignment: .leading)
+                .frame(width: 80, alignment: .center)
             HStack(spacing: 6) {
                 Spacer(minLength: 0)
                 Button(action: { model.testConnection(item) }) {
@@ -212,7 +212,7 @@ struct ProxyConfigView: View {
                            ? AppTheme.orange
                            : AppTheme.sidebarActive).opacity(0.12))
             )
-            .frame(width: 72, alignment: .leading)
+            .frame(width: 72, alignment: .center)
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
@@ -243,7 +243,7 @@ struct ProxyConfigView: View {
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(AppTheme.sidebarText(dark))
                 }
-                .frame(width: 80, alignment: .leading)
+                .frame(width: 80, alignment: .center)
             }
             .buttonStyle(PlainButtonStyle())
             .help(revealed ? "隐藏密码" : "显示密码")
@@ -256,7 +256,7 @@ struct ProxyConfigView: View {
             .foregroundColor(dark ? Color.white.opacity(0.88) : Color(hex: "1e2f42"))
             .lineLimit(1)
             .truncationMode(.tail)
-            .frame(width: width, alignment: .leading)
+            .frame(width: width, alignment: .center)
             .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
             .clipped()
             .help(text)

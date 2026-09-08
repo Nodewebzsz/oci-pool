@@ -84,7 +84,7 @@ struct AiModelsView: View {
                             set: { model.onTenantChanged($0) }
                         ),
                         placeholder: "-- 请选择租户 --",
-                        width: 240,
+                        width: 220,
                         allowClear: true,
                         searchable: true
                     )

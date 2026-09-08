@@ -16,6 +16,7 @@ services:
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: "6379"
       MODERN_UI_ENABLED: "${MODERN_UI_ENABLED:-true}"
+      MODERN_UI_MOCK_DATA: "${MODERN_UI_MOCK_DATA:-false}"
       DB_PASSWORD: "${DB_PASSWORD:-}"
     volumes:
       - ./data:/oci-pool/data

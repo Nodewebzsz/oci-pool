@@ -295,7 +295,7 @@ struct TenantSheetHost: View {
                                 tableCell(u.username, width: 110, bold: true)
                                 tableCell(u.email.isEmpty ? "—" : u.email, width: nil)
                                 StatusBadge.state(u.lifecycleState)
-                                    .frame(width: 80, alignment: .leading)
+                                    .frame(width: 80, alignment: .center)
                                     .padding(.horizontal, 10)
                                 tableCell(u.timeCreated.isEmpty ? "—" : u.timeCreated, width: 120, muted: true)
                                 tableCell(u.lastSuccessfulLoginTime.isEmpty ? "—" : u.lastSuccessfulLoginTime, width: 120, muted: true)
@@ -303,7 +303,7 @@ struct TenantSheetHost: View {
                                     AppButton(title: "重置", kind: .secondary) { model.resetUserPassword(for: t, user: u) }
                                     AppButton(title: "删除", kind: .danger) { model.deleteUser(for: t, user: u) }
                                 }
-                                .frame(width: 150, alignment: .leading)
+                                .frame(width: 150, alignment: .center)
                                 .padding(.horizontal, 6)
                             }
                         }
@@ -347,10 +347,10 @@ struct TenantSheetHost: View {
                                 tableCell("\(idx + 1)", width: 50, muted: true)
                                 tableCell(email, width: nil)
                                 StatusBadge(text: "有效", tone: .success)
-                                    .frame(width: 100, alignment: .leading)
+                                    .frame(width: 100, alignment: .center)
                                     .padding(.horizontal, 10)
                                 AppButton(title: "移除", kind: .danger) { model.removeNotifyEmail(t, email: email) }
-                                    .frame(width: 90, alignment: .leading)
+                                    .frame(width: 90, alignment: .center)
                                     .padding(.horizontal, 6)
                             }
                         }
@@ -536,7 +536,7 @@ struct TenantSheetHost: View {
                                     tableCell(s.clientId.isEmpty ? "—" : s.clientId, width: nil)
                                     tableCell(s.redirectUrl.isEmpty ? "—" : s.redirectUrl, width: 180, muted: true)
                                     StatusBadge(text: s.socialStatus, tone: s.socialStatus == "active" ? .success : .neutral)
-                                        .frame(width: 80, alignment: .leading)
+                                        .frame(width: 80, alignment: .center)
                                         .padding(.horizontal, 8)
                                     HStack(spacing: 4) {
                                         AppButton(title: "编辑", kind: .secondary) { model.editSocial(t, social: s) }
@@ -546,7 +546,7 @@ struct TenantSheetHost: View {
                                             AppButton(title: "启用", kind: .primary) { model.toggleSocial(t, social: s, enable: true) }
                                         }
                                     }
-                                    .frame(width: 160, alignment: .leading)
+                                    .frame(width: 160, alignment: .center)
                                     .padding(.horizontal, 4)
                                 }
                             }
@@ -634,7 +634,7 @@ struct TenantSheetHost: View {
                                                     }
                                                 }
                                             }
-                                            .frame(width: 140, alignment: .leading)
+                                            .frame(width: 140, alignment: .center)
                                             .padding(.horizontal, 4)
                                         }
                                         if model.editingVolumeId == v.id {
@@ -749,22 +749,51 @@ struct TenantSheetHost: View {
     }
 
     private func progressSheet(title: String, lines: [String]) -> some View {
-        chrome(title: title, width: 520, height: 400, footer: {
-            AppButton(title: "关闭", kind: .secondary) { presentationMode.wrappedValue.dismiss() }
+        let isDone = lines.contains { $0.contains("[success]") }
+        let isFailed = lines.contains { $0.contains("[error]") }
+
+        return chrome(title: title, width: 520, height: 400, footer: {
+            AppButton(title: isDone ? "完成" : "关闭", kind: isDone ? .primary : .secondary) {
+                presentationMode.wrappedValue.dismiss()
+            }
         }) {
             VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text("处理中…")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(mutedText)
+                HStack(spacing: 8) {
+                    if isDone {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(AppTheme.sidebarActive)
+                        Text("更新完成")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(AppTheme.sidebarActive)
+                    } else if isFailed {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(AppTheme.danger)
+                        Text("更新失败")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(AppTheme.danger)
+                    } else {
+                        ProgressView()
+                            .scaleEffect(0.75)
+                        Text("处理中…")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(mutedText)
+                    }
                 }
                 formPanel {
-                    VStack(alignment: .leading, spacing: 3) {
-                        ForEach(lines.suffix(50), id: \.self) { line in
-                            Text(line)
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundColor(primaryText.opacity(0.88))
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(lines.suffix(50), id: \.self) { line in
+                                Text(line)
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundColor(
+                                        line.contains("[success]") ? AppTheme.sidebarActive :
+                                        line.contains("[error]") ? AppTheme.danger :
+                                        primaryText.opacity(0.88)
+                                    )
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
                         }
                     }
                 }
@@ -1101,7 +1130,7 @@ struct TenantSheetHost: View {
                                         AppButton(title: "删除", kind: .danger) {
                                             model.deleteSecurityRule(at: idx, item: t)
                                         }
-                                        .frame(width: 70, alignment: .leading)
+                                        .frame(width: 70, alignment: .center)
                                         .padding(.horizontal, 4)
                                     }
                                 }
@@ -1161,7 +1190,7 @@ struct TenantSheetHost: View {
                                                 .help("点击复制 OCID")
                                         }
                                         .buttonStyle(PlainButtonStyle())
-                                        .frame(width: 120, alignment: .leading)
+                                        .frame(width: 120, alignment: .center)
                                         .padding(.horizontal, 10)
 
                                         tableCell(row.dbVersion.isEmpty ? "—" : row.dbVersion, width: 64)
@@ -1182,7 +1211,7 @@ struct TenantSheetHost: View {
                                             .buttonStyle(PlainButtonStyle())
                                             .help("点击显示/隐藏密码")
                                         }
-                                        .frame(width: 120, alignment: .leading)
+                                        .frame(width: 120, alignment: .center)
                                         .padding(.horizontal, 10)
 
                                         tableCell(row.shape.isEmpty ? "—" : row.shape, width: 90)
@@ -1211,7 +1240,7 @@ struct TenantSheetHost: View {
                                             }
                                             .menuStyle(BorderlessButtonMenuStyle())
                                         }
-                                        .frame(width: 168, alignment: .leading)
+                                        .frame(width: 168, alignment: .center)
                                         .padding(.horizontal, 4)
                                     }
                                 }
@@ -1292,10 +1321,10 @@ struct TenantSheetHost: View {
                                             Text("—").foregroundColor(mutedText).font(.system(size: 12))
                                         }
                                     }
-                                    .frame(width: 70, alignment: .leading)
+                                    .frame(width: 70, alignment: .center)
                                     .padding(.horizontal, 10)
                                     StatusBadge(text: r.status.isEmpty ? "—" : r.status, tone: .success)
-                                        .frame(width: 90, alignment: .leading)
+                                        .frame(width: 90, alignment: .center)
                                         .padding(.horizontal, 10)
                                 }
                             }
@@ -1527,7 +1556,7 @@ struct TenantSheetHost: View {
             .font(.system(size: 12, weight: bold ? .semibold : .regular))
             .foregroundColor(muted ? mutedText : primaryText)
             .lineLimit(2)
-            .frame(width: width, alignment: .leading)
+            .frame(width: width, alignment: .center)
             .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
             .padding(.horizontal, 10)
     }

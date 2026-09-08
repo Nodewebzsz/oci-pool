@@ -37,6 +37,9 @@ public class AiChatController  extends BaseController{
     private TenantService tenantService;
 
     @Resource
+    private com.doubledimple.ociserver.mock.MockDataService mockDataService;
+
+    @Resource
     private OciAiChatUtils ociAiChatUtils;
 
     /**
@@ -115,6 +118,13 @@ public class AiChatController  extends BaseController{
 
         } catch (Exception e) {
             log.error("获取可用模型失败 - 租户ID: {}, 错误: {}", tenantId, e.getMessage(), e);
+            // 模拟数据：OCI AI 调用失败且开关开启时返回 demo 模型
+            if (mockDataService.isMockEnabled()) {
+                response.put("success", true);
+                response.put("models", mockDataService.aiModels());
+                response.put("count", mockDataService.aiModels().size());
+                return ResponseEntity.ok(response);
+            }
             response.put("success", false);
             response.put("message", "获取模型列表失败: 该租户不支持或者不存在模型");
             return ResponseEntity.ok(response);

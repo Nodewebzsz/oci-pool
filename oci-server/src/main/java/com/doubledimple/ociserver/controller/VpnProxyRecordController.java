@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
+import java.util.Map;
 
 /**
  * @version 1.0.0
@@ -31,6 +33,9 @@ public class VpnProxyRecordController extends BaseController{
 
     @Resource
     private VpnProxyRecordService vpnProxyRecordService;
+
+    @Resource
+    private com.doubledimple.ociserver.mock.MockDataService mockDataService;
 
 
     @GetMapping("/page")
@@ -55,6 +60,17 @@ public class VpnProxyRecordController extends BaseController{
     public ApiResponse pageList(@RequestBody VpnProxyRecordRequest vpnProxyRecordRequest) {
         try {
             Page<VpnProxyRecord> page = vpnProxyRecordService.listPage(vpnProxyRecordRequest);
+            // 模拟数据：无代理记录且开关开启时返回 demo 代理
+            if (page.getContent().isEmpty() && mockDataService.isMockEnabled()) {
+                Map<String, Object> mock = new java.util.HashMap<>();
+                List<Map<String, Object>> items = mockDataService.proxyList();
+                mock.put("content", items);
+                mock.put("totalElements", items.size());
+                mock.put("totalPages", 1);
+                mock.put("number", 0);
+                mock.put("size", 10);
+                return ApiResponse.success(mock);
+            }
             return ApiResponse.success(page);
         } catch (Exception e) {
             log.error("查询vpn代理配置列表失败", e);

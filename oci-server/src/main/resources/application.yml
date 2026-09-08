@@ -168,3 +168,5 @@ sa-token:
 modern-ui:
   enabled: true
   entry: /modern-ui/index.html
+  # 模拟数据开关：库无数据时列表接口返回构造的 demo 数据（仅开发/演示用）
+  mock-data: false

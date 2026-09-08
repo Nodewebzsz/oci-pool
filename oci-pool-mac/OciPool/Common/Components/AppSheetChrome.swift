@@ -235,7 +235,7 @@ struct AppSheetTableHeader: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(AppSheetSurface.mutedText(dark))
                     .lineLimit(1)
-                    .frame(width: col.width, alignment: .leading)
+                    .frame(width: col.width, alignment: .center)
                     .frame(maxWidth: col.width == nil ? .infinity : nil, alignment: .leading)
                     .padding(.horizontal, 10)
             }

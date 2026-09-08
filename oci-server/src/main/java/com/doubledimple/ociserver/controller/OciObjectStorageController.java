@@ -57,6 +57,9 @@ public class OciObjectStorageController extends BaseController {
     TenantService tenantService;
 
     @Resource
+    com.doubledimple.ociserver.mock.MockDataService mockDataService;
+
+    @Resource
     OciMultipartUploadService multipartUploadService;
 
     /**
@@ -97,12 +100,24 @@ public class OciObjectStorageController extends BaseController {
 
             // 重新包装分页结果
             Map<String, Object> responseData = new HashMap<>();
-            responseData.put("items", result);
+            // 模拟数据：桶为空且开关开启时返回 demo 存储桶
+            if (result.isEmpty() && mockDataService.isMockEnabled()) {
+                responseData.put("items", mockDataService.storageBuckets());
+            } else {
+                responseData.put("items", result);
+            }
             responseData.put("nextPage", pageData.get("nextPage")); // 如果没有下一页，这里会是null
 
             return ApiResponse.success(responseData);
         } catch (Exception e) {
             log.error("获取存储桶列表失败, tenantId={}", tenantId, e);
+            // 模拟数据：OCI 调用失败且开关开启时返回 demo 桶（演示环境无有效凭证）
+            if (mockDataService.isMockEnabled()) {
+                Map<String, Object> responseData = new HashMap<>();
+                responseData.put("items", mockDataService.storageBuckets());
+                responseData.put("nextPage", null);
+                return ApiResponse.success(responseData);
+            }
             return ApiResponse.error("获取存储桶列表失败: " + e.getMessage());
         }
     }
@@ -581,12 +596,24 @@ public class OciObjectStorageController extends BaseController {
             ).collect(Collectors.toList());
 
             Map<String, Object> responseData = new HashMap<>();
-            responseData.put("items", result);
+            // 模拟数据：对象为空且开关开启时返回 demo 对象
+            if (result.isEmpty() && mockDataService.isMockEnabled()) {
+                responseData.put("items", mockDataService.storageObjects(bucketName));
+            } else {
+                responseData.put("items", result);
+            }
             responseData.put("nextStartWith", pageData.get("nextStartWith")); // 用于前端请求下一页的游标
 
             return ApiResponse.success(responseData);
         } catch (Exception e) {
             log.error("获取对象列表失败, tenantId={}, bucket={}", tenantId, bucketName, e);
+            // 模拟数据：OCI 调用失败且开关开启时返回 demo 对象
+            if (mockDataService.isMockEnabled()) {
+                Map<String, Object> responseData = new HashMap<>();
+                responseData.put("items", mockDataService.storageObjects(bucketName));
+                responseData.put("nextStartWith", null);
+                return ApiResponse.success(responseData);
+            }
             return ApiResponse.error("获取对象列表失败: " + e.getMessage());
         }
     }

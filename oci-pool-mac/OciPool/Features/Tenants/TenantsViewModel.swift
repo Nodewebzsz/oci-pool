@@ -316,6 +316,14 @@ final class TenantsViewModel: ObservableObject {
     }
 
     func updateTenantSSE(_ item: TenantItem) {
+        // 对齐 Web 端二次确认弹窗
+        guard AppAlert.confirm(
+            title: "更新租户「\(item.displayName)」?",
+            message: "该操作会调用 /tenants/updateTenant 通过 SSE 拉取最新的区域、配额、密码策略、账单等元数据，可能耗时 5-10 秒。",
+            confirmTitle: "开始更新",
+            cancelTitle: "取消"
+        ) else { return }
+
         updateLines = ["开始更新…"]
         activeSheet = .updateProgress(tenantId: item.id, lines: updateLines)
         let tenantId = item.id
@@ -1596,6 +1604,7 @@ final class TenantsViewModel: ObservableObject {
                         userName: $0.userName,
                         region: $0.region,
                         tenantId: $0.tenantId,
+                        defName: $0.defName,
                         isHomeRegion: $0.isHomeRegion,
                         hasChildren: $0.hasChildren
                     )

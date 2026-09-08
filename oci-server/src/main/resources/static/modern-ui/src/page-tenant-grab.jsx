@@ -447,7 +447,8 @@ function TenantGrabPage({ density, ctx, navigate, updateDetailCtx }) {
                   <td style={{ padding: '11px 12px', borderBottom: '1px solid var(--border)' }}>
                     <span style={{
                       padding: '1px 6px',
-                      background: 'var(--info-soft)', color: 'var(--info)',
+                      background: getInstanceArch(r) === 'ARM' ? 'var(--info-soft)' : 'var(--violet-soft)',
+                      color: getInstanceArch(r) === 'ARM' ? 'var(--info)' : 'var(--violet)',
                       borderRadius: 3, fontSize: 10, fontWeight: 600,
                       fontFamily: 'var(--font-mono)',
                     }}>{getInstanceArch(r)}</span>

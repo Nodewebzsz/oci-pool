@@ -77,7 +77,7 @@ struct StorageView: View {
                             set: { model.onTenantChanged($0) }
                         ),
                         placeholder: "选择租户…",
-                        width: 260,
+                        width: 220,
                         allowClear: true
                     )
                 }
@@ -286,9 +286,9 @@ struct StorageView: View {
     private var objectHeader: some View {
         HStack(spacing: 0) {
             Text("名称").frame(maxWidth: .infinity, alignment: .leading)
-            Text("大小").frame(width: 88, alignment: .trailing)
-            Text("修改时间").frame(width: 130, alignment: .leading)
-            Text("操作").frame(width: 160, alignment: .trailing)
+            Text("大小").frame(width: 88, alignment: .center)
+            Text("修改时间").frame(maxWidth: .infinity, alignment: .leading)
+            Text("操作").frame(width: 160, alignment: .center)
         }
         .font(.system(size: 11, weight: .semibold))
         .foregroundColor(AppTheme.sidebarText(dark))
@@ -309,12 +309,14 @@ struct StorageView: View {
             Text(o.sizeText)
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundColor(AppTheme.sidebarText(dark))
-                .frame(width: 88, alignment: .trailing)
+                .frame(width: 88, alignment: .center)
 
             Text(o.modifiedText)
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.sidebarText(dark))
-                .frame(width: 130, alignment: .leading)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .help(o.modifiedText)
 
             HStack(spacing: 4) {
                 if o.isPreviewable {
@@ -324,7 +326,7 @@ struct StorageView: View {
                 iconBtn("link", help: "预签名链接") { model.openPresigned(o) }
                 iconBtn("trash", help: "删除", danger: true) { model.deleteObject(o) }
             }
-            .frame(width: 160, alignment: .trailing)
+            .frame(width: 160, alignment: .center)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, appearance.density.rowPadding)

@@ -318,14 +318,15 @@ struct RegionsView: View {
 
                 HStack(spacing: 0) {
                     col("状态", 80)
-                    col("区域编码", 140)
-                    col("区域名称", 140)
+                    colFlexible("区域编码")
+                    colFlexible("区域名称")
                     col("架构类型", 90)
-                    col("开机时间", 140)
+                    colFlexible("开机时间")
                     col("总开机数量", 90)
                     col("本月开机数量", 100)
                     colFlexible("最近开机时间")
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 10)
                 .padding(.horizontal, 8)
                 .background(RegionsTheme.surface(dark))
@@ -441,21 +442,18 @@ struct RegionsView: View {
     private func regionRow(_ row: RegionRow) -> some View {
         HStack(spacing: 0) {
             regionBadge(open: row.isOpen)
-                .frame(width: 80, alignment: .leading)
-            Text(row.regionCode)
-                .font(.system(size: 11.5, design: .monospaced))
-                .foregroundColor(AppTheme.sidebarActive)
-                .lineLimit(1)
-                .frame(width: 140, alignment: .leading)
-            cell(row.name, 140)
+                .frame(width: 80, alignment: .center)
+            monoCellFlexible(row.regionCode, color: AppTheme.sidebarActive, size: 11.5)
+            cellFlexible(row.name)
             archBadge(row.architectureType)
-                .frame(width: 90, alignment: .leading)
-            cell(Self.fmt(row.openTime), 140)
+                .frame(width: 90, alignment: .center)
+            monoCellFlexible(Self.fmt(row.openTime), color: RegionsTheme.text(dark).opacity(0.72))
             grabCountCell(row.openCount, width: 90)
             monthlyCell(row.monthlyOpenCount)
-                .frame(width: 100, alignment: .leading)
-            cellFlexible(Self.fmt(row.lastNotifyTime))
+                .frame(width: 100, alignment: .center)
+            monoCellFlexible(Self.fmt(row.lastNotifyTime), color: RegionsTheme.text(dark).opacity(0.72))
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, appearance.density.rowPadding)
         .padding(.horizontal, 8)
         .background(
@@ -510,7 +508,7 @@ struct RegionsView: View {
             .font(.system(size: 12, weight: count > 0 ? .semibold : .regular))
             .foregroundColor(color)
             .lineLimit(1)
-            .frame(width: width, alignment: .leading)
+            .frame(width: width, alignment: .center)
     }
 
     /// Web 本月开机数量：>0 orange 加粗，0 fg-3
@@ -521,36 +519,44 @@ struct RegionsView: View {
             .lineLimit(1)
     }
 
-    /// 最后一列弹性撑满剩余宽度（对齐 Web 表格 width:100%）
+    /// 弹性列头（占满剩余宽度，让内容更长的列吸收多余空间；内容居中，与固定列统一）
     private func colFlexible(_ title: String) -> some View {
         Text(title)
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(RegionsTheme.muted(dark))
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
     }
 
-    private func cellFlexible(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 12, design: .monospaced))
-            .foregroundColor(RegionsTheme.text(dark).opacity(0.75))
-            .lineLimit(1)
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
+    /// 固定宽列头（短内容列，如状态/架构/数量）
     private func col(_ title: String, _ w: CGFloat) -> some View {
         Text(title)
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(RegionsTheme.muted(dark))
-            .frame(width: w, alignment: .leading)
+            .frame(width: w, alignment: .center)
     }
 
-    private func cell(_ text: String, _ w: CGFloat) -> some View {
+    /// 弹性单元格（占满剩余空间，居中，截断 + hover 显示完整）
+    private func cellFlexible(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 12))
             .foregroundColor(RegionsTheme.text(dark))
             .lineLimit(1)
             .truncationMode(.tail)
-            .frame(width: w, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .clipped()
+            .help(text)
+    }
+
+    /// 弹性等宽字体单元格（占满剩余空间，居中，截断 + hover 显示完整）
+    private func monoCellFlexible(_ text: String,
+                                  color: Color? = nil,
+                                  size: CGFloat = 12) -> some View {
+        Text(text)
+            .font(.system(size: size, design: .monospaced))
+            .foregroundColor(color ?? RegionsTheme.text(dark).opacity(0.72))
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: .infinity, alignment: .center)
             .clipped()
             .help(text)
     }

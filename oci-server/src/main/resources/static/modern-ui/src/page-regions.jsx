@@ -158,11 +158,11 @@ function RegionsPage({ density }) {
       ),
     },
     {
-      key: 'code', label: tr('regions.col.code'),
+      key: 'code', label: tr('regions.col.code'), width: 140,
       render: r => <span className="mono" style={{ color: 'var(--accent)', fontSize: 11.5 }}>{r.code}</span>,
     },
     {
-      key: 'name', label: tr('regions.col.name'),
+      key: 'name', label: tr('regions.col.name'), width: 190,
       render: r => (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 14 }}>{r.flag}</span>
@@ -178,7 +178,7 @@ function RegionsPage({ density }) {
       ),
     },
     {
-      key: 'arch', label: tr('regions.col.arch'),
+      key: 'arch', label: tr('regions.col.arch'), width: 80,
       render: r => (
         r.arch !== '—'
           ? <span style={{
@@ -190,11 +190,11 @@ function RegionsPage({ density }) {
       ),
     },
     {
-      key: 'firstAt', label: tr('regions.col.firstAt'),
+      key: 'firstAt', label: tr('regions.col.firstAt'), width: 150,
       render: r => <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>{r.firstAt}</span>,
     },
     {
-      key: 'totalGrabs', label: tr('regions.col.totalGrabs'), align: 'right',
+      key: 'totalGrabs', label: tr('regions.col.totalGrabs'), align: 'right', width: 90,
       render: r => (
         <span className="num" style={{
           fontWeight: 600,
@@ -203,7 +203,7 @@ function RegionsPage({ density }) {
       ),
     },
     {
-      key: 'monthlyOpenCount', label: tr('regions.col.monthly'), align: 'right',
+      key: 'monthlyOpenCount', label: tr('regions.col.monthly'), align: 'right', width: 90,
       render: r => (
         r.monthlyOpenCount > 0
           ? <span className="num" style={{ color: 'var(--orange)', fontWeight: 700 }}>{r.monthlyOpenCount}</span>
@@ -211,7 +211,7 @@ function RegionsPage({ density }) {
       ),
     },
     {
-      key: 'lastAt', label: tr('regions.col.lastAt'),
+      key: 'lastAt', label: tr('regions.col.lastAt'), width: 150,
       render: r => (
         r.lastAt === '—'
           ? <span style={{ color: 'var(--fg-3)' }}>—</span>

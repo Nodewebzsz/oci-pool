@@ -57,6 +57,9 @@ public class OciController  extends BaseController{
     OracleInstanceService oracleInstanceService;
 
     @Resource
+    com.doubledimple.ociserver.mock.MockDataService mockDataService;
+
+    @Resource
     MetricsService metricsService;
 
     @Resource
@@ -107,6 +110,18 @@ public class OciController  extends BaseController{
             @RequestParam(required = false) String tenantId) {
         Page<InstanceDetailsRes> userPage = oracleInstanceService.getAllInstances(page, size, tenantId);
         Map<String, Object> result = new HashMap<>();
+        // 模拟数据：库为空且开关开启时返回 demo 实例
+        if (userPage.getContent().isEmpty() && mockDataService.isMockEnabled()) {
+            List<Map<String, Object>> allMock = mockDataService.instanceListPage(0, Integer.MAX_VALUE);
+            int total = allMock.size();
+            List<Map<String, Object>> content = mockDataService.instanceListPage(page, Math.max(1, size));
+            result.put("content", content);
+            result.put("currentPage", page);
+            result.put("totalPages", (int) Math.ceil((double) total / Math.max(1, size)));
+            result.put("totalElements", total);
+            result.put("size", size);
+            return ResponseEntity.ok(result);
+        }
         result.put("content", userPage.getContent());
         result.put("currentPage", page);
         result.put("totalPages", userPage.getTotalPages());

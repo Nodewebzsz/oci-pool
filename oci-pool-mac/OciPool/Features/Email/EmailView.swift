@@ -547,10 +547,10 @@ struct EmailView: View {
             } else {
                 DataList {
                     DataListColumnHeader(title: "主题", width: nil)
-                    DataListColumnHeader(title: "发件人", width: 260)
+                    DataListColumnHeader(title: "发件人", width: nil)
                     DataListColumnHeader(title: "收件数", width: 80, alignment: .center)
                     DataListColumnHeader(title: "状态", width: 100, alignment: .center)
-                    DataListColumnHeader(title: "发送时间", width: 160)
+                    DataListColumnHeader(title: "发送时间", width: nil)
                 } content: {
                     ForEach(model.records) { r in
                         DataListRow(action: { model.openRecordDetail(r) }) {
@@ -580,7 +580,7 @@ struct EmailView: View {
             Text(r.senderEmail)
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(AppTheme.sidebarText(dark))
-                .frame(width: 260, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .lineLimit(1)
 
             // Web：收件数（居中）
@@ -595,7 +595,7 @@ struct EmailView: View {
             Text(r.createTime.isEmpty ? "—" : r.createTime)
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(AppTheme.sidebarText(dark))
-                .frame(width: 160, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .lineLimit(1)
 
         }

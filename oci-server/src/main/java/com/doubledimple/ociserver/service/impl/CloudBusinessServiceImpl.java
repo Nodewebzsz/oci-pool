@@ -38,27 +38,44 @@ public class CloudBusinessServiceImpl implements CloudBusinessService {
     private CloudCostServiceFactory cloudCostServiceFactory;
 
     @Resource
+    private com.doubledimple.ociserver.mock.MockDataService mockDataService;
+
+    @Resource
     private TenantRepository tenantRepository;
 
     @Override
     public ApiResponse queryDailyCost(CostQueryRequest costQueryRequest) {
+        try {
+            Tenant tenant = tenantRepository.findById(Long.valueOf(costQueryRequest.getTenantId()))
+                    .orElseThrow(() -> new RuntimeException("未找到对应租户"));
 
-        Tenant tenant = tenantRepository.findById(Long.valueOf(costQueryRequest.getTenantId()))
-                .orElseThrow(() -> new RuntimeException("未找到对应租户"));
+            CloudTypeEnum cloudTypeEnum = CloudTypeEnum.getCloudTypeEnum(tenant.getCloudType());
+            if (cloudTypeEnum == null) {
+                log.warn("未找到对应云厂商: {}", tenant.getCloudType());
+                if (mockDataService.isMockEnabled()) return ApiResponse.success(mockDataService.costList());
+                return ApiResponse.success(Collections.emptyList());
+            }
+            CostService costService = cloudCostServiceFactory.get(cloudTypeEnum);
+            if (costService == null) {
+                log.warn("未找到对应云厂商的成本服务: {}", tenant.getCloudType());
+                if (mockDataService.isMockEnabled()) return ApiResponse.success(mockDataService.costList());
+                return ApiResponse.success(Collections.emptyList());
+            }
 
-        CloudTypeEnum cloudTypeEnum = CloudTypeEnum.getCloudTypeEnum(tenant.getCloudType());
-        if (cloudTypeEnum == null) {
-            log.warn("未找到对应云厂商: {}", tenant.getCloudType());
-            return ApiResponse.success(Collections.emptyList());
+            List<?> rawList = costService.queryCustomCost(tenant, costQueryRequest.getStartDate(), costQueryRequest.getEndDate());
+            List<?> result = convertRawList(rawList, cloudTypeEnum);
+            // 模拟数据：无费用数据且开关开启时返回 demo 费用
+            if (result.isEmpty() && mockDataService.isMockEnabled()) {
+                return ApiResponse.success(mockDataService.costList());
+            }
+            return ApiResponse.success(result);
+        } catch (Exception e) {
+            log.error("查询每日费用失败: {}", e.getMessage(), e);
+            if (mockDataService.isMockEnabled()) {
+                return ApiResponse.success(mockDataService.costList());
+            }
+            return ApiResponse.error("查询每日费用失败: " + e.getMessage());
         }
-        CostService costService = cloudCostServiceFactory.get(cloudTypeEnum);
-        if (costService == null) {
-            log.warn("未找到对应云厂商的成本服务: {}", tenant.getCloudType());
-            return ApiResponse.success(Collections.emptyList());
-        }
-
-        List<?> rawList = costService.queryCustomCost(tenant, costQueryRequest.getStartDate(), costQueryRequest.getEndDate());
-        return ApiResponse.success(convertRawList(rawList, cloudTypeEnum));
     }
 
     /**

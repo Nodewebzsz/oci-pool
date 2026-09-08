@@ -373,7 +373,7 @@ struct EdgeOneView: View {
             .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
             .lineLimit(1)
             .truncationMode(.middle)
-            .frame(width: width, alignment: .leading)
+            .frame(width: width, alignment: .center)
             .frame(maxWidth: width == nil ? .infinity : width, alignment: .leading)
             .help(text)
     }

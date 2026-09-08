@@ -12,8 +12,8 @@ struct TenantAuditLogView: View {
 
     private let wIndex: CGFloat = 44
     private let wUser: CGFloat = 120
-    private let wIP: CGFloat = 120
-    private let wTime: CGFloat = 150
+    private let wIPBase: CGFloat = 120
+    private let wTimeBase: CGFloat = 150
     private let wStatus: CGFloat = 72
     private let minEvent: CGFloat = 140
     private let minEnv: CGFloat = 120
@@ -144,14 +144,17 @@ struct TenantAuditLogView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             GeometryReader { geo in
-                let fixed = wIndex + wUser + wIP + wTime + wStatus + minEvent + minEnv + hPad * 2
+                let fixed = wIndex + wUser + wStatus + minEvent + minEnv + hPad * 2
                 let totalW = max(geo.size.width, fixed)
                 let flex = max(0, totalW - fixed)
-                let wEvent = minEvent + flex * 0.55
-                let wEnv = minEnv + flex * 0.45
+                // 多列均匀分配：事件/环境/来源IP/时间弹性，其余固定
+                let wEvent = minEvent + flex * 0.40
+                let wEnv = minEnv + flex * 0.30
+                let wIP = wIPBase + flex * 0.20
+                let wTime = wTimeBase + flex * 0.10
 
                 VStack(spacing: 0) {
-                    headerRow(wEvent: wEvent, wEnv: wEnv, width: totalW)
+                    headerRow(wEvent: wEvent, wEnv: wEnv, wIP: wIP, wTime: wTime, width: totalW)
                     ScrollView {
                         LazyVStack(spacing: 0) {
                             ForEach(Array(model.auditPageItems.enumerated()), id: \.offset) { idx, log in
@@ -161,6 +164,8 @@ struct TenantAuditLogView: View {
                                     log: log,
                                     wEvent: wEvent,
                                     wEnv: wEnv,
+                                    wIP: wIP,
+                                    wTime: wTime,
                                     width: totalW
                                 )
                             }
@@ -173,7 +178,7 @@ struct TenantAuditLogView: View {
         }
     }
 
-    private func headerRow(wEvent: CGFloat, wEnv: CGFloat, width: CGFloat) -> some View {
+    private func headerRow(wEvent: CGFloat, wEnv: CGFloat, wIP: CGFloat, wTime: CGFloat, width: CGFloat) -> some View {
         HStack(spacing: 0) {
             colHeader("#", wIndex)
             colHeader("用户", wUser)
@@ -199,6 +204,8 @@ struct TenantAuditLogView: View {
         log: TenantAuditLogEntry,
         wEvent: CGFloat,
         wEnv: CGFloat,
+        wIP: CGFloat,
+        wTime: CGFloat,
         width: CGFloat
     ) -> some View {
         let errorTint = AppTheme.danger.opacity(dark ? 0.12 : 0.08)
@@ -233,7 +240,7 @@ struct TenantAuditLogView: View {
         s.isEmpty ? "—" : s
     }
 
-    private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .leading) -> some View {
+    private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .center) -> some View {
         Text(title)
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(AppTheme.sidebarText(dark))
@@ -250,6 +257,6 @@ struct TenantAuditLogView: View {
             )
             .lineLimit(1)
             .help(text)
-            .frame(width: w, alignment: .leading)
+            .frame(width: w, alignment: .center)
     }
 }

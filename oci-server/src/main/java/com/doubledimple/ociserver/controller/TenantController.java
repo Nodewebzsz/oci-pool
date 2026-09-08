@@ -87,6 +87,9 @@ public class TenantController extends BaseController{
     private TenantService tenantService;
 
     @Resource
+    private com.doubledimple.ociserver.mock.MockDataService mockDataService;
+
+    @Resource
     private BootInstanceService bootInstanceService;
 
     @Resource
@@ -271,20 +274,32 @@ public class TenantController extends BaseController{
     @GetMapping("/subscribed-regions-data")
     @ResponseBody
     public List<Map<String, Object>> getSubscribedData(@RequestParam long tenantId) {
-        List<RegionSubscription> originalList = tenantService.regionSub(tenantId);
+        try {
+            List<RegionSubscription> originalList = tenantService.regionSub(tenantId);
 
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (RegionSubscription sub : originalList) {
-            Map<String, Object> map = new HashMap<>();
-            map.put("regionKey", sub.getRegionKey());
-            map.put("regionName", sub.getRegionName());
-            map.put("status", new HashMap<String, String>() {{
-                put("value", sub.getStatus().getValue());
-            }});
-            map.put("isHomeRegion", sub.getIsHomeRegion());
-            result.add(map);
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (RegionSubscription sub : originalList) {
+                Map<String, Object> map = new HashMap<>();
+                map.put("regionKey", sub.getRegionKey());
+                map.put("regionName", sub.getRegionName());
+                map.put("status", new HashMap<String, String>() {{
+                    put("value", sub.getStatus().getValue());
+                }});
+                map.put("isHomeRegion", sub.getIsHomeRegion());
+                result.add(map);
+            }
+            // 模拟数据：无订阅区域且开关开启时返回 demo 已订阅区域
+            if (result.isEmpty() && mockDataService.isMockEnabled()) {
+                return mockDataService.subscribedRegions();
+            }
+            return result;
+        } catch (Exception e) {
+            log.error("获取已订阅区域失败, tenantId={}", tenantId, e);
+            if (mockDataService.isMockEnabled()) {
+                return mockDataService.subscribedRegions();
+            }
+            return Collections.emptyList();
         }
-        return result;
     }
 
     /**
@@ -348,9 +363,16 @@ public class TenantController extends BaseController{
                     })
                     .collect(Collectors.toList());
 
+            // 模拟数据：无未订阅区域且开关开启时返回 demo 未订阅区域
+            if (result.isEmpty() && mockDataService.isMockEnabled()) {
+                return ResponseEntity.ok(mockDataService.unsubscribedRegions());
+            }
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             log.error("获取未订阅区域列表失败", e);
+            if (mockDataService.isMockEnabled()) {
+                return ResponseEntity.ok(mockDataService.unsubscribedRegions());
+            }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Collections.emptyList());
         }
     }
@@ -826,10 +848,17 @@ public class TenantController extends BaseController{
                                     extractDomain(user.getName())
                             ))
                     .collect(Collectors.toList());
+            // 模拟数据：无用户且开关开启时返回 demo 用户
+            if (users.isEmpty() && mockDataService.isMockEnabled()) {
+                return ResponseEntity.ok(mockDataService.userList());
+            }
             return ResponseEntity.ok(users);
         } catch (Exception e) {
             // 打印错误日志并返回失败信息
             e.printStackTrace();
+            if (mockDataService.isMockEnabled()) {
+                return ResponseEntity.ok(mockDataService.userList());
+            }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Collections.emptyList());
         }

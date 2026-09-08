@@ -52,6 +52,121 @@ enum RegionLngLat {
     ]
 }
 
+/// 区域 code → 中文名（simpleName），对齐 Web data.jsx REGIONS。
+/// 用于租户下拉「租户名 · 中文区域」的展示。
+enum RegionCnName {
+    static let table: [String: String] = [
+        // Asia Pacific
+        "ap-tokyo-1":        "东京",
+        "ap-osaka-1":        "大阪",
+        "ap-chuncheon-1":    "春川",
+        "ap-seoul-1":        "首尔",
+        "ap-singapore-1":    "新加坡",
+        "ap-singapore-2":    "新加坡西",
+        "ap-kulai-2":        "古来",
+        "ap-batam-1":        "巴淡",
+        "ap-mumbai-1":       "孟买",
+        "ap-hyderabad-1":    "海得拉巴",
+        "ap-melbourne-1":    "墨尔本",
+        "ap-sydney-1":       "悉尼",
+        // Europe
+        "uk-london-1":       "伦敦",
+        "uk-cardiff-1":      "纽波特",
+        "eu-frankfurt-1":    "法兰克福",
+        "eu-amsterdam-1":    "阿姆斯特丹",
+        "eu-paris-1":        "巴黎",
+        "eu-marseille-1":    "马赛",
+        "eu-milan-1":        "米兰",
+        "eu-turin-1":        "都灵",
+        "eu-madrid-1":       "马德里",
+        "eu-madrid-3":       "马德里 3",
+        "eu-zurich-1":       "苏黎世",
+        "eu-stockholm-1":    "斯德哥尔摩",
+        "eu-jovanovac-1":    "约万诺瓦茨",
+        "il-jerusalem-1":    "耶路撒冷",
+        // Middle East / Africa
+        "me-jeddah-1":       "吉达",
+        "me-riyadh-1":       "利雅得",
+        "me-dubai-1":        "迪拜",
+        "me-abudhabi-1":     "阿布扎比",
+        "af-casablanca-1":   "卡萨布兰卡",
+        "af-johannesburg-1": "约翰内斯堡",
+        // Americas
+        "us-ashburn-1":      "阿什本",
+        "us-phoenix-1":      "凤凰城",
+        "us-sanjose-1":      "圣何塞",
+        "us-chicago-1":      "芝加哥",
+        "ca-toronto-1":      "多伦多",
+        "ca-montreal-1":     "蒙特利尔",
+        "mx-queretaro-1":    "克雷塔罗",
+        "mx-monterrey-1":    "蒙特雷",
+        "sa-saopaulo-1":     "圣保罗",
+        "sa-vinhedo-1":      "维尼耶多",
+        "sa-santiago-1":     "圣地亚哥",
+        "sa-valparaiso-1":   "瓦尔帕莱索",
+        "sa-bogota-1":       "波哥大"
+    ]
+}
+
+/// 区域 code → 国旗 emoji（对齐 Web data.jsx REGIONS.flag）
+enum RegionFlag {
+    static let table: [String: String] = [
+        // Asia Pacific
+        "ap-tokyo-1":        "🇯🇵",
+        "ap-osaka-1":        "🇯🇵",
+        "ap-chuncheon-1":    "🇰🇷",
+        "ap-seoul-1":        "🇰🇷",
+        "ap-singapore-1":    "🇸🇬",
+        "ap-singapore-2":    "🇸🇬",
+        "ap-kulai-2":        "🇲🇾",
+        "ap-batam-1":        "🇮🇩",
+        "ap-mumbai-1":       "🇮🇳",
+        "ap-hyderabad-1":    "🇮🇳",
+        "ap-melbourne-1":    "🇦🇺",
+        "ap-sydney-1":       "🇦🇺",
+        // Europe
+        "uk-london-1":       "🇬🇧",
+        "uk-cardiff-1":      "🇬🇧",
+        "eu-frankfurt-1":    "🇩🇪",
+        "eu-amsterdam-1":    "🇳🇱",
+        "eu-paris-1":        "🇫🇷",
+        "eu-marseille-1":    "🇫🇷",
+        "eu-milan-1":        "🇮🇹",
+        "eu-turin-1":        "🇮🇹",
+        "eu-madrid-1":       "🇪🇸",
+        "eu-madrid-3":       "🇪🇸",
+        "eu-zurich-1":       "🇨🇭",
+        "eu-stockholm-1":    "🇸🇪",
+        "eu-jovanovac-1":    "🇷🇸",
+        "il-jerusalem-1":    "🇮🇱",
+        // Middle East / Africa
+        "me-jeddah-1":       "🇸🇦",
+        "me-riyadh-1":       "🇸🇦",
+        "me-dubai-1":        "🇦🇪",
+        "me-abudhabi-1":     "🇦🇪",
+        "af-casablanca-1":   "🇲🇦",
+        "af-johannesburg-1": "🇿🇦",
+        // Americas
+        "us-ashburn-1":      "🇺🇸",
+        "us-phoenix-1":      "🇺🇸",
+        "us-sanjose-1":      "🇺🇸",
+        "us-chicago-1":      "🇺🇸",
+        "ca-toronto-1":      "🇨🇦",
+        "ca-montreal-1":     "🇨🇦",
+        "mx-queretaro-1":    "🇲🇽",
+        "mx-monterrey-1":    "🇲🇽",
+        "sa-saopaulo-1":     "🇧🇷",
+        "sa-vinhedo-1":      "🇧🇷",
+        "sa-santiago-1":     "🇨🇱",
+        "sa-valparaiso-1":   "🇨🇱",
+        "sa-bogota-1":       "🇨🇴"
+    ]
+
+    static func emoji(_ code: String) -> String {
+        table[code] ?? ""
+    }
+}
+
 // MARK: - 地图节点
 
 struct RegionMapNode: Identifiable, Equatable {

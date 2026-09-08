@@ -1547,7 +1547,7 @@ function useTenantDetailDrawer() {
       { id: 'disk-info',     label: tr('tenant.a74b62'),   icon: 'hard-drive',    color: 'var(--fg-1)' },
       { id: 'security-rules',label: tr('tenant.d77eaa'),   icon: 'shield',        color: 'var(--fg-1)' },
       { id: 'resource-list', label: tr('tenant.6a50dc'),   icon: 'list',          color: 'var(--fg-1)' },
-      { id: 'storage-case',  label: tr('tenant.9ff7a2'),   icon: 'database',      color: 'var(--fg-1)' },
+      { id: 'database-case', label: tr('tenant.9ff7a2'),   icon: 'database',      color: 'var(--fg-1)' },
     ];
 
     const runAction = (actionId, row) => {
@@ -1587,8 +1587,8 @@ function useTenantDetailDrawer() {
         case 'resource-list':
           showResourceModal(shell, tenant, row);
           return;
-        case 'storage-case':
-          showStorageModal(shell, tenant, row);
+        case 'database-case':
+          showMysqlModal(shell, tenant, row);
           return;
       }
     };
@@ -3214,6 +3214,394 @@ function showResourceModal(shell, tenant, row) {
   };
   render();
   loadInstances();
+}
+function showMysqlModal(shell, tenant, row) {
+  // ═══════════════════════════════════════════════════════════════════════
+  // 数据库管理 (MySQL HeatWave) · 对齐原项目 doubleDimple/oci-start
+  // ═══════════════════════════════════════════════════════════════════════
+  // 布局:单面板表格
+  //   · 顶部: + 创建 MySQL  |  ⟳ 从云同步  → 右侧关闭
+  //   · 表格:名称(点击复制 OCID)/版本/状态/公网·端口/账密(可切换显隐)/规格/存储(GB)/操作(⋯)
+  //   · 行内 ⋯ 菜单(复用 <RowActionMenu>):同步此实例 / 绑定公网IP / 重置账密 / 终止实例(红)
+  //   · 空态:暂无数据;加载态:loader
+
+  const state = {
+    instances: [],
+    loading: true,
+    revealing: null,        // 正在显示密码的行 id
+    openMenu: null,         // { rowId, anchorEl }
+  };
+
+  const unwrap = payload => payload && payload.data !== undefined ? payload.data : payload;
+
+  const load = async () => {
+    state.loading = true; render();
+    try {
+      const r = await window.ociApi.request('/tenants/mysql-info?tenantId=' + encodeURIComponent(getTenantDbId(tenant)));
+      const list = (r && r.success && Array.isArray(r.data)) ? r.data : (Array.isArray(r) ? r : []);
+      state.instances = list;
+      state.revealing = null;
+    } catch (e) {
+      state.instances = [];
+    }
+    state.loading = false; render();
+  };
+
+  const tenantId = getTenantDbId(tenant);
+
+  // 行内操作:同步此实例
+  const syncSingle = async (inst) => {
+    try {
+      await window.ociApi.request('/tenants/sync-single-mysql?id=' + encodeURIComponent(inst.id));
+      shell.showToast(tr('td.mysql.toast.sync'), { kind: 'success' });
+      load();
+    } catch (e) {
+      shell.showToast(tr('td.mysql.toast.err') + (e.message || e), { kind: 'error' });
+    }
+  };
+
+  // 行内操作:绑定公网 IP
+  const bindPublicIp = (inst) => {
+    shell.openConfirm({
+      title: tr('td.mysql.confirm.bindIp'),
+      body: <div>{tr('td.mysql.confirm.bindIpBody').replace('{0}', inst.displayName || inst.dbName || '?')}</div>,
+      confirmLabel: tr('td.mysql.confirm'),
+      onConfirm: async () => {
+        try {
+          await window.ociApi.request('/tenants/bind-public-ip?id=' + encodeURIComponent(inst.id));
+          shell.showToast(tr('td.mysql.toast.bindIp'), { kind: 'success' });
+          load();
+        } catch (e) {
+          shell.showToast(tr('td.mysql.toast.err') + (e.message || e), { kind: 'error' });
+        }
+      },
+    });
+  };
+
+  // 行内操作:重置账密
+  const resetAuth = (inst) => {
+    shell.openConfirm({
+      title: tr('td.mysql.confirm.resetAuth'),
+      body: <div style={{ lineHeight: 1.6 }}>{tr('td.mysql.confirm.resetAuthBody')}<b>{inst.displayName || inst.dbName || '?'}</b></div>,
+      confirmLabel: tr('td.mysql.confirm'),
+      onConfirm: async () => {
+        try {
+          await window.ociApi.request('/tenants/mysql-reset-auth?id=' + encodeURIComponent(inst.id) + '&tenantId=' + encodeURIComponent(tenantId));
+          shell.showToast(tr('td.mysql.toast.resetAuth'), { kind: 'success' });
+          load();
+        } catch (e) {
+          shell.showToast(tr('td.mysql.toast.err') + (e.message || e), { kind: 'error' });
+        }
+      },
+    });
+  };
+
+  // 行内操作:终止实例(删除)
+  const terminate = (inst) => {
+    shell.openConfirm({
+      title: tr('td.mysql.confirm.delete'),
+      body: <div style={{ lineHeight: 1.6 }}>{tr('td.mysql.confirm.deleteBody')}<b>{inst.displayName || inst.dbName || '?'}</b></div>,
+      danger: true,
+      confirmLabel: tr('td.mysql.confirm.delete'),
+      onConfirm: async () => {
+        try {
+          await window.ociApi.request('/tenants/mysql-action', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tenantId, id: String(inst.id), action: 'delete' }),
+          });
+          shell.showToast(tr('td.mysql.toast.delete'), { kind: 'warn' });
+          load();
+        } catch (e) {
+          shell.showToast(tr('td.mysql.toast.err') + (e.message || e), { kind: 'error' });
+        }
+      },
+    });
+  };
+
+  // 创建 MySQL · 对齐原项目:确认 → loading 弹窗 → 成功/失败结果弹窗
+  const doCreate = () => {
+    shell.openConfirm({
+      title: tr('td.mysql.confirm.create'),
+      body: <div style={{ lineHeight: 1.6 }}>{tr('td.mysql.confirm.createBody')}<b>{getTenantName(tenant)}</b></div>,
+      confirmLabel: tr('td.mysql.confirm'),
+      onConfirm: async () => {
+        // step1: 先展示阻塞式 loading 弹窗（旋转 loader）
+        shell.openModal({
+          title: tr('td.mysql.loadingCreate'),
+          icon: 'loader',
+          iconColor: 'var(--accent)',
+          size: 'sm',
+          onClose: () => {},   // 创建过程中不响应关闭；接口结束后会覆盖为结果弹窗
+          body: (
+            <div style={{ padding: '24px 20px', textAlign: 'center' }}>
+              <Icon name="loader" size={28} style={{ color: 'var(--accent)', animation: 'button-spin 800ms linear infinite' }} />
+              <div style={{ marginTop: 12, fontSize: 12, color: 'var(--fg-2)' }}>{tr('td.mysql.loadingCreateBody')}</div>
+            </div>
+          ),
+        });
+        try {
+          const r = await window.ociApi.request('/tenants/mysql-create?tenantId=' + encodeURIComponent(tenantId), { method: 'POST' });
+          const ok = r && (r.success || r.code === 200);
+          const msg = (r && r.message) || tr('td.mysql.toast.create');
+          // step2: 覆盖为成功/失败结果弹窗
+          shell.openModal({
+            title: ok ? tr('td.mysql.result.success') : tr('td.mysql.result.fail'),
+            icon: ok ? 'check-circle' : 'alert-triangle',
+            iconColor: ok ? 'var(--accent)' : 'var(--danger)',
+            size: 'md',
+            body: (
+              <div style={{ padding: '20px 22px 6px', fontSize: 12.5, color: 'var(--fg-1)', lineHeight: 1.7 }}>{ok ? tr('td.mysql.result.createBody') : msg}</div>
+            ),
+            footer: (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <Button variant={ok ? 'primary' : 'danger'} size="md" onClick={shell.closeModal}>{tr('td.mysql.confirm')}</Button>
+              </div>
+            ),
+          });
+          if (ok) load();
+        } catch (e) {
+          const msg = tr('td.mysql.toast.err') + (e.message || e);
+          shell.openModal({
+            title: tr('td.mysql.result.fail'),
+            icon: 'alert-triangle',
+            iconColor: 'var(--danger)',
+            size: 'md',
+            body: (
+              <div style={{ padding: '20px 22px 6px' }}>
+                <div style={{
+                  padding: '12px 14px',
+                  background: 'var(--danger-soft)',
+                  border: '1px solid color-mix(in oklab, var(--danger) 40%, transparent)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: 12.5, color: 'var(--danger)', lineHeight: 1.7,
+                }}>{msg}</div>
+              </div>
+            ),
+            footer: (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <Button variant="danger" size="md" onClick={shell.closeModal}>{tr('td.mysql.confirm')}</Button>
+              </div>
+            ),
+          });
+        }
+      },
+    });
+  };
+
+  // 行内菜单项
+  const menuItemsFor = (inst) => [
+    { id: 'sync',    label: tr('td.mysql.menu.sync'),    icon: 'sync',      color: 'var(--info)' },
+    { id: 'bindIp',  label: tr('td.mysql.menu.bindIp'),  icon: 'globe',     color: 'var(--cyan)' },
+    { id: 'reset',   label: tr('td.mysql.menu.reset'),   icon: 'key-round', color: 'var(--orange)' },
+    { id: 'delete',  label: tr('td.mysql.menu.delete'),  icon: 'trash-2',   color: 'var(--danger)' },
+  ];
+
+  const copyOcid = (inst) => {
+    if (!inst.dbId) return;
+    navigator.clipboard.writeText(inst.dbId).then(() => {
+      shell.showToast(tr('td.mysql.toast.copy'), { kind: 'success' });
+    }).catch(() => shell.showToast(tr('td.mysql.toast.err'), { kind: 'error' }));
+  };
+
+  const render = () => {
+    const cols = [
+      { h: tr('td.mysql.col.name'),    w: 150 },
+      { h: tr('td.mysql.col.version'), w: 80 },
+      { h: tr('td.mysql.col.status'),  w: 90 },
+      { h: tr('td.mysql.col.public'),  w: 150 },
+      { h: tr('td.mysql.col.cred'),    w: 200 },
+      { h: tr('td.mysql.col.shape'),   w: 120 },
+      { h: tr('td.mysql.col.storage'), w: 80, align: 'center' },
+      { h: tr('td.mysql.col.ops'),     w: 56, align: 'center' },
+    ];
+
+    shell.openModal({
+      title: tr('td.mysql.title').replace('{0}', getTenantName(tenant)),
+      subtitle: <span><span className="mono">{getTenantName(tenant)}</span> · {row.region} · <span style={{ color: 'var(--fg-2)' }}>{state.instances.length} {tr('td.mysql.subtitle.count')}</span></span>,
+      icon: 'database',
+      iconColor: 'var(--info)',
+      size: 'xl',
+      body: (
+        <div style={{ padding: 18 }}>
+          {/* ── 顶部操作栏 ─────────────────────────── */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14 }}>
+            <Button size="sm" variant="primary" icon="plus" onClick={doCreate}>{tr('td.mysql.create')}</Button>
+            <Button size="sm" variant="outline" icon="refresh-cw" onClick={async () => {
+              try {
+                const r = await window.ociApi.request('/tenants/sync-mysql?tenantId=' + encodeURIComponent(tenantId), { method: 'POST' });
+                const msg = (r && r.message) || tr('td.mysql.toast.syncAll');
+                shell.showToast(msg, { kind: 'success' });
+                load();
+              } catch (e) {
+                shell.showToast(tr('td.mysql.toast.err') + (e.message || e), { kind: 'error' });
+              }
+            }}>{tr('td.mysql.sync')}</Button>
+            <div style={{ flex: 1 }} />
+            <Button size="sm" variant="ghost" icon="refresh-cw" onClick={load}>{tr('td.mysql.refresh')}</Button>
+          </div>
+
+          {/* ── 表格 ─────────────────────────────── */}
+          {state.loading ? (
+            <div style={{ padding: '48px 0', textAlign: 'center', color: 'var(--fg-3)' }}>
+              <Icon name="loader" size={24} style={{ color: 'var(--info)', marginBottom: 8, animation: 'button-spin 800ms linear infinite' }} />
+              <div style={{ fontSize: 11.5 }}>{tr('td.mysql.loading')}</div>
+            </div>
+          ) : state.instances.length === 0 ? (
+            <div style={{ padding: '48px 0', textAlign: 'center', color: 'var(--fg-3)', fontSize: 12 }}>
+              <Icon name="database" size={28} style={{ color: 'var(--bg-3)', marginBottom: 8 }} />
+              <div>{tr('td.mysql.empty')}</div>
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12 }}>
+              <thead>
+                <tr>
+                  {cols.map((c, i) => (
+                    <th key={i} style={{
+                      textAlign: c.align || 'left', padding: '10px 12px', width: c.w,
+                      background: 'var(--bg-2)', color: 'var(--fg-3)',
+                      fontSize: 10.5, fontWeight: 600,
+                      textTransform: 'uppercase', letterSpacing: 0.5,
+                      borderBottom: '1px solid var(--border)',
+                      whiteSpace: 'nowrap',
+                    }}>{c.h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {state.instances.map((inst, i) => {
+                  const revealed = state.revealing === inst.id;
+                  const name = inst.displayName || inst.dbName || tr('td.mysql.unnamed');
+                  const isOpen = state.openMenu?.rowId === inst.id;
+                  return (
+                    <tr key={inst.id} style={{
+                      background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent',
+                    }}>
+                      {/* 名称 · 点击复制 OCID */}
+                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                        <strong
+                          title={inst.dbId ? tr('td.mysql.copyOcid') : ''}
+                          onClick={() => copyOcid(inst)}
+                          style={{ cursor: inst.dbId ? 'pointer' : 'default', color: 'var(--info)' }}
+                        >{name}</strong>
+                      </td>
+                      {/* 版本 */}
+                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                        <span className="mono" style={{ fontSize: 11, color: 'var(--fg-1)' }}>{inst.dbVersion || '-'}</span>
+                      </td>
+                      {/* 状态 */}
+                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          padding: '1px 8px', borderRadius: 3, fontSize: 10.5, fontWeight: 500,
+                          background: inst.dbStatus === 'ACTIVE' ? 'var(--accent-soft)' : 'var(--bg-3)',
+                          color: inst.dbStatus === 'ACTIVE' ? 'var(--accent)' : 'var(--fg-2)',
+                          whiteSpace: 'nowrap',
+                        }}>{inst.dbStatus || '-'}</span>
+                      </td>
+                      {/* 公网/端口 */}
+                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                        <span className="mono" style={{ fontSize: 11, color: inst.dbPublicUrl ? 'var(--info)' : 'var(--fg-3)' }}>
+                          {inst.dbPublicUrl || tr('td.mysql.noPublic')} : {inst.dbPort || '3306'}
+                        </span>
+                      </td>
+                      {/* 账密 · 可切换显隐 */}
+                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <span className="mono" style={{ fontSize: 11, color: 'var(--fg-1)' }}>{inst.dbName || tr('td.mysql.noUser')}</span>
+                          <span style={{ color: 'var(--fg-3)' }}>/</span>
+                          <span className="mono" style={{ fontSize: 11, color: 'var(--cyan)' }}>
+                            {revealed ? (inst.dbPassword || tr('td.mysql.noPassword')) : '•••••••'}
+                          </span>
+                          {inst.dbPassword && (
+                            <button
+                              type="button"
+                              onClick={() => { state.revealing = revealed ? null : inst.id; render(); }}
+                              style={{ background: 'transparent', border: 'none', color: 'var(--fg-3)', cursor: 'pointer', padding: 0, display: 'inline-flex' }}
+                              title={revealed ? tr('td.mysql.hide') : tr('td.mysql.show')}
+                            >
+                              <Icon name={revealed ? 'eye-off' : 'eye'} size={12} />
+                            </button>
+                          )}
+                        </span>
+                      </td>
+                      {/* 规格 */}
+                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                        <span style={{ color: 'var(--fg-1)' }}>{inst.shapeName || '-'}</span>
+                      </td>
+                      {/* 存储 GB */}
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
+                        <span className="num" style={{ color: 'var(--fg-1)' }}>{inst.dataStorageSizeInGBs != null ? inst.dataStorageSizeInGBs : '-'}</span>
+                      </td>
+                      {/* 操作 ⋯ */}
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation();
+                            if (isOpen) { state.openMenu = null; render(); return; }
+                            state.openMenu = { rowId: inst.id, anchorEl: e.currentTarget };
+                            render();
+                          }}
+                          style={{
+                            width: 28, height: 28, borderRadius: 4,
+                            background: isOpen ? 'var(--accent)' : 'var(--bg-2)',
+                            border: '1px solid ' + (isOpen ? 'var(--accent)' : 'var(--border)'),
+                            color: isOpen ? 'var(--accent-fg)' : 'var(--fg-1)',
+                            cursor: 'pointer',
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          }}
+                          title={tr('td.mysql.col.ops')}
+                        >
+                          <Icon name="more-horizontal" size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+
+          {/* ── 行操作 · 复用统一的 <RowActionMenu>(portal 到 body,不被弹窗裁剪) ─────── */}
+          {state.openMenu && (() => {
+            const inst = state.instances.find(x => x.id === state.openMenu.rowId);
+            if (!inst) return null;
+            return (
+              <RowActionMenu
+                anchorEl={state.openMenu.anchorEl}
+                width={220}
+                columns={1}
+                header={
+                  <>
+                    <Icon name="database" size={11} style={{ color: 'var(--info)' }} />
+                    <span style={{ color: 'var(--fg-0)' }}>{inst.displayName || inst.dbName || tr('td.mysql.unnamed')}</span>
+                  </>
+                }
+                items={menuItemsFor(inst)}
+                onClose={() => { state.openMenu = null; render(); }}
+                onAction={(id) => {
+                  const it = inst;
+                  state.openMenu = null;
+                  if (id === 'sync') syncSingle(it);
+                  else if (id === 'bindIp') bindPublicIp(it);
+                  else if (id === 'reset') resetAuth(it);
+                  else if (id === 'delete') terminate(it);
+                }}
+              />
+            );
+          })()}
+        </div>
+      ),
+      footer: (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('tenant.625fb2')}</Button>
+        </div>
+      ),
+    });
+  };
+
+  render();
+  load();
 }
 function showStorageModal(shell, tenant, row) {
   // ═══════════════════════════════════════════════════════════════════════
@@ -7691,6 +8079,6 @@ Object.assign(window, {
   useMailModal, useSocialConfigModal,
   useUpdateAccountModal, useExportTenantModal,
   // 供独立的租户详情页调用
-  showDiskModal, showSecurityModal, showResourceModal, showStorageModal,
+  showDiskModal, showSecurityModal, showResourceModal, showStorageModal, showMysqlModal,
   MiniMetric,
 });

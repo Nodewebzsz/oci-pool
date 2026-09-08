@@ -115,11 +115,12 @@ function InstancesPage({ density }) {
         const rows = await window.ociServices.tenant.listRegions({ parentId: tenantFilter });
         if (!alive) return;
         const options = (Array.isArray(rows) ? rows : [])
-          .map(row => ({
-            id: String(row.id ?? ''),
-            label: row.region || row.tenancyName || row.userName || row.tenantId || row.id || '',
-            region: row.region || '',
-          }))
+          .map(row => {
+            const base = row.region || row.tenancyName || row.userName || row.tenantId || row.id || '';
+            // 多区域账户：主区域(add)追加 i18n 主区域标识
+            const label = row.isHomeRegion ? `${base} · ${tr('tenants.col.mainRegion')}` : base;
+            return { id: String(row.id ?? ''), label, region: row.region || '' };
+          })
           .filter(row => row.id);
         setRegionOptions(options);
         const requested = String(regionFilter || '');

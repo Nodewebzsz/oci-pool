@@ -22,7 +22,7 @@ struct TenantCostView: View {
     private var pageBg: Color { dark ? Color(hex: "0f1117") : Color(hex: "f3f6fa") }
 
     private let wDay: CGFloat = 110
-    private let wType: CGFloat = 120
+    private let wTypeBase: CGFloat = 120
     private let wCost: CGFloat = 100
     private let minSku: CGFloat = 140
     private let minRes: CGFloat = 160
@@ -369,16 +369,18 @@ struct TenantCostView: View {
                     .padding(28)
             } else {
                 GeometryReader { geo in
-                    let fixed = wDay + wType + wCost + minSku + minRes + hPad * 2
+                    let fixed = wDay + wCost + minSku + minRes + hPad * 2
                     let totalW = max(geo.size.width, fixed)
                     let flex = max(0, totalW - fixed)
-                    let wSku = minSku + flex * 0.45
-                    let wRes = minRes + flex * 0.55
+                    // 多列均匀分配：SKU/资源ID/资源类型弹性，其余固定
+                    let wSku = minSku + flex * 0.40
+                    let wRes = minRes + flex * 0.40
+                    let wType = wTypeBase + flex * 0.20
 
                     VStack(spacing: 0) {
-                        costHeader(wSku: wSku, wRes: wRes, width: totalW)
+                        costHeader(wSku: wSku, wRes: wRes, wType: wType, width: totalW)
                         ForEach(Array(model.costPageItems.enumerated()), id: \.offset) { idx, item in
-                            costRow(index: idx, item: item, wSku: wSku, wRes: wRes, width: totalW)
+                            costRow(index: idx, item: item, wSku: wSku, wRes: wRes, wType: wType, width: totalW)
                         }
                         PaginationBar(state: $model.costPageState) {
                             model.syncCostPagination()
@@ -394,13 +396,13 @@ struct TenantCostView: View {
         .cornerRadius(8)
     }
 
-    private func costHeader(wSku: CGFloat, wRes: CGFloat, width: CGFloat) -> some View {
+    private func costHeader(wSku: CGFloat, wRes: CGFloat, wType: CGFloat, width: CGFloat) -> some View {
         HStack(spacing: 0) {
             colHeader("日期", wDay)
             colHeader("资源类型", wType)
             colHeader("SKU", wSku)
             colHeader("资源 ID", wRes)
-            colHeader("费用", wCost, align: .trailing)
+            colHeader("费用", wCost, align: .center)
         }
         .padding(.horizontal, hPad)
         .padding(.vertical, 9)
@@ -408,7 +410,7 @@ struct TenantCostView: View {
         .background(AppTheme.sidebarHover(dark).opacity(0.65))
     }
 
-    private func costRow(index: Int, item: TenantCostItem, wSku: CGFloat, wRes: CGFloat, width: CGFloat) -> some View {
+    private func costRow(index: Int, item: TenantCostItem, wSku: CGFloat, wRes: CGFloat, wType: CGFloat, width: CGFloat) -> some View {
         let positive = item.cost > 0
         let stripe = index % 2 == 1 ? AppTheme.sidebarHover(dark).opacity(0.18) : Color.clear
         return HStack(spacing: 0) {
@@ -419,7 +421,7 @@ struct TenantCostView: View {
             Text(money6(item.cost))
                 .font(.system(size: 12, weight: positive ? .semibold : .regular, design: .monospaced))
                 .foregroundColor(positive ? accentGreen : secondaryText)
-                .frame(width: wCost, alignment: .trailing)
+                .frame(width: wCost, alignment: .center)
                 .lineLimit(1)
         }
         .padding(.horizontal, hPad)
@@ -432,7 +434,7 @@ struct TenantCostView: View {
         )
     }
 
-    private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .leading) -> some View {
+    private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .center) -> some View {
         Text(title)
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(AppTheme.sidebarText(dark))
@@ -445,7 +447,7 @@ struct TenantCostView: View {
             .foregroundColor(muted ? secondaryText : primaryText)
             .lineLimit(1)
             .help(text)
-            .frame(width: w, alignment: .leading)
+            .frame(width: w, alignment: .center)
     }
 
     private func money(_ v: Double) -> String {

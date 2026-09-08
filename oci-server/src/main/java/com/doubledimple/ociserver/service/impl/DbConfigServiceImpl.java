@@ -55,6 +55,9 @@ public class DbConfigServiceImpl implements DbConfigService {
     @Resource(name = "delayedTaskExecutor")
     private ScheduledExecutorService scheduledExecutorService;
 
+    @Resource
+    private com.doubledimple.ociserver.mock.MockDataService mockDataService;
+
 
     @Override
     @Transactional
@@ -69,6 +72,9 @@ public class DbConfigServiceImpl implements DbConfigService {
     public ApiResponse findByTenantId(Long tenantId) {
         Tenant tenant = tenantRepository.findById(tenantId).get();
         List<DbConfig> dbConfigList = dbConfigRepository.findByTenantIdAndCloudTypeAndDbType(tenantId, tenant.getCloudType(), 1);
+        if ((dbConfigList == null || dbConfigList.isEmpty()) && mockDataService.isMockEnabled()) {
+            return ApiResponse.success(mockDataService.mysqlInstances(tenantId));
+        }
         return ApiResponse.success(dbConfigList);
     }
 

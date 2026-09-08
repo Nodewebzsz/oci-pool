@@ -15,17 +15,17 @@ struct BootView: View {
     private var dark: Bool { appearance.isDarkEffective }
 
     // 固定列宽；租户/备注/区域吃剩余宽度。操作列仅三点菜单。
-    private let wIndex: CGFloat = 36
-    private let wTenant: CGFloat = 108
-    private let wRemark: CGFloat = 80
-    private let wRegion: CGFloat = 84
-    private let wArch: CGFloat = 52
-    private let wStatus: CGFloat = 68
-    private let wNum: CGFloat = 48
-    private let wTime: CGFloat = 100
+    private let wIndex: CGFloat = 28
+    private let wTenant: CGFloat = 72
+    private let wRemark: CGFloat = 70
+    private let wRegion: CGFloat = 58
+    private let wArch: CGFloat = 72
+    private let wStatus: CGFloat = 66
+    private let wNum: CGFloat = 58
+    private let wTime: CGFloat = 140
     private let wAction: CGFloat = 48
     private let hPad: CGFloat = 12
-    private let minFlex: CGFloat = 72
+    private let minFlex: CGFloat = 12
 
     private var fixedColsWidth: CGFloat {
         wIndex + wTenant + wRemark + wRegion + wArch + wStatus
@@ -154,7 +154,7 @@ struct BootView: View {
                     set: { model.onRegionChanged($0) }
                 ),
                 placeholder: "请选择区域",
-                width: 160,
+                width: 200,
                 enabled: !model.selectedParentId.isEmpty,
                 allowClear: true,
                 searchable: true
@@ -269,7 +269,7 @@ struct BootView: View {
                             set: { model.onParentChanged($0) }
                         ),
                         placeholder: "请选择租户",
-                        width: 160,
+                        width: 220,
                         allowClear: true,
                         searchable: true
                     )
@@ -282,7 +282,7 @@ struct BootView: View {
                             set: { model.onRegionChanged($0) }
                         ),
                         placeholder: "请选择区域",
-                        width: 160,
+                        width: 200,
                         enabled: !model.selectedParentId.isEmpty,
                         allowClear: true,
                         searchable: true
@@ -423,9 +423,12 @@ struct BootView: View {
         GeometryReader { geo in
             let totalW = max(geo.size.width, fixedColsWidth)
             let flex = max(0, totalW - fixedColsWidth + minFlex)
-            let wTenantFlex = wTenant + flex * 0.4
-            let wRemarkFlex = wRemark + flex * 0.3
-            let wRegionFlex = wRegion + flex * 0.3
+            // 多列均匀分配（对齐租户管理方案）：租户/自定义名称/区域/架构/时间分剩余，数值列固定
+            let wTenantFlex = wTenant + flex * 0.21
+            let wRemarkFlex = wRemark + flex * 0.24
+            let wRegionFlex = wRegion + flex * 0.18
+            let wArchFlex = wArch + flex * 0.11
+            let wTimeFlex = wTime + flex * 0.26
             let needsHScroll = totalW > geo.size.width + 0.5
 
             let table = VStack(spacing: 0) {
@@ -433,6 +436,8 @@ struct BootView: View {
                     wTenant: wTenantFlex,
                     wRemark: wRemarkFlex,
                     wRegion: wRegionFlex,
+                    wArch: wArchFlex,
+                    wTime: wTimeFlex,
                     width: totalW
                 )
                 ScrollView {
@@ -444,6 +449,8 @@ struct BootView: View {
                                 wTenant: wTenantFlex,
                                 wRemark: wRemarkFlex,
                                 wRegion: wRegionFlex,
+                                wArch: wArchFlex,
+                                wTime: wTimeFlex,
                                 width: totalW
                             )
                         }
@@ -473,13 +480,15 @@ struct BootView: View {
         wTenant: CGFloat,
         wRemark: CGFloat,
         wRegion: CGFloat,
+        wArch: CGFloat,
+        wTime: CGFloat,
         width: CGFloat
     ) -> some View {
         HStack(spacing: 0) {
             Group {
                 colHeader("序号", wIndex)
                 colHeader("租户名称", wTenant)
-                colHeader("备注名称", wRemark)
+                colHeader("自定义名称", wRemark)
                 colHeader("区域编码", wRegion)
             }
             Group {
@@ -514,6 +523,8 @@ struct BootView: View {
         wTenant: CGFloat,
         wRemark: CGFloat,
         wRegion: CGFloat,
+        wArch: CGFloat,
+        wTime: CGFloat,
         width: CGFloat
     ) -> some View {
         let hovered = hoveredRowId == item.id
@@ -526,7 +537,7 @@ struct BootView: View {
             }
             Group {
                 bootStatusCell(item)
-                    .frame(width: wStatus, alignment: .leading)
+                    .frame(width: wStatus, alignment: .center)
                     .clipped()
                 numCell(item.recordCount, wNum)
                 numCell(item.executingCount, wNum, accent: item.executingCount > 0 ? AppTheme.sidebarActive : nil)
@@ -538,7 +549,7 @@ struct BootView: View {
                 cellText(formatNum(Int64(item.failCount)), wNum, danger: true)
                 successCell(item.successCount, wNum)
                 archChip(item.archText)
-                    .frame(width: wArch, alignment: .leading)
+                    .frame(width: wArch, alignment: .center)
                     .clipped()
                 cellText(item.createText, wTime, muted: true)
                 actionBar(item)
@@ -556,6 +567,8 @@ struct BootView: View {
             alignment: .bottom
         )
         .onHover { inside in
+            // 弹窗浮层打开时不响应列表行 hover，避免悬停弹窗时底层列表误高亮
+            if BootActionMenuPresenter.shared.isPresented { return }
             withAnimation(.easeInOut(duration: 0.12)) {
                 hoveredRowId = inside ? item.id : (hoveredRowId == item.id ? nil : hoveredRowId)
             }
@@ -576,7 +589,7 @@ struct BootView: View {
 
     // MARK: - Cells
 
-    private func colHeader(_ title: String, _ width: CGFloat, align: Alignment = .leading) -> some View {
+    private func colHeader(_ title: String, _ width: CGFloat, align: Alignment = .center) -> some View {
         Text(title)
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(AppTheme.sidebarText(dark))
@@ -597,7 +610,7 @@ struct BootView: View {
             )
             .lineLimit(1)
             .truncationMode(.tail)
-            .frame(width: width, alignment: .leading)
+            .frame(width: width, alignment: .center)
             .clipped()
             .help(text)
     }
@@ -611,6 +624,8 @@ struct BootView: View {
             Text(item.openBootFlag ? "运行中" : "无任务")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(item.openBootFlag ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
+                .lineLimit(1)
+                .fixedSize()
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 2)
@@ -627,7 +642,7 @@ struct BootView: View {
                 accent ?? (dark ? Color.white.opacity(0.88) : Color.primary)
             )
             .lineLimit(1)
-            .frame(width: width, alignment: .leading)
+            .frame(width: width, alignment: .center)
             .clipped()
     }
 
@@ -636,7 +651,7 @@ struct BootView: View {
             .font(.system(size: 12, weight: n > 0 ? .semibold : .regular, design: .monospaced))
             .foregroundColor(n > 0 ? AppTheme.sidebarActive : (dark ? Color.white.opacity(0.88) : Color.primary))
             .lineLimit(1)
-            .frame(width: width, alignment: .leading)
+            .frame(width: width, alignment: .center)
             .clipped()
     }
 
@@ -649,7 +664,7 @@ struct BootView: View {
                 .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .frame(width: width, alignment: .leading)
+                .frame(width: width, alignment: .center)
                 .clipped()
                 .contentShape(Rectangle())
         }
@@ -659,20 +674,27 @@ struct BootView: View {
 
     private func archChip(_ text: String) -> some View {
         let t = text.isEmpty || text == "—" ? "—" : text
-        let c = AppTheme.info
+        // 对齐 Web：ARM=info 蓝 / AMD 等=violet 紫（区分颜色）
+        let isARM = t.uppercased() == "ARM"
+        let fg = isARM ? AppTheme.info : violetArch
         return Text(t)
-            .font(.system(size: 10, weight: .bold, design: .monospaced))
-            .foregroundColor(t == "—" ? AppTheme.sidebarText(dark) : c)
-            .padding(.horizontal, t == "—" ? 0 : 7)
+            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+            .foregroundColor(t == "—" ? AppTheme.sidebarText(dark) : fg)
+            .padding(.horizontal, t == "—" ? 0 : 6)
             .padding(.vertical, t == "—" ? 0 : 2)
             .background(
                 Group {
                     if t != "—" {
-                        Capsule().fill(c.opacity(0.14))
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(isARM
+                                  ? AppTheme.info.opacity(0.14)
+                                  : violetArch.opacity(0.14))
                     }
                 }
             )
     }
+
+    private var violetArch: Color { dark ? Color(hex: "a78bfa") : Color(hex: "7c3aed") }
 
     private func formatNum(_ n: Int64) -> String {
         if n >= 10_000 {
@@ -699,7 +721,17 @@ struct BootActionItem: Identifiable {
     let title: String
     let systemImage: String
     let isDanger: Bool
+    var disabled: Bool = false
+    let tone: Tone
     let action: () -> Void
+
+    enum Tone {
+        case accent    // 开机启动/手动开机（绿）
+        case danger    // 开机删除（红）
+        case info      // 已抢实例（青）
+        case orange    // 手动开机（橙）
+        case `default`
+    }
 }
 
 enum BootActionPanel {
@@ -714,21 +746,30 @@ enum BootActionPanel {
             _ title: String,
             _ icon: String,
             danger: Bool = false,
+            disabled: Bool = false,
+            tone: BootActionItem.Tone = .default,
             _ body: @escaping @MainActor () -> Void
         ) -> BootActionItem {
-            BootActionItem(
+            let t = danger ? BootActionItem.Tone.danger : tone
+            return BootActionItem(
                 id: id, title: title, systemImage: icon,
-                isDanger: danger, action: run(body)
+                isDanger: danger, disabled: disabled, tone: t, action: run(body)
             )
         }
+        // 任务状态（对齐原项目 BootInstanceStatusEnum：0未开机/1开机中/2已开机）
+        //   开机启动：仅 status == 0（未开机）可点
+        //   开机停止：仅 status == 1（开机中正在循环）可点
+        //   手动开机：status == 0 或 1 均可单次尝试（原项目不限制）；仅 status == 2（已开机成功）禁用防多开
+        let isNotStarted = item.status == 0
+        let isOpened = item.status == 2
         return [
             make("clone", "克隆开机", "doc.on.doc") { model.confirmClone(item) },
-            make("start", "开机启动", "play.fill") { model.confirmStart(item) },
-            make("stop", "开机停止", "stop.fill") { model.confirmStop(item) },
-            make("detail", "开机详情", "list.bullet.rectangle") { model.openDetail(item) },
-            make("log", "开机日志", "text.alignleft") { model.openBootLog(for: item) },
-            make("cfg", "开机配置", "settings") { model.openAddConfig(item) },
-            make("manual", "手动开机", "hand.raised") { model.confirmManual(item) },
+            make("start", "开机启动", "play.fill", disabled: !isNotStarted, tone: .accent) { model.confirmStart(item) },
+            make("stop", "开机停止", "stop.fill", disabled: isNotStarted || isOpened) { model.confirmStop(item) },
+            make("detail", "开机详情", "info.circle") { model.openDetail(item) },
+            make("cfg", "开机配置", "gearshape") { model.openAddConfig(item) },
+            make("instances", "已抢实例 (\(item.successCount))", "server.rack", tone: .info) { model.openDetail(item) },
+            make("manual", "手动开机", "bolt.fill", disabled: isOpened, tone: .orange) { model.confirmManual(item) },
             make("del", "开机删除", "trash", danger: true) { model.confirmDelete(item) }
         ]
     }
@@ -737,11 +778,11 @@ enum BootActionPanel {
 // MARK: - 窗内操作菜单（对齐实例列表，扁平两列 + 悬停）
 
 private enum BootActionMenuLayout {
-    static let width: CGFloat = 300
-    static let vPad: CGFloat = 12
-    static let titleH: CGFloat = 18
-    static let gridGap: CGFloat = 8
-    static let rowH: CGFloat = 36
+    static let width: CGFloat = 280
+    static let vPad: CGFloat = 8
+    static let titleH: CGFloat = 20
+    static let gridGap: CGFloat = 1
+    static let rowH: CGFloat = 30
     static let cols = 2
     static let margin: CGFloat = 10
     static let minHeight: CGFloat = 140
@@ -749,25 +790,37 @@ private enum BootActionMenuLayout {
 
     static func idealHeight(itemCount: Int) -> CGFloat {
         let rows = max(1, Int(ceil(Double(itemCount) / Double(cols))))
-        return vPad * 2 + titleH + 8
-            + CGFloat(rows) * rowH + CGFloat(max(0, rows - 1)) * gridGap
+        // 对齐 BootActionMenuContent：LazyVGrid spacing 8；每行 rowH 精确，给足 8 项展示、消除底部多余空隙。
+        return vPad * 2 + titleH + 4
+            + CGFloat(rows) * rowH
+            + CGFloat(max(0, rows - 1)) * 8
     }
 
     static func panelFrame(button: NSView, in container: NSView, itemCount: Int) -> NSRect {
         let ideal = idealHeight(itemCount: itemCount)
         let btn = button.convert(button.bounds, to: container)
-        let bounds = container.bounds.insetBy(dx: margin, dy: margin)
+        let bounds = container.bounds
         var h = min(ideal, bounds.height)
         h = max(minHeight, h)
 
-        var x = btn.minX - width - gap
-        if x < bounds.minX { x = btn.maxX + gap }
-        if x + width > bounds.maxX { x = bounds.maxX - width }
-        x = max(bounds.minX, x)
+        // 对齐实例/Web：菜单右缘对齐按钮右缘；下方 6px 缝隙；下方放不下翻到上方。
+        var x = btn.maxX - width
+        if x < bounds.minX { x = bounds.minX + margin }
+        if x + width > bounds.maxX { x = bounds.maxX - width - margin }
 
-        var y = btn.midY - h / 2
-        if y < bounds.minY { y = bounds.minY }
-        if y + h > bounds.maxY { y = bounds.maxY - h }
+        let spaceBelow = btn.minY - bounds.minY
+        let spaceAbove = bounds.maxY - btn.maxY
+        var y: CGFloat
+        if spaceBelow >= h + gap {
+            y = btn.minY - gap - h
+        } else if spaceAbove >= h + gap {
+            y = btn.maxY + gap
+        } else {
+            y = max(bounds.minY + margin, btn.minY - gap - h)
+        }
+        y = max(bounds.minY + margin, y)
+        if y + h > bounds.maxY - margin { y = bounds.maxY - margin - h }
+
         return NSRect(x: x, y: y, width: width, height: h)
     }
 }
@@ -779,6 +832,8 @@ final class BootActionMenuPresenter {
     private var panelHost: NSView?
     private var keyMonitor: Any?
     private var mouseMonitor: Any?
+    private var activeButton: NSButton?
+    private var activeDark = false
     private init() {}
 
     var isPresented: Bool { panelHost != nil }
@@ -794,6 +849,26 @@ final class BootActionMenuPresenter {
         }
         panelHost?.removeFromSuperview()
         panelHost = nil
+        if let btn = activeButton {
+            setButtonHighlight(btn, highlighted: false, dark: activeDark)
+            activeButton = nil
+        }
+    }
+
+    private func setButtonHighlight(_ button: NSButton, highlighted: Bool, dark: Bool) {
+        guard let layer = button.layer else { return }
+        let accent = NSColor(AppTheme.sidebarActive)
+        if highlighted {
+            layer.backgroundColor = accent.cgColor
+            button.contentTintColor = .white
+        } else {
+            layer.backgroundColor = (dark
+                ? NSColor(calibratedRed: 0.17, green: 0.19, blue: 0.21, alpha: 1)
+                : NSColor(calibratedRed: 0.93, green: 0.95, blue: 0.96, alpha: 1)).cgColor
+            button.contentTintColor = dark
+                ? NSColor.white.withAlphaComponent(0.9)
+                : NSColor.labelColor
+        }
     }
 
     func toggle(
@@ -810,6 +885,11 @@ final class BootActionMenuPresenter {
         guard let window = button.window, let content = window.contentView else { return }
         dismiss()
 
+        // 打开菜单时按钮高亮为主题色（对齐实例列表操作规范）
+        activeButton = button
+        activeDark = dark
+        setButtonHighlight(button, highlighted: true, dark: dark)
+
         let actions = BootActionPanel.actions(for: item, model: model)
         let frame = BootActionMenuLayout.panelFrame(
             button: button,
@@ -818,6 +898,7 @@ final class BootActionMenuPresenter {
         )
         let root = BootActionMenuContent(
             title: item.displayTenant,
+            running: item.openBootFlag,
             dark: dark,
             panelHeight: frame.height,
             actions: actions,
@@ -842,6 +923,27 @@ final class BootActionMenuPresenter {
         }
 
         content.addSubview(host)
+        // 用 panelFrame 计算的高度（容纳内容，超屏时 content 内滚动）；add 后仅重定位
+        let realHeight = frame.height
+        var r = frame
+        r.size.height = realHeight
+        host.frame = r
+        // 重定位：保证贴紧按钮下方/上方且不出界
+        let btnRect2 = button.convert(button.bounds, to: content)
+        let bounds2 = content.bounds
+        let gap2 = BootActionMenuLayout.gap
+        let belowSpace = btnRect2.minY - bounds2.minY
+        let aboveSpace = bounds2.maxY - btnRect2.maxY
+        if belowSpace >= realHeight + gap2 {
+            r.origin.y = btnRect2.minY - gap2 - realHeight
+        } else if aboveSpace >= realHeight + gap2 {
+            r.origin.y = btnRect2.maxY + gap2
+        } else {
+            r.origin.y = max(bounds2.minY + 12, btnRect2.minY - gap2 - realHeight)
+        }
+        r.origin.y = max(bounds2.minY + 12, r.origin.y)
+        if r.origin.y + realHeight > bounds2.maxY - 12 { r.origin.y = bounds2.maxY - 12 - realHeight }
+        host.frame = r
         panelHost = host
 
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -855,6 +957,11 @@ final class BootActionMenuPresenter {
             guard let self = self, let host = self.panelHost else { return event }
             let loc = event.locationInWindow
             let frameInWindow = host.convert(host.bounds, to: nil)
+            // 点击再次点击"..."按钮本体时交给按钮 toggle 处理（关闭），不在此 dismiss —— 避免多击状态错乱
+            if let btn = self.activeButton {
+                let btnFrame = btn.convert(btn.bounds, to: nil)
+                if btnFrame.contains(loc) { return event }
+            }
             if !frameInWindow.contains(loc) {
                 DispatchQueue.main.async { self.dismiss() }
             }
@@ -865,6 +972,7 @@ final class BootActionMenuPresenter {
 
 struct BootActionMenuContent: View {
     var title: String = ""
+    var running: Bool = false
     let dark: Bool
     var panelHeight: CGFloat = 280
     let actions: [BootActionItem]
@@ -874,25 +982,32 @@ struct BootActionMenuContent: View {
     @State private var hoveredId: String?
 
     private let columns = [
-        GridItem(.flexible(), spacing: 8),
-        GridItem(.flexible(), spacing: 8)
+        GridItem(.flexible(), spacing: BootActionMenuLayout.gridGap),
+        GridItem(.flexible(), spacing: BootActionMenuLayout.gridGap)
     ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if !title.isEmpty {
+            // 对齐 Web header：状态点 + 租户名（无重复灰块）
+            HStack(spacing: 6) {
+                // 运行中：任务状态同款脉冲动效原点；非运行：静态弱灰（统一 PulseDot，对齐 Web StatusDot pulse）
+                MenuPulseDot(color: running ? AppTheme.sidebarActive : AppTheme.sidebarText(dark), pulse: running)
                 Text(title)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                     .lineLimit(1)
-                    .padding(.horizontal, 2)
+                    .truncationMode(.tail)
+                Spacer(minLength: 0)
             }
+            .padding(.horizontal, 2)
+            .padding(.bottom, 2)
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(actions) { act in
                         actionButton(act)
                     }
                 }
+                .padding(.top, 2)
             }
         }
         .padding(12)
@@ -902,8 +1017,9 @@ struct BootActionMenuContent: View {
     }
 
     private func actionButton(_ act: BootActionItem) -> some View {
-        let hovered = hoveredId == act.id
+        let hovered = hoveredId == act.id && !act.disabled
         return Button(action: {
+            if act.disabled { return }
             let run = act.action
             onDismiss()
             DispatchQueue.main.async { run() }
@@ -917,13 +1033,9 @@ struct BootActionMenuContent: View {
                     .lineLimit(1)
                 Spacer(minLength: 0)
             }
-            .foregroundColor(
-                act.isDanger
-                    ? AppTheme.danger
-                    : (dark ? Color.white.opacity(0.92) : Color.primary)
-            )
+            .foregroundColor(act.disabled ? AppTheme.sidebarText(dark).opacity(0.35) : toneColor(act.tone))
             .padding(.horizontal, 10)
-            .padding(.vertical, 9)
+            .padding(.vertical, 5)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 8)
@@ -944,9 +1056,33 @@ struct BootActionMenuContent: View {
         }
         .buttonStyle(PlainButtonStyle())
         .onHover { inside in
+            // 禁用项不产生 hover 高亮
+            if act.disabled { return }
             withAnimation(.easeInOut(duration: 0.12)) {
                 hoveredId = inside ? act.id : (hoveredId == act.id ? nil : hoveredId)
             }
+        }
+        .help(disabledHelp(act))
+    }
+
+    /// 禁用项 hover 提示原因（非禁用返回空）
+    private func disabledHelp(_ act: BootActionItem) -> String {
+        guard act.disabled else { return "" }
+        switch act.id {
+        case "start":  return "任务正在运行或已完成，无需重复启动"
+        case "stop":   return "未在运行中，暂无可停止的任务"
+        case "manual": return "该任务已开机成功，无需手动抢机"
+        default:       return "当前不可用"
+        }
+    }
+
+    private func toneColor(_ tone: BootActionItem.Tone) -> Color {
+        switch tone {
+        case .accent: return AppTheme.sidebarActive
+        case .danger: return AppTheme.danger
+        case .info:   return AppTheme.cyan
+        case .orange: return AppTheme.orange
+        case .default: return dark ? Color.white.opacity(0.92) : Color.primary
         }
     }
 
@@ -975,7 +1111,7 @@ private struct BootActionMoreButton: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSButton {
-        let b = NSButton(frame: NSRect(x: 0, y: 0, width: 30, height: 26))
+        let b = NSButton(frame: NSRect(x: 0, y: 0, width: 28, height: 28))
         b.bezelStyle = .shadowlessSquare
         b.isBordered = false
         b.title = ""
@@ -987,7 +1123,7 @@ private struct BootActionMoreButton: NSViewRepresentable {
             : NSColor.labelColor
         b.wantsLayer = true
         if let layer = b.layer {
-            layer.cornerRadius = 7
+            layer.cornerRadius = 4
             layer.backgroundColor = (dark
                 ? NSColor(calibratedRed: 0.17, green: 0.19, blue: 0.21, alpha: 1)
                 : NSColor(calibratedRed: 0.93, green: 0.95, blue: 0.96, alpha: 1)).cgColor

@@ -18,6 +18,7 @@ public class TenantResp {
     private String tenantId;
     private String userName;
     private String tenancyName;
+    private String defName;     // 自定义/显示名（对齐 Web getTenantAlias：自定义名优先）
     private String region;
     private Boolean hasChildren;
     private Boolean isHomeRegion;
@@ -36,6 +37,9 @@ public class TenantResp {
         dto.setTenantId(tenant.getTenantId());
         dto.setUserName(newUserName);
         dto.setTenancyName(StringUtils.isNotBlank(tenant.getTenancyName()) ? tenant.getTenancyName() : newUserName);
+        // 自定义/显示名：优先使用已设置的自定义名，否则回落到租户名（对齐 Web getTenantAlias）
+        dto.setDefName(StringUtils.isNotBlank(tenant.getDefName()) ? tenant.getDefName()
+                : (StringUtils.isNotBlank(tenant.getTenancyName()) ? tenant.getTenancyName() : newUserName));
         dto.setRegion(tenant.getRegion());
         dto.setHasChildren(tenant.getHasChildren());
         dto.setIsHomeRegion(tenant.getIsHomeRegion());

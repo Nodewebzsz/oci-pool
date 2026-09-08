@@ -44,6 +44,9 @@ public class OpenBootController  extends BaseController{
     private BootInstanceService bootInstanceService;
 
     @Resource
+    private com.doubledimple.ociserver.mock.MockDataService mockDataService;
+
+    @Resource
     private BootInstanceRepository bootInstanceRepository;
 
     @Resource
@@ -110,6 +113,18 @@ public class OpenBootController  extends BaseController{
             bootPage = Page.empty(org.springframework.data.domain.PageRequest.of(page, size));
         }
         Map<String, Object> result = new HashMap<>();
+        // 模拟数据：库为空且开关开启时返回 demo 开机任务
+        if (bootPage.getContent().isEmpty() && mockDataService.isMockEnabled()) {
+            List<Map<String, Object>> allMock = mockDataService.bootListPage(0, Integer.MAX_VALUE);
+            int total = allMock.size();
+            List<Map<String, Object>> content = mockDataService.bootListPage(page, size);
+            result.put("content", content);
+            result.put("currentPage", page);
+            result.put("totalPages", (int) Math.ceil((double) total / Math.max(1, size)));
+            result.put("totalElements", total);
+            result.put("size", size);
+            return ResponseEntity.ok(result);
+        }
         result.put("content", bootPage.getContent());
         result.put("currentPage", page);
         result.put("totalPages", bootPage.getTotalPages());

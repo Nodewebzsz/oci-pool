@@ -59,6 +59,9 @@ public class SystemSettingsController  extends BaseController{
     private TelegramUserService telegramUserService;
 
     @Resource
+    private com.doubledimple.ociserver.mock.MockDataService mockDataService;
+
+    @Resource
     private TelegramBotService telegramBotService;
 
     @Resource
@@ -409,6 +412,10 @@ public class SystemSettingsController  extends BaseController{
             Tenant target = tenants.stream()
                     .filter(t -> t.getId().toString().equals(tenantId))
                     .findFirst().orElse(null);
+            // 模拟数据：租户无 AI 配置且开关开启时返回 demo 模型
+            if (target == null && mockDataService.isMockEnabled()) {
+                return ResponseEntity.ok(mockDataService.aiModelsDef(tenantId));
+            }
             if (target == null) {
                 return ResponseEntity.ok(Collections.emptyList());
             }
@@ -425,9 +432,15 @@ public class SystemSettingsController  extends BaseController{
                 def.setTenantId(target.getId().toString());
                 models.add(def);
             }
+            if (models.isEmpty() && mockDataService.isMockEnabled()) {
+                return ResponseEntity.ok(mockDataService.aiModelsDef(tenantId));
+            }
             return ResponseEntity.ok(models);
         } catch (Exception e) {
             log.error("获取租户AI模型列表失败", e);
+            if (mockDataService.isMockEnabled()) {
+                return ResponseEntity.ok(mockDataService.aiModelsDef(tenantId));
+            }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }

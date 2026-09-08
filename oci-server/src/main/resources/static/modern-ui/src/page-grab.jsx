@@ -71,7 +71,12 @@ function GrabPage({ density }) {
         const rows = await window.ociServices.tenant.listRegions({ parentId: tenantFilter });
         if (!alive) return;
         const options = (Array.isArray(rows) ? rows : [])
-          .map(row => ({ id: String(row.id ?? ''), label: row.region || row.tenancyName || row.userName || row.id || '', region: row.region || '' }))
+          .map(row => {
+            const base = row.region || row.tenancyName || row.userName || row.id || '';
+            // 多区域账户：主区域(add)追加 i18n 主区域标识
+            const label = row.isHomeRegion ? `${base} · ${tr('tenants.col.mainRegion')}` : base;
+            return { id: String(row.id ?? ''), label, region: row.region || '' };
+          })
           .filter(row => row.id);
         setRegionOptions(options);
         const requested = String(regionFilter || '');
@@ -349,7 +354,7 @@ function GrabPage({ density }) {
         : <span className="num" style={{ color: 'var(--fg-3)' }}>0</span>
     },
     { key: 'arch', label: tr('grab.col.arch'), width: 80,
-      render: r => <span style={{ padding: '1px 6px', background: 'var(--info-soft)', color: 'var(--info)', borderRadius: 3, fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{getInstanceArch(r)}</span> },
+      render: r => <span style={{ padding: '1px 6px', background: getInstanceArch(r) === 'ARM' ? 'var(--info-soft)' : 'var(--violet-soft)', color: getInstanceArch(r) === 'ARM' ? 'var(--info)' : 'var(--violet)', borderRadius: 3, fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{getInstanceArch(r)}</span> },
     { key: 'createdAt', label: tr('common.createdAt'),
       render: r => <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>{r.createdAt}</span> },
     { key: 'actions', label: tr('common.operation'), width: 48, minWidth: 48, align: 'center', ellipsis: false,
@@ -512,12 +517,7 @@ function GrabTaskMenu({ task, anchorEl, onClose, onAction }) {
   const header = (
     <>
       <StatusDot status={task.status} size={5} pulse={task.status === 'running'} />
-      <span className="mono" style={{
-        padding: '1px 6px', borderRadius: 3,
-        background: 'var(--bg-3)', color: 'var(--fg-0)',
-        fontSize: 11, fontWeight: 500,
-      }}>{task.tenantName}</span>
-      <span style={{ color: 'var(--fg-2)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <span style={{ color: 'var(--fg-0)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
         {getTenantName(task)}
       </span>
     </>

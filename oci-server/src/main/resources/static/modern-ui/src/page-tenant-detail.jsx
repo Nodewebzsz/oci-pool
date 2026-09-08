@@ -98,8 +98,8 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
 
   // 区域切换下拉的开关状态
   const [regionMenuOpen, setRegionMenuOpen] = useStateTD(false);
-  // 敏感信息脱敏切换
-  const [masked, setMasked] = useStateTD(true);
+  // 敏感信息脱敏切换(详情页默认展示完整名称，亦可通过眼睛按钮或点击标题切换)
+  const [masked, setMasked] = useStateTD(false);
 
   // 若 tenant 不存在(数据变化/直链非法),让 app 层已经处理了回退,这里兜底
   if (loading) {
@@ -167,7 +167,7 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
         return;
       case 'disk-info':      return showDiskModal(shell, selectedRegion, activeRow);
       case 'security-rules': return showSecurityModal(shell, selectedRegion, activeRow);
-      case 'storage-case':   return showStorageModal(shell, selectedRegion, activeRow);
+      case 'database-case':  return showMysqlModal(shell, selectedRegion, activeRow);
     }
   };
 
@@ -178,7 +178,7 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
     { id: 'disk-info',      label: tr('td.action.disk'), icon: 'hard-drive', variant: 'outline'   },
     { id: 'security-rules', label: tr('td.action.rules'), icon: 'shield',     variant: 'outline'   },
     { id: 'resource-list',  label: tr('td.action.resources'), icon: 'list',       variant: 'outline'   },
-    { id: 'storage-case',   label: tr('td.action.storage'), icon: 'database',   variant: 'outline'   },
+    { id: 'database-case',  label: tr('td.action.storage'), icon: 'database',   variant: 'outline'   },
   ];
 
   return (
@@ -252,22 +252,37 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
             <Icon name="diamond" size={20} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-              <h1 style={{ fontSize: 18, fontWeight: 600, margin: 0, color: 'var(--fg-0)', letterSpacing: -0.2 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+              <h1
+                onClick={() => setMasked(!masked)}
+                title={masked ? tr('td.toggleMask') : ''}
+                style={{ fontSize: 18, fontWeight: 600, margin: 0, color: 'var(--fg-0)', letterSpacing: -0.2, cursor: 'pointer' }}
+              >
                 {masked ? window.maskName(getTenantName(tenant) || '') : (getTenantName(tenant) || '')}
               </h1>
-              <span className="mono" style={{
-                padding: '2px 8px', background: 'var(--bg-3)',
-                borderRadius: 4, fontSize: 11, color: 'var(--fg-1)', fontWeight: 500,
-              }}>
-                {masked ? window.maskName(getTenantName(tenant) || '') : (getTenantName(tenant) || '')}
-              </span>
+              {/* 自定义别名徽章：只有在设置了别名且与租户名不同时才展示，彻底消除双份重复 */}
+              {(() => {
+                const alias = getTenantAlias(tenant);
+                const fullName = getTenantName(tenant);
+                if (!alias || alias === fullName) return null;
+                return (
+                  <span className="mono" title={tr('tenants.col.defName')} style={{
+                    padding: '2px 8px', background: 'var(--bg-3)',
+                    borderRadius: 4, fontSize: 11, color: 'var(--fg-1)', fontWeight: 500,
+                  }}>
+                    {alias}
+                  </span>
+                );
+              })()}
               <StatusPill status={tenant._ui.status === 'active' ? 'active' : tenant._ui.status} label={tr('status.' + tenant._ui.status)} />
             </div>
             <div style={{ marginTop: 4, fontSize: 12, color: 'var(--fg-3)', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span>{tenant._ui.hasChildren ? tr('td.multiRegion') : tr('td.singleRegion')}</span>
+              {(() => {
+                const isMulti = Boolean(tenant._ui?.hasChildren || regionOptions.length > 1);
+                return <span>{isMulti ? tr('td.multiRegion') : tr('td.singleRegion')}</span>;
+              })()}
               <span style={{ color: 'var(--fg-3)' }}>·</span>
-              <span>{(tenant.accountTypeName && tenant.accountTypeName !== '未知' && tenant.accountTypeName !== '未知账号/权限不足' && tenant.accountTypeName !== 'Unknown' && tenant.accountTypeName !== tr('tenants.type.unknown')) ? tenant.accountTypeName : (tenant._ui.hasChildren ? tr('tenants.type.multi-region') : tr('tenants.type.unknown'))}</span>
+              <span>{(tenant.accountTypeName && tenant.accountTypeName !== '未知' && tenant.accountTypeName !== '未知账号/权限不足' && tenant.accountTypeName !== 'Unknown' && tenant.accountTypeName !== tr('tenants.type.unknown')) ? tenant.accountTypeName : ((tenant._ui?.hasChildren || regionOptions.length > 1) ? tr('tenants.type.multi-region') : tr('tenants.type.unknown'))}</span>
               <span style={{ color: 'var(--fg-3)' }}>·</span>
               <span>{tr('td.uptimePrefix')}<span className="num" style={{ color: 'var(--fg-1)' }}>{getTenantDays(tenant)}</span>{tr('td.uptimeSuffix')}</span>
             </div>

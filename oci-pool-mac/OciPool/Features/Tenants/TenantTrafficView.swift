@@ -309,9 +309,7 @@ struct TenantTrafficView: View {
     }
 
     private func regionLabel(_ r: TenantRegionOption) -> String {
-        if !r.region.isEmpty { return r.region }
-        if !r.tenancyName.isEmpty { return r.tenancyName }
-        return r.id
+        r.regionDropdownLabel
     }
 
     // MARK: - Stats cards (Web .stats-cards)

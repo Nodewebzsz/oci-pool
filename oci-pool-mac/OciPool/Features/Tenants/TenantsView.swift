@@ -6,6 +6,8 @@ struct TenantsView: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appearance: AppearanceController
     @StateObject private var model = TenantsViewModel()
+    /// 列表行 hover 高亮（对齐实例列表：悬停行高亮；弹窗打开时不触发）。租户 id 为 Int64。
+    @State private var hoveredRowId: Int64?
 
     private var dark: Bool { appearance.isDarkEffective }
 
@@ -22,8 +24,8 @@ struct TenantsView: View {
     private let wStatus: CGFloat = 56
     private let wAction: CGFloat = 52
     private let hPad: CGFloat = 12
-    private let minNameShownFloor: CGFloat = 160
-    private let minDefShown: CGFloat = 72
+    private let minNameShownFloor: CGFloat = 128
+    private let minDefShown: CGFloat = 120
     private let minRegionShown: CGFloat = 68
 
     /// 显示全名时压缩固定列，把宽度让给名称（单行不换行）
@@ -38,12 +40,13 @@ struct TenantsView: View {
                 minNameShownFloor, minDefShown, minRegionShown)
     }
 
-    /// 按最长租户名单行估算名称列宽（约 12pt 等宽字符）
+    /// 按最长租户名单行估算名称列宽（约 12pt 等宽字符）。
+    /// 上限收紧到合理值，避免租户名列被最长租户名撑得远宽于自定义名称列（对齐 Web 租户名列固定较窄）。
     private func estimatedNameWidth(for items: [TenantItem], floor: CGFloat) -> CGFloat {
         let longest = items.map(\.displayName).max(by: { $0.count < $1.count }) ?? ""
         // 中文偏宽、英文偏窄，取折中系数
         let estimated = CGFloat(longest.count) * 8.0 + 12
-        return max(floor, min(estimated, 720))
+        return max(floor, min(estimated, 150))
     }
 
     private func fixedColsWidth(m: (
@@ -246,8 +249,9 @@ struct TenantsView: View {
                 let totalW = max(geo.size.width, baseFixed)
                 let flexPool = max(0, totalW - baseFixed)
                 // 剩余宽度：遮罩时名称/自定义名/区域分；展开时优先名称
-                let nameShare: CGFloat = 0.70
-                let defShare: CGFloat = 0.18
+                // 对齐 Web：租户名列较窄、自定义名称列更宽
+                let nameShare: CGFloat = 0.34
+                let defShare: CGFloat = 0.46
                 let regionShare: CGFloat = 1 - nameShare - defShare
                 let wName = nameNeed + flexPool * nameShare
                 let wDef = m.minDef + flexPool * defShare
@@ -258,20 +262,28 @@ struct TenantsView: View {
                     create: m.create, time: m.time, status: wStatus, action: wAction, hPad: hPad
                 )
 
-                ScrollView([.horizontal, .vertical], showsIndicators: true) {
-                    VStack(spacing: 0) {
-                        headerRow(cols: cols, width: totalW)
+                let needsHScroll = totalW > geo.size.width + 0.5
+                // 对齐实例列表：表头固定 + 数据独立垂直滚动（表头不再随数据一起滚）
+                let table = VStack(spacing: 0) {
+                    headerRow(cols: cols, width: totalW)
+                    ScrollView {
                         LazyVStack(spacing: 0) {
                             ForEach(Array(model.rows.enumerated()), id: \.element.id) { idx, row in
                                 tenantRow(index: idx, item: row, cols: cols, width: totalW)
                             }
                         }
                     }
-                    // 双向 ScrollView 会在内容少于视口时垂直居中；强制顶部对齐（对齐 Web 表格顶格）
-                    .frame(minHeight: geo.size.height, alignment: .topLeading)
-                    .frame(width: totalW, alignment: .topLeading)
                 }
-                .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
+                .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
+
+                Group {
+                    if needsHScroll {
+                        ScrollView(.horizontal, showsIndicators: true) { table }
+                            .frame(width: geo.size.width, height: geo.size.height)
+                    } else {
+                        table
+                    }
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -313,7 +325,8 @@ struct TenantsView: View {
     }
 
     private func tenantRow(index: Int, item: TenantItem, cols: TenantColWidths, width: CGFloat) -> some View {
-        HStack(alignment: .center, spacing: 0) {
+        let hovered = hoveredRowId == item.id
+        return HStack(alignment: .center, spacing: 0) {
             HStack(alignment: .center, spacing: 0) {
                 proxyShieldCell(item, width: cols.proxy)
                 nameCell(item, width: cols.name)
@@ -341,10 +354,19 @@ struct TenantsView: View {
             alignment: .bottom
         )
         .background(
-            (index % 2 == 1)
-                ? AppTheme.sidebarHover(dark).opacity(0.18)
-                : Color.clear
+            hovered
+                ? AppTheme.sidebarActive.opacity(dark ? 0.12 : 0.08)
+                : ((index % 2 == 1)
+                   ? AppTheme.sidebarHover(dark).opacity(0.18)
+                   : Color.clear)
         )
+        .onHover { inside in
+            // 弹窗浮层打开时不响应列表行 hover，避免悬停弹窗时底层列表误高亮
+            if TenantActionMenuPresenter.shared.isPresented { return }
+            withAnimation(.easeInOut(duration: 0.12)) {
+                hoveredRowId = inside ? item.id : (hoveredRowId == item.id ? nil : hoveredRowId)
+            }
+        }
     }
 
     // MARK: - Cells
@@ -383,7 +405,7 @@ struct TenantsView: View {
                 // 始终单行；展开时靠加宽名称列完整显示，禁止换行
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .frame(width: width, alignment: .leading)
+                .frame(width: width, alignment: .center)
                 .frame(height: 28, alignment: .center)
         }
         .buttonStyle(PlainButtonStyle())
@@ -398,7 +420,7 @@ struct TenantsView: View {
                 .foregroundColor(dark ? Color(hex: "ccd2d6") : Color(hex: "2d3439"))
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .frame(width: width, alignment: .leading)
+                .frame(width: width, alignment: .center)
                 .frame(minHeight: 20)
                 .clipped()
         }
@@ -415,7 +437,7 @@ struct TenantsView: View {
                 .foregroundColor(item.costText == "—" ? RegionsMuted : (nonZero ? AppTheme.orange : AppTheme.sidebarActive))
                 .underline(true, color: item.costText == "—" ? .clear : AppTheme.orange.opacity(0.6))
                 .lineLimit(1)
-                .frame(width: width, alignment: .leading)
+                .frame(width: width, alignment: .center)
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -430,7 +452,7 @@ struct TenantsView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(RoundedRectangle(cornerRadius: 4).fill(AppTheme.info.opacity(0.14)))
-            .frame(width: width, alignment: .leading)
+            .frame(width: width, alignment: .center)
     }
 
     /// Web：有任务 = accent-soft + 脉冲圆点「进行中」，否则灰「无任务」
@@ -449,7 +471,7 @@ struct TenantsView: View {
             RoundedRectangle(cornerRadius: 999)
                 .fill(item.openBootFlag ? AppTheme.sidebarActive.opacity(0.14) : Color.clear)
         )
-        .frame(width: width, alignment: .leading)
+        .frame(width: width, alignment: .center)
     }
 
     /// Web：多区域 = 圆点（有子区 accent）+ 是/否
@@ -462,7 +484,7 @@ struct TenantsView: View {
         }
         .font(.system(size: 12))
         .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
-        .frame(width: width, alignment: .leading)
+        .frame(width: width, alignment: .center)
     }
 
     /// Web StatusPill：圆点 + 文字，active=accent-soft/accent
@@ -482,7 +504,7 @@ struct TenantsView: View {
                 item.isActive ? AppTheme.sidebarActive.opacity(0.14) : AppTheme.danger.opacity(0.14)
             )
         )
-        .frame(width: width, alignment: .leading)
+        .frame(width: width, alignment: .center)
     }
 
     @ViewBuilder
@@ -496,7 +518,7 @@ struct TenantsView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(RoundedRectangle(cornerRadius: 4).fill(item.typeBadgeColor.opacity(0.14)))
-                    .frame(width: width, alignment: .leading)
+                    .frame(width: width, alignment: .center)
             }
             .buttonStyle(PlainButtonStyle())
         } else {
@@ -521,7 +543,7 @@ struct TenantsView: View {
                 .cornerRadius(5)
             }
             .buttonStyle(PlainButtonStyle())
-            .frame(width: width, alignment: .leading)
+            .frame(width: width, alignment: .center)
         } else {
             cell("—", width, muted: true)
         }
@@ -529,12 +551,16 @@ struct TenantsView: View {
 
     /// AppKit 三点按钮 + 窗内浮层（不使用 NSPopover，避免超出应用窗口）
     private func actionCell(_ item: TenantItem, width: CGFloat) -> some View {
-        TenantActionEllipsisButton(dark: dark, item: item, model: model)
-            .environmentObject(appearance)
-            .frame(width: width, height: 28)
+        // 按钮固定 28×28，外层 ZStack 按列宽展开并居中（不拉伸按钮本体）
+        ZStack {
+            TenantActionEllipsisButton(dark: dark, item: item, model: model)
+                .environmentObject(appearance)
+                .frame(width: 28, height: 28)
+        }
+        .frame(width: width, height: 28)
     }
 
-    private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .leading) -> some View {
+    private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .center) -> some View {
         Text(title)
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(AppTheme.sidebarText(dark))
@@ -547,7 +573,7 @@ struct TenantsView: View {
             .foregroundColor(muted ? AppTheme.sidebarText(dark) : (dark ? Color.white.opacity(0.9) : Color.primary))
             .lineLimit(1)
             .truncationMode(.tail)
-            .frame(width: w, alignment: .leading)
+            .frame(width: w, alignment: .center)
             .clipped()
             .help(text)
     }
@@ -562,11 +588,11 @@ private struct TenantColWidths {
 // MARK: - AppKit ellipsis + 窗内浮层（绝不使用 NSPopover，保证在应用窗口内）
 
 private enum TenantActionMenuLayout {
-    static let width: CGFloat = 300
-    static let vPad: CGFloat = 12
-    static let titleH: CGFloat = 18
-    static let gridGap: CGFloat = 8
-    static let rowH: CGFloat = 36
+    static let width: CGFloat = 280
+    static let vPad: CGFloat = 8
+    static let titleH: CGFloat = 20
+    static let gridGap: CGFloat = 1
+    static let rowH: CGFloat = 30
     static let cols = 2
     static let margin: CGFloat = 10
     static let minHeight: CGFloat = 140
@@ -574,8 +600,9 @@ private enum TenantActionMenuLayout {
 
     static func idealHeight(actionCount: Int) -> CGFloat {
         let rows = max(1, Int(ceil(Double(actionCount) / Double(cols))))
-        let gridH = CGFloat(rows) * rowH + CGFloat(max(0, rows - 1)) * gridGap
-        return vPad * 2 + titleH + 8 + gridH
+        // 对齐 Web：外层 padding(左右4) + header + 项目行，去掉多余空隙
+        return vPad * 2 + titleH + 4
+            + CGFloat(rows) * rowH + CGFloat(max(0, rows - 1)) * gridGap
     }
 
     /// 在 `container`（窗口 contentView）坐标系内计算面板 frame，严格夹紧不越界。
@@ -587,48 +614,23 @@ private enum TenantActionMenuLayout {
         var h = min(ideal, bounds.height)
         h = max(minHeight, h)
 
-        // 水平：优先按钮左侧；不够则右侧；再夹紧
-        var x = btn.minX - width - gap
-        if x < bounds.minX {
-            x = btn.maxX + gap
-        }
-        if x + width > bounds.maxX {
-            x = bounds.maxX - width
-        }
-        x = max(bounds.minX, x)
+        // 对齐实例/Web：菜单右缘对齐按钮右缘；下方 6px 缝隙；下方放不下翻到上方。
+        var x = btn.maxX - width
+        if x < bounds.minX { x = bounds.minX + margin }
+        if x + width > bounds.maxX { x = bounds.maxX - width - margin }
 
-        // 垂直：底部行优先向上展开（面板底对齐按钮上沿附近）；顶部行向下；中间居中。再夹紧。
-        let spaceAbove = bounds.maxY - btn.maxY
         let spaceBelow = btn.minY - bounds.minY
+        let spaceAbove = bounds.maxY - btn.maxY
         var y: CGFloat
-
-        if spaceBelow < h * 0.35 {
-            // 靠近底部：面板在按钮上方，底边贴近按钮顶
+        if spaceBelow >= h + gap {
+            y = btn.minY - gap - h
+        } else if spaceAbove >= h + gap {
             y = btn.maxY + gap
-            if y + h > bounds.maxY {
-                h = max(minHeight, bounds.maxY - y)
-            }
-            if y + h > bounds.maxY {
-                y = bounds.maxY - h
-            }
-        } else if spaceAbove < h * 0.35 {
-            // 靠近顶部：面板在按钮下方
-            y = btn.minY - h - gap
-            if y < bounds.minY {
-                y = bounds.minY
-                h = max(minHeight, min(ideal, btn.minY - gap - bounds.minY))
-            }
         } else {
-            // 相对按钮垂直居中
-            y = btn.midY - h / 2
-            if y < bounds.minY { y = bounds.minY }
-            if y + h > bounds.maxY { y = bounds.maxY - h }
+            y = max(bounds.minY + margin, btn.minY - gap - h)
         }
-
-        // 最终夹紧
-        if h > bounds.height { h = bounds.height }
-        if y < bounds.minY { y = bounds.minY }
-        if y + h > bounds.maxY { y = bounds.maxY - h }
+        y = max(bounds.minY + margin, y)
+        if y + h > bounds.maxY - margin { y = bounds.maxY - margin - h }
 
         return NSRect(x: x, y: y, width: width, height: h)
     }
@@ -644,6 +646,9 @@ final class TenantActionMenuPresenter {
     private var panelHost: NSView?
     private var keyMonitor: Any?
     private var mouseMonitor: Any?
+    /// 打开菜单的按钮（dismiss 时恢复高亮，对齐 Boot 操作规范）
+    private var activeButton: NSButton?
+    private var activeDark = false
 
     private init() {}
 
@@ -660,6 +665,27 @@ final class TenantActionMenuPresenter {
         }
         panelHost?.removeFromSuperview()
         panelHost = nil
+        if let btn = activeButton {
+            setButtonHighlight(btn, highlighted: false, dark: activeDark)
+            activeButton = nil
+        }
+    }
+
+    /// 打开菜单时按钮变主题色高亮，关闭时恢复（对齐 Boot `menuFor` accent）
+    private func setButtonHighlight(_ button: NSButton, highlighted: Bool, dark: Bool) {
+        guard let layer = button.layer else { return }
+        let accent = NSColor(AppTheme.sidebarActive)
+        if highlighted {
+            layer.backgroundColor = accent.cgColor
+            button.contentTintColor = .white
+        } else {
+            layer.backgroundColor = (dark
+                ? NSColor(calibratedRed: 0.17, green: 0.19, blue: 0.21, alpha: 1)
+                : NSColor(calibratedRed: 0.93, green: 0.95, blue: 0.96, alpha: 1)).cgColor
+            button.contentTintColor = dark
+                ? NSColor.white.withAlphaComponent(0.9)
+                : NSColor.labelColor
+        }
     }
 
     /// 租户列表行菜单
@@ -673,6 +699,7 @@ final class TenantActionMenuPresenter {
         present(
             from: button,
             title: item.displayName,
+            isActive: item.isActive,
             dark: dark,
             appearance: appearance,
             actions: TenantActionPanel.actions(for: item, model: model)
@@ -690,6 +717,7 @@ final class TenantActionMenuPresenter {
         present(
             from: button,
             title: item.displayName,
+            isActive: item.isActive,
             dark: dark,
             appearance: appearance,
             actions: TenantActionPanel.detailActions(for: item, model: model)
@@ -699,6 +727,7 @@ final class TenantActionMenuPresenter {
     private func present(
         from button: NSButton,
         title: String,
+        isActive: Bool,
         dark: Bool,
         appearance: AppearanceController,
         actions: [TenantActionItem]
@@ -710,6 +739,11 @@ final class TenantActionMenuPresenter {
         guard let window = button.window, let content = window.contentView else { return }
         dismiss()
 
+        // 打开菜单时按钮高亮为主题色（对齐 Boot 操作规范）
+        activeButton = button
+        activeDark = dark
+        setButtonHighlight(button, highlighted: true, dark: dark)
+
         let frame = TenantActionMenuLayout.panelFrame(
             button: button,
             in: content,
@@ -717,7 +751,8 @@ final class TenantActionMenuPresenter {
         )
 
         let root = TenantActionMenuContent(
-            title: title,
+            displayName: title,
+            isActive: isActive,
             dark: dark,
             panelHeight: frame.height,
             actions: actions,
@@ -742,6 +777,28 @@ final class TenantActionMenuPresenter {
         }
 
         content.addSubview(host)
+        // 用 panelFrame 计算的高度（容纳内容，超屏时 content 内滚动）；add 后仅重定位
+        let realHeight = frame.height
+        var r = frame
+        r.size.height = realHeight
+        host.frame = r
+        // 重定位：保证贴紧按钮下方/上方且不出界
+        let btnRect2 = button.convert(button.bounds, to: content)
+        let bounds2 = content.bounds
+        let gap2 = TenantActionMenuLayout.gap
+        let belowSpace = btnRect2.minY - bounds2.minY
+        let aboveSpace = bounds2.maxY - btnRect2.maxY
+        if belowSpace >= realHeight + gap2 {
+            r.origin.y = btnRect2.minY - gap2 - realHeight
+        } else if aboveSpace >= realHeight + gap2 {
+            r.origin.y = btnRect2.maxY + gap2
+        } else {
+            r.origin.y = max(bounds2.minY + 12, btnRect2.minY - gap2 - realHeight)
+        }
+        r.origin.y = max(bounds2.minY + 12, r.origin.y)
+        if r.origin.y + realHeight > bounds2.maxY - 12 { r.origin.y = bounds2.maxY - 12 - realHeight }
+        host.frame = r
+
         panelHost = host
 
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -752,12 +809,17 @@ final class TenantActionMenuPresenter {
             return event
         }
 
-        // 只监视、不吞事件，避免挡死顶栏/侧栏/返回
+        // 只监视、不吞事件，避免挡死顶栏/侧栏/返回；点击再次点击"..."按钮本体时交给按钮 toggle 处理（关闭）
         mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             guard let self = self, let host = self.panelHost else { return event }
             let loc = event.locationInWindow
             let frameInWindow = host.convert(host.bounds, to: nil)
+            if let btn = self.activeButton {
+                let btnFrame = btn.convert(btn.bounds, to: nil)
+                if btnFrame.contains(loc) { return event }
+            }
             if !frameInWindow.contains(loc) {
+                // 异步 dismiss，让本次点击继续落到下层控件
                 DispatchQueue.main.async { self.dismiss() }
             }
             return event
@@ -776,14 +838,31 @@ private struct TenantActionEllipsisButton: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSButton {
-        let b = NSButton(frame: NSRect(x: 0, y: 0, width: 32, height: 26))
-        b.bezelStyle = .rounded
-        b.isBordered = true
-        b.title = "···"
-        b.font = NSFont.systemFont(ofSize: 14, weight: .bold)
+        let b = NSButton(frame: NSRect(x: 0, y: 0, width: 28, height: 28))
+        b.bezelStyle = .shadowlessSquare
+        b.isBordered = false
+        b.title = ""
+        b.image = NSImage(systemSymbolName: "ellipsis", accessibilityDescription: "更多")
+        b.imagePosition = .imageOnly
+        b.imageScaling = .scaleProportionallyDown
+        b.contentTintColor = dark
+            ? NSColor.white.withAlphaComponent(0.9)
+            : NSColor.labelColor
+        b.wantsLayer = true
+        if let layer = b.layer {
+            layer.cornerRadius = 4
+            layer.backgroundColor = (dark
+                ? NSColor(calibratedRed: 0.17, green: 0.19, blue: 0.21, alpha: 1)
+                : NSColor(calibratedRed: 0.93, green: 0.95, blue: 0.96, alpha: 1)).cgColor
+            layer.borderWidth = 1
+            layer.borderColor = (dark
+                ? NSColor.white.withAlphaComponent(0.12)
+                : NSColor.black.withAlphaComponent(0.08)).cgColor
+        }
         b.target = context.coordinator
         b.action = #selector(Coordinator.toggleMenu(_:))
-        b.setButtonType(.momentaryPushIn)
+        b.setButtonType(.momentaryChange)
+        b.toolTip = "更多操作"
         context.coordinator.button = b
         return b
     }
@@ -793,6 +872,18 @@ private struct TenantActionEllipsisButton: NSViewRepresentable {
         context.coordinator.model = model
         context.coordinator.appearance = appearance
         context.coordinator.dark = dark
+        nsView.contentTintColor = dark
+            ? NSColor.white.withAlphaComponent(0.9)
+            : NSColor.labelColor
+        if let layer = nsView.layer {
+            layer.cornerRadius = 4
+            layer.backgroundColor = (dark
+                ? NSColor(calibratedRed: 0.17, green: 0.19, blue: 0.21, alpha: 1)
+                : NSColor(calibratedRed: 0.93, green: 0.95, blue: 0.96, alpha: 1)).cgColor
+            layer.borderColor = (dark
+                ? NSColor.white.withAlphaComponent(0.12)
+                : NSColor.black.withAlphaComponent(0.08)).cgColor
+        }
     }
 
     final class Coordinator: NSObject {
@@ -831,7 +922,17 @@ struct TenantActionItem: Identifiable {
     let title: String
     let systemImage: String
     let isDanger: Bool
+    var tone: Tone = .default
     let action: () -> Void
+
+    enum Tone {
+        case accent    // 配额/强调动作（Web color: var(--accent)）
+        case orange    // 橙色主题动作
+        case danger    // 删除/危险动作
+        case info      // 信息/复制
+        case gray      // 中性
+        case `default` // 其余（对齐 Web var(--fg-1) 灰）
+    }
 }
 
 @MainActor
@@ -860,7 +961,7 @@ enum TenantActionPanel {
                 TenantActionItem(id: "export", title: "导出租户", systemImage: "square.and.arrow.down", isDanger: false) { model.openExportOne(item) },
                 TenantActionItem(id: "email", title: "邮箱服务", systemImage: "envelope", isDanger: false) { model.openEmail(item) },
                 TenantActionItem(id: "social", title: "社媒配置", systemImage: "link", isDanger: false) { model.openSocial(item) },
-                TenantActionItem(id: "quota", title: "查看配额", systemImage: "chart.bar", isDanger: false) { model.openQuota(item) }
+                TenantActionItem(id: "quota", title: "查看配额", systemImage: "chart.bar", isDanger: false, tone: .accent) { model.openQuota(item) }
             ])
         } else if item.cloudType == 2 {
             list.append(TenantActionItem(id: "detail", title: "租户详情", systemImage: "info.circle", isDanger: false) {
@@ -919,73 +1020,121 @@ enum TenantActionPanel {
     }
 }
 
-/// 窗内菜单内容（两列网格，限高可滚动）
+/// 窗内菜单内容（对齐开机管理操作规范：扁平两列 + 悬停变绿）。
 struct TenantActionMenuContent: View {
-    var title: String = ""
+    var displayName: String = ""
+    var isActive: Bool = true
     let dark: Bool
-    var panelHeight: CGFloat = 420
+    var panelHeight: CGFloat = 280
     let actions: [TenantActionItem]
     let onDismiss: () -> Void
 
     @EnvironmentObject private var appearance: AppearanceController
+    @State private var hoveredId: String?
 
     private let columns = [
-        GridItem(.flexible(), spacing: 8),
-        GridItem(.flexible(), spacing: 8)
+        GridItem(.flexible(), spacing: TenantActionMenuLayout.gridGap),
+        GridItem(.flexible(), spacing: TenantActionMenuLayout.gridGap)
     ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if !title.isEmpty {
-                Text(title)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+            // 对齐 Boot header：状态点（有效脉冲动效）+ 租户名（无重复灰块/N 项）
+            HStack(spacing: 6) {
+                MenuPulseDot(color: isActive ? AppTheme.sidebarActive : AppTheme.sidebarText(dark), pulse: isActive)
+                Text(displayName.isEmpty ? "—" : displayName)
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                     .lineLimit(1)
-                    .padding(.horizontal, 2)
+                    .truncationMode(.tail)
+                Spacer(minLength: 0)
             }
+            .padding(.horizontal, 2)
+            .padding(.bottom, 2)
 
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(actions) { act in
-                        Button(action: {
-                            onDismiss()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-                                act.action()
-                            }
-                        }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: act.systemImage)
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .frame(width: 14)
-                                Text(act.title)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .lineLimit(1)
-                                Spacer(minLength: 0)
-                            }
-                            .foregroundColor(act.isDanger ? AppTheme.danger : (dark ? Color.white.opacity(0.9) : Color.primary))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 9)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(act.isDanger
-                                          ? AppTheme.danger.opacity(0.1)
-                                          : AppTheme.sidebarHover(dark).opacity(dark ? 0.55 : 0.7))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(PlainButtonStyle())
+                        actionButton(act)
                     }
                 }
+                .padding(.top, 2)
             }
         }
         .padding(12)
         .frame(width: TenantActionMenuLayout.width, height: panelHeight, alignment: .topLeading)
         .background(AppTheme.pageBg(dark))
         .cornerRadius(12)
+    }
+
+    private func actionButton(_ act: TenantActionItem) -> some View {
+        let hovered = hoveredId == act.id
+        let effTone: TenantActionItem.Tone = act.isDanger ? .danger : act.tone
+        return Button(action: {
+            let run = act.action
+            onDismiss()
+            DispatchQueue.main.async { run() }
+        }) {
+            HStack(spacing: 6) {
+                Image(systemName: act.systemImage)
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(width: 14)
+                Text(act.title)
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .foregroundColor(toneColor(effTone))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(buttonFill(act: act, hovered: hovered))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(
+                        hovered
+                            ? (act.isDanger
+                               ? AppTheme.danger.opacity(0.45)
+                               : AppTheme.sidebarActive.opacity(0.45))
+                            : AppTheme.border(dark).opacity(0.4),
+                        lineWidth: 1
+                    )
+            )
+            .animation(.easeInOut(duration: 0.12), value: hovered)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .onHover { inside in
+            withAnimation(.easeInOut(duration: 0.12)) {
+                hoveredId = inside ? act.id : (hoveredId == act.id ? nil : hoveredId)
+            }
+        }
+    }
+
+    private func toneColor(_ tone: TenantActionItem.Tone) -> Color {
+        switch tone {
+        case .accent: return AppTheme.sidebarActive
+        case .danger: return AppTheme.danger
+        case .info:   return AppTheme.cyan
+        case .orange: return AppTheme.orange
+        case .gray:   return AppTheme.sidebarText(dark).opacity(0.75)
+        case .default: return dark ? Color.white.opacity(0.92) : Color.primary
+        }
+    }
+
+    private func buttonFill(act: TenantActionItem, hovered: Bool) -> Color {
+        if hovered {
+            if act.isDanger {
+                return AppTheme.danger.opacity(dark ? 0.22 : 0.16)
+            }
+            return AppTheme.sidebarActive.opacity(dark ? 0.22 : 0.14)
+        }
+        if act.isDanger {
+            return AppTheme.danger.opacity(0.06)
+        }
+        return dark ? Color.white.opacity(0.04) : Color.black.opacity(0.03)
     }
 }
 

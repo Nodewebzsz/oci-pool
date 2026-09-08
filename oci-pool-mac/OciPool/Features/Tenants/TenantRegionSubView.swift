@@ -159,11 +159,13 @@ struct TenantRegionSubView: View {
                 GeometryReader { geo in
                     let wHome: CGFloat = 80
                     let wStatus: CGFloat = 96
-                    let wKey: CGFloat = 180
                     let hPad: CGFloat = 16
-                    let fixed = wHome + wStatus + wKey + hPad * 2
-                    let totalW = max(geo.size.width, fixed + 160)
-                    let wName = max(160, totalW - fixed)
+                    // 多列均匀分配：区域名称/区域标识弹性，主区域/状态固定
+                    let fixed = wHome + wStatus + hPad * 2
+                    let totalW = max(geo.size.width, fixed + 320)
+                    let flex = max(0, totalW - fixed)
+                    let wName = 160 + flex * 0.50
+                    let wKey = 180 + flex * 0.50
 
                     VStack(spacing: 0) {
                         subscribedHeader(wName: wName, wKey: wKey, wHome: wHome, wStatus: wStatus, width: totalW, hPad: hPad)
@@ -202,16 +204,16 @@ struct TenantRegionSubView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(primaryText)
                 .lineLimit(1)
-                .frame(width: wName, alignment: .leading)
+                .frame(width: wName, alignment: .center)
             Text(r.regionKey)
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.sidebarActive)
                 .lineLimit(1)
-                .frame(width: wKey, alignment: .leading)
+                .frame(width: wKey, alignment: .center)
             homeBadge(r.isHomeRegion)
-                .frame(width: wHome, alignment: .leading)
+                .frame(width: wHome, alignment: .center)
             statusBadge(r.status)
-                .frame(width: wStatus, alignment: .leading)
+                .frame(width: wStatus, alignment: .center)
         }
         .padding(.horizontal, hPad)
         .padding(.vertical, appearance.density.rowPadding)
@@ -346,7 +348,7 @@ struct TenantRegionSubView: View {
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(mutedText)
         if let w = w {
-            return AnyView(view.frame(width: w, alignment: .leading))
+            return AnyView(view.frame(width: w, alignment: .center))
         }
         return AnyView(view)
     }

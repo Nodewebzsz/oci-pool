@@ -34,6 +34,9 @@ public class CloudflareController  extends BaseController {
     private CloudflareService cloudflareService;
 
     @Resource
+    private com.doubledimple.ociserver.mock.MockDataService mockDataService;
+
+    @Resource
     private SystemConfigService systemConfigService;
 
     /**
@@ -102,6 +105,10 @@ public class CloudflareController  extends BaseController {
     public ApiResponse getZones() {
         try {
             List<Map<String, Object>> zones = cloudflareService.listAllZones();
+            // 模拟数据：无域名且开关开启时返回 demo 域名
+            if (zones.isEmpty() && mockDataService.isMockEnabled()) {
+                zones = mockDataService.cfZones();
+            }
             return ApiResponse.builder()
                     .success(true)
                     .message("获取域名列表成功")
@@ -109,6 +116,14 @@ public class CloudflareController  extends BaseController {
                     .build();
         } catch (Exception e) {
             log.error("获取域名列表失败", e);
+            // 模拟数据：CF API 调用失败且开关开启时返回 demo 域名
+            if (mockDataService.isMockEnabled()) {
+                return ApiResponse.builder()
+                        .success(true)
+                        .message("获取域名列表成功")
+                        .data(mockDataService.cfZones())
+                        .build();
+            }
             return ApiResponse.error("获取域名列表失败: " + e.getMessage());
         }
     }

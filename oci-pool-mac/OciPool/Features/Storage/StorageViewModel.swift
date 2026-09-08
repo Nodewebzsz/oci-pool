@@ -127,9 +127,7 @@ final class StorageViewModel: ObservableObject {
     }
 
     func tenantLabel(_ t: TenantRegionOption) -> String {
-        if !t.tenancyName.isEmpty { return t.tenancyName }
-        if !t.userName.isEmpty { return t.userName }
-        return t.id
+        t.label
     }
 
     // MARK: - Buckets

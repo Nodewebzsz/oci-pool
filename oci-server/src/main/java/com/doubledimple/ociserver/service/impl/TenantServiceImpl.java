@@ -149,6 +149,9 @@ public class TenantServiceImpl implements TenantService {
     private TenantRepository tenantRepository;
 
     @Resource
+    private com.doubledimple.ociserver.mock.MockDataService mockDataService;
+
+    @Resource
     private VpnProxyRecordRepository vpnProxyRecordRepository;
 
     @Resource
@@ -282,16 +285,18 @@ public class TenantServiceImpl implements TenantService {
                     }
                 }
                 // 获取并处理子记录
-                //List<Tenant> children = tenantRepository.findByParenId(parent.getId());
                 List<Tenant> children = this.regionList(parent.getId());
-                //final List<Tenant> collect = children.stream().filter(child -> !child.getIsHomeRegion()).collect(Collectors.toList());
                 children.removeIf(child -> child.getId().equals(parent.getId()));
+                // 核心修复：必须在塞入 parentClone 自身之前判断是否真实存在其他子区域记录！
+                boolean hasRealChildren = !children.isEmpty();
+
                 Tenant parentClone = new Tenant();
                 BeanUtils.copyProperties(parent, parentClone);
                 parentClone.setChildren(null);
                 parentClone.setRegion(parent.getRegion());
                 children.add(0, parentClone);
-                if (!children.isEmpty()) {
+
+                if (hasRealChildren) {
                     children.forEach(child -> {
                         child.setRegion(RegionEnum.getNameByCode(child.getRegion()));
                         child.setIdStr(child.getId().toString());
@@ -311,6 +316,7 @@ public class TenantServiceImpl implements TenantService {
                 } else {
                     boolean b = bootInstanceRepository.existsRunningTaskByTenantId(parent.getId());
                     openInsFlag.set(b);
+                    parent.setChildren(null);
                     parent.setHasChildren(false);
                 }
                 parent.setOpenBootFlag(openInsFlag.get());
@@ -509,18 +515,18 @@ public class TenantServiceImpl implements TenantService {
         if (CloudTypeEnum.ORACLE_CLOUD.getType() == cloudType){
             tenancyDetail = ociClassLoader.loadManyRegions(tenant);
             subscription = OciGateWayUtils.getAccountTypeInfo(tenant);
-            tenancyName = tenancyDetail.getTenancyName();
-            if (tenancyName == null)tenancyName = tenant.getUserName();
+            tenancyName = resolveTenancyName(tenancyDetail, tenant);
             description = tenancyDetail.getDescription();
             if (description == null)description = StringUtils.EMPTY;
             regionSubscriptions = tenancyDetail.getRegionSubscriptions();
         }else if (CloudTypeEnum.GOOGLE_CLOUD.getType() == cloudType){
-            tenancyName = tenant.getUserName();
+            tenancyName = resolveTenancyName(null, tenant);
             description = StringUtils.EMPTY;
             tenancyDetail = new TenancyDetail();
             tenancyDetail.setAccountTypeEnum(AccountTypeEnum.FREE_ACCOUNT);
             tenant.setRegion(RegionEnum.GCP_REGION.getCode());
         }
+        String finalDefName1 = resolveDefName(tenant, tenancyName);
         List<Tenant> tenants = new ArrayList<>();
         long snowflakeNextId = IdUtil.getSnowflakeNextId();
         if (regionSubscriptions == null){
@@ -551,12 +557,12 @@ public class TenantServiceImpl implements TenantService {
             tenantAdd.setIsHomeRegion(true);
             tenantAdd.setTenancyName(tenancyName);
             tenantAdd.setTenancyDes(description);
-            // 自定义名称默认与租户名一致（导入时设置，后期可单独修改）
-            tenantAdd.setDefName(tenancyName);
+            // 保护自定义名称：优先保留用户已设置的自定义名称，全新导入未设置时才默认等于租户名
+            tenantAdd.setDefName(finalDefName1);
             tenants.add(tenantAdd);
         }else{
             for (RegionSubscription regionSubscription : regionSubscriptions) {
-                doExecuteTenants(tenants,tenant,regionSubscription,snowflakeNextId,subscription,tenancyDetail,tenancyName,description);
+                doExecuteTenants(tenants,tenant,regionSubscription,snowflakeNextId,subscription,tenancyDetail,tenancyName,description,finalDefName1);
             }
         }
 
@@ -577,18 +583,18 @@ public class TenantServiceImpl implements TenantService {
         if (CloudTypeEnum.ORACLE_CLOUD.getType() == cloudType){
             tenancyDetail = ociClassLoader.loadManyRegionsInner(tenant);
             subscription = OciGateWayUtils.getAccountTypeInfo(tenant);
-            tenancyName = tenancyDetail.getTenancyName();
-            if (tenancyName == null)tenancyName = tenant.getUserName();
+            tenancyName = resolveTenancyName(tenancyDetail, tenant);
             description = tenancyDetail.getDescription();
             if (description == null)description = StringUtils.EMPTY;
             regionSubscriptions = tenancyDetail.getRegionSubscriptions();
         }else if (CloudTypeEnum.GOOGLE_CLOUD.getType() == cloudType){
-            tenancyName = tenant.getUserName();
+            tenancyName = resolveTenancyName(null, tenant);
             description = StringUtils.EMPTY;
             tenancyDetail = new TenancyDetail();
             tenancyDetail.setAccountTypeEnum(AccountTypeEnum.FREE_ACCOUNT);
             tenant.setRegion(RegionEnum.GCP_REGION.getCode());
         }
+        String finalDefName2 = resolveDefName(tenant, tenancyName);
         List<Tenant> tenants = new ArrayList<>();
         long snowflakeNextId = IdUtil.getSnowflakeNextId();
         if (regionSubscriptions == null){
@@ -620,12 +626,12 @@ public class TenantServiceImpl implements TenantService {
             tenantAdd.setIsHomeRegion(true);
             tenantAdd.setTenancyName(tenancyName);
             tenantAdd.setTenancyDes(description);
-            // 自定义名称默认与租户名一致（导入时设置，后期可单独修改）
-            tenantAdd.setDefName(tenancyName);
+            // 保护自定义名称：优先保留用户已设置的自定义名称，全新导入未设置时才默认等于租户名
+            tenantAdd.setDefName(finalDefName2);
             tenants.add(tenantAdd);
         }else{
             for (RegionSubscription regionSubscription : regionSubscriptions) {
-                doExecuteTenants(tenants,tenant,regionSubscription,snowflakeNextId,subscription,tenancyDetail,tenancyName,description);
+                doExecuteTenants(tenants,tenant,regionSubscription,snowflakeNextId,subscription,tenancyDetail,tenancyName,description,finalDefName2);
             }
         }
 
@@ -634,7 +640,7 @@ public class TenantServiceImpl implements TenantService {
         return tenants;
     }
 
-    private void doExecuteTenants(List<Tenant> tenants,Tenant tenant,RegionSubscription regionSubscription,Long snowflakeNextId,Subscription subscription,TenancyDetail tenancyDetail,String tenancyName,String description) {
+    private void doExecuteTenants(List<Tenant> tenants,Tenant tenant,RegionSubscription regionSubscription,Long snowflakeNextId,Subscription subscription,TenancyDetail tenancyDetail,String tenancyName,String description,String defName) {
         Tenant tenantAdd = new Tenant();
         BeanUtils.copyProperties(tenant, tenantAdd);
         List<Tenant> tenantList = tenantRepository.queryByUserName(tenantAdd.getUserName());
@@ -676,7 +682,54 @@ public class TenantServiceImpl implements TenantService {
         tenantAdd.setIsHomeRegion(regionSubscription.getIsHomeRegion());
         tenantAdd.setTenancyName(tenancyName);
         tenantAdd.setTenancyDes(description);
+        tenantAdd.setDefName(defName);
         tenants.add(tenantAdd);
+    }
+
+    /**
+     * 智能解析并保护租户名称：
+     * 1. 优先采用 OCI 官方返回的 tenancyName（需非空且不是 ocid1.）
+     * 2. 次优先保留原有传入的租户名（用户导入时输入的名称），严禁退化覆盖为 OCID
+     * 3. 再次使用用户已设置的自定义名称
+     * 4. 兜底才使用 userName
+     */
+    private String resolveTenancyName(TenancyDetail tenancyDetail, Tenant tenant) {
+        String apiName = tenancyDetail != null ? tenancyDetail.getTenancyName() : null;
+        if (StringUtils.isNotBlank(apiName) && !apiName.startsWith("ocid1.")) {
+            return apiName;
+        }
+        String existingName = tenant != null ? tenant.getTenancyName() : null;
+        if (StringUtils.isNotBlank(existingName) && !existingName.startsWith("ocid1.")) {
+            return existingName;
+        }
+        String defName = tenant != null ? tenant.getDefName() : null;
+        if (StringUtils.isNotBlank(defName) && !defName.startsWith("ocid1.")) {
+            return defName;
+        }
+        return (tenant != null && StringUtils.isNotBlank(tenant.getUserName())) ? tenant.getUserName() : "Unknown";
+    }
+
+    /**
+     * 智能解析并保护自定义名称：
+     * 1. 如果已有用户修改过的有效 defName（非空且非 OCID），必须原样保护保留！
+     * 2. 如果 CloudTenancy 库表存有该租户的 defName，也优先保留！
+     * 3. 只有全新的租户且从未设置过自定义名称时，才默认等于租户名。
+     */
+    private String resolveDefName(Tenant tenant, String resolvedTenancyName) {
+        String existingDefName = tenant != null ? tenant.getDefName() : null;
+        if (StringUtils.isNotBlank(existingDefName) && !existingDefName.startsWith("ocid1.")) {
+            return existingDefName;
+        }
+        if (tenant != null && StringUtils.isNotBlank(tenant.getTenancy())) {
+            try {
+                Optional<CloudTenancy> ct = cloudTenancyRepository.findByTenancyNameAndCloudTypeAndType(tenant.getTenancy(), tenant.getCloudType(), 1);
+                if (ct.isPresent() && StringUtils.isNotBlank(ct.get().getDefName()) && !ct.get().getDefName().startsWith("ocid1.")) {
+                    return ct.get().getDefName();
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return resolvedTenancyName;
     }
 
     /**
@@ -702,9 +755,18 @@ public class TenantServiceImpl implements TenantService {
         Tenant tenant = getById(Long.valueOf(tenantId));
         if (tenant != null){
             try {
+                // 关键保护：删除前暂存该租户已有的真实租户名与自定义名称，防止重新入库时被抹除为 OCID
+                String oldTenancyName = tenant.getTenancyName();
+                String oldDefName = tenant.getDefName();
+
                 self.deleteApi(Long.valueOf(tenantId),Boolean.FALSE);
                 Path path = Paths.get(tenant.getKeyFile()).toAbsolutePath().normalize();
                 tenant.setTmpKeyFile(path.toAbsolutePath().toString());
+
+                // 回填到临时租户对象中供 saveTenantInner 识别与保护
+                tenant.setTenancyName(oldTenancyName);
+                tenant.setDefName(oldDefName);
+
                 tenants = self.saveTenantInner(tenant);
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -1097,16 +1159,28 @@ public class TenantServiceImpl implements TenantService {
 
                 OciPageResult<OciAuditEventDto> result = auditLogUtils.listAuditEventsByDateRange(
                         tenant, startDate, endDate, auditLogRequest.getPageToken());
+                if ((result == null || result.getData() == null || result.getData().isEmpty())
+                        && mockDataService.isMockEnabled()) {
+                    return ApiResponse.success(mockDataService.auditEvents());
+                }
                 return ApiResponse.success(result);
             }
 
             int days = auditLogRequest.getDays() > 0 ? auditLogRequest.getDays() : 1;
             OciPageResult<OciAuditEventDto> result =
                     auditLogUtils.listRecentAuditEvents(tenant, days, auditLogRequest.getPageToken());
+            if ((result == null || result.getData() == null || result.getData().isEmpty())
+                    && mockDataService.isMockEnabled()) {
+                return ApiResponse.success(mockDataService.auditEvents());
+            }
             return ApiResponse.success(result);
 
         } catch (Exception e) {
             log.warn("审计日志查询出现异常, 原因: {}", e.getMessage(), e);
+            // 模拟数据：审计调用异常且开关开启时返回 demo 审计事件
+            if (mockDataService.isMockEnabled()) {
+                return ApiResponse.success(mockDataService.auditEvents());
+            }
             return ApiResponse.error("审计日志查询出现异常");
         }
     }
@@ -2018,6 +2092,14 @@ public class TenantServiceImpl implements TenantService {
                 .collect(Collectors.toMap(RegisterDetail::getTenantId, detail -> detail, (existing, replacement) -> existing));
 
         for (Tenant tenant : content) {
+            // 自定义/显示名：优先云租户配置里的自定义名，否则回落到租户名（对齐 Web getTenantAlias）
+            Optional<CloudTenancy> cloudTenancyOptional = cloudTenancyRepository.findByTenancyNameAndCloudTypeAndType(tenant.getTenancy(), tenant.getCloudType(), 1);
+            if (cloudTenancyOptional.isPresent()) {
+                tenant.setDefName(cloudTenancyOptional.get().getDefName());
+            } else {
+                tenant.setDefName(StringUtils.isNotBlank(tenant.getTenancyName()) ? tenant.getTenancyName() : tenant.getUserName());
+            }
+
             RegisterDetail registerDetail = registerDetailMap.get(tenant.getTenantId());
 
             if (registerDetail != null) {

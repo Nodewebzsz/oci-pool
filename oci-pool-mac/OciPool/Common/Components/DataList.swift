@@ -76,7 +76,7 @@ struct DataListRow<Content: View>: View {
 struct DataListColumnHeader: View {
     let title: String
     var width: CGFloat? = nil
-    var alignment: Alignment = .leading
+    var alignment: Alignment = .center   // 数据表列头统一居中（对齐数据表居中标准）
 
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme

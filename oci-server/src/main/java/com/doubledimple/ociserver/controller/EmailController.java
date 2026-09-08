@@ -28,6 +28,7 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 import java.util.List;
+import java.util.Map;
 
 /**
  * @version 1.0.0
@@ -43,6 +44,9 @@ public class EmailController extends BaseController{
 
     @Resource
     private EmailService emailService;
+
+    @Resource
+    private com.doubledimple.ociserver.mock.MockDataService mockDataService;
 
     /**
      * 邮箱管理页面
@@ -80,6 +84,17 @@ public class EmailController extends BaseController{
     public ApiResponse listTenant(@RequestBody TenantEmailConfigRequest request) {
         try {
             Page<TenantEmailConfig> page = emailService.listTenantEmailConfig(request);
+            // 模拟数据：无邮件配置且开关开启时返回 demo 配置
+            if (page.getContent().isEmpty() && mockDataService.isMockEnabled()) {
+                Map<String, Object> mock = new java.util.HashMap<>();
+                List<Map<String, Object>> items = mockDataService.emailConfigs();
+                mock.put("content", items);
+                mock.put("totalElements", items.size());
+                mock.put("totalPages", 1);
+                mock.put("number", 0);
+                mock.put("size", 20);
+                return ApiResponse.success(mock);
+            }
             return ApiResponse.success(page);
         } catch (Exception e) {
             log.warn("查询开启邮件服务的租户列表失败,原因为:{}", e.getMessage(),e);

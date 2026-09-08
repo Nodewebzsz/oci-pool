@@ -584,12 +584,7 @@ function TenantActionMenu({ tenant, anchorEl, onClose, onAction }) {
   const header = (
     <>
       <StatusDot status={tenant._ui.status} size={5} pulse={tenant._ui.status === 'active'} />
-      <span className="mono" style={{
-        padding: '1px 6px', borderRadius: 3,
-        background: 'var(--bg-3)', color: 'var(--fg-0)',
-        fontSize: 11, fontWeight: 500,
-      }}>{tenant._ui.name}</span>
-      <span style={{ color: 'var(--fg-2)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <span style={{ color: 'var(--fg-0)', fontWeight: 600, fontSize: 12, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {getTenantName(tenant)}
       </span>
     </>

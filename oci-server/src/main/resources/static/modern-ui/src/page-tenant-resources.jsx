@@ -346,7 +346,8 @@ function TenantResourcesPage({ density, ctx, navigate, updateDetailCtx }) {
                   <td style={{ padding: '11px 12px', borderBottom: '1px solid var(--border)' }}>
                     <span style={{
                       padding: '1px 6px',
-                      background: 'var(--info-soft)', color: 'var(--info)',
+                      background: getInstanceArch(inst) === 'ARM' ? 'var(--info-soft)' : 'var(--violet-soft)',
+                      color: getInstanceArch(inst) === 'ARM' ? 'var(--info)' : 'var(--violet)',
                       borderRadius: 3, fontSize: 10, fontWeight: 600,
                       fontFamily: 'var(--font-mono)',
                     }}>{getInstanceArch(inst)}</span>

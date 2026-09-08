@@ -601,15 +601,11 @@ final class BootViewModel: ObservableObject {
     }
 
     func tenantLabel(_ t: TenantRegionOption) -> String {
-        if !t.tenancyName.isEmpty { return t.tenancyName }
-        if !t.userName.isEmpty { return t.userName }
-        return t.id
+        t.label
     }
 
     func regionLabel(_ r: TenantRegionOption) -> String {
-        var s = r.region.isEmpty ? (r.tenancyName.isEmpty ? r.id : r.tenancyName) : r.region
-        if r.isHomeRegion { s += " · 主" }
-        return s
+        r.regionDropdownLabel
     }
 
     // MARK: - Boot log（详情页下方内嵌面板 + SSE，非弹框）

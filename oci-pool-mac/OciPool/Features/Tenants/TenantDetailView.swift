@@ -27,13 +27,13 @@ struct TenantDetailView: View {
 
     /// 显示全名时压缩其它列，名称列单行加宽（禁止换行）
     private func detailColMetrics(namesHidden: Bool) -> (
-        task: CGFloat, region: CGFloat, home: CGFloat, sync: CGFloat, time: CGFloat,
-        action: CGFloat, minName: CGFloat, minDef: CGFloat
+        task: CGFloat, home: CGFloat, sync: CGFloat, action: CGFloat,
+        minName: CGFloat, minDef: CGFloat, minRegion: CGFloat, minTime: CGFloat
     ) {
         if namesHidden {
-            return (wTask, wRegion, wHome, wSync, wTime, wAction, minNameHidden, minDefHidden)
+            return (wTask, wHome, wSync, wAction, minNameHidden, minDefHidden, wRegion, wTime)
         }
-        return (60, 88, 52, 60, 108, 148, 200, 72)
+        return (60, 52, 60, 148, 200, 72, 88, 108)
     }
 
     private func estimatedDetailNameWidth(floor: CGFloat) -> CGFloat {
@@ -231,20 +231,22 @@ struct TenantDetailView: View {
                 let nameNeed: CGFloat = model.detailNamesHidden
                     ? m.minName
                     : estimatedDetailNameWidth(floor: m.minName)
-                let fixed = wIndex + m.task + m.region + m.home + m.sync + m.time + m.action
-                    + nameNeed + m.minDef + hPad * 2
+                let fixed = wIndex + m.task + m.home + m.sync + m.action
+                    + nameNeed + m.minDef + m.minRegion + m.minTime + hPad * 2
                 let totalW = max(geo.size.width, fixed)
                 let flex = max(0, totalW - fixed)
-                let nameShare: CGFloat = model.detailNamesHidden ? 0.55 : 0.75
-                let wName = nameNeed + flex * nameShare
-                let wDef = m.minDef + flex * (1 - nameShare)
+                // 多列均匀分配：租户名/名称/区域/创建时间分剩余，其余固定
+                let wName = nameNeed + flex * 0.30
+                let wDef = m.minDef + flex * 0.30
+                let wRegion = m.minRegion + flex * 0.25
+                let wTime = m.minTime + flex * 0.15
 
                 ScrollView([.horizontal, .vertical], showsIndicators: true) {
                     VStack(spacing: 0) {
                         headerRow(
-                            wName: wName, wDef: wDef,
-                            task: m.task, region: m.region, home: m.home,
-                            sync: m.sync, time: m.time, action: m.action,
+                            wName: wName, wDef: wDef, wRegion: wRegion, wTime: wTime,
+                            task: m.task, home: m.home,
+                            sync: m.sync, action: m.action,
                             width: totalW
                         )
                         // 必须用 offset 做 identity：regionList 在异常/兜底数据下可能出现重复 id，
@@ -253,9 +255,9 @@ struct TenantDetailView: View {
                             ForEach(Array(model.detailRows.enumerated()), id: \.offset) { idx, row in
                                 dataRow(
                                     index: idx, item: row,
-                                    wName: wName, wDef: wDef,
-                                    task: m.task, region: m.region, home: m.home,
-                                    sync: m.sync, time: m.time, action: m.action,
+                                    wName: wName, wDef: wDef, wRegion: wRegion, wTime: wTime,
+                                    task: m.task, home: m.home,
+                                    sync: m.sync, action: m.action,
                                     width: totalW
                                 )
                                 .id("detail-row-\(idx)-\(row.id)")
@@ -283,9 +285,9 @@ struct TenantDetailView: View {
     }
 
     private func headerRow(
-        wName: CGFloat, wDef: CGFloat,
-        task: CGFloat, region: CGFloat, home: CGFloat,
-        sync: CGFloat, time: CGFloat, action: CGFloat,
+        wName: CGFloat, wDef: CGFloat, wRegion: CGFloat, wTime: CGFloat,
+        task: CGFloat, home: CGFloat,
+        sync: CGFloat, action: CGFloat,
         width: CGFloat
     ) -> some View {
         HStack(spacing: 0) {
@@ -293,10 +295,10 @@ struct TenantDetailView: View {
             colHeader("租户名", wName)
             colHeader("名称", wDef)
             colHeader("开机任务", task)
-            colHeader("区域", region)
+            colHeader("区域", wRegion)
             colHeader("主区域", home)
             colHeader("实例同步", sync)
-            colHeader("创建时间", time)
+            colHeader("创建时间", wTime)
             colHeader("操作", action, align: .center)
         }
         .padding(.horizontal, hPad)
@@ -311,9 +313,9 @@ struct TenantDetailView: View {
 
     private func dataRow(
         index: Int, item: TenantItem,
-        wName: CGFloat, wDef: CGFloat,
-        task: CGFloat, region: CGFloat, home: CGFloat,
-        sync: CGFloat, time: CGFloat, action: CGFloat,
+        wName: CGFloat, wDef: CGFloat, wRegion: CGFloat, wTime: CGFloat,
+        task: CGFloat, home: CGFloat,
+        sync: CGFloat, action: CGFloat,
         width: CGFloat
     ) -> some View {
         let hovered = hoveredRowId == item.id
@@ -323,7 +325,7 @@ struct TenantDetailView: View {
             cell(item.defNameText, wDef)
             taskCell(item)
                 .frame(width: task, alignment: .leading)
-            regionCell(item, width: region)
+            regionCell(item, width: wRegion)
             homeBadge(item)
                 .frame(width: home, alignment: .leading)
             StatusBadge(
@@ -332,7 +334,7 @@ struct TenantDetailView: View {
                 tone: item.apiSynced ? .success : .neutral
             )
             .frame(width: sync, alignment: .leading)
-            cell(item.createdAt.isEmpty ? "—" : item.createdAt, time, muted: true)
+            cell(item.createdAt.isEmpty ? "—" : item.createdAt, wTime, muted: true)
             actionBar(item)
                 .frame(width: action, alignment: .center)
         }
@@ -471,7 +473,7 @@ struct TenantDetailView: View {
             }
             TenantDetailActionButton(dark: dark, item: item, model: model)
                 .environmentObject(appearance)
-                .frame(width: 30, height: 26)
+                .frame(width: 28, height: 28)
         }
     }
 
@@ -530,7 +532,7 @@ private struct TenantDetailActionButton: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSButton {
-        let b = NSButton(frame: NSRect(x: 0, y: 0, width: 30, height: 26))
+        let b = NSButton(frame: NSRect(x: 0, y: 0, width: 28, height: 28))
         b.bezelStyle = .shadowlessSquare
         b.isBordered = false
         b.title = ""
@@ -542,7 +544,7 @@ private struct TenantDetailActionButton: NSViewRepresentable {
             : NSColor.labelColor
         b.wantsLayer = true
         if let layer = b.layer {
-            layer.cornerRadius = 7
+            layer.cornerRadius = 4
             layer.backgroundColor = (dark
                 ? NSColor(calibratedRed: 0.17, green: 0.19, blue: 0.21, alpha: 1)
                 : NSColor(calibratedRed: 0.93, green: 0.95, blue: 0.96, alpha: 1)).cgColor
@@ -567,6 +569,7 @@ private struct TenantDetailActionButton: NSViewRepresentable {
             ? NSColor.white.withAlphaComponent(0.9)
             : NSColor.labelColor
         if let layer = nsView.layer {
+            layer.cornerRadius = 4
             layer.backgroundColor = (dark
                 ? NSColor(calibratedRed: 0.17, green: 0.19, blue: 0.21, alpha: 1)
                 : NSColor(calibratedRed: 0.93, green: 0.95, blue: 0.96, alpha: 1)).cgColor

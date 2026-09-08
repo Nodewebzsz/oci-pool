@@ -222,12 +222,12 @@ struct CloudflareView: View {
     private func row(_ item: CfDnsRecord) -> some View {
         HStack(spacing: 0) {
             typeChip(item.type)
-                .frame(width: 72, alignment: .leading)
+                .frame(width: 72, alignment: .center)
             cell(item.name, width: nil)
             cell(item.content, width: nil)
             cell(CloudflareJSON.formatTTL(item.ttl), width: 72)
             proxyBadge(item)
-                .frame(width: 80, alignment: .leading)
+                .frame(width: 80, alignment: .center)
             HStack(spacing: 6) {
                 Spacer(minLength: 0)
                 actionBtn("pencil", color: AppTheme.sidebarActive, tip: "编辑") {
@@ -258,7 +258,7 @@ struct CloudflareView: View {
             .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
             .lineLimit(1)
             .truncationMode(.middle)
-            .frame(width: width, alignment: .leading)
+            .frame(width: width, alignment: .center)
             .frame(maxWidth: width == nil ? .infinity : width, alignment: .leading)
             .help(text)
     }
