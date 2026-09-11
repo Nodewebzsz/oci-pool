@@ -18,9 +18,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
@@ -76,13 +76,22 @@ public class AuditLogUtils {
                     }
 
                     String userType = event.getData().getIdentity().getAuthType();
+                    // 控制台会话 ID：非空 = 控制台登录，为空 = API/SDK 调用。
+                    // 注意 authType 无公开枚举，不能用作判据，见 OciAuditEventDto#consoleSessionId。
+                    String consoleSessionId = event.getData().getIdentity().getConsoleSessionId();
                     String ipAddress = event.getData().getIdentity().getIpAddress();
 
                     // 拼接 IP + 地址信息
                     String resolvedIpInfo = resolveMultiIpLocation(ipAddress);
 
                     String clientEnv = event.getData().getIdentity().getUserAgent();
-                    String eventType = event.getEventType();
+                    // 列主值取短名（eventName，如 LaunchInstance）；完整类型（eventType，
+                    // 如 com.oraclecloud.ComputeApi.LaunchInstance）留给 hover 排查。
+                    String eventName = event.getData().getEventName();
+                    String eventFullType = event.getEventType();
+                    String eventType = (eventName != null && !eventName.isEmpty())
+                            ? eventName
+                            : eventFullType;
                     String eventTime = event.getEventTime() != null
                             ? DateTimeUtils.formatDate(event.getEventTime())
                             : "-";
@@ -90,8 +99,17 @@ public class AuditLogUtils {
                             ? event.getData().getResponse().getStatus()
                             : "-";
 
-                    results.add(new OciAuditEventDto(
-                            eventType, userName, userType, resolvedIpInfo, clientEnv, eventTime, responseStatus));
+                    results.add(OciAuditEventDto.builder()
+                            .eventType(eventType)
+                            .eventFullType(eventFullType)
+                            .userName(userName)
+                            .userType(userType)
+                            .consoleSessionId(consoleSessionId)
+                            .ipAddress(resolvedIpInfo)
+                            .clientEnv(clientEnv)
+                            .eventTime(eventTime)
+                            .responseStatus(responseStatus)
+                            .build());
                 }
             }
 
@@ -99,12 +117,19 @@ public class AuditLogUtils {
                     tenant.getUserName(), results.size(), nextPage);
 
         } catch (BmcException e) {
+            // 不再吞没失败：否则「真的没有日志」与「OCI 查询失败」在接口层不可区分
             log.warn("查询审计日志失败: 状态码={}, 错误={}", e.getStatusCode(), e.getMessage());
+            throw new IllegalStateException(
+                    String.format("查询审计日志失败（OCI 返回 %d）：%s", e.getStatusCode(), e.getMessage()), e);
         } catch (Exception e) {
-            log.error("查询审计日志异常: {}", e.getMessage());
+            log.error("查询审计日志异常: {}", e.getMessage(), e);
+            throw new IllegalStateException("查询审计日志异常：" + e.getMessage(), e);
         }
 
-        return new OciPageResult<>(results, nextPage);
+        return OciPageResult.<OciAuditEventDto>builder()
+                .data(results)
+                .nextPageToken(nextPage)
+                .build();
     }
 
 
@@ -135,33 +160,39 @@ public class AuditLogUtils {
     public OciPageResult<OciAuditEventDto> listAuditEventsByDateRange(
             Tenant tenant, String startDate, String endDate, String pageToken) {
 
+        LocalDate start;
+        LocalDate end;
         try {
-            LocalDate start = LocalDate.parse(startDate);
-            LocalDate end = (endDate != null && !endDate.isEmpty())
+            start = LocalDate.parse(startDate);
+            end = (endDate != null && !endDate.isEmpty())
                     ? LocalDate.parse(endDate)
                     : start;
-
-            long diffDays = ChronoUnit.DAYS.between(start, end);
-            if (diffDays < 0) {
-                throw new IllegalArgumentException("结束日期不能早于开始日期");
-            }
-            if (diffDays > 90) {
-                throw new IllegalArgumentException("日期范围不能超过90天");
-            }
-
-            ZonedDateTime startUtc = start.atStartOfDay(ZoneOffset.UTC);
-            ZonedDateTime endUtc = end.plusDays(1).atStartOfDay(ZoneOffset.UTC).minusSeconds(1);
-
-            String startTime = startUtc.toInstant().toString();
-            String endTime = endUtc.toInstant().toString();
-
-            log.debug("查询租户 [{}] 日期范围 {} → {} 的审计日志", tenant.getUserName(), startTime, endTime);
-            return listAuditEvents(tenant, startTime, endTime, pageToken);
-
-        } catch (Exception e) {
-            log.error("日期范围查询失败: {} → {}, 错误: {}", startDate, endDate, e.getMessage());
-            return new OciPageResult<>(Collections.emptyList(), null);
+        } catch (DateTimeParseException e) {
+            // 参数错误必须上抛：吞成空列表会让前端把「参数错」误当「没有日志」
+            log.warn("日期格式非法: startDate={}, endDate={}", startDate, endDate);
+            throw new IllegalArgumentException("日期格式不正确，应为 yyyy-MM-dd");
         }
+
+        // 统一按「闭区间天数」计数（选 1 月 1 日到 1 月 1 日 = 1 天，不是 0 天），与两端前端
+        // （Web validateRange / 客户端 searchAudit 的 days = 日期差 + 1）口径一致。
+        // 曾用 `diffDays > 90`，等于允许闭区间 91 天，比前端宽 1 天——前端总是先拦下，
+        // 用户看不到，但绕过前端直连接口时口径不一致。
+        long diffDays = ChronoUnit.DAYS.between(start, end);
+        if (diffDays < 0) {
+            throw new IllegalArgumentException("结束日期不能早于开始日期");
+        }
+        if (diffDays + 1 > 90) {
+            throw new IllegalArgumentException("日期范围不能超过 90 天（当前 " + (diffDays + 1) + " 天）");
+        }
+
+        ZonedDateTime startUtc = start.atStartOfDay(ZoneOffset.UTC);
+        ZonedDateTime endUtc = end.plusDays(1).atStartOfDay(ZoneOffset.UTC).minusSeconds(1);
+
+        String startTime = startUtc.toInstant().toString();
+        String endTime = endUtc.toInstant().toString();
+
+        log.debug("查询租户 [{}] 日期范围 {} → {} 的审计日志", tenant.getUserName(), startTime, endTime);
+        return listAuditEvents(tenant, startTime, endTime, pageToken);
     }
 
     /**

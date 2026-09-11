@@ -77,7 +77,7 @@ public class LoginUserService {
 
     public void registerFirstUser(String username, String password) {
         if (!isFirstTimeDeployment()) {
-            throw new RuntimeException("System already initialized");
+            throw new RuntimeException("系统已初始化，无法重复注册，请直接登录");
         }
 
         LoginUser user = new LoginUser();
@@ -94,7 +94,7 @@ public class LoginUserService {
 
         if (newUsername != null && !newUsername.equals(currentUsername)) {
             if (loginUserRepository.existsByUsername(newUsername)) {
-                throw new RuntimeException("Username already exists");
+                throw new RuntimeException("用户名已存在");
             }
             user.setUsername(newUsername);
         }

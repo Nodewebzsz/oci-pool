@@ -23,6 +23,7 @@ struct TenantRegionSubView: View {
             content: {
                 VStack(spacing: 0) {
                     summaryBar
+                    infoBanner
                     tabBar
                     tabContent
                 }
@@ -97,6 +98,38 @@ struct TenantRegionSubView: View {
         .padding(.vertical, 8)
         .background(dark ? Color.white.opacity(0.06) : Color.black.opacity(0.04))
         .cornerRadius(6)
+    }
+
+    // MARK: - Info Banner
+
+    private var infoBanner: some View {
+        let homeName = tenant.map { t in
+            let cn = t.regionNameText
+            return cn.isEmpty ? (t.region.isEmpty ? "—" : t.region) : cn
+        } ?? "—"
+
+        return HStack(spacing: 8) {
+            Image(systemName: "info.circle.fill")
+                .foregroundColor(AppTheme.cyan)
+                .font(.system(size: 13))
+            (Text("主区域为 ")
+                .foregroundColor(mutedText)
+            + Text(homeName)
+                .fontWeight(.semibold)
+                .foregroundColor(primaryText)
+            + Text("，不可退订。订阅新区域后可在该区域创建实例。")
+                .foregroundColor(mutedText))
+                .font(.system(size: 11.5))
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(AppTheme.cyan.opacity(dark ? 0.12 : 0.08))
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(AppTheme.cyan.opacity(0.35), lineWidth: 1))
+        .cornerRadius(6)
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+        .padding(.bottom, 4)
     }
 
     // MARK: - Tab bar

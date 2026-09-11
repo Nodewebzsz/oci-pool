@@ -21,17 +21,21 @@ struct ProxyConfigView: View {
                 VStack(spacing: 0) {
                     if let err = model.errorText, !err.isEmpty {
                         errorBanner(err)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
+                            .padding(.bottom, 12)
                     }
-                    listBody
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-                .appLoading(model.isLoading && model.items.isEmpty)
-            },
-            footer: {
-                PaginationBar(state: $model.pageState) {
-                    model.onPageChange()
+                    VStack(spacing: 0) {
+                        listBody
+                        PaginationBar(state: $model.pageState) {
+                            model.onPageChange()
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(AppTheme.sidebarBg(dark))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(AppTheme.border(dark), lineWidth: 1)
+                    )
+                    .cornerRadius(8)
                 }
             }
         )
@@ -73,8 +77,29 @@ struct ProxyConfigView: View {
     }
 
     private var listBody: some View {
-        Group {
-            if model.items.isEmpty && !model.isLoading {
+        DataList {
+            DataListColumnHeader(title: "名称", width: 100)
+            DataListColumnHeader(title: "类型", width: 64)
+            DataListColumnHeader(title: "地址", width: nil)
+            DataListColumnHeader(title: "端口", width: 56)
+            DataListColumnHeader(title: "用户名", width: 88)
+            DataListColumnHeader(title: "密码", width: 80)
+            DataListColumnHeader(title: "租户", width: 110)
+            DataListColumnHeader(title: "强制", width: 72)
+            DataListColumnHeader(title: "连通状态", width: 80)
+            DataListColumnHeader(title: "操作", width: 170, alignment: .center)
+        } content: {
+            if (!model.hasLoadedOnce || model.isLoading) && model.items.isEmpty {
+                VStack(spacing: 10) {
+                    Spacer()
+                    ProgressView()
+                    Text("加载代理列表中…")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.sidebarText(dark))
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, minHeight: 260)
+            } else if model.items.isEmpty {
                 EmptyStateView(
                     icon: "arrow.left.arrow.right.circle",
                     title: "暂无代理",
@@ -82,35 +107,14 @@ struct ProxyConfigView: View {
                     actionTitle: "新增代理",
                     action: { model.openAdd() }
                 )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, minHeight: 260)
             } else {
-                DataList {
-                    DataListColumnHeader(title: "名称", width: 100)
-                    DataListColumnHeader(title: "类型", width: 64)
-                    DataListColumnHeader(title: "地址", width: nil)
-                    DataListColumnHeader(title: "端口", width: 56)
-                    DataListColumnHeader(title: "用户名", width: 88)
-                    DataListColumnHeader(title: "密码", width: 80)
-                    DataListColumnHeader(title: "租户", width: 110)
-                    DataListColumnHeader(title: "强制", width: 72)
-                    DataListColumnHeader(title: "连通状态", width: 80)
-                    DataListColumnHeader(title: "操作", width: 170, alignment: .center)
-                } content: {
-                    ForEach(model.items) { item in
-                        DataListRow {
-                            row(item)
-                        }
+                ForEach(model.items) { item in
+                    DataListRow {
+                        row(item)
                     }
                 }
-.padding(.horizontal, 12)
-                .padding(.top, 8)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(AppTheme.sidebarBg(dark))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppTheme.border(dark), lineWidth: 1)
-                )
-                .cornerRadius(8)
+                .opacity(model.isLoading ? 0.6 : 1.0)
             }
         }
     }
@@ -270,6 +274,14 @@ struct ProxyConfigView: View {
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
+            Button(action: { model.clearError() }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(AppTheme.danger.opacity(0.8))
+                    .padding(4)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .help("关闭提示")
         }
         .foregroundColor(AppTheme.danger)
         .padding(12)

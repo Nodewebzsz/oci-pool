@@ -196,9 +196,7 @@ public class LoginController {
 
     private boolean isMessageEnabled() {
         try {
-            return systemConfigService.getTelegramConfig().isEnabled()
-                    || systemConfigService.getDingTalkConfig().isEnabled()
-                    || systemConfigService.getBarkConfig().isEnabled();
+            return verifyService.isMessageEnabled();
         } catch (Exception e) {
             return false;
         }

@@ -25,6 +25,7 @@ struct IpQualityView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         if let err = model.errorText, !err.isEmpty {
                             errorBanner(err)
+                                .padding(.bottom, 12)
                         }
                         VStack(spacing: 14) {
                             EqualHeightCardRow(minHeight: cardMinHeight) {
@@ -39,7 +40,6 @@ struct IpQualityView: View {
                             }
                         }
                     }
-                    .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

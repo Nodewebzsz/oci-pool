@@ -83,9 +83,6 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
         if (request.getId() != null) {
             record = vpnProxyRecordRepository.findById(request.getId()).orElse(null);
         }
-        if (record == null && StringUtils.isNotBlank(request.getProxyHost())) {
-            record = vpnProxyRecordRepository.findTopByProxyHost(request.getProxyHost());
-        }
         if (record == null) {
             record = new VpnProxyRecord();
             record.setCreateTime(now);

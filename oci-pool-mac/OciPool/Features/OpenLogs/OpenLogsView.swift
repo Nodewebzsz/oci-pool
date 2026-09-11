@@ -20,11 +20,11 @@ struct OpenLogsView: View {
                 VStack(spacing: 0) {
                     if let err = model.errorText, !err.isEmpty {
                         errorBanner(err)
+                            .padding(.bottom, 12)
                     }
                     terminalCard
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(12)
             }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)

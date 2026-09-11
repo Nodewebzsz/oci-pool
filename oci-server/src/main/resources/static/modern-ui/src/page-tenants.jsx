@@ -10,7 +10,7 @@ function TenantsPage({ density }) {
   const initialRoute = (typeof window !== 'undefined' && window.ociRouter) ? window.ociRouter.read() : { query: {} };
   const initSearch = initialRoute.query.keyword || '';
   const initPage = (initialRoute.query.page !== undefined && initialRoute.query.page !== '') ? Math.max(1, Number(initialRoute.query.page) + 1) : 1;
-  const initSize = (initialRoute.query.size !== undefined && initialRoute.query.size !== '') ? Math.max(1, Number(initialRoute.query.size)) : 10;
+  const initSize = (initialRoute.query.size !== undefined && initialRoute.query.size !== '') ? Math.max(1, Number(initialRoute.query.size)) : 20;
   const initCloudType = (initialRoute.query.cloudType !== undefined && initialRoute.query.cloudType !== '') ? Number(initialRoute.query.cloudType) : 1;
 
   const [search, setSearch] = useStateT(initSearch);
@@ -183,7 +183,7 @@ function TenantsPage({ density }) {
   useEffectT(() => {
     if (typeof window === 'undefined' || !window.ociRouter) return;
     const q = { cloudType };
-    if (perPage !== 10) q.size = perPage;
+    if (perPage !== 20) q.size = perPage;
     if (search.trim()) q.keyword = search.trim();
     if (page > 1) q.page = page - 1;
     window.ociRouter.go('tenants', q, { replace: true });
@@ -195,11 +195,7 @@ function TenantsPage({ density }) {
   const apiImport        = useApiImportModal();
   const importTenants    = useImportTenantsModal();
   // 租户详情已改为独立页面(见 page-tenant-detail.jsx),不再用 Modal
-  // 保留 useTenantDetailDrawer 代码以防回退,但入口走 window.__ocipNavigate
-  const quota            = useQuotaDrawer();
-  const cost             = useCostDrawer();
-  const traffic          = useTrafficDrawer();
-  const audit            = useAuditDrawer();
+  // 费用统计、流量查询、审计日志、账号配额已全部升级为独立整页(见 page-tenant-cost.jsx / page-tenant-traffic.jsx / page-tenant-audit.jsx / page-tenant-quota.jsx),入口走 window.__ocipNavigate
   const userManage       = useUserManageModal();
   const regionSubscribe  = useRegionSubscribeModal();
   const trafficAlert     = useTrafficAlertModal();
@@ -278,13 +274,33 @@ function TenantsPage({ density }) {
       case 'region-subscribe': return regionSubscribe(tenant);
       case 'user-manage':      return userManage(tenant);
       case 'traffic-alert':    return trafficAlert(tenant);
-      case 'traffic-query':    return traffic(tenant);
-      case 'audit-log':        return audit(tenant);
-      case 'cost':             return cost(tenant);
+      case 'traffic-query':
+        // 跳转到独立的实例流量监控大盘页面（对齐客户端整页模式）
+        if (window.__ocipNavigate) {
+          window.__ocipNavigate('tenant-traffic', { tenantDbId: getTenantDbId(tenant), from: 'tenants' });
+        }
+        return;
+      case 'audit-log':
+        // 跳转到独立的审计日志整页（对齐客户端整页模式）
+        if (window.__ocipNavigate) {
+          window.__ocipNavigate('tenant-audit', { tenantDbId: getTenantDbId(tenant), from: 'tenants' });
+        }
+        return;
+      case 'cost':
+        // 跳转到独立的费用统计整页（对齐客户端整页模式）
+        if (window.__ocipNavigate) {
+          window.__ocipNavigate('tenant-cost', { tenantDbId: getTenantDbId(tenant), from: 'tenants' });
+        }
+        return;
       case 'export':           return exportTenant(tenant);
       case 'mail':             return mail(tenant);
       case 'social':           return socialConfig(tenant);
-      case 'quota':            return quota(tenant);
+      case 'quota':
+        // 跳转到独立的账号配额整页（对齐客户端整页模式）
+        if (window.__ocipNavigate) {
+          window.__ocipNavigate('tenant-quota', { tenantDbId: getTenantDbId(tenant), from: 'tenants' });
+        }
+        return;
       case 'delete':
         shell.openConfirm({
           title: tr('tenants.delete.title').replace('{name}', tenant._ui.name),
@@ -329,37 +345,64 @@ function TenantsPage({ density }) {
       );
     } },
     { key: 'name', label: tr('tenants.col.name'), width: 110,
-      render: r => <span className="mono" style={{ padding: '2px 6px', background: 'var(--bg-3)', borderRadius: 4, fontSize: 11, color: 'var(--fg-1)', fontWeight: 500, display: 'inline-block', maxWidth: 96, overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'middle' }}>{masked ? window.maskName(r._ui.name) : r._ui.name}</span>,
-    },
-    { key: 'custom', label: tr('tenants.col.custom'), tooltip: r => getTenantAlias(r) || '', render: r => {
-      const alias = getTenantAlias(r);
-      // 未设置过自定义名称时(defName 缺失或回落为 userName/OCID),显示为空(—)
-      // 后端历史数据会把未设置的 defName 回填为 userName/OCID；这些值仍应按“未设置”显示为空。
-      const hasCustomName = alias !== ''
-        && alias !== r.userName
-        && alias !== r.idStr
-        && alias !== r.tenantId;
-      return (
-        <a
-          role="button"
-          tabIndex={0}
-          title={alias || ''}
-          onClick={e => { e.stopPropagation(); editCustomName(r); }}
-          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); editCustomName(r); } }}
+      tooltip: r => r._ui.name || '',
+      render: r => (
+        <span
+          title={r._ui.name || ''}
+          className="mono"
           style={{
-            color: alias ? 'var(--fg-1)' : 'var(--fg-3)',
-            fontWeight: 500,
-            textDecoration: 'none',
-            borderBottom: alias ? '1px dashed rgba(150,160,170,0.55)' : '1px solid transparent',
+            padding: '2px 6px', background: 'var(--bg-3)', borderRadius: 4,
+            fontSize: 11, color: 'var(--fg-1)', fontWeight: 500,
+            display: 'inline-block', maxWidth: 96,
+            overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'middle',
             cursor: 'pointer',
-            whiteSpace: 'nowrap',
           }}
         >
-          {/* 未设置自定义名称时默认为空，对齐原项目 defName 为空时的空白展示 */}
-          {hasCustomName ? window.truncateDisplayName(alias, 14) : ''}
-        </a>
-      );
-    } },
+          {masked ? window.maskName(r._ui.name) : r._ui.name}
+        </span>
+      ),
+    },
+    { key: 'custom', label: tr('tenants.col.custom'),
+      tooltip: r => {
+        const alias = getTenantAlias(r);
+        return (alias && alias !== r.userName && alias !== r.idStr && alias !== r.tenantId) ? alias : '';
+      },
+      render: r => {
+        const alias = getTenantAlias(r);
+        // 未设置过自定义名称时(defName 缺失或回落为 userName/OCID),显示为空(—)
+        // 后端历史数据会把未设置的 defName 回填为 userName/OCID；这些值仍应按“未设置”显示为空。
+        const hasCustomName = alias !== ''
+          && alias !== r.userName
+          && alias !== r.idStr
+          && alias !== r.tenantId;
+        const fullAlias = hasCustomName ? alias : '';
+        return (
+          <a
+            role="button"
+            tabIndex={0}
+            title={fullAlias}
+            onClick={e => { e.stopPropagation(); editCustomName(r); }}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); editCustomName(r); } }}
+            style={{
+              color: alias ? 'var(--fg-1)' : 'var(--fg-3)',
+              fontWeight: 500,
+              textDecoration: 'none',
+              borderBottom: alias ? '1px dashed rgba(150,160,170,0.55)' : '1px solid transparent',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              display: 'inline-block',
+              maxWidth: 160,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              verticalAlign: 'middle',
+            }}
+          >
+            {/* 未设置自定义名称时默认为空，对齐原项目 defName 为空时的空白展示 */}
+            {hasCustomName ? window.truncateDisplayName(alias, 14) : ''}
+          </a>
+        );
+      }
+    },
     { key: 'cost', label: tr('tenants.col.cost'),
       render: r => (
         <button
@@ -480,7 +523,7 @@ function TenantsPage({ density }) {
         iconColor="var(--accent)"
         actions={
           <>
-            <SearchInput placeholder={tr('tenants.search')} value={search} onChange={value => { setSearch(value); setPage(1); }} width={280} />
+            <SearchInput placeholder={tr('tenants.search')} value={search} onChange={value => { setSearch(value); setTenants([]); setLoading(true); setPage(1); }} width={280} />
             <IconButton
               icon={masked ? 'eye' : 'eye-off'}
               onClick={() => setMasked(!masked)}
@@ -522,6 +565,14 @@ function TenantsPage({ density }) {
           <Icon name="alert-circle" size={15} />
           <span style={{ flex: 1 }}>{loadError}</span>
           <Button size="xs" variant="outline" onClick={loadTenants}>{tr('common.retry')}</Button>
+          <button
+            type="button"
+            onClick={() => setLoadError('')}
+            style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', display: 'inline-flex', padding: 2 }}
+            title={tr('common.close')}
+          >
+            <Icon name="x" size={14} />
+          </button>
         </div>
       )}
 
@@ -534,9 +585,24 @@ function TenantsPage({ density }) {
         borderRadius: 'var(--radius)',
       }}>
         <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-          {loading
-            ? <div style={{ padding: 40, textAlign: 'center', color: 'var(--fg-2)' }}>{tr('tenants.loading')}</div>
-            : <Table columns={columns} rows={paged} density={density} />}
+          <Table
+            columns={columns}
+            rows={paged}
+            loading={loading}
+            empty={
+              <EmptyState
+                icon="users"
+                title={search ? '无匹配结果' : '暂无租户'}
+                subtitle={search ? '请尝试更换搜索关键词' : '点击「API 导入」添加 OCI 凭据'}
+                actionLabel={search ? '清除搜索' : 'API 导入'}
+                onAction={() => {
+                  if (search) { setSearch(''); setTenants([]); setLoading(true); setPage(1); }
+                  else { apiImport(); }
+                }}
+              />
+            }
+            density={density}
+          />
         </div>
         <div style={{ flexShrink: 0, borderTop: '1px solid var(--border)', background: 'var(--bg-1)' }}>
           <Pagination

@@ -103,15 +103,15 @@ struct LoginHeroView: View {
     // MARK: - Brand header (top)
 
     private var brandHeader: some View {
-        HStack(spacing: 10) {
-            LoginBrandBadge(accent: accent, cyan: cyanAccent)
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 12) {
+            LoginBrandBadge(size: 38, accent: accent, cyan: cyanAccent)
+            VStack(alignment: .leading, spacing: 3) {
                 Text("OCI-POOL")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundColor(LoginPalette.text(dark))
                     .tracking(-0.2)
                 Text(brandTagline)
-                    .font(.system(size: 10))
+                    .font(.system(size: 11))
                     .foregroundColor(LoginPalette.muted(dark))
                     .tracking(0.4)
             }
@@ -164,27 +164,23 @@ struct LoginHeroView: View {
 
                 // central core
                 Circle().fill(coreFill)
-                    .frame(width: 104 * scale, height: 104 * scale)
+                    .frame(width: 116 * scale, height: 116 * scale)
                     .position(x: cx, y: cy)
-                Circle().stroke(accent, lineWidth: 2)
-                    .frame(width: 104 * scale, height: 104 * scale)
+                Circle().stroke(accent, lineWidth: 2.2)
+                    .frame(width: 116 * scale, height: 116 * scale)
                     .position(x: cx, y: cy)
-                Circle().stroke(accent.opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [2, 4]))
-                    .frame(width: 84 * scale, height: 84 * scale)
+                Circle().stroke(accent.opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [2, 4]))
+                    .frame(width: 96 * scale, height: 96 * scale)
                     .position(x: cx, y: cy)
 
-                // shield mark
-                LoginShieldShape()
-                    .fill(accent.opacity(0.15))
-                    .frame(width: 30 * scale, height: 30 * scale)
+                // 核心品牌云池图标（与 Web PoolBrandMark 1:1 坐标比例）
+                PoolBrandGlyphStroke()
+                    .stroke(accent, style: StrokeStyle(lineWidth: 2 * scale, lineCap: .round, lineJoin: .round))
+                    .frame(width: 54 * scale, height: 54 * scale)
                     .position(x: cx, y: cy)
-                LoginShieldShape()
-                    .stroke(accent, lineWidth: 1.8 * scale)
-                    .frame(width: 30 * scale, height: 30 * scale)
-                    .position(x: cx, y: cy)
-                LoginCheckShape()
-                    .stroke(accent, style: StrokeStyle(lineWidth: 1.6 * scale, lineCap: .round, lineJoin: .round))
-                    .frame(width: 30 * scale, height: 30 * scale)
+                PoolBrandGlyphDots()
+                    .fill(accent)
+                    .frame(width: 54 * scale, height: 54 * scale)
                     .position(x: cx, y: cy)
 
                 // 45 region dots
@@ -247,28 +243,69 @@ struct LoginHeroView: View {
     }
 }
 
-// Mini brand badge (top-left logo)
+// Mini brand badge (top-left logo) — 与 Web 端 PoolBrandMark 1:1 精确对齐
 private struct LoginBrandBadge: View {
+    var size: CGFloat = 38
     var accent: Color
     var cyan: Color
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: size * (10.0 / 34.0))
                 .fill(LinearGradient(gradient: Gradient(colors: [accent, cyan]),
                                      startPoint: .topLeading, endPoint: .bottomTrailing))
-                .frame(width: 32, height: 32)
-            LoginShieldShape()
-                .fill(Color.white.opacity(0.16))
-                .frame(width: 17, height: 17)
-            LoginShieldShape()
-                .stroke(Color.white.opacity(0.92), lineWidth: 1.6)
-                .frame(width: 17, height: 17)
-            LoginCheckShape()
-                .stroke(Color.white.opacity(0.92), style: StrokeStyle(lineWidth: 1.4, lineCap: .round, lineJoin: .round))
-                .frame(width: 17, height: 17)
+                .frame(width: size, height: size)
+            PoolBrandGlyphStroke()
+                .stroke(Color(hex: "0e2a22"),
+                        style: StrokeStyle(lineWidth: size * (2.0 / 36.0), lineCap: .round, lineJoin: .round))
+                .frame(width: size, height: size)
+            PoolBrandGlyphDots()
+                .fill(Color(hex: "0e2a22"))
+                .frame(width: size, height: size)
         }
-        .frame(width: 32, height: 32)
+        .frame(width: size, height: size)
+    }
+}
+
+// 严格对齐 Web 端 PoolBrandMark SVG（viewBox="0 0 36 36"）
+// <path d="M10 20.4a4.2 4.2 0 0 1 2.6-7.5 6.1 6.1 0 0 1 11.6 1.2 3.7 3.7 0 0 1 .7 7.3H11.2" stroke-width="2" stroke-linecap="round"/>
+// <path d="M13 23.9v-2.5 M18 23.9v-2.5 M23 23.9v-2.5" stroke-width="1.4"/>
+private struct PoolBrandGlyphStroke: Shape {
+    func path(in rect: CGRect) -> Path {
+        let sx = rect.width / 36.0
+        let sy = rect.height / 36.0
+        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: rect.minX + x * sx, y: rect.minY + y * sy)
+        }
+        var path = Path()
+        // 1. 云朵外轮廓（Web SVG 精确三段贝塞尔弧）
+        path.move(to: p(10, 20.4))
+        path.addCurve(to: p(12.6, 12.9), control1: p(10, 16.6), control2: p(10.6, 14.5))
+        path.addCurve(to: p(24.2, 14.1), control1: p(14.4, 7.4), control2: p(22.5, 8.2))
+        path.addCurve(to: p(24.9, 21.4), control1: p(28.6, 14.3), control2: p(29.1, 20.5))
+        path.addLine(to: p(11.2, 21.4))
+        // 2. 底部三根连接虚线立柱 (M13 23.9v-2.5 ...)
+        for x: CGFloat in [13.0, 18.0, 23.0] {
+            path.move(to: p(x, 23.9))
+            path.addLine(to: p(x, 21.4))
+        }
+        return path
+    }
+}
+
+// 底部三个云池节点圆点（Web SVG cx="13/18/23", cy="25.5", r="1.6"）
+private struct PoolBrandGlyphDots: Shape {
+    func path(in rect: CGRect) -> Path {
+        let sx = rect.width / 36.0
+        let sy = rect.height / 36.0
+        var path = Path()
+        let r: CGFloat = 1.6 * min(sx, sy)
+        for x: CGFloat in [13.0, 18.0, 23.0] {
+            let cx = rect.minX + x * sx
+            let cy = rect.minY + 25.5 * sy
+            path.addEllipse(in: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
+        }
+        return path
     }
 }
 

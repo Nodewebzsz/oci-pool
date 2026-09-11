@@ -13,6 +13,7 @@ final class RegionsViewModel: ObservableObject {
     @Published private(set) var pageRows: [RegionRow] = []
     @Published private(set) var lastUpdateText = "加载中..."
     @Published private(set) var isLoading = false
+    @Published private(set) var hasLoadedOnce = false
     @Published private(set) var errorText: String?
 
     @Published var searchText = "" {
@@ -30,7 +31,7 @@ final class RegionsViewModel: ObservableObject {
         }
     }
     @Published var showMapBoard = false
-    @Published var pageState = PageState(page: 0, size: 10)
+    @Published var pageState = PageState(page: 0, size: 20)
 
     // 区域详情抽屉（对齐 Web useRegionDetailDrawer）
     @Published var detailRegion: RegionRow?
@@ -77,7 +78,10 @@ final class RegionsViewModel: ObservableObject {
     func refresh() async {
         isLoading = true
         errorText = nil
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoadedOnce = true
+        }
         do {
             async let arm: () = fetchArmData()
             async let mine: () = fetchMyRegions()

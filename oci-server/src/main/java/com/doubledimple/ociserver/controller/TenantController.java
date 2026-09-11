@@ -704,8 +704,13 @@ public class TenantController extends BaseController{
             return ResponseEntity.ok(savedRule);
         } catch (Exception e) {
             log.error("Failed to add security rule", e);
+            // 仅返回友好提示，不泄漏 OCI 原始异常全文（原文已记入日志）
+            String msg = e.getMessage();
+            if (msg == null || msg.trim().isEmpty()) {
+                msg = "添加安全规则失败，请稍后重试或检查该租户凭证";
+            }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Failed to add security rule: " + e.getMessage());
+                    .body(java.util.Collections.singletonMap("message", msg));
         }
     }
 

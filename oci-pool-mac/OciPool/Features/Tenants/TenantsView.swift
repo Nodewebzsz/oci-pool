@@ -62,10 +62,6 @@ struct TenantsView: View {
         Group {
             if model.bootPageParent != nil {
                 TenantBootCreateView(model: model)
-            } else if model.userManageParent != nil {
-                TenantUserManageView(model: model)
-            } else if model.regionSubParent != nil {
-                TenantRegionSubView(model: model)
             } else if model.detailParent != nil {
                 // Web 整页：/tenants/regionList → 租户详情
                 TenantDetailView(model: model)
@@ -219,74 +215,105 @@ struct TenantsView: View {
 
     @ViewBuilder
     private var listBody: some View {
-        if model.rows.isEmpty && !model.isLoading {
-            EmptyStateView(
-                icon: "person.2",
-                title: "暂无租户",
-                subtitle: model.searchText.isEmpty ? "点击「API 导入」添加 OCI 凭据" : "无匹配结果",
-                actionTitle: model.searchText.isEmpty ? "API 导入" : "清除搜索",
-                action: {
-                    if model.searchText.isEmpty { model.openAdd() }
-                    else { model.searchText = ""; model.onSearchSubmit() }
-                }
+        GeometryReader { geo in
+            let m = colMetrics(namesHidden: model.namesHidden)
+            // 名称列始终按完整名估宽（脱敏切换不改变列宽，防抖动）
+            let nameNeed: CGFloat = estimatedNameWidth(for: model.rows, floor: m.minName)
+            // 固定列用压缩后的值；名称列至少吃到单行全名所需宽度
+            let baseFixed = fixedColsWidth(m: m) - m.minName + nameNeed
+            let totalW = max(geo.size.width, baseFixed)
+            let flexPool = max(0, totalW - baseFixed)
+            // 剩余宽度：遮罩时名称/自定义名/区域分；展开时优先名称
+            // 对齐 Web：租户名列较窄、自定义名称列更宽
+            let nameShare: CGFloat = 0.34
+            let defShare: CGFloat = 0.46
+            let regionShare: CGFloat = 1 - nameShare - defShare
+            let wName = nameNeed + flexPool * nameShare
+            let wDef = m.minDef + flexPool * defShare
+            let wRegion = m.minRegion + flexPool * regionShare
+            let cols = TenantColWidths(
+                proxy: wProxy, name: wName, def: wDef, cost: m.cost, days: m.days,
+                task: m.task, region: wRegion, multi: m.multi, type: m.type,
+                create: m.create, time: m.time, status: wStatus, action: wAction, hPad: hPad
             )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if model.rows.isEmpty && model.isLoading {
-            VStack {
-                Spacer()
-                ProgressView()
-                Text("加载中…").font(.system(size: 12)).foregroundColor(AppTheme.sidebarText(dark)).padding(.top, 8)
-                Spacer()
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            GeometryReader { geo in
-                let m = colMetrics(namesHidden: model.namesHidden)
-                // 名称列始终按完整名估宽（脱敏切换不改变列宽，防抖动）
-                let nameNeed: CGFloat = estimatedNameWidth(for: model.rows, floor: m.minName)
-                // 固定列用压缩后的值；名称列至少吃到单行全名所需宽度
-                let baseFixed = fixedColsWidth(m: m) - m.minName + nameNeed
-                let totalW = max(geo.size.width, baseFixed)
-                let flexPool = max(0, totalW - baseFixed)
-                // 剩余宽度：遮罩时名称/自定义名/区域分；展开时优先名称
-                // 对齐 Web：租户名列较窄、自定义名称列更宽
-                let nameShare: CGFloat = 0.34
-                let defShare: CGFloat = 0.46
-                let regionShare: CGFloat = 1 - nameShare - defShare
-                let wName = nameNeed + flexPool * nameShare
-                let wDef = m.minDef + flexPool * defShare
-                let wRegion = m.minRegion + flexPool * regionShare
-                let cols = TenantColWidths(
-                    proxy: wProxy, name: wName, def: wDef, cost: m.cost, days: m.days,
-                    task: m.task, region: wRegion, multi: m.multi, type: m.type,
-                    create: m.create, time: m.time, status: wStatus, action: wAction, hPad: hPad
-                )
 
-                let needsHScroll = totalW > geo.size.width + 0.5
-                // 对齐实例列表：表头固定 + 数据独立垂直滚动（表头不再随数据一起滚）
-                let table = VStack(spacing: 0) {
-                    headerRow(cols: cols, width: totalW)
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            ForEach(Array(model.rows.enumerated()), id: \.element.id) { idx, row in
-                                tenantRow(index: idx, item: row, cols: cols, width: totalW)
+            let needsHScroll = totalW > geo.size.width + 0.5
+            // 对齐标准：表头置顶常驻 + 表体内部优雅承载 Loading / Empty / DataRow
+            let table = VStack(spacing: 0) {
+                // 1. 表头置顶常驻，无论加载还是空态始终可见，结构骨架稳定零抖动
+                headerRow(cols: cols, width: totalW)
+
+                // 2. 表体内容区（数据行 / 空态 / 加载态）
+                ZStack {
+                    if (!model.hasLoadedOnce || model.isLoading) && model.rows.isEmpty {
+                        VStack(spacing: 10) {
+                            Spacer()
+                            ProgressView()
+                            Text("正在加载租户数据…")
+                                .font(.system(size: 12))
+                                .foregroundColor(AppTheme.sidebarText(dark))
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if model.rows.isEmpty {
+                        EmptyStateView(
+                            icon: "person.2",
+                            title: "暂无租户",
+                            subtitle: model.searchText.isEmpty ? "点击「API 导入」添加 OCI 凭据" : "无匹配结果",
+                            actionTitle: model.searchText.isEmpty ? "API 导入" : "清除搜索",
+                            action: {
+                                if model.searchText.isEmpty { model.openAdd() }
+                                else { model.searchText = ""; model.onSearchSubmit() }
+                            }
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 0) {
+                                ForEach(Array(model.rows.enumerated()), id: \.element.id) { idx, row in
+                                    tenantRow(index: idx, item: row, cols: cols, width: totalW)
+                                }
                             }
                         }
+                        .opacity(model.isLoading ? 0.6 : 1.0)
+                    }
+
+                    // 原地刷新/分页加载时，轻量且优雅的卡片内微型指示器
+                    if model.isLoading && !model.rows.isEmpty {
+                        VStack(spacing: 8) {
+                            ProgressView()
+                                .scaleEffect(0.9)
+                            Text("更新中…")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(AppTheme.sidebarText(dark))
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(AppTheme.sidebarBg(dark).opacity(0.85))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(AppTheme.border(dark), lineWidth: 1)
+                        )
+                        .shadow(color: Color.black.opacity(dark ? 0.3 : 0.08), radius: 6, y: 2)
                     }
                 }
-                .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
 
-                Group {
-                    if needsHScroll {
-                        ScrollView(.horizontal, showsIndicators: true) { table }
-                            .frame(width: geo.size.width, height: geo.size.height)
-                    } else {
-                        table
-                    }
+            Group {
+                if needsHScroll {
+                    ScrollView(.horizontal, showsIndicators: true) { table }
+                        .frame(width: geo.size.width, height: geo.size.height)
+                } else {
+                    table
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func headerRow(cols: TenantColWidths, width: CGFloat) -> some View {
@@ -425,7 +452,7 @@ struct TenantsView: View {
                 .clipped()
         }
         .buttonStyle(PlainButtonStyle())
-        .help(item.defNameText)
+        .help(item.customAlias.isEmpty ? "" : item.customAlias)
     }
 
     /// Web：账号成本 0=accent 绿，>0=橙 + dashed 下划线
@@ -595,55 +622,56 @@ private enum TenantActionMenuLayout {
     static let rowH: CGFloat = 30
     static let cols = 2
     static let margin: CGFloat = 10
-    static let minHeight: CGFloat = 140
+    static let minHeight: CGFloat = 68
     static let gap: CGFloat = 6
 
     static func idealHeight(actionCount: Int) -> CGFloat {
         let rows = max(1, Int(ceil(Double(actionCount) / Double(cols))))
-        // 对齐 Web：外层 padding(左右4) + header + 项目行，去掉多余空隙
-        return vPad * 2 + titleH + 4
-            + CGFloat(rows) * rowH + CGFloat(max(0, rows - 1)) * gridGap
+        // 外层 padding(上下 12) + header(高约 18) + 间距(8) + 网格行(每行约 30) + 行间距(6)
+        return 24 + 18 + 8 + CGFloat(rows) * 30 + CGFloat(max(0, rows - 1)) * 6
     }
 
-    /// 在 `container`（窗口 contentView）坐标系内计算面板 frame，严格夹紧不越界。
-    static func panelFrame(button: NSView, in container: NSView, actionCount: Int) -> NSRect {
-        let ideal = idealHeight(actionCount: actionCount)
-        let btn = button.convert(button.bounds, to: container)
-        let bounds = container.bounds.insetBy(dx: margin, dy: margin)
+    /// 在屏幕坐标系内计算面板 frame，严格夹紧不越界。
+    static func screenFrame(button: NSView, actionCount: Int, fittingHeight: CGFloat? = nil) -> NSRect {
+        guard let window = button.window else { return .zero }
+        let ideal = fittingHeight ?? idealHeight(actionCount: actionCount)
+        let btnWin = button.convert(button.bounds, to: nil)
+        let btnScreen = window.convertToScreen(btnWin)
+        let screen = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
 
-        var h = min(ideal, bounds.height)
-        h = max(minHeight, h)
+        let h = min(ideal, screen.height - margin * 2)
 
         // 对齐实例/Web：菜单右缘对齐按钮右缘；下方 6px 缝隙；下方放不下翻到上方。
-        var x = btn.maxX - width
-        if x < bounds.minX { x = bounds.minX + margin }
-        if x + width > bounds.maxX { x = bounds.maxX - width - margin }
+        var x = btnScreen.maxX - width
+        if x + width > screen.maxX - margin { x = screen.maxX - margin - width }
+        if x < screen.minX + margin { x = screen.minX + margin }
 
-        let spaceBelow = btn.minY - bounds.minY
-        let spaceAbove = bounds.maxY - btn.maxY
+        let spaceBelow = btnScreen.minY - screen.minY
+        let spaceAbove = screen.maxY - btnScreen.maxY
         var y: CGFloat
         if spaceBelow >= h + gap {
-            y = btn.minY - gap - h
+            y = btnScreen.minY - gap - h
         } else if spaceAbove >= h + gap {
-            y = btn.maxY + gap
+            y = btnScreen.maxY + gap
         } else {
-            y = max(bounds.minY + margin, btn.minY - gap - h)
+            y = max(screen.minY + margin, btnScreen.minY - gap - h)
         }
-        y = max(bounds.minY + margin, y)
-        if y + h > bounds.maxY - margin { y = bounds.maxY - margin - h }
+        y = max(screen.minY + margin, y)
+        if y + h > screen.maxY - margin { y = screen.maxY - margin - h }
 
         return NSRect(x: x, y: y, width: width, height: h)
     }
 }
 
-/// 全局单例：窗内操作菜单（列表页 / 租户详情页共用）。
-/// 禁止全窗 ClickCatcher——若 dismiss 失败会整窗假死（控制台/侧栏全点不动）。
+/// 全局单例：浮层操作菜单（列表页 / 租户详情页 / Sheet 弹窗等全站共用）。
+/// 使用轻量 NSPanel (.popUpMenu 级别) 挂载到按钮所在窗口作为 childWindow，
+/// 完美兼容主窗口、Sheet 模态窗口及任意层级，无视层叠上下文和滚动遮挡，点外部自动关闭。
 @MainActor
 final class TenantActionMenuPresenter {
     static let shared = TenantActionMenuPresenter()
 
-    /// 强引用直到 dismiss，避免 weak 丢失后浮层残留
-    private var panelHost: NSView?
+    /// 浮层面板
+    private var popupPanel: NSPanel?
     private var keyMonitor: Any?
     private var mouseMonitor: Any?
     /// 打开菜单的按钮（dismiss 时恢复高亮，对齐 Boot 操作规范）
@@ -652,7 +680,7 @@ final class TenantActionMenuPresenter {
 
     private init() {}
 
-    var isPresented: Bool { panelHost != nil }
+    var isPresented: Bool { popupPanel != nil }
 
     func dismiss() {
         if let monitor = keyMonitor {
@@ -663,8 +691,11 @@ final class TenantActionMenuPresenter {
             NSEvent.removeMonitor(monitor)
             mouseMonitor = nil
         }
-        panelHost?.removeFromSuperview()
-        panelHost = nil
+        if let panel = popupPanel {
+            panel.parent?.removeChildWindow(panel)
+            panel.orderOut(nil)
+            popupPanel = nil
+        }
         if let btn = activeButton {
             setButtonHighlight(btn, highlighted: false, dark: activeDark)
             activeButton = nil
@@ -724,7 +755,7 @@ final class TenantActionMenuPresenter {
         )
     }
 
-    private func present(
+    func present(
         from button: NSButton,
         title: String,
         isActive: Bool,
@@ -736,7 +767,7 @@ final class TenantActionMenuPresenter {
             dismiss()
             return
         }
-        guard let window = button.window, let content = window.contentView else { return }
+        guard let window = button.window else { return }
         dismiss()
 
         // 打开菜单时按钮高亮为主题色（对齐 Boot 操作规范）
@@ -744,24 +775,16 @@ final class TenantActionMenuPresenter {
         activeDark = dark
         setButtonHighlight(button, highlighted: true, dark: dark)
 
-        let frame = TenantActionMenuLayout.panelFrame(
-            button: button,
-            in: content,
-            actionCount: actions.count
-        )
-
         let root = TenantActionMenuContent(
             displayName: title,
             isActive: isActive,
             dark: dark,
-            panelHeight: frame.height,
             actions: actions,
             onDismiss: { [weak self] in self?.dismiss() }
         )
         .environmentObject(appearance)
 
         let host = NSHostingView(rootView: root)
-        host.frame = frame
         host.wantsLayer = true
         if let layer = host.layer {
             layer.cornerRadius = 12
@@ -776,30 +799,31 @@ final class TenantActionMenuPresenter {
             layer.shadowOffset = CGSize(width: 0, height: -3)
         }
 
-        content.addSubview(host)
-        // 用 panelFrame 计算的高度（容纳内容，超屏时 content 内滚动）；add 后仅重定位
-        let realHeight = frame.height
-        var r = frame
-        r.size.height = realHeight
-        host.frame = r
-        // 重定位：保证贴紧按钮下方/上方且不出界
-        let btnRect2 = button.convert(button.bounds, to: content)
-        let bounds2 = content.bounds
-        let gap2 = TenantActionMenuLayout.gap
-        let belowSpace = btnRect2.minY - bounds2.minY
-        let aboveSpace = bounds2.maxY - btnRect2.maxY
-        if belowSpace >= realHeight + gap2 {
-            r.origin.y = btnRect2.minY - gap2 - realHeight
-        } else if aboveSpace >= realHeight + gap2 {
-            r.origin.y = btnRect2.maxY + gap2
-        } else {
-            r.origin.y = max(bounds2.minY + 12, btnRect2.minY - gap2 - realHeight)
-        }
-        r.origin.y = max(bounds2.minY + 12, r.origin.y)
-        if r.origin.y + realHeight > bounds2.maxY - 12 { r.origin.y = bounds2.maxY - 12 - realHeight }
-        host.frame = r
+        // 使用视图的真实自适应高度计算精确屏幕 Frame
+        let fittingH = host.fittingSize.height
+        let exactHeight = fittingH > 30 ? fittingH : TenantActionMenuLayout.idealHeight(actionCount: actions.count)
+        let screenFrame = TenantActionMenuLayout.screenFrame(
+            button: button,
+            actionCount: actions.count,
+            fittingHeight: exactHeight
+        )
 
-        panelHost = host
+        let panel = NSPanel(
+            contentRect: screenFrame,
+            styleMask: [.nonactivatingPanel, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isFloatingPanel = true
+        panel.level = .popUpMenu
+        panel.hasShadow = false
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.contentView = host
+
+        window.addChildWindow(panel, ordered: .above)
+        panel.orderFront(nil)
+        popupPanel = panel
 
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             if event.keyCode == 53 {
@@ -809,17 +833,16 @@ final class TenantActionMenuPresenter {
             return event
         }
 
-        // 只监视、不吞事件，避免挡死顶栏/侧栏/返回；点击再次点击"..."按钮本体时交给按钮 toggle 处理（关闭）
+        // 监视全局点击：点击菜单外部时自动关闭菜单；若点击触发按钮本体，由按钮自身的点击回调处理
         mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            guard let self = self, let host = self.panelHost else { return event }
-            let loc = event.locationInWindow
-            let frameInWindow = host.convert(host.bounds, to: nil)
-            if let btn = self.activeButton {
-                let btnFrame = btn.convert(btn.bounds, to: nil)
-                if btnFrame.contains(loc) { return event }
+            guard let self = self, let panel = self.popupPanel else { return event }
+            let mouseLoc = NSEvent.mouseLocation
+            if let btn = self.activeButton, let btnWin = btn.window {
+                let btnWinFrame = btn.convert(btn.bounds, to: nil)
+                let btnScreenRect = btnWin.convertToScreen(btnWinFrame)
+                if btnScreenRect.contains(mouseLoc) { return event }
             }
-            if !frameInWindow.contains(loc) {
-                // 异步 dismiss，让本次点击继续落到下层控件
+            if !panel.frame.contains(mouseLoc) {
                 DispatchQueue.main.async { self.dismiss() }
             }
             return event
@@ -1025,7 +1048,6 @@ struct TenantActionMenuContent: View {
     var displayName: String = ""
     var isActive: Bool = true
     let dark: Bool
-    var panelHeight: CGFloat = 280
     let actions: [TenantActionItem]
     let onDismiss: () -> Void
 
@@ -1033,13 +1055,13 @@ struct TenantActionMenuContent: View {
     @State private var hoveredId: String?
 
     private let columns = [
-        GridItem(.flexible(), spacing: TenantActionMenuLayout.gridGap),
-        GridItem(.flexible(), spacing: TenantActionMenuLayout.gridGap)
+        GridItem(.flexible(), spacing: 6),
+        GridItem(.flexible(), spacing: 6)
     ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // 对齐 Boot header：状态点（有效脉冲动效）+ 租户名（无重复灰块/N 项）
+            // 对齐 Boot header：状态点（有效脉冲动效）+ 租户名/用户名
             HStack(spacing: 6) {
                 MenuPulseDot(color: isActive ? AppTheme.sidebarActive : AppTheme.sidebarText(dark), pulse: isActive)
                 Text(displayName.isEmpty ? "—" : displayName)
@@ -1052,19 +1074,30 @@ struct TenantActionMenuContent: View {
             .padding(.horizontal, 2)
             .padding(.bottom, 2)
 
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 8) {
-                    ForEach(actions) { act in
-                        actionButton(act)
-                    }
+            // 操作网格：>8 项时滚动，<=8 项时自然高度平铺
+            if actions.count > 8 {
+                ScrollView {
+                    actionGrid
+                        .padding(.top, 2)
                 }
-                .padding(.top, 2)
+                .frame(maxHeight: 250)
+            } else {
+                actionGrid
+                    .padding(.top, 2)
             }
         }
         .padding(12)
-        .frame(width: TenantActionMenuLayout.width, height: panelHeight, alignment: .topLeading)
+        .frame(width: TenantActionMenuLayout.width, alignment: .topLeading)
         .background(AppTheme.pageBg(dark))
         .cornerRadius(12)
+    }
+
+    private var actionGrid: some View {
+        LazyVGrid(columns: columns, spacing: 6) {
+            ForEach(actions) { act in
+                actionButton(act)
+            }
+        }
     }
 
     private func actionButton(_ act: TenantActionItem) -> some View {

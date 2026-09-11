@@ -76,16 +76,21 @@ import com.oracle.bmc.core.requests.UpdateBootVolumeRequest;
 import com.oracle.bmc.core.responses.ListBootVolumesResponse;
 import com.oracle.bmc.core.responses.UpdateBootVolumeResponse;
 import com.oracle.bmc.email.model.EmailDomain;
+import com.oracle.bmc.http.client.jersey.JerseyHttpProvider;
 import com.oracle.bmc.identity.Identity;
 import com.oracle.bmc.identity.IdentityClient;
 import com.oracle.bmc.identity.model.RegionSubscription;
 import com.oracle.bmc.identity.model.User;
 import com.oracle.bmc.identity.requests.DeleteMfaTotpDeviceRequest;
+import com.oracle.bmc.identity.requests.GetTenancyRequest;
+import com.oracle.bmc.identity.requests.ListCompartmentsRequest;
 import com.oracle.bmc.identity.requests.ListMfaTotpDevicesRequest;
 import com.oracle.bmc.identity.requests.ListUsersRequest;
+import com.oracle.bmc.identity.responses.GetTenancyResponse;
 import com.oracle.bmc.identity.responses.ListMfaTotpDevicesResponse;
 import com.oracle.bmc.identitydomains.model.PasswordPolicy;
 import com.oracle.bmc.logging.LoggingManagementClient;
+import com.oracle.bmc.model.BmcException;
 import com.oracle.bmc.ospgateway.model.Subscription;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -514,7 +519,17 @@ public class TenantServiceImpl implements TenantService {
         String tenancyName = null;
         String description = null;
         if (CloudTypeEnum.ORACLE_CLOUD.getType() == cloudType){
-            tenancyDetail = ociClassLoader.loadManyRegions(tenant);
+            try {
+                tenancyDetail = ociClassLoader.loadManyRegions(tenant);
+            } catch (Exception e) {
+                log.warn("保存租户调用 Oracle API 失败: {}", e.getMessage());
+                boolean authFailure = (e instanceof BmcException && ((BmcException) e).getStatusCode() == 401)
+                        || (e.getMessage() != null && (e.getMessage().contains("NotAuthenticated") || e.getMessage().contains("401")));
+                if (authFailure) {
+                    throw new IllegalArgumentException("该账号已失效或已被封禁(401 NotAuthenticated)，导入失败");
+                }
+                throw e;
+            }
             subscription = OciGateWayUtils.getAccountTypeInfo(tenant);
             tenancyName = resolveTenancyName(tenancyDetail, tenant);
             description = tenancyDetail.getDescription();
@@ -1169,36 +1184,52 @@ public class TenantServiceImpl implements TenantService {
             Tenant tenant = tenantRepository.findById(Long.valueOf(auditLogRequest.getTenantId()))
                     .orElseThrow(() -> new RuntimeException("未找到对应租户"));
 
+            OciPageResult<OciAuditEventDto> result;
             if (auditLogRequest.getStartDate() != null && !auditLogRequest.getStartDate().isEmpty()) {
-                String startDate = auditLogRequest.getStartDate();
-                String endDate = auditLogRequest.getEndDate();
-
-                OciPageResult<OciAuditEventDto> result = auditLogUtils.listAuditEventsByDateRange(
-                        tenant, startDate, endDate, auditLogRequest.getPageToken());
-                if ((result == null || result.getData() == null || result.getData().isEmpty())
-                        && mockDataService.isMockEnabled()) {
-                    return ApiResponse.success(mockDataService.auditEvents());
-                }
-                return ApiResponse.success(result);
+                result = auditLogUtils.listAuditEventsByDateRange(
+                        tenant,
+                        auditLogRequest.getStartDate(),
+                        auditLogRequest.getEndDate(),
+                        auditLogRequest.getPageToken());
+            } else {
+                int days = auditLogRequest.getDays() > 0 ? auditLogRequest.getDays() : 1;
+                result = auditLogUtils.listRecentAuditEvents(
+                        tenant, days, auditLogRequest.getPageToken());
             }
 
-            int days = auditLogRequest.getDays() > 0 ? auditLogRequest.getDays() : 1;
-            OciPageResult<OciAuditEventDto> result =
-                    auditLogUtils.listRecentAuditEvents(tenant, days, auditLogRequest.getPageToken());
+            // 空结果：仅在显式演示模式下返回 mock，且必须带 mock 标记让前端能提示「演示数据」
             if ((result == null || result.getData() == null || result.getData().isEmpty())
                     && mockDataService.isMockEnabled()) {
-                return ApiResponse.success(mockDataService.auditEvents());
+                log.warn("审计日志查询结果为空，返回演示数据（MODERN_UI_MOCK_DATA=true）");
+                return ApiResponse.success(mockAuditPage());
             }
             return ApiResponse.success(result);
 
+        } catch (IllegalArgumentException e) {
+            // 参数非法（日期格式 / 区间超限）：明确报错，绝不回退 mock，
+            // 否则用户会把假数据当成「该区间没有日志」
+            log.warn("审计日志查询参数非法: {}", e.getMessage());
+            return ApiResponse.error(400, e.getMessage());
         } catch (Exception e) {
             log.warn("审计日志查询出现异常, 原因: {}", e.getMessage(), e);
-            // 模拟数据：审计调用异常且开关开启时返回 demo 审计事件
             if (mockDataService.isMockEnabled()) {
-                return ApiResponse.success(mockDataService.auditEvents());
+                log.warn("审计日志查询失败，返回演示数据（MODERN_UI_MOCK_DATA=true）");
+                return ApiResponse.success(mockAuditPage());
             }
-            return ApiResponse.error("审计日志查询出现异常");
+            return ApiResponse.error("审计日志查询失败：" + e.getMessage());
         }
+    }
+
+    /**
+     * 构造带 mock 标记的演示数据分页结果。
+     * 统一返回 OciPageResult 形态（而非裸 List），使真实/演示两条路径的响应结构一致。
+     */
+    private OciPageResult<Map<String, Object>> mockAuditPage() {
+        return OciPageResult.<Map<String, Object>>builder()
+                .data(mockDataService.auditEvents())
+                .nextPageToken(null)
+                .mock(true)
+                .build();
     }
 
     @Override
@@ -1526,6 +1557,9 @@ public class TenantServiceImpl implements TenantService {
 
                 // 创建并保存父租户
                 Tenant tenant = createTenantFromRecord(record, createdKeyFiles);
+                if (tenant.getCloudType() == CloudTypeEnum.ORACLE_CLOUD.getType()) {
+                    validateTenantHealthOnImport(tenant, requestData.size());
+                }
                 Tenant savedTenant = tenantRepository.save(tenant);
 
                 // 处理子租户
@@ -1624,6 +1658,54 @@ public class TenantServiceImpl implements TenantService {
         }
 
         return tenant;
+    }
+
+    /**
+     * 导入时进行账号健康探测与有效性校验。
+     * 若为 401 封号/认证失败：单账号导入直接阻断抛出异常，批量恢复导入将租户明确标记为失效(false)。
+     */
+    private void validateTenantHealthOnImport(Tenant tenant, int batchSize) {
+        if (tenant.getCloudType() != CloudTypeEnum.ORACLE_CLOUD.getType()) {
+            return;
+        }
+        try {
+            SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
+            try (IdentityClient identityClient = IdentityClient.builder()
+                    .httpProvider(JerseyHttpProvider.getInstance())
+                    .clientConfigurator(ProxyContext.get())
+                    .build(provider)) {
+                ListCompartmentsRequest request = ListCompartmentsRequest.builder()
+                        .compartmentId(provider.getTenantId())
+                        .build();
+                identityClient.listCompartments(request);
+
+                // 探测成功，顺便拉取真实的 tenancyName 确保租户名称准确
+                try {
+                    GetTenancyRequest getTenancyRequest = GetTenancyRequest.builder()
+                            .tenancyId(provider.getTenantId())
+                            .build();
+                    GetTenancyResponse tenancyResponse = identityClient.getTenancy(getTenancyRequest);
+                    if (tenancyResponse != null && tenancyResponse.getTenancy() != null) {
+                        String realName = tenancyResponse.getTenancy().getName();
+                        if (StringUtils.isNotBlank(realName)) {
+                            tenant.setTenancyName(realName);
+                        }
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+        } catch (Exception e) {
+            log.warn("导入租户[{}]健康状态探测异常: {}", tenant.getUserName(), e.getMessage());
+            boolean authFailure = (e instanceof BmcException && ((BmcException) e).getStatusCode() == 401)
+                    || (e.getMessage() != null && (e.getMessage().contains("NotAuthenticated") || e.getMessage().contains("401")));
+            if (authFailure) {
+                if (batchSize <= 1) {
+                    throw new IllegalArgumentException("该账号已失效或已被封禁(401 NotAuthenticated)，导入失败");
+                } else {
+                    tenant.setActive(false);
+                }
+            }
+        }
     }
 
     /**

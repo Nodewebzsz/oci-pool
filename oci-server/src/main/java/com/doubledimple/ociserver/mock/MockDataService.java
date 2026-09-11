@@ -175,24 +175,36 @@ public class MockDataService {
     }
 
     // ── 审计日志 ────────────────────────────────────────────────
+    // ⚠️ userType(authType) 一律填 "natv"：OCI 对 authType 无公开枚举，控制台与 API 调用
+    //    都可能落到同一值，因此**不能**用它区分调用来源。环境列的判据是 consoleSessionId
+    //    （非空 = 控制台会话，为空 = API/SDK 调用）。这组数据刻意让两类调用 authType 相同，
+    //    正是为了让「用 authType 判来源」这个错误假设在演示时立刻暴露。
     public List<Map<String, Object>> auditEvents() {
         List<Map<String, Object>> list = new ArrayList<>();
+        String UA_MAC = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
+        String UA_WIN = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
         String[][] seeds = {
-            {"CreateInstance", "phoenix", "10.0.1.10", "Chrome/macOS", "2026-09-07 10:22:33", "200"},
-            {"StopInstance", "sanjose1", "172.16.0.5", "Chrome/macOS", "2026-09-07 09:10:12", "200"},
-            {"LaunchInstance", "saopaulo", "10.2.1.31", "Safari/iOS", "2026-09-07 08:44:56", "200"},
-            {"DeleteVolume", "sgw", "192.168.1.7", "Chrome/Windows", "2026-09-06 22:15:40", "404"},
-            {"CreateVcn", "phoenix", "10.0.1.10", "Chrome/macOS", "2026-09-06 20:05:03", "200"},
-            {"UpdateSubnet", "sanjose1", "172.16.0.5", "Chrome/macOS", "2026-09-06 18:30:21", "200"},
+            // {eventName, eventFullType, consoleSessionId, userName, ipAddress(含地理位置), userAgent, eventTime, responseStatus}
+            {"LaunchInstance",    "com.oraclecloud.ComputeApi.LaunchInstance",    "ocid1.console.oc1..sess001", "nodewebzsz@gmail.com",   "10.0.2.9(内网地址)，252.49.125.199(中国广东省深圳市)", UA_MAC, "2026-09-11 12:04:11", "200"},
+            {"GetInstance",       "com.oraclecloud.ComputeApi.GetInstance",       "ocid1.console.oc1..sess001", "nodewebzsz@gmail.com",   "10.0.2.9(内网地址)",                                   UA_MAC, "2026-09-11 12:04:09", "200"},
+            {"CreateVcn",         "com.oraclecloud.NetworkingApi.CreateVcn",      "",                           "terraform-svc@example.com", "203.0.113.47(中国广东省深圳市)",                    "Terraform/1.9.5 (+https://www.terraform.io) terraform-provider-oci/6.14.0", "2026-09-11 11:58:02", "200"},
+            {"UpdateBootVolume",  "com.oraclecloud.ComputeApi.UpdateBootVolume",  "",                           "ci-runner@example.com",  "198.51.100.9(中国香港)",                               "oci-java-sdk/3.92.0", "2026-09-11 11:47:33", "201"},
+            {"StopInstance",      "com.oraclecloud.ComputeApi.StopInstance",      "ocid1.console.oc1..sess002", "ops@example.com",        "172.16.0.5(内网地址)",                                 UA_WIN, "2026-09-11 11:32:18", "204"},
+            {"TerminateInstance", "com.oraclecloud.ComputeApi.TerminateInstance", "",                           "ci-runner@example.com",  "198.51.100.9(中国香港)",                               "oci-cli/3.47.0", "2026-09-11 11:20:56", "404"},
+            {"DeleteVolume",      "com.oraclecloud.BlockstorageApi.DeleteVolume", "ocid1.console.oc1..sess002", "admin@example.com",      "203.0.113.88(日本东京都)",                             UA_MAC, "2026-09-11 10:59:04", "500"},
+            {"ListInstances",     "com.oraclecloud.ComputeApi.ListInstances",     "ocid1.console.oc1..sess001", "nodewebzsz@gmail.com",   "10.0.2.9(内网地址)",                                   UA_MAC, "2026-09-11 10:41:27", "-"},
         };
         for (String[] s : seeds) {
             Map<String, Object> m = new java.util.HashMap<>();
             m.put("eventType", s[0]);
-            m.put("userName", "ocid1.user.oc1.." + s[1]);
-            m.put("ipAddress", s[2]);
-            m.put("clientEnv", s[3]);
-            m.put("eventTime", s[4]);
-            m.put("responseStatus", s[5]);
+            m.put("eventFullType", s[1]);
+            m.put("consoleSessionId", s[2]);
+            m.put("userName", s[3]);
+            m.put("userType", "natv");
+            m.put("ipAddress", s[4]);
+            m.put("clientEnv", s[5]);
+            m.put("eventTime", s[6]);
+            m.put("responseStatus", s[7]);
             list.add(m);
         }
         return list;

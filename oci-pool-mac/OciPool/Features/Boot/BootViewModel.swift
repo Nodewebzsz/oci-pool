@@ -9,6 +9,8 @@ final class BootViewModel: ObservableObject {
     @Published private(set) var rows: [BootTaskItem] = []
     @Published private(set) var isLoading = false
     @Published private(set) var errorText: String?
+    /// 首次加载完成哨兵标记：首屏未完成前为 false，杜绝幽灵空态闪现
+    @Published private(set) var hasLoadedOnce = false
     @Published var pageState = PageState(page: 0, size: 20)
 
     // Cascade filter: parent → region (tenantId for list = region id)
@@ -76,7 +78,7 @@ final class BootViewModel: ObservableObject {
     private var service: BootService { BootService(baseURL: session.serverURL) }
 
     var hasActiveFilter: Bool {
-        filterTenantId != nil && !(filterTenantId ?? "").isEmpty
+        !selectedParentId.isEmpty || !selectedRegionId.isEmpty || (filterTenantId != nil && !(filterTenantId?.isEmpty ?? true))
     }
 
     var canQuery: Bool { !selectedRegionId.isEmpty || !selectedParentId.isEmpty }
@@ -88,6 +90,7 @@ final class BootViewModel: ObservableObject {
     // MARK: - Lifecycle
 
     func start() {
+        isLoading = true
         Task {
             await loadParentTenants()
             if let pending = NavigationState.shared.takePendingBootFilter() {
@@ -125,7 +128,10 @@ final class BootViewModel: ObservableObject {
     func reload() async {
         isLoading = true
         errorText = nil
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoadedOnce = true
+        }
         do {
             let resp = try await service.list(
                 page: pageState.page,
@@ -153,7 +159,12 @@ final class BootViewModel: ObservableObject {
 
     func loadParentTenants() async {
         do {
-            parentTenants = try await service.listParentTenants()
+            // 对齐 Web 方案 B：按真实租户名 tenancyName A~Z 字母排序
+            parentTenants = try await service.listParentTenants().sorted {
+                let a = $0.tenancyName.isEmpty ? $0.userName : $0.tenancyName
+                let b = $1.tenancyName.isEmpty ? $1.userName : $1.tenancyName
+                return a.localizedCaseInsensitiveCompare(b) == .orderedAscending
+            }
         } catch {
             parentTenants = []
         }
@@ -163,18 +174,44 @@ final class BootViewModel: ObservableObject {
         selectedParentId = parentId ?? ""
         selectedRegionId = ""
         regions = []
-        guard !selectedParentId.isEmpty else { return }
+        if selectedParentId.isEmpty {
+            filterTenantId = nil
+            pageState.page = 0
+            rows = []
+            isLoading = true
+            Task { await reload() }
+            return
+        }
+        // 切换租户时立即清空旧数据并同步置为 loading，拉取区域期间绝不进入空态！
+        rows = []
+        pageState.page = 0
+        isLoading = true
         Task {
             do {
-                regions = try await service.listRegions(parentId: selectedParentId)
+                let list = try await service.listRegions(parentId: selectedParentId)
+                regions = list.sorted {
+                    $0.region.localizedCaseInsensitiveCompare($1.region) == .orderedAscending
+                }
+                if regions.count == 1 {
+                    selectedRegionId = regions[0].id
+                    applyFilter() // 单区域自动联动查询！
+                } else {
+                    // 多区域租户：待用户选择区域
+                    isLoading = false
+                }
             } catch {
                 regions = []
+                isLoading = false
+                ToastCenter.shared.error(error.localizedDescription)
             }
         }
     }
 
     func onRegionChanged(_ regionId: String?) {
         selectedRegionId = regionId ?? ""
+        if !selectedRegionId.isEmpty {
+            applyFilter()
+        }
     }
 
     func applyFilter() {
@@ -186,6 +223,8 @@ final class BootViewModel: ObservableObject {
             filterTenantId = nil
         }
         pageState.page = 0
+        rows = []
+        isLoading = true
         Task { await reload() }
     }
 
@@ -195,6 +234,8 @@ final class BootViewModel: ObservableObject {
         regions = []
         filterTenantId = nil
         pageState.page = 0
+        rows = []
+        isLoading = true
         Task { await reload() }
     }
 

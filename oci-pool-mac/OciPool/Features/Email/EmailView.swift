@@ -20,23 +20,29 @@ struct EmailView: View {
                 VStack(spacing: 0) {
                     if let err = model.errorText, !err.isEmpty {
                         errorBanner(err)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
+                            .padding(.bottom, 12)
                     }
                     kpiGrid
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
+                        .padding(.bottom, 12)
                     mainSectionBar
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
-                        .padding(.bottom, 4)
-                    filterBar
-                    sectionBody
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.bottom, 12)
+
+                    // 统一主卡片：bg-1 · border · radius 8 · 顶部 FilterBar + 内部滚动列表 + 底部钉住分页栏
+                    VStack(spacing: 0) {
+                        filterBar
+                        sectionBody
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        paginationFooter
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(AppTheme.sidebarBg(dark))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(AppTheme.border(dark), lineWidth: 1)
+                    )
+                    .cornerRadius(8)
                 }
-                .appLoading(pageLoading)
-            },
-            footer: { paginationFooter }
+            }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         .onAppear { model.start() }
@@ -77,10 +83,10 @@ struct EmailView: View {
         "Email Delivery Service · \(model.enabledTotal) 个租户已启用 · \(model.contactPage.totalElements) 位联系人 · \(model.recordPage.totalElements) 条发送记录"
     }
 
-    // MARK: - KPI（对齐 Web mail.kpi.* 4 卡）
+    // MARK: - KPI（对齐 Web mail.kpi.* 4 卡与 InstancesView 标准卡片）
 
     private var kpiGrid: some View {
-        HStack(spacing: 14) {
+        HStack(alignment: .top, spacing: 12) {
             kpiCard(icon: "checkmark.circle", color: AppTheme.sidebarActive,
                     label: "已启用邮件服务的租户", value: "\(model.enabledTotal)")
             kpiCard(icon: "circle", color: AppTheme.sidebarText(dark),
@@ -93,28 +99,37 @@ struct EmailView: View {
     }
 
     private func kpiCard(icon: String, color: Color, label: String, value: String) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(color.opacity(0.18))
                     .frame(width: 36, height: 36)
                 Image(systemName: icon)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 17, weight: .medium))
                     .foregroundColor(color)
             }
-            Text(label)
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .multilineTextAlignment(.leading)
-            Text(value)
-                .font(.system(size: 22, weight: .bold))
-                .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(AppTheme.textTertiary(dark))
+                    .lineLimit(1)
+                Text(value)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(AppTheme.navIcon(dark))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+            }
+            Spacer(minLength: 0)
         }
-        .padding(14)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.sidebarBg(dark)))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.border(dark), lineWidth: 1))
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
+        )
+        .cornerRadius(8)
     }
 
     private var sectionBusy: Bool {
@@ -321,7 +336,7 @@ struct EmailView: View {
 
     private var tenantsBody: some View {
         Group {
-            if model.tenantsLoading && currentTenantEmpty {
+            if (!model.hasLoadedOnce || model.tenantsLoading) && currentTenantEmpty {
                 loadingBox
             } else if currentTenantEmpty {
                 EmptyStateView(
@@ -338,21 +353,19 @@ struct EmailView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if model.tenantTab == .enabled {
                 ScrollView {
-                    LazyVStack(spacing: 12) {
+                    LazyVStack(spacing: 0) {
                         ForEach(model.enabledConfigs) { item in
                             enabledCard(item)
                         }
                     }
-                    .padding(16)
                 }
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 12) {
+                    LazyVStack(spacing: 0) {
                         ForEach(model.disabledTenants) { item in
                             disabledCard(item)
                         }
                     }
-                    .padding(16)
                 }
             }
         }
@@ -361,25 +374,25 @@ struct EmailView: View {
     private func enabledCard(_ item: TenantEmailConfigItem) -> some View {
         HStack(alignment: .center, spacing: 14) {
             ZStack {
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: 8)
                     .fill(AppTheme.info.opacity(0.14))
-                    .frame(width: 40, height: 40)
+                    .frame(width: 36, height: 36)
                 Image(systemName: "envelope.fill")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(AppTheme.info)
             }
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     Text(item.displaySender)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                         .lineLimit(1)
                     StatusBadge(text: "运行中", tone: .success)
                 }
                 if !item.tenantName.isEmpty {
                     Text(item.tenantName)
-                        .font(.system(size: 12))
+                        .font(.system(size: 11.5))
                         .foregroundColor(AppTheme.sidebarText(dark))
                         .lineLimit(1)
                 }
@@ -392,11 +405,16 @@ struct EmailView: View {
                 model.disableConfig(item)
             }
         }
-        .padding(14)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(cardBackground)
-        .overlay(cardStroke(accent: AppTheme.info, active: true))
-        .shadow(color: Color.black.opacity(dark ? 0.18 : 0.05), radius: 8, y: 2)
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(
+            Rectangle()
+                .fill(AppTheme.border(dark).opacity(0.5))
+                .frame(height: 1),
+            alignment: .bottom
+        )
     }
 
     private func usageBar(_ item: TenantEmailConfigItem) -> some View {
@@ -426,9 +444,9 @@ struct EmailView: View {
     private func disabledCard(_ item: DisabledTenantItem) -> some View {
         HStack(alignment: .center, spacing: 14) {
             ZStack {
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: 8)
                     .fill(Color(hex: "9b59b6").opacity(0.14))
-                    .frame(width: 40, height: 40)
+                    .frame(width: 36, height: 36)
                 Image(systemName: "plus.circle")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(Color(hex: "9b59b6"))
@@ -436,11 +454,11 @@ struct EmailView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.name)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                     .lineLimit(1)
                 Text(item.region.isEmpty ? "未开启邮件服务" : item.region)
-                    .font(.system(size: 12))
+                    .font(.system(size: 11.5))
                     .foregroundColor(AppTheme.sidebarText(dark))
                     .lineLimit(1)
             }
@@ -451,18 +469,23 @@ struct EmailView: View {
                 model.openEnableTenant(item)
             }
         }
-        .padding(14)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(cardBackground)
-        .overlay(cardStroke(accent: Color(hex: "9b59b6"), active: false))
-        .shadow(color: Color.black.opacity(dark ? 0.18 : 0.05), radius: 8, y: 2)
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(
+            Rectangle()
+                .fill(AppTheme.border(dark).opacity(0.5))
+                .frame(height: 1),
+            alignment: .bottom
+        )
     }
 
     // MARK: Contacts
 
     private var contactsBody: some View {
         Group {
-            if model.contactsLoading && model.contacts.isEmpty {
+            if (!model.hasLoadedOnce || model.contactsLoading) && model.contacts.isEmpty {
                 loadingBox
             } else if model.contacts.isEmpty {
                 EmptyStateView(
@@ -475,12 +498,11 @@ struct EmailView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 12) {
+                    LazyVStack(spacing: 0) {
                         ForEach(model.contacts) { c in
                             contactCard(c)
                         }
                     }
-                    .padding(16)
                 }
             }
         }
@@ -491,19 +513,19 @@ struct EmailView: View {
             ZStack {
                 Circle()
                     .fill(AppTheme.sidebarActive.opacity(0.15))
-                    .frame(width: 40, height: 40)
+                    .frame(width: 36, height: 36)
                 Text(avatarLetter(c))
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: 13, weight: .bold))
                     .foregroundColor(AppTheme.sidebarActive)
             }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(c.name.isEmpty ? "—" : c.name)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                     .lineLimit(1)
                 Text(c.email)
-                    .font(.system(size: 12))
+                    .font(.system(size: 11.5, design: .monospaced))
                     .foregroundColor(AppTheme.sidebarText(dark))
                     .lineLimit(1)
             }
@@ -512,7 +534,7 @@ struct EmailView: View {
 
             if !c.createTime.isEmpty {
                 Text(c.createTime)
-                    .font(.system(size: 11))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(AppTheme.sidebarText(dark).opacity(0.85))
             }
 
@@ -520,11 +542,16 @@ struct EmailView: View {
                 model.deleteContact(c)
             }
         }
-        .padding(14)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(cardBackground)
-        .overlay(cardStroke(accent: AppTheme.sidebarActive, active: false))
-        .shadow(color: Color.black.opacity(dark ? 0.18 : 0.05), radius: 8, y: 2)
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(
+            Rectangle()
+                .fill(AppTheme.border(dark).opacity(0.5))
+                .frame(height: 1),
+            alignment: .bottom
+        )
     }
 
     private func avatarLetter(_ c: EmailContactItem) -> String {
@@ -536,7 +563,7 @@ struct EmailView: View {
 
     private var recordsBody: some View {
         Group {
-            if model.recordsLoading && model.records.isEmpty {
+            if (!model.hasLoadedOnce || model.recordsLoading) && model.records.isEmpty {
                 loadingBox
             } else if model.records.isEmpty {
                 EmptyStateView(
@@ -623,30 +650,31 @@ struct EmailView: View {
 
     // MARK: - Pagination
 
-    // MARK: - Pagination
-
     @ViewBuilder
     private var paginationFooter: some View {
-        switch model.mainSection {
-        case .tenants:
-            if model.tenantTab == .enabled {
-                PaginationBar(state: $model.enabledPage) {
-                    model.onEnabledPageChange()
+        Group {
+            switch model.mainSection {
+            case .tenants:
+                if model.tenantTab == .enabled {
+                    PaginationBar(state: $model.enabledPage) {
+                        model.onEnabledPageChange()
+                    }
+                } else {
+                    PaginationBar(state: $model.disabledPage) {
+                        model.onDisabledPageChange()
+                    }
                 }
-            } else {
-                PaginationBar(state: $model.disabledPage) {
-                    model.onDisabledPageChange()
+            case .contacts:
+                PaginationBar(state: $model.contactPage) {
+                    model.onContactPageChange()
                 }
-            }
-        case .contacts:
-            PaginationBar(state: $model.contactPage) {
-                model.onContactPageChange()
-            }
-        case .records:
-            PaginationBar(state: $model.recordPage) {
-                model.onRecordPageChange()
+            case .records:
+                PaginationBar(state: $model.recordPage) {
+                    model.onRecordPageChange()
+                }
             }
         }
+        .cornerRadius(8, corners: [.bottomLeft, .bottomRight])
     }
 
     // MARK: - Shared chrome

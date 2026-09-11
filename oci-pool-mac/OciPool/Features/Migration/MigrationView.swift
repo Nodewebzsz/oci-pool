@@ -35,7 +35,6 @@ struct MigrationView: View {
                                 .foregroundColor(AppTheme.sidebarText(dark))
                         }
                     }
-                    .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

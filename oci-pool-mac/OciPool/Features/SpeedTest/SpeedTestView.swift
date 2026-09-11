@@ -23,6 +23,7 @@ struct SpeedTestView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         if let err = model.errorText, !err.isEmpty {
                             errorBanner(err)
+                                .padding(.bottom, 12)
                         }
 
                         statsRow
@@ -33,7 +34,6 @@ struct SpeedTestView: View {
 
                         regionSection
                     }
-                    .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

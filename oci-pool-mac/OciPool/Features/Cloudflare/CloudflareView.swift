@@ -8,6 +8,13 @@ struct CloudflareView: View {
 
     private var dark: Bool { appearance.isDarkEffective }
 
+    // 严格统一表头与行单元格列宽常量（对齐 UI_STANDARD.md 第一章）
+    private let colTypeWidth: CGFloat = 80
+    private let colNameWidth: CGFloat = 200
+    private let colTtlWidth: CGFloat = 90
+    private let colProxyWidth: CGFloat = 100
+    private let colActionWidth: CGFloat = 88
+
     var body: some View {
         PageScaffold(
             title: "CF 管理",
@@ -19,17 +26,13 @@ struct CloudflareView: View {
                 VStack(spacing: 0) {
                     if let err = model.errorText, !err.isEmpty {
                         errorBanner(err)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
+                            .padding(.bottom, 12)
                     }
                     searchBar
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
                         .padding(.bottom, 12)
                     listBody
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .appLoading((model.isLoading || model.isZonesLoading) && model.records.isEmpty && model.zones.isEmpty)
             },
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
@@ -100,19 +103,32 @@ struct CloudflareView: View {
     /// Web 搜索卡（bg-1 border radius 8 padding 10）：按名称: 输入 + 按值: 输入 + 搜索(info) + 清除(danger-soft)
     private var searchBar: some View {
         HStack(spacing: 10) {
+            Text("类型:")
+                .font(.system(size: 11))
+                .foregroundColor(AppTheme.textTertiary(dark))
+            SelectMenu(
+                options: [SelectOption(id: "", title: "全部类型")] + CloudflareJSON.typeOptions,
+                selection: Binding(
+                    get: { model.selectedType.isEmpty ? nil : model.selectedType },
+                    set: { model.selectedType = $0 ?? "" }
+                ),
+                placeholder: "全部类型",
+                width: 100,
+                allowClear: true
+            )
             Text("按名称:")
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.textTertiary(dark))
-            SearchField(text: $model.searchName, placeholder: "e.g. www")
+            SearchField(text: $model.searchName, placeholder: "e.g. www", fillsWidth: true)
             Text("按值:")
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.textTertiary(dark))
-            SearchField(text: $model.searchContent, placeholder: "e.g. 192.9")
+            SearchField(text: $model.searchContent, placeholder: "e.g. 192.9", fillsWidth: true)
             AppButton(title: "搜索", systemImage: "magnifyingglass", kind: .info) {
                 ToastCenter.shared.show("匹配 \(model.filteredRecords.count) 条", style: .info)
             }
             AppButton(title: "清除", systemImage: "xmark", kind: .danger,
-                      enabled: !model.searchName.isEmpty || !model.searchContent.isEmpty) {
+                      enabled: !model.searchName.isEmpty || !model.searchContent.isEmpty || !model.selectedType.isEmpty) {
                 model.clearSearch()
             }
         }
@@ -125,72 +141,80 @@ struct CloudflareView: View {
     // MARK: - List
 
     private var listBody: some View {
-        Group {
-            if model.selectedZoneId == nil || model.selectedZoneId?.isEmpty == true {
-                EmptyStateView(
-                    icon: "cloud",
-                    title: model.zones.isEmpty ? "暂无可用域名" : "请选择域名",
-                    subtitle: model.zones.isEmpty
-                        ? "请先在「密钥配置」中填写 Cloudflare API Key，或点击「密钥配置」"
-                        : "从上方下拉选择要管理的 Zone",
-                    actionTitle: "密钥配置",
-                    action: { model.openConfig() }
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if model.filteredRecords.isEmpty && !model.isLoading {
-                EmptyStateView(
-                    icon: "list.bullet.rectangle",
-                    title: model.records.isEmpty ? "暂无 DNS 记录" : "无匹配结果",
-                    subtitle: model.records.isEmpty ? "点击「添加记录」创建解析" : "试试其他关键词（仅过滤当前页）",
-                    actionTitle: model.records.isEmpty ? "添加记录" : nil,
-                    action: model.records.isEmpty ? { model.openAdd() } : nil
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                VStack(spacing: 0) {
-                    // Web 标题条：bg-2 · list 图标 + DNS 记录 + (filtered/total)
-                    HStack(spacing: 6) {
-                        Image(systemName: "list.bullet")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(AppTheme.textSecondary(dark))
-                        Text("DNS 记录")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(AppTheme.navIcon(dark))
-                        Text("(\(model.filteredRecords.count)/\(model.records.count))")
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundColor(AppTheme.textTertiary(dark))
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(AppTheme.sidebarHover(dark))
-                    .overlay(Rectangle().fill(AppTheme.border(dark)).frame(height: 1), alignment: .bottom)
+        VStack(spacing: 0) {
+            // Web 标题条：bg-2 · list 图标 + DNS 记录 + (filtered/total)
+            HStack(spacing: 6) {
+                Image(systemName: "list.bullet")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(AppTheme.textSecondary(dark))
+                Text("DNS 记录")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppTheme.navIcon(dark))
+                Text("(\(model.filteredRecords.count)/\(model.records.count))")
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundColor(AppTheme.textTertiary(dark))
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(AppTheme.sidebarHover(dark))
+            .overlay(Rectangle().fill(AppTheme.border(dark)).frame(height: 1), alignment: .bottom)
 
-                    DataList {
-                        DataListColumnHeader(title: "类型", width: 80)
-                        DataListColumnHeader(title: "记录名", width: 200)
-                        DataListColumnHeader(title: "记录值", width: nil)
-                        DataListColumnHeader(title: "TTL", width: 100)
-                        DataListColumnHeader(title: "代理状态", width: 110)
-                        DataListColumnHeader(title: "操作", width: 100)
-                    } content: {
-                        ForEach(model.filteredRecords) { item in
-                            DataListRow {
-                                row(item)
-                            }
+            DataList {
+                DataListColumnHeader(title: "类型", width: colTypeWidth, alignment: .center)
+                DataListColumnHeader(title: "名称", width: colNameWidth, alignment: .center)
+                DataListColumnHeader(title: "值", width: nil, alignment: .center)
+                DataListColumnHeader(title: "TTL", width: colTtlWidth, alignment: .center)
+                DataListColumnHeader(title: "代理状态", width: colProxyWidth, alignment: .center)
+                DataListColumnHeader(title: "操作", width: colActionWidth, alignment: .center)
+            } content: {
+                if (!model.hasLoadedOnce || model.isLoading) && model.records.isEmpty {
+                    VStack(spacing: 10) {
+                        Spacer()
+                        ProgressView()
+                        Text("正在加载 DNS 记录…")
+                            .font(.system(size: 12))
+                            .foregroundColor(AppTheme.sidebarText(dark))
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 260)
+                } else if model.selectedZoneId == nil || model.selectedZoneId?.isEmpty == true {
+                    EmptyStateView(
+                        icon: "cloud",
+                        title: model.zones.isEmpty ? "暂无可用域名" : "请选择域名",
+                        subtitle: model.zones.isEmpty
+                            ? "请先在「密钥配置」中填写 Cloudflare API Key，或点击「密钥配置」"
+                            : "从上方下拉选择要管理的 Zone",
+                        actionTitle: model.zones.isEmpty ? "密钥配置" : nil,
+                        action: model.zones.isEmpty ? { model.openConfig() } : nil
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 260)
+                } else if model.filteredRecords.isEmpty {
+                    EmptyStateView(
+                        icon: "list.bullet.rectangle",
+                        title: model.records.isEmpty ? "暂无 DNS 记录" : "无匹配结果",
+                        subtitle: model.records.isEmpty ? "点击「添加记录」创建解析" : "试试其他关键词（仅过滤当前页）",
+                        actionTitle: model.records.isEmpty ? "添加记录" : nil,
+                        action: model.records.isEmpty ? { model.openAdd() } : nil
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 260)
+                } else {
+                    ForEach(model.filteredRecords) { item in
+                        DataListRow {
+                            row(item)
                         }
                     }
+                    .opacity(model.isLoading ? 0.6 : 1.0)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(AppTheme.sidebarBg(dark))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppTheme.border(dark), lineWidth: 1)
-                )
-                .cornerRadius(8)
-                .appLoading(model.isLoading)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
+        )
+        .cornerRadius(8)
     }
 
     /// Web 代理状态徽章：仅 A/AAAA/CNAME 显示（🟠 已代理 = orange-soft / ⚪ 仅 DNS = 灰），其他类型「—」
@@ -222,12 +246,39 @@ struct CloudflareView: View {
     private func row(_ item: CfDnsRecord) -> some View {
         HStack(spacing: 0) {
             typeChip(item.type)
-                .frame(width: 72, alignment: .center)
-            cell(item.name, width: nil)
-            cell(item.content, width: nil)
-            cell(CloudflareJSON.formatTTL(item.ttl), width: 72)
+                .frame(width: colTypeWidth, alignment: .center)
+            cell(item.name, width: colNameWidth)
+            HStack(spacing: 6) {
+                Text(item.content.isEmpty ? "—" : item.content)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(item.content)
+                if item.type == "MX", let p = item.priority {
+                    Text("优先级 \(p)")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundColor(AppTheme.orange)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(AppTheme.orange.opacity(0.12))
+                        .cornerRadius(3)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+
+            // TTL — 严格使用 colTtlWidth，水平居中对齐表头
+            Text(CloudflareJSON.formatTTL(item.ttl))
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(AppTheme.sidebarText(dark))
+                .lineLimit(1)
+                .frame(width: colTtlWidth, alignment: .center)
+
+            // 代理状态 — 严格使用 colProxyWidth，水平居中对齐表头
             proxyBadge(item)
-                .frame(width: 80, alignment: .center)
+                .frame(width: colProxyWidth, alignment: .center)
+
+            // 操作列 — 严格使用 colActionWidth
             HStack(spacing: 6) {
                 Spacer(minLength: 0)
                 actionBtn("pencil", color: AppTheme.sidebarActive, tip: "编辑") {
@@ -236,8 +287,9 @@ struct CloudflareView: View {
                 actionBtn("trash", color: AppTheme.danger, tip: "删除") {
                     model.delete(item)
                 }
+                Spacer(minLength: 0)
             }
-            .frame(width: 88)
+            .frame(width: colActionWidth, alignment: .center)
         }
     }
 
@@ -252,14 +304,14 @@ struct CloudflareView: View {
             .cornerRadius(6)
     }
 
-    private func cell(_ text: String, width: CGFloat?) -> some View {
+    private func cell(_ text: String, width: CGFloat?, align: Alignment = .center) -> some View {
         Text(text.isEmpty ? "—" : text)
-            .font(.system(size: 12))
+            .font(.system(size: 12, design: .monospaced))
             .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
             .lineLimit(1)
             .truncationMode(.middle)
-            .frame(width: width, alignment: .center)
-            .frame(maxWidth: width == nil ? .infinity : width, alignment: .leading)
+            .frame(width: width, alignment: align)
+            .frame(maxWidth: width == nil ? .infinity : nil, alignment: align)
             .help(text)
     }
 
@@ -287,6 +339,14 @@ struct CloudflareView: View {
                 Task { await model.loadZones(selectFirst: true) }
             }
             .buttonStyle(PlainButtonStyle())
+            Button(action: { model.clearError() }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(AppTheme.danger.opacity(0.8))
+                    .padding(4)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .help("关闭提示")
         }
         .foregroundColor(AppTheme.danger)
         .padding(12)

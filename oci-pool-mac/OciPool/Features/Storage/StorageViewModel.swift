@@ -33,6 +33,7 @@ final class StorageViewModel: ObservableObject {
     // MARK: - UI state
 
     @Published private(set) var isLoading = false
+    @Published private(set) var hasLoadedOnce = false
     @Published private(set) var errorText: String?
     @Published var activeSheet: StorageSheet?
 
@@ -82,10 +83,12 @@ final class StorageViewModel: ObservableObject {
     // MARK: - Lifecycle
 
     func start() {
+        isLoading = true
         Task { await loadTenants() }
     }
 
     func reloadAll() async {
+        errorText = nil
         await loadTenants()
         if !selectedTenantId.isEmpty {
             await loadBuckets(reset: true)
@@ -100,12 +103,15 @@ final class StorageViewModel: ObservableObject {
     func loadTenants() async {
         isLoading = true
         errorText = nil
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoadedOnce = true
+        }
         do {
             var list = try await service.listParentTenants()
             list.sort {
-                let a = $0.userName.isEmpty ? $0.tenancyName : $0.userName
-                let b = $1.userName.isEmpty ? $1.tenancyName : $1.userName
+                let a = $0.tenancyName.isEmpty ? $0.userName : $0.tenancyName
+                let b = $1.tenancyName.isEmpty ? $1.userName : $1.tenancyName
                 return a.localizedCaseInsensitiveCompare(b) == .orderedAscending
             }
             parentTenants = list
@@ -121,8 +127,10 @@ final class StorageViewModel: ObservableObject {
         buckets = []
         bucketNextToken = nil
         bucketSearch = ""
+        errorText = nil
         clearObjectPanel()
         guard !selectedTenantId.isEmpty else { return }
+        bucketsLoading = true
         Task { await loadBuckets(reset: true) }
     }
 
@@ -137,6 +145,7 @@ final class StorageViewModel: ObservableObject {
         if reset {
             bucketsLoading = true
             bucketNextToken = nil
+            errorText = nil
         }
         defer { bucketsLoading = false }
         do {
@@ -145,6 +154,7 @@ final class StorageViewModel: ObservableObject {
                 limit: 20,
                 pageToken: reset ? nil : bucketNextToken
             )
+            errorText = nil
             if reset {
                 buckets = page.items
             } else {
@@ -160,6 +170,11 @@ final class StorageViewModel: ObservableObject {
             if namespace.isEmpty, let ns = buckets.first?.namespace, !ns.isEmpty {
                 namespace = ns
             }
+            if namespace.isEmpty {
+                if let ns = try? await service.getNamespace(tenantId: tenantId), !ns.isEmpty {
+                    namespace = ns
+                }
+            }
         } catch {
             if reset { buckets = [] }
             handleError(error)
@@ -171,6 +186,7 @@ final class StorageViewModel: ObservableObject {
             ToastCenter.shared.error("请先选择租户")
             return
         }
+        errorText = nil
         Task { await loadBuckets(reset: true) }
     }
 
@@ -184,6 +200,7 @@ final class StorageViewModel: ObservableObject {
         if !item.namespace.isEmpty {
             namespace = item.namespace
         }
+        objectsLoading = true
         Task { await loadObjects(reset: true) }
     }
 
@@ -285,6 +302,7 @@ final class StorageViewModel: ObservableObject {
         if reset {
             objectTokens = [nil]
             objectPageIndex = 0
+            errorText = nil
         }
         objectsLoading = true
         defer { objectsLoading = false }
@@ -298,6 +316,7 @@ final class StorageViewModel: ObservableObject {
                 limit: objectPageLimit,
                 startToken: token
             )
+            errorText = nil
             objects = page.items
             if let next = page.nextStartWith, !next.isEmpty {
                 if objectTokens.count <= objectPageIndex + 1 {
@@ -661,6 +680,10 @@ final class StorageViewModel: ObservableObject {
         case "zip": return "application/zip"
         default: return nil
         }
+    }
+
+    func clearError() {
+        errorText = nil
     }
 
     // MARK: - Helpers

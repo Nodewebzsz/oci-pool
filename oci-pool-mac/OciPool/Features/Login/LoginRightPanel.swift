@@ -17,9 +17,6 @@ struct LoginRightPanel: View {
     var onForgotPassword: () -> Void = {}
     var onLocale: (AppLocale) -> Void = { _ in }
 
-    @State private var backendVersion = ""
-    @State private var pageLoadToken = 0
-
     private var formReady: Bool {
         guard model.modeActivated else { return false }
         if model.isRemoteServer { return true }
@@ -63,8 +60,6 @@ struct LoginRightPanel: View {
         .animation(.easeInOut(duration: 0.28), value: showBootLoading)
         .animation(.easeInOut(duration: 0.28), value: localBootFailed != nil)
         .animation(.easeInOut(duration: 0.22), value: model.modeActivated)
-        .onAppear { routeLoadVersion() }
-        .onChange(of: model.metaLoadedURL) { _ in routeLoadVersion() }
     }
 
     // MARK: - Boot states
@@ -76,6 +71,8 @@ struct LoginRightPanel: View {
                 .padding(.top, 30)
             Spacer(minLength: 0)
             VStack(spacing: 14) {
+                deploymentChip
+                    .padding(.bottom, 10)
                 ProgressView()
                     .progressViewStyle(CircularProgressViewStyle())
                     .scaleEffect(1.55)
@@ -102,6 +99,8 @@ struct LoginRightPanel: View {
                 .padding(.top, 30)
             Spacer(minLength: 0)
             VStack(spacing: 14) {
+                deploymentChip
+                    .padding(.bottom, 10)
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 30, weight: .medium))
                     .foregroundColor(AppTheme.orange)
@@ -156,7 +155,6 @@ struct LoginRightPanel: View {
 
     private var topControls: some View {
         HStack {
-            deploymentChip
             Spacer()
             languageChip
         }
@@ -438,9 +436,17 @@ struct LoginRightPanel: View {
 
     private var loginCard: some View {
         VStack(alignment: .leading, spacing: 0) {
+            deploymentChip
+                .padding(.bottom, 20)
+
             heading(title: model.locale == .enUS ? "Welcome back" : "欢迎回来",
                     subtitle: model.locale == .enUS ? "Sign in to your OCI-POOL account" : "登录你的 OCI-POOL 管理账号")
                 .padding(.bottom, 26)
+
+            if model.isRemoteServer {
+                remoteServerRow
+                    .padding(.bottom, 14)
+            }
 
             fieldLabel(model.locale == .enUS ? "Username" : "用户名")
             LoginField(
@@ -504,14 +510,22 @@ struct LoginRightPanel: View {
 
     private var registerCard: some View {
         VStack(alignment: .leading, spacing: 0) {
+            deploymentChip
+                .padding(.bottom, 20)
+
             heading(title: model.locale == .enUS ? "Create account" : "创建账号",
                     subtitle: model.locale == .enUS ? "Manage multiple OCI tenants after signup" : "注册后可管理多个 OCI 租户")
                 .padding(.bottom, 26)
 
+            if model.isRemoteServer {
+                remoteServerRow
+                    .padding(.bottom, 14)
+            }
+
             fieldLabel(model.locale == .enUS ? "Username" : "用户名")
             LoginField(
                 title: "",
-                placeholder: "请输入用户名",
+                placeholder: model.locale == .enUS ? "Enter username" : "请输入用户名",
                 text: $model.username,
                 dark: dark,
                 enabled: formFieldEnabled,
@@ -537,7 +551,7 @@ struct LoginRightPanel: View {
             fieldLabel(model.locale == .enUS ? "Confirm password" : "确认密码")
             LoginField(
                 title: "",
-                placeholder: "再次输入密码",
+                placeholder: model.locale == .enUS ? "Confirm password" : "再次输入密码",
                 text: $model.confirmPassword,
                 secure: true,
                 dark: dark,
@@ -575,12 +589,12 @@ struct LoginRightPanel: View {
     private var registerPasswordLabel: some View {
         HStack {
             Text(model.locale == .enUS ? "New password" : "新密码")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(LoginPalette.muted(dark))
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(LoginPalette.text(dark))
             Spacer()
             if !strengthLabel.isEmpty {
                 Text(strengthLabel)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(strengthColor)
             }
         }
@@ -632,6 +646,32 @@ struct LoginRightPanel: View {
 
     // MARK: - Pieces
 
+    private var remoteServerRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            fieldLabel(model.locale == .enUS ? "Remote server" : "服务器地址")
+            HStack(alignment: .center, spacing: 10) {
+                LoginField(
+                    title: "",
+                    placeholder: "http://your-host:9856",
+                    text: $model.serverURL,
+                    dark: dark,
+                    enabled: !model.isLoadingMeta && !model.isSubmitting,
+                    onCommit: onServerCommit
+                )
+                LoginFieldActionButton(
+                    title: model.isLoadingMeta
+                        ? (model.locale == .enUS ? "…" : "连接中")
+                        : (model.locale == .enUS ? "Connect" : "连接"),
+                    loading: model.isLoadingMeta,
+                    enabled: !model.serverURL.trimmingCharacters(in: .whitespaces).isEmpty,
+                    dark: dark,
+                    minWidth: 88,
+                    action: onServerCommit
+                )
+            }
+        }
+    }
+
     private func heading(title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
@@ -646,20 +686,20 @@ struct LoginRightPanel: View {
 
     private func fieldLabel(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 11, weight: .medium))
-            .foregroundColor(LoginPalette.muted(dark))
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(LoginPalette.text(dark))
             .padding(.bottom, 6)
     }
 
     private var passwordLabelRow: some View {
         HStack {
             Text(model.locale == .enUS ? "Password" : "密码")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(LoginPalette.muted(dark))
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(LoginPalette.text(dark))
             Spacer()
             Button(action: onForgotPassword) {
                 Text(model.locale == .enUS ? "Forgot password?" : "忘记密码?")
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundColor(infoColor)
             }
             .buttonStyle(PlainButtonStyle())
@@ -748,12 +788,14 @@ struct LoginRightPanel: View {
             Text(info)
                 .font(.system(size: 12))
                 .foregroundColor(LoginPalette.muted(dark))
-        } else if model.modeActivated, !model.isRemoteServer, model.metaLoadedURL != nil, !model.isLoadingMeta {
+        } else if model.modeActivated, model.metaLoadedURL != nil, !model.isLoadingMeta {
             HStack(spacing: 6) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.sidebarActive)
-                Text(model.locale == .enUS ? "Local backend ready" : "本机服务已就绪，请登录")
+                Text(model.isRemoteServer
+                     ? (model.locale == .enUS ? "Remote server ready" : "远程服务器已就绪")
+                     : (model.locale == .enUS ? "Local backend ready" : "本机服务已就绪，请登录"))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(LoginPalette.muted(dark))
             }
@@ -871,36 +913,9 @@ struct LoginRightPanel: View {
     // MARK: - Footer
 
     private var footer: some View {
-        Text("\(backendVersion.isEmpty ? "" : "v\(backendVersion) · ")MIT · Nodewebzsz/oci-pool")
+        Text("MIT · Nodewebzsz/oci-pool")
             .font(.system(size: 10.5, weight: .regular, design: .monospaced))
             .foregroundColor(LoginPalette.muted(dark))
             .frame(maxWidth: .infinity)
-    }
-
-    // MARK: - Version fetch
-
-    private func routeLoadVersion() {
-        pageLoadToken += 1
-        let token = pageLoadToken
-        Task {
-            await loadBackendVersion(token: token)
-        }
-    }
-
-    private func loadBackendVersion(token: Int) async {
-        let base = model.serverURL
-        guard let url = URL(string: base)?.appendingPathComponent("api/version/check") else { return }
-        var req = URLRequest(url: url)
-        req.timeoutInterval = 4
-        do {
-            let (data, _) = try await URLSession.shared.data(for: req)
-            if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let cur = obj["currentVersion"] as? String, !cur.isEmpty {
-                let v = cur.replacingOccurrences(of: "^[vV]-?", with: "", options: .regularExpression)
-                if token == pageLoadToken {
-                    await MainActor.run { backendVersion = v }
-                }
-            }
-        } catch {}
     }
 }

@@ -335,8 +335,20 @@ struct RegionsView: View {
                 // 表格区 — 占剩余空间，内部滚动（Web: flex:1 + overflow auto）
                 ScrollView(.vertical, showsIndicators: true) {
                     VStack(alignment: .leading, spacing: 0) {
-                        if model.pageRows.isEmpty {
-                            Text(model.isLoading ? "加载中..." : "没有找到匹配的区域")
+                        if (!model.hasLoadedOnce || model.isLoading) && model.allRows.isEmpty {
+                            HStack {
+                                Spacer()
+                                ProgressView().scaleEffect(0.85)
+                                Text("正在加载区域数据…")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(RegionsTheme.muted(dark))
+                                    .padding(.leading, 8)
+                                Spacer()
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(40)
+                        } else if model.pageRows.isEmpty {
+                            Text("没有找到匹配的区域")
                                 .font(.system(size: 13))
                                 .foregroundColor(RegionsTheme.muted(dark))
                                 .frame(maxWidth: .infinity)
@@ -345,6 +357,7 @@ struct RegionsView: View {
                             ForEach(model.pageRows) { row in
                                 regionRow(row)
                             }
+                            .opacity(model.isLoading ? 0.6 : 1.0)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .topLeading)

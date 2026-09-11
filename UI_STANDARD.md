@@ -1,7 +1,7 @@
 # UI 标准（UI Standard）
 
-> **本文档是项目内表格 + 操作弹窗的统一标准。** 后续新增其它统一标准，按章节在本文件追加。
-> 标准实现可对照：实例（`InstancesView.swift`）、开机管理（`BootView.swift`，**以此为准**）、租户管理（`TenantsView.swift`）。
+> **本文档是项目内表格、操作弹窗、下拉选择框、分页的统一标准。** 后续新增其它统一标准，按章节在本文件追加。
+> 标准实现可对照：实例（`InstancesView.swift`）、开机管理（`BootView.swift`，**以此为准**）、租户管理（`TenantsView.swift`）；分页见 `Common/Components/PaginationBar.swift` + `Common/Models/PageState.swift`。
 >
 > 各章「已对齐」清单：已对齐的页面不必重做；新页面照对应章节对齐即可。
 
@@ -172,20 +172,168 @@ MenuPulseDot(color: statusColor(item), pulse: item.isRunning)
 
 ---
 
-### 1.8 已对齐页面清单
+### 1.8 数据列表加载态（Loading）与表头常驻标准（杜绝全屏大遮罩与脏数据残留）
 
-- 实例列表（`InstancesView.swift`，已落实 1.1~1.7 全部标准）
-- 开机管理（`BootView.swift`，已落实 1.1~1.7 全部标准）
-- 租户管理（`TenantsView.swift`，已落实 1.1~1.7 全部标准，表头固定 + 独立滚动 + 行 hover + 防穿透）
-- 区域管理（`RegionsView.swift`，全列与弹性列居中）
-- 对象存储（`StorageView.swift`，全列与操作列居中）
-- 审计日志（`TenantAuditLogView.swift`，全列居中）
-- 费用统计（`TenantCostView.swift`，全列与金额居中）
+> ⚠️ **曾踩坑**：
+> 1. **首屏切入抹除表头**：使用 `if isLoading && rows.isEmpty` 直接用空白转圈 View 替换整个表格卡片，导致**表头被整个抹掉**；数据加载出来时表头突然弹现，造成严重的**视觉跳动（Jitter）**！
+> 2. **粗暴全局大遮罩**：在最外层容器（含筛选条、KPI 统计卡）挂载 `.appLoading(...)`，导致二次筛选时**整个屏幕 80% 区域（连带顶部筛选条和 KPI 卡）全部被厚重的半透明蒙层覆盖**，视觉极为突兀粗糙！
+> 3. **切换主体旧数据残留（Stale Data）**：切换租户/区域时，旧租户的机器依然留在列表上并盖着 loading，产生“选了租户 B 却看着租户 A 的机器”的数据混淆与误导！
+
+**必须遵守的统一规范**：
+
+1. **表头骨架永久置顶常驻（首屏切入零跳动）**：
+   - 表头（Header Row）始终固定在表格卡片最顶端；
+   - 无论是首屏切入、切换租户、还是原地刷新，**表头绝对不消失、不隐藏**。数据行到达后自然平滑填入表头下方，杜绝任何布局闪烁。
+
+2. **Loading 范围严格收敛在「表格卡片内部」**：
+   - 严禁在外层挂载全局 `.appLoading` 蒙层；
+   - 顶部的「筛选状态条」与「KPI 指标卡」属于页面元信息，在加载过程中必须**始终保持清晰可见，绝不被遮挡**。
+
+3. **区分操作类型的表体过渡策略（核心原则）**：
+
+| 操作类型 | 行为触发 | 旧数据行处理 | 视觉呈现 |
+|:---|:---|:---|:---|
+| **主体/作用域切换** | 切换租户、切换区域、重置筛选 | **立即清空**（`rows = []`） | 表头常驻，表体居中展示轻量 `ProgressView()` + `正在加载...`，杜绝旧数据残留混淆 |
+| **同主体原地刷新/翻页** | 点击「刷新」按钮、分页翻页 | **保留当前行** | 表体数据行呈微半透明（`opacity: 0.6`），中央浮现微型更新卡片，平滑过渡 |
+
+4. **杜绝首屏幽灵空态闪现（Flash of Empty State）**：
+   - ⚠️ **曾踩坑**：ViewModel 初始化时 `rows = []` 且 `isLoading = false`，视图挂载时 `onAppear` 尚未发起请求，导致第 1 帧直接命中 `rows.isEmpty` 闪现「暂无数据」，随后第 2 帧发起请求才变成 Loading，形成“无数据 → Loading → 有数据”的时序倒挂！
+   - **规范约束**：在 ViewModel 中声明 `@Published private(set) var hasLoadedOnce = false`（首次请求完成在 `defer` 中置 `true`）；
+   - 空状态 `EmptyStateView` 严格限制在 `hasLoadedOnce && !isLoading && rows.isEmpty`；首次加载完成前（`!hasLoadedOnce`）直接展示置顶表头 + 居中 Loading，严禁闪现空状态！
+
+5. **切换筛选主体时同步置为 `isLoading = true`（杜绝拉取选项期间空态闪现）**：
+   - ⚠️ **曾踩坑**：用户切换租户时，代码执行了 `rows = []` 并去异步拉取区域列表 `await service.listRegions(...)`。然而在拉取区域列表的这几百毫秒内，`isLoading` 依然为 `false`（因为真正的 `reload()` 还没被调用），而此时 `hasLoadedOnce` 已经是 `true`、`rows.isEmpty` 也是 `true`，导致在拉取区域列表的空隙中**瞬间闪现出「暂无实例」空态**！等区域拉取回来触发 `reload()` 时，又跳成 Loading，再次发生闪烁！
+   - **规范约束**：在触发切换父级实体（如 `onParentChanged`）或应用筛选（`applyFilter`）的方法头部，**必须在清除旧数据（`rows = []`）的同时，同步执行 `isLoading = true`**！保证在拉取子级选项乃至发起真实数据请求的全周期中，表体始终处于 Loading 态，绝不给空态任何抢跑机会！
+
+6. **错误横幅状态生命周期闭环（杜绝报错死锁滞留）**：
+   - ⚠️ **曾踩坑**：在对象存储等页面中，某个租户拉取失败后，`handleError` 赋予了 `errorText`。然而当用户切换到其他正常租户、重新拉取存储桶或重新刷新成功后，代码**从未执行 `errorText = nil`**！导致界面下方明明已经成功拉出了正常的存储桶和数据，上方却依然永久顶着刺眼的红色错误横幅，自相矛盾且产生严重认知混乱！
+   - **规范约束**：
+     - **操作发起即刻清空**：在用户主动触发的切换实体（如 `onTenantChanged`）、重新加载（`loadBuckets(reset: true)`）、点击刷新（`refreshBuckets`）等方法头部，**第一时间执行 `errorText = nil`**，绝不把上一个租户的错误残留在新租户界面上；
+     - **请求成功时确保消退**：数据成功返回后，确保 `errorText = nil`；
+     - **横幅支持主动关闭（Dismiss）**：错误横幅右侧除「重试」按钮外，必须提供「关闭（`xmark`）」按钮（绑定 `model.clearError()`），允许用户获知错误后手动关闭，不再永久霸占视觉高度。
+
+**标准实现模板**：
+```swift
+let table = VStack(spacing: 0) {
+    // 1. 表头置顶常驻，无论加载还是空态始终可见，结构骨架稳定零抖动
+    headerRow(cols: cols, width: totalW)
+
+    // 2. 表体内容区（数据行 / 空态 / 加载态）
+    ZStack {
+        // 首次未加载完成或加载中且数据为空：直接展示居中 Loading，杜绝空态闪现
+        if (!model.hasLoadedOnce || model.isLoading) && model.rows.isEmpty {
+            VStack(spacing: 10) {
+                Spacer()
+                ProgressView()
+                Text("正在加载实例数据…")
+                    .font(.system(size: 12))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if model.rows.isEmpty {
+            EmptyStateView(...)
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(Array(model.rows.enumerated()), id: \.element.id) { idx, row in
+                        dataRow(...)
+                    }
+                }
+            }
+            .opacity(model.isLoading ? 0.6 : 1.0)
+        }
+
+        // 原地翻页/刷新时：仅在表体中央浮现微型轻量指示器（绝不遮罩全局 KPI 和筛选栏）
+        if model.isLoading && !model.rows.isEmpty {
+            VStack(spacing: 8) {
+                ProgressView().scaleEffect(0.9)
+                Text("更新中…")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.sidebarBg(dark).opacity(0.85)))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.border(dark), lineWidth: 1))
+            .shadow(color: Color.black.opacity(dark ? 0.3 : 0.08), radius: 6, y: 2)
+        }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+}
+```
+
+---
+
+### 1.9 筛选联动与单选项默认选中即查标准
+
+> ⚠️ **曾踩坑**：用户选择租户后，接口返回该租户仅有 1 个可用区域（如仅有「凤凰城」）。代码自动将区域下拉框赋值为该区域，**却未触发任何数据查询**！导致下拉框显示已选，下方列表却依然展示全量实例，用户必须手动再点一次「查看实例」才能过滤，极不符合直觉。
+
+**必须遵守的联动规范**：
+1. **单选项自动触发查询**：
+   - 当上级实体（如租户）改变，拉取下级选项（如区域）且判定 `options.count == 1` 时；
+   - 下拉框自动选中唯一项的同时，**必须立即自动调用 `applyFilter()` / 发起查询**；
+2. **下拉项变更即选即查**：
+   - 手动在下拉菜单中切换具体选项时，同样应即刻触发过滤查询；
+3. **清空上级筛选时自动重置**：
+   - 清除租户选择时，自动置空过滤条件并重置为全量数据加载。
+
+```swift
+func onParentChanged(_ parentId: String?) {
+    selectedParentId = parentId ?? ""
+    selectedRegionId = ""
+    regions = []
+    if selectedParentId.isEmpty {
+        filterTenantId = nil
+        pageState.page = 0
+        rows = []                          // 1. 立即清空，避免残留旧数据
+        isLoading = true                   // 同步置为 loading，防空态闪现
+        Task { await reload() }
+        return
+    }
+    rows = []                              // 2. 切换主体即刻卸载旧数据
+    pageState.page = 0
+    isLoading = true                       // 关键！在拉取子级选项前同步进入 loading 态
+    Task {
+        do {
+            let list = try await service.listRegions(parentId: selectedParentId)
+            regions = list.sorted { ... }
+            // 3. 仅一个选项时自动选中并联动触发筛选查询
+            if regions.count == 1 {
+                selectedRegionId = regions[0].id
+                applyFilter()              // 立即联动查询！
+            } else {
+                isLoading = false
+            }
+        } catch {
+            isLoading = false
+        }
+    }
+}
+```
+
+---
+
+### 1.10 已对齐页面清单
+
+> **范围说明**：本清单只覆盖**第一章**（表格布局 / 滚动 / 居中 / 行交互 / Loading 与联动）的落实情况。
+> 分页相关的对齐状态见 **4.6**；两处清单职责不同，不要互相引用。
+> 全项目「已对齐 / 待对齐」的**唯一权威**是 `UI_STANDARD.md` 本身，其它文档只引用、不复制。
+
+- 实例列表（`InstancesView.swift`，已落实 1.1~1.9 全部标准，表头置顶常驻 + 表体纯净 loading + 单区域自动联动筛选）
+- 开机管理（`BootView.swift`，已落实 1.1~1.9 全部标准，表头置顶常驻 + 表体纯净 loading + 解除全屏大遮罩 + 单区域自动联动筛选）
+- 租户管理（`TenantsView.swift`，已落实 1.1~1.9 全部标准，表头置顶常驻 + 表体纯净 loading + 搜索即刻清空旧数据 + 杜绝幽灵空态）
+- 区域管理（`RegionsView.swift`，已落实 1.1~1.9 全部标准，表头置顶常驻 + 居中 Loading + 杜绝幽灵空态）
+- 对象存储（`StorageView.swift`，已落实 1.1~1.9 全部标准，解除全屏大遮罩 + 桶与对象独立表头置顶 + 表体纯净 loading + 错误生命周期闭环）
+- 邮箱服务（`EmailView.swift`，已落实 1.1~1.9 全部标准，解除全局大遮罩 + 子列表平滑切换 + 杜绝幽灵空态）
+- 代理配置（`ProxyConfigView.swift`，已落实 1.1~1.9 全部标准，解除卡片遮罩 + 居中 loading + 错误支持关闭）
+- Cloudflare（`CloudflareView.swift`，已落实 1.1~1.9 全部标准，全量拉取全类型记录 + 列宽居中严格对齐 + 记录类型筛选 + 解除卡片遮罩）
+- EdgeOne（`EdgeOneView.swift`，已落实 1.1~1.9 全部标准，解除卡片遮罩 + 双列表表体纯净 loading + 错误支持关闭）
+- 审计日志（`TenantAuditLogView.swift`，已落实 1.1~1.9 全部标准，全列居中 + 表头置顶常驻 + 游标加载更多）
+- 费用统计（`TenantCostView.swift`，已落实 1.1~1.9 全部标准，标准面包屑 + 消除底部空白 + 统一 Loading 动效 + 杜绝空态闪现）
+- 账号配额（`TenantQuotaView.swift`，已落实 1.1~1.9 全部标准，标准面包屑 + 标准数据大卡片 + 固定表头 + 解除全屏遮罩 + 独立滚动 + 行 hover + 分页底栏）
 - 用户管理（`TenantUserManageView.swift`，全列与操作列居中）
 - 区域订阅（`TenantRegionSubView.swift`，全列居中）
-- 代理配置（`ProxyConfigView.swift`，全列居中）
-- Cloudflare（`CloudflareView.swift`，全列居中）
-- EdgeOne（`EdgeOneView.swift`，全列居中）
 - 共享组件：`DataListColumnHeader` 默认居中覆盖所有 DataList 页面；`AppSheetTableHeader` 默认居中覆盖所有租户弹窗内表格。
 
 ---
@@ -367,6 +515,259 @@ func toneColor(_ tone: Tone) -> Color {
 > ⚠️ 按钮 **固定 28×28，绝不随操作列宽拉伸**。渲染处的 `.frame(width: max(colWidth, 28), ...)` 会把按钮撑成宽方块（曾踩坑）——必须写死 `.frame(width: 28, height: 28)`，且用列宽 frame 居中。
 
 > 已对齐：开机 `BootActionMenu*`、实例 `InstanceActionMenu*`、租户 `TenantActionMenu*`（列表 + 租户详情 `TenantDetailActionButton`，均在 `TenantsView.swift` / `TenantDetailView.swift`）。
+
+---
+
+## 第三章 · 下拉选择框标准（单选 SelectMenu / 多选 MultiSelect / 视觉层级 / 零抖动）
+
+适用于全站表单、筛选栏、监控大盘中的下拉选择组件（单选如代理类型、强制开关；多选如流量监控区域筛选等）。标准实现以 `SelectMenu.swift` 与 `TenantTrafficView.swift` 为准。
+
+### 3.1 核心架构：独立浮层避免父级高度抖动与裁剪（核心原则）
+
+> ⚠️ **曾踩坑**：
+> 1. **严禁在父级卡片内部流式展开（In-flow Layout）**：直接在 `VStack` 中渲染展开列表，会导致父级卡片物理高度瞬间从 `36px` 暴增到 `200px+`，推搡下方所有组件产生剧烈跳动！
+> 2. **严禁依赖局部普通 `.overlay` 偏移展开**：当外层卡片带有 `.cornerRadius(...)` 或外层被 `ScrollView` 包裹时，底层 CALayer 会对超出 bounds 的区域施加硬件裁剪（`masksToBounds: true`），导致下拉选项被齐刷刷切掉大半截！
+> 3. **多选组件避免使用系统级 `SwiftUI.Menu`**：系统级 `Menu` 每次点击单项会自动强行收起，无法满足用户勾选多个区域的连续多选交互诉求。
+
+**标准实现架构**：
+采用轻量级 **`NSPanel (.popUpMenu)` 窗口桥接模式（`NSViewRepresentable` AnchorView）**：
+- 下拉选项列表作为独立无边框浮层（`childWindow`）挂载到当前窗口；
+- 物理尺寸脱离普通文档流，触发按钮与父卡片**高度恒定零抖动**；
+- 层级设为 `.popUpMenu`，永远漂浮在所有 `ScrollView`、模态弹窗与复杂图层树的最顶层，**绝无裁剪风险**；
+- 面板内部支持连续点击复选框切换状态而不收起，点击页面任意外部区域或按下 `ESC` 即时平滑关闭。
+
+---
+
+### 3.2 双主题视觉层级与颜色规范（解决混叠与扁平感）
+
+下拉面板与触发输入框、页面底层卡片必须形成**清晰、舒适的「三层立体明暗阶梯」**：
+
+| 元素 | 深色主题 (Dark Mode) | 浅色主题 (Light Mode) | 说明 |
+|:---|:---|:---|:---|
+| **页面底层底板** | 基础暗色 `#0f1117` / `#161820` | 微灰底色 `#f1f5f9` / `#f3f6fa` | 最底层页面底板 |
+| **触发输入框** | 局部深色 `#161820` / `var(--bg-2)` | 微灰质感色 `#f8fafc` | 与纯白浮层形成第一道明暗差 |
+| **展开下拉面板背景** | **明朗浮层色 `#252a36`** | **纯净雪白色 `#ffffff`** | 关键！绝不与底层同色，形成清晰前景层 |
+| **面板外轮廓边框** | 柔和冷灰 `#3a4152`（1px） | 质感 Slate 灰 `#cbd5e1`（1px） | 告别模糊，提供清晰精确的外轮廓定义 |
+| **立体悬浮投影** | `shadow(color: black.opacity(0.65), radius: 14, y: 6)` | `shadow(color: black.opacity(0.22), radius: 14, y: 6)` | 柔和自然的系统级下投影，产生真实的纵深感 |
+
+---
+
+### 3.3 选项行与复选框交互规范
+
+1. **多选控制行（顶部操作栏）**：
+   - 顶部提供「全选 / 取消全选」便捷按钮（根据当前是否已全选动态切换文案）；
+   - 下方紧跟细分割线 `Divider()`。
+2. **选项行高与内边距**：
+   - 选项行高 `36px`，左右内边距 `12px`；
+   - 选中态：展示饱满的主题绿选中方块（`checkmark.square.fill`，颜色 `AppTheme.sidebarActive`）；
+   - 未选态：中性浅灰复选框（`square`，颜色 `secondaryText`）；
+   - 鼠标悬停（Hover）：整行背景平滑变为浅强调悬停色（深色 `#2c3240`，浅色 `#f1f5f9`），圆角 `4px`。
+3. **滚动容器限制**：
+   - 选项超过 5 项时，使用内部 `ScrollView` 约束最大高度（`maxHeight: 200~240`），避免面板超出屏幕视口。
+
+---
+
+### 3.4 示例标准代码结构模板（多选下拉框）
+
+```swift
+// 1. 浮动面板视图
+private struct MultiSelectDropdownPanel: View {
+    let selectedIds: Set<String>
+    let options: [SelectOption]
+    let dark: Bool
+    let onToggle: (String) -> Void
+    let onSelectAll: () -> Void
+    let onClearAll: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // 全选操作
+            let isAll = selectedIds.count == options.count && !options.isEmpty
+            Button(action: { isAll ? onClearAll() : onSelectAll() }) {
+                HStack {
+                    Text(isAll ? "取消全选" : "全选所有")
+                        .font(.system(size: 13, weight: .medium))
+                    Spacer()
+                }
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PlainButtonStyle())
+
+            Divider().background(dark ? Color(hex: "3a4152") : Color(hex: "e2e8f0"))
+
+            // 滚动选项列表
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(options) { opt in
+                        let sel = selectedIds.contains(opt.id)
+                        Button(action: { onToggle(opt.id) }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: sel ? "checkmark.square.fill" : "square")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(sel ? AppTheme.sidebarActive : Color.gray)
+                                Text(opt.title)
+                                    .font(.system(size: 13))
+                                    .lineLimit(1)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 12).padding(.vertical, 8)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+            }
+            .frame(maxHeight: 200)
+        }
+        .frame(width: 240)
+        // 遵循 3.2 双主题视觉层级标准
+        .background(dark ? Color(hex: "252a36") : Color.white)
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(dark ? Color(hex: "3a4152") : Color(hex: "cbd5e1"), lineWidth: 1)
+        )
+        .cornerRadius(6)
+        .shadow(color: Color.black.opacity(dark ? 0.65 : 0.22), radius: 14, x: 0, y: 6)
+    }
+}
+```
+
+---
+
+## 第四章 · 分页标准（默认条数 / 档位 / 两种分页形态）
+
+适用于所有数据列表页（实例、租户、开机、区域、存储、邮件、审计日志等）。
+
+标准实现可对照：
+- **页码分页**（Spring `Page` 接口）：`Common/Components/PaginationBar.swift` + `Common/Models/PageState.swift`
+- **游标分页**（OCI token 接口）：原项目 `oci-server/src/main/resources/templates/mobile/audit_log.ftl` 的「加载更多」形态
+
+### 4.1 默认每页条数 = 20
+
+所有数据列表页的 `PageState` 初始值统一为 **`PageState(page: 0, size: 20)`**。
+
+```swift
+@Published var pageState = PageState(page: 0, size: 20)
+```
+
+**理由**：10 条太碎，稍长的列表就要频繁翻页；50 / 100 首屏请求与渲染都偏重。20 是折中值。
+
+> ⚠️ **曾踩坑**：各页默认值不统一——实例 / 租户 / 区域 / 代理配置为 `10`，开机 / Cloudflare / EdgeOne / 费用统计为 `20`，邮件服务为 `5`。**10 的那批需统一改为 20。**
+
+### 4.2 每页条数只允许 `sizeOptions` 内的档位
+
+`PageState.sizeOptions = [10, 20, 50, 100]`。**禁止**给 `PageState` 赋该列表以外的值。
+
+> ⚠️ **曾踩坑**：`EmailViewModel` 用了 `size: 5`，而 5 不在 `sizeOptions` 里 → 每页条数选择器显示的值**不在自己的选项列表中**，用户改过之后再也选不回 5，属自相矛盾。
+
+**规则**：确需非标准档位时，先把该值加进 `sizeOptions`，再使用。
+
+### 4.3 分页控件与接口形态必须匹配（核心原则）
+
+分页接口分两类，**控件形态不可互换**：
+
+| 接口形态 | 特征 | 必须使用的控件 |
+|:---|:---|:---|
+| **页码分页** | Spring `Page`，返回 `totalElements` / `totalPages`，支持任意页跳转 | `PaginationBar`（页码条 + 上下页 + 跳页 + 每页条数） |
+| **游标分页** | OCI `opc-next-page` / `nextPageToken`，**无总数、不支持随机访问** | **「加载更多」按钮**（append 到列表尾部） |
+
+### 4.4 游标分页：明确禁用页码条与跳页框
+
+游标接口**不提供总数**，也**只能向前链式推进**，因此：
+
+- **禁止**使用带页码数字条的 `PaginationBar`（页码总数只能靠猜，且会随探索不断增长）。
+- **禁止**提供「跳至 __ 页」输入框（无法随机访问，超出范围的输入会被静默夹回）。
+- **禁止**显示「共 N 条」（总数拿不到）。
+- 必须 `showsSizeSelector: false`（每页条数由服务端固定，既不可设也不可读）。
+- 文案用「已加载 N 条 · 还有更多」，以「还有更多」表达总数未知。
+
+```swift
+// 游标分页标准形态（底部条）
+HStack(spacing: 12) {
+    Text("已加载 \(rows.count) 条\(hasMore ? " · 还有更多" : "")")
+        .font(.system(size: 12))
+        .foregroundColor(AppTheme.sidebarText(dark))
+    Spacer()
+    if hasMore {
+        AppButton(title: "加载更多", systemImage: "chevron.down", kind: .secondary) {
+            model.loadNextPage()          // 带 pageToken 追加到 rows 尾部
+        }
+    }
+}
+.padding(.horizontal, 12).padding(.vertical, 10)
+```
+
+**参考实现**：原项目 `mobile/audit_log.ftl`（`_alNextToken` + `loadNextPage()` append）。这是游标分页的正确形态。
+
+> ⚠️ **曾踩坑（审计日志）**：
+> 1. OCI Audit 的 `ListEventsRequest` 实测只有 `compartmentId / startTime / endTime / page / opcRequestId`，**没有 `limit`** —— 每页条数既不可设也不可读。
+> 2. 客户端曾把 `PaginationBar` 套在游标接口上：`totalPages` 靠 `max(已知最大页+1, 当前页+2)` 猜，页码条随翻页从「1 2」长到「1 2 3」；而 `PageState.go(to:)` 内部有 `min(max(0, newPage), totalPages - 1)` 的 clamp，跳页框输入超范围页码会被**静默夹回且无任何提示**。
+> 3. 为伪造随机访问，客户端维护了 `auditPageCache` / `auditTokenForPage` / `auditNextTokenByPage` / `auditMaxKnownPageIndex` 四个字典 + 一个 O(页数) 的序号累加循环。改用「加载更多」后可全部收敛为单个 `nextToken`，序号即 `1..N`。
+
+### 4.5 页码换算（Web）
+
+- 浏览器路由 query `page` 为 **1-based**；Spring Controller 的 `page` 为 **0-based**。
+- 换算只允许在领域服务里做**一次**，禁止在页面内散落 `-1` / `+1`。
+
+### 4.6 已对齐 / 待对齐清单
+
+> **本清单是本项目分页标准的唯一权威来源。** 其它文档（如 `NEW_SESSION_CONTINUE.md`）只引用、不复制，避免多处清单互相矛盾。
+
+**已对齐 / 待对齐（按端分别核对，2026-09-11 复核）**：
+
+> ⚠️ **原表只覆盖 macOS 客户端，却写成「全量核对通过」，与 Web / Windows 实际状态不符。**
+> 2026-09-11 验收时实测发现：**Web 端 4 处仍是 10、邮件页是硬编码 6/8/8、CF/EO 无分页；Windows 端 2 处仍是 10。**
+> 下表已拆成三端分别列，未对齐的一律标 ⬜。
+
+**macOS 客户端 —— 已对齐 ✅**
+
+| 页面 | 默认条数 | 控件形态 | 状态 |
+|:---|:---|:---|:---|
+| 开机管理 `BootViewModel` | 20 | `PaginationBar` | ✅ |
+| Cloudflare `CloudflareViewModel` | 20 | `PaginationBar` | ✅ |
+| EdgeOne `EdgeOneViewModel` | 20 | `PaginationBar` | ✅ |
+| 租户费用统计 `TenantsViewModel.costPageState` | 20 | `PaginationBar` | ✅ |
+| 实例管理 `InstancesViewModel` | 20 | `PaginationBar` | ✅ |
+| 租户管理 `TenantsViewModel` | 20 | `PaginationBar` | ✅ |
+| 区域管理 `RegionsViewModel` | 20 | `PaginationBar` | ✅ |
+| 代理配置 `ProxyConfigViewModel` | 20 | `PaginationBar` | ✅ |
+| 邮件服务 `EmailViewModel`（5 个列表） | 20 | `PaginationBar` | ✅ |
+| 审计日志 `TenantAuditLogView` | 服务端固定 | **「加载更多」**（游标） | ✅ |
+
+**Web 端（`modern-ui`）—— 全部已对齐 ✅**
+
+| 页面 | 组件 | 默认条数 | 状态 |
+|:---|:---|:---|:---|
+| 开机管理 | `GrabPage` | 20 | ✅ |
+| 租户抢机 | `TenantGrabPage` | 20 | ✅ |
+| 实例管理 | `InstancesPage` | 20 | ✅ |
+| 租户管理 | `TenantsPage`（`initSize`） | 20 | ✅ |
+| 区域管理 | `RegionsPage` | 20 | ✅ |
+| 系统管理·代理配置 | `SysVpnProxyPage` | 20 | ✅ |
+| 邮件服务 | `MailPage` | 20 | ✅ |
+| 账号配额 | `TenantQuotaPage` | 20 | ✅ |
+| 费用统计 | `TenantCostPage` | 20 | ✅ |
+| 审计日志整页 | `TenantAuditPage` | 游标加载更多 | ✅ |
+| 实例流量监控 | `TenantTrafficPage` | 图表+实例列表 | ✅ |
+
+> - `MailPage` 的 6/8/8 是 `const` 常量而非 state，且该页**自绘 `‹ ›` 分页**、不使用共享 `Pagination` 组件 —— 所以既改不了、也违反 4.2（档位越界）。
+> - `CFManagePage` 直接拉 100 条、**没有分页控件**；`EOManagePage` 同样。与 macOS 端「`PaginationBar` + 20」形态不一致，**是否补齐待定**。
+> - `page-proxy.jsx` 里的 `ProxyPage` 虽挂在 `window` 上，但**未接入路由表**（`app.jsx` 只映射了 `proxyKeyConfig` / `cfManage` / `eoManage`），属遗留容器，不计入本清单。
+
+**Windows 端（`oci-pool-win`）—— 部分未对齐 ⬜**
+
+| 页面 | 文件 | 默认条数 | 应改 | 状态 |
+|:---|:---|:---|:---|:---|
+| 租户管理 | `TenantsView.cs` | **10** | 20 | ⬜ |
+| 实例管理 | `InstancesView.cs` | **10** | 20 | ⬜ |
+| GCP 实例 | `GcpInstancesView.cs` | 20 | — | ✅ |
+
+**踩坑记录**：
+- **「只改了一端就写全量对齐」**（2026-09-11 验收实测）：D1 的实现记录只列了 4 个 Swift ViewModel，但本表当时写的是「全量核对通过」。**核对标准时必须逐端点名，不能只核一端。**
+- 曾出现各页默认值不统一（实例/租户/区域/代理配置为 `10`，邮件服务为 `5`）。**macOS 端已于 2026-09-11 统一为 `20`；Web / Windows 端待改。**
+- 邮件服务的 `size: 5` 不在 `PageState.sizeOptions = [10, 20, 50, 100]` 内，导致每页条数选择器显示的值不在自己的选项列表中。**macOS 端已修正为 `20`；Web 端是硬编码 6/8/8，同样越界且不可调，待改。**
+- 审计日志曾套用 `PaginationBar`（页码条 + 跳页框），而接口是 OCI token 游标：页码总数只能靠 `max(已探明+1, page+2)` 猜、会随翻页增长，跳页框超范围输入被静默夹回。已改为「加载更多」append 形态（两端均已改）。
 
 ---
 

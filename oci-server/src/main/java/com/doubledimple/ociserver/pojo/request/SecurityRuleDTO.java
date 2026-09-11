@@ -21,5 +21,6 @@ public class SecurityRuleDTO {
     private String ports;
     private Long tenantId;
     private String icmpType; // 新增的ICMP类型字段
+    private String warning; // 高危规则告警提示（可空，后端兜底检测危险规则时填充）
 
 }

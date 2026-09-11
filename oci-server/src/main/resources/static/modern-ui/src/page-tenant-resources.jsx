@@ -325,10 +325,11 @@ function TenantResourcesPage({ density, ctx, navigate, updateDetailCtx }) {
                   <td style={{ padding: '11px 12px', color: 'var(--fg-3)', borderBottom: '1px solid var(--border)' }}>
                     <span className="num">{(page - 1) * perPage + i + 1}</span>
                   </td>
-                  <td style={{ padding: '11px 12px', borderBottom: '1px solid var(--border)' }}>
-                    <span className="mono" style={{
+                  <td style={{ padding: '11px 12px', borderBottom: '1px solid var(--border)' }} title={inst.tenantName || ''}>
+                    <span title={inst.tenantName || ''} className="mono" style={{
                       padding: '2px 6px', background: 'var(--bg-3)',
                       borderRadius: 3, fontSize: 11, color: 'var(--fg-1)',
+                      cursor: 'pointer',
                     }}>{masked ? window.maskName(inst.tenantName) : inst.tenantName}</span>
                   </td>
                   <td style={{ padding: '11px 12px', color: 'var(--fg-0)', borderBottom: '1px solid var(--border)' }}>

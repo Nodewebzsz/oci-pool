@@ -21,18 +21,24 @@ struct MfaBackupView: View {
                 VStack(spacing: 0) {
                     if let err = model.errorText, !err.isEmpty {
                         errorBanner(err)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
+                            .padding(.bottom, 12)
                     }
-                    FilterBar {
-                        SearchField(text: $model.searchText, placeholder: "按名称或发行方搜索...")
+                    HStack(spacing: 12) {
+                        SearchField(text: $model.searchText, placeholder: "按名称或发行方搜索...", fillsWidth: true)
                         Spacer()
                         Text("刷新倒计时 \(model.countdown)s")
                             .font(.system(size: 11))
                             .foregroundColor(AppTheme.sidebarText(dark))
                     }
                     .padding(.horizontal, 16)
-                    .padding(.top, 12)
+                    .padding(.vertical, 10)
+                    .background(AppTheme.sidebarBg(dark))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(AppTheme.border(dark), lineWidth: 1)
+                    )
+                    .cornerRadius(8)
+                    .padding(.bottom, 12)
 
                     if model.filtered.isEmpty && !model.isLoading {
                         EmptyStateView(
@@ -50,7 +56,6 @@ struct MfaBackupView: View {
                                     keyCard(item)
                                 }
                             }
-                            .padding(16)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }

@@ -41,7 +41,11 @@ final class AiModelsViewModel: ObservableObject {
         isLoadingTenants = true
         defer { isLoadingTenants = false }
         do {
-            tenants = try await service.listTenants()
+            tenants = try await service.listTenants().sorted {
+                let a = $0.tname.isEmpty ? $0.name : $0.tname
+                let b = $1.tname.isEmpty ? $1.name : $1.tname
+                return a.localizedCaseInsensitiveCompare(b) == .orderedAscending
+            }
             // 对齐 Web：默认不选中任何租户，由用户手动选择
         } catch {
             tenants = []

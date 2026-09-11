@@ -64,9 +64,17 @@ struct InstancesView: View {
         .environmentObject(appearance)
     }
 
+    private var pageTitle: String {
+        if tenantSubPage {
+            let name = NavigationState.shared.tenantSubPageName
+            return name.isEmpty ? "租户实例列表" : "\(name) · 实例列表"
+        }
+        return "OCI 实例列表"
+    }
+
     private var listPage: some View {
         PageScaffold(
-            title: "OCI 实例列表",
+            title: pageTitle,
             subtitle: tenantSubPage ? tenantSubtitle : nil,
             systemImage: "server.rack",
             iconColor: AppTheme.cyan,
@@ -86,36 +94,76 @@ struct InstancesView: View {
                     listBody
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .appLoading(model.isLoading && !model.rows.isEmpty)
             }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
     }
 
-    /// 子页面包屑（对齐 Web：返回 + OCI 租户管理 > 详情 · 租户名 > 资源列表）
+    /// 子页面包屑（对齐 Web：返回 + OCI 租户管理 > 租户详情 · 租户名 > 实例列表）
     private var tenantSubtitle: String {
-        let name = NavigationState.shared.tenantSubPageName
-        return name.isEmpty ? "租户实例" : "\(name) · 共 \(model.pageState.totalElements) 个实例"
+        "共 \(model.pageState.totalElements) 个实例"
     }
 
     private var breadcrumbBar: some View {
         HStack(spacing: 8) {
+            // 返回按钮：返回上一级（若来自租户详情则精准回到租户详情页）
             Button(action: { NavigationState.shared.closeTenantSubPage() }) {
                 HStack(spacing: 4) {
                     Image(systemName: "chevron.left").font(.system(size: 11, weight: .semibold))
                     Text("返回").font(.system(size: 12, weight: .medium))
                 }
                 .foregroundColor(AppTheme.sidebarText(dark))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(AppTheme.sidebarBg(dark))
+                .cornerRadius(5)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5)
+                        .stroke(AppTheme.border(dark).opacity(0.8), lineWidth: 1)
+                )
             }
             .buttonStyle(PlainButtonStyle())
+            .help("返回上一级")
+
             Text("›").font(.system(size: 11)).foregroundColor(AppTheme.sidebarText(dark).opacity(0.5))
-            Text("OCI 租户管理").font(.system(size: 12)).foregroundColor(AppTheme.sidebarText(dark))
+
+            // 第一级：OCI 租户管理（点击直接返回租户管理大列表）
+            Button(action: { NavigationState.shared.closeToTenantsList() }) {
+                Text("OCI 租户管理")
+                    .font(.system(size: 12))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+            }
+            .buttonStyle(PlainButtonStyle())
+            .help("回到租户列表")
+
+            // 第二级：租户详情 · 租户名（若有上级租户详情上下文，点击即可返回该租户详情）
+            let name = NavigationState.shared.tenantSubPageName
             Text("›").font(.system(size: 11)).foregroundColor(AppTheme.sidebarText(dark).opacity(0.5))
-            Text("资源列表").font(.system(size: 12, weight: .medium)).foregroundColor(AppTheme.sidebarActive)
+            Button(action: { NavigationState.shared.closeTenantSubPage() }) {
+                HStack(spacing: 4) {
+                    Text("租户详情")
+                    if !name.isEmpty {
+                        Text("·")
+                        Text(name)
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    }
+                }
+                .font(.system(size: 12))
+                .foregroundColor(AppTheme.sidebarText(dark))
+            }
+            .buttonStyle(PlainButtonStyle())
+            .help("回到该租户详情页")
+
+            // 第三级：当前实例列表
+            Text("›").font(.system(size: 11)).foregroundColor(AppTheme.sidebarText(dark).opacity(0.5))
+            Text("实例列表")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(AppTheme.sidebarActive)
+
             Spacer()
         }
-        .padding(.horizontal, 16)
         .padding(.vertical, 8)
+        .padding(.bottom, 4)
     }
 
     private var filterSubtitle: String {
@@ -130,30 +178,45 @@ struct InstancesView: View {
     /// Web 页头 actions：`请选择:` + 租户/区域 Select(160) + eye 图标钮 + 查看实例(primary) + 一键导出(orange)
     private var toolbar: some View {
         HStack(spacing: 8) {
-            Text("请选择:")
-                .font(.system(size: 12))
+            if !tenantSubPage {
+                Text("请选择:")
+                    .font(.system(size: 12))
+                    .foregroundColor(AppTheme.textTertiary(dark))
+                SelectMenu(
+                    options: model.parentTenants.map { SelectOption(id: $0.id, title: parentLabel($0)) },
+                    selection: Binding(
+                        get: { model.selectedParentId.isEmpty ? nil : model.selectedParentId },
+                        set: { model.onParentChanged($0) }
+                    ),
+                    placeholder: "请选择租户",
+                    width: 220,
+                    allowClear: true,
+                    searchable: model.parentTenants.count > 5
+                )
+            } else {
+                HStack(spacing: 4) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 11))
+                    Text("当前区域:")
+                        .font(.system(size: 12))
+                }
                 .foregroundColor(AppTheme.textTertiary(dark))
-            SelectMenu(
-                options: model.parentTenants.map { SelectOption(id: $0.id, title: parentLabel($0)) },
-                selection: Binding(
-                    get: { model.selectedParentId.isEmpty ? nil : model.selectedParentId },
-                    set: { model.onParentChanged($0) }
-                ),
-                placeholder: "请选择租户",
-                width: 220,
-                allowClear: true,
-                searchable: true
-            )
+            }
             SelectMenu(
                 options: model.regions.map { SelectOption(id: $0.id, title: regionLabel($0)) },
                 selection: Binding(
                     get: { model.selectedRegionId.isEmpty ? nil : model.selectedRegionId },
-                    set: { model.onRegionChanged($0) }
+                    set: {
+                        model.onRegionChanged($0)
+                        if tenantSubPage && !($0 ?? "").isEmpty {
+                            model.applyFilter()
+                        }
+                    }
                 ),
                 placeholder: "请选择区域",
                 width: 200,
                 enabled: !model.selectedParentId.isEmpty,
-                allowClear: true,
+                allowClear: !tenantSubPage,
                 searchable: true
             )
             Button {
@@ -173,9 +236,11 @@ struct InstancesView: View {
             }
             .buttonStyle(PlainButtonStyle())
             .help(model.namesHidden ? "显示完整租户名" : "隐藏租户名")
-            AppButton(title: "查看实例", systemImage: "magnifyingglass", kind: .primary,
-                      enabled: !model.selectedRegionId.isEmpty) {
-                model.applyFilter()
+            if !tenantSubPage {
+                AppButton(title: "查看实例", systemImage: "magnifyingglass", kind: .primary,
+                          enabled: !model.selectedRegionId.isEmpty) {
+                    model.applyFilter()
+                }
             }
             AppButton(title: "一键导出", systemImage: "square.and.arrow.down", kind: .orange) {
                 model.exportInstances()
@@ -203,10 +268,14 @@ struct InstancesView: View {
             Text("· 匹配 \(model.pageState.totalElements) 条")
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.textSecondary(dark))
-            Spacer(minLength: 12)
-            AppButton(title: "清除筛选", systemImage: "arrow.counterclockwise", kind: .secondary,
-                      enabled: model.hasActiveFilter) {
-                model.resetFilter()
+            if !tenantSubPage {
+                Spacer(minLength: 12)
+                AppButton(title: "清除筛选", systemImage: "arrow.counterclockwise", kind: .secondary,
+                          enabled: model.hasActiveFilter) {
+                    model.resetFilter()
+                }
+            } else {
+                Spacer(minLength: 0)
             }
         }
         .padding(.horizontal, 12)
@@ -236,9 +305,9 @@ struct InstancesView: View {
         .cornerRadius(3)
     }
 
-    /// Web `parentLabel` 的短名（自定义名优先）
+    /// Web `parentLabel` 的短名（方案 B 优先真实租户名）
     private func parentAlias(_ t: TenantRegionOption) -> String {
-        t.displayName
+        t.tenantPrimaryName
     }
 
     /// Web KPI：4 卡 gap 12（总实例数 cyan / 运行中 accent / ARM 架构 info / 覆盖区域 violet）
@@ -368,30 +437,7 @@ struct InstancesView: View {
     private var listBody: some View {
         // Web 三段结构：卡片占满剩余高度，表格内部滚动，分页钉在卡片底部
         VStack(spacing: 0) {
-            if model.isLoading && model.rows.isEmpty {
-                VStack(spacing: 10) {
-                    Spacer()
-                    ProgressView()
-                    Text("正在加载实例数据…")
-                        .font(.system(size: 12))
-                        .foregroundColor(AppTheme.sidebarText(dark))
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if model.rows.isEmpty {
-                EmptyStateView(
-                    icon: "server.rack",
-                    title: "暂无实例",
-                    subtitle: model.hasActiveFilter
-                        ? "当前筛选条件下没有实例"
-                        : "可从租户同步实例，或调整筛选后查询",
-                    actionTitle: "刷新",
-                    action: { Task { await model.reload() } }
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                tableArea
-            }
+            tableArea
 
             PaginationBar(state: $model.pageState) {
                 model.onPageChange()
@@ -420,14 +466,66 @@ struct InstancesView: View {
             let needsHScroll = totalW > geo.size.width + 0.5
 
             let table = VStack(spacing: 0) {
+                // 1. 表头置顶常驻，无论加载还是空态始终可见，结构骨架稳定零抖动
                 headerRow(wName: wName, wIp: wIp, wTenant: wTenant, wRegion: wRegion, wTime: wTime, width: totalW)
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(Array(model.rows.enumerated()), id: \.element.id) { idx, row in
-                            dataRow(index: idx, item: row, wName: wName, wIp: wIp, wTenant: wTenant, wRegion: wRegion, wTime: wTime, width: totalW)
+
+                // 2. 表体内容区（数据行 / 空态 / 加载态）
+                ZStack {
+                    if (!model.hasLoadedOnce || model.isLoading) && model.rows.isEmpty {
+                        VStack(spacing: 10) {
+                            Spacer()
+                            ProgressView()
+                            Text("正在加载实例数据…")
+                                .font(.system(size: 12))
+                                .foregroundColor(AppTheme.sidebarText(dark))
+                            Spacer()
                         }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if model.rows.isEmpty {
+                        EmptyStateView(
+                            icon: "server.rack",
+                            title: model.selectedParentId.isEmpty ? "暂无实例" : (model.selectedRegionId.isEmpty ? "请选择区域" : "暂无实例"),
+                            subtitle: model.selectedParentId.isEmpty
+                                ? "可从租户同步实例，或调整筛选后查询"
+                                : (model.selectedRegionId.isEmpty ? "当前租户包含多个可用区域，请在上方选择具体区域后查看实例" : "当前筛选条件下没有实例"),
+                            actionTitle: model.selectedRegionId.isEmpty ? nil : "刷新",
+                            action: { Task { await model.reload() } }
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 0) {
+                                ForEach(Array(model.rows.enumerated()), id: \.element.id) { idx, row in
+                                    dataRow(index: idx, item: row, wName: wName, wIp: wIp, wTenant: wTenant, wRegion: wRegion, wTime: wTime, width: totalW)
+                                }
+                            }
+                        }
+                        .opacity(model.isLoading ? 0.6 : 1.0)
+                    }
+
+                    // 二次加载/筛选加载时，轻量且优雅的卡片内指示器（绝不遮罩全局 KPI 和筛选栏）
+                    if model.isLoading && !model.rows.isEmpty {
+                        VStack(spacing: 8) {
+                            ProgressView()
+                                .scaleEffect(0.9)
+                            Text("更新中…")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(AppTheme.sidebarText(dark))
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(AppTheme.sidebarBg(dark).opacity(0.85))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(AppTheme.border(dark), lineWidth: 1)
+                        )
+                        .shadow(color: Color.black.opacity(dark ? 0.3 : 0.08), radius: 6, y: 2)
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
 
@@ -624,7 +722,7 @@ struct InstancesView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
-        .help(item.tenancyName.isEmpty ? "—" : "@\(item.maskedTenancyName)")
+        .help(item.tenancyName.isEmpty ? "—" : item.tenancyName)
     }
 
     private func nameCell(_ item: InstanceItem, width: CGFloat) -> some View {

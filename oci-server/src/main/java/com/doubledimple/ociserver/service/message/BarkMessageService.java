@@ -33,17 +33,34 @@ public class BarkMessageService implements MessageService {
 
     @Override
     public void sendMessageTemplate(String message) {
+        BarkConfig barkConfig = getBarkConfig();
+        if (barkConfig == null || !barkConfig.isEnabled()){
+            log.warn("BARK 无法推送消息, 未启用或未配置");
+            return;
+        }
+        final String url = barkConfig.getUrl();
+        final String deviceKey = barkConfig.getDeviceKey();
+        if (org.apache.commons.lang3.StringUtils.isBlank(deviceKey)) {
+            log.warn("BARK deviceKey 为空，跳过推送");
+            return;
+        }
 
+        try {
+            BarkPush pusher = new BarkPush(url, deviceKey);
+            pusher.simpleWithResp(message);
+        } catch (Exception e) {
+            log.error("BARK 消息发送失败: {}", e.getMessage());
+        }
     }
 
     @Override
     public void sendMessageTemplateText(String message) {
-
+        sendMessageTemplate(message);
     }
 
     @Override
     public void sendMessageTemplateText(String message, Boolean consoleFlag) {
-
+        sendMessageTemplate(message);
     }
 
     @Override
@@ -82,7 +99,27 @@ public class BarkMessageService implements MessageService {
 
     @Override
     public void sendVerificationCodeMessage(String userName, String verificationCode) {
+        BarkConfig barkConfig = getBarkConfig();
+        if (barkConfig == null || !barkConfig.isEnabled()){
+            log.warn("BARK 无法推送验证码, 未启用或未配置");
+            return;
+        }
 
+        final String url = barkConfig.getUrl();
+        final String deviceKey = barkConfig.getDeviceKey();
+        if (org.apache.commons.lang3.StringUtils.isBlank(deviceKey)) {
+            log.warn("BARK deviceKey 为空，跳过验证码推送");
+            return;
+        }
+
+        try {
+            BarkPush pusher = new BarkPush(url, deviceKey);
+            String content = String.format("【OCI-Pool】用户 [%s] 登录验证码是: %s (5分钟有效)", userName, verificationCode);
+            pusher.simpleWithResp(content);
+            log.info("BARK 验证码推送成功, 用户: {}", userName);
+        } catch (Exception e) {
+            log.error("BARK 验证码发送失败: {}", e.getMessage());
+        }
     }
 
     public BarkConfig getBarkConfig() {

@@ -687,11 +687,11 @@ function BootRecordsTable({ task }) {
       {loading && <div style={{ padding: 28, textAlign: 'center', color: 'var(--fg-3)' }}>{tr('ga.loadingRecords')}</div>}
       {!loading && loadError && <div role="alert" style={{ padding: 28, textAlign: 'center', color: 'var(--danger)' }}>{loadError}</div>}
       {!loading && !loadError && rows.length === 0 && <div style={{ padding: 28, textAlign: 'center', color: 'var(--fg-3)' }}>{tr('ga.noRecords')}</div>}
-      {!loading && !loadError && rows.length > 0 && <div style={{ overflowX: 'auto' }}>
+      {!loading && !loadError && rows.length > 0 && <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 460 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, minWidth: 700 }}>
           <thead>
             <tr>
-              <th style={{ ...headStyle, width: 30, textAlign: 'center' }}>
+              <th style={{ ...headStyle, width: 30, textAlign: 'center', position: 'sticky', top: 0, zIndex: 2 }}>
                 <input
                   type="checkbox"
                   checked={allSelected}
@@ -700,9 +700,9 @@ function BootRecordsTable({ task }) {
                 />
               </th>
               {[tr('grab.23c9bc'), tr('grab.296304'), tr('grab.acd5cb'), tr('grab.8a8b89'), tr('grab.224e2c'), tr('grab.df0116'), tr('grab.2cd98a'), tr('grab.a1d4e6'), tr('grab.f667d7'), tr('grab.3fea7c'), tr('grab.592c59')].map(h => { const hk = tr('ga.recordCols.' + ({ '昨日':'yesterday','今日':'today','失败':'failed','系统':'os','配置':'shape','范围':'range','循环时间(秒)':'loop','公网 IP':'ip','Root 密码':'rootPw','状态':'status','开始时间':'started'}[h] || h)); return (
-                <th key={h} style={headStyle}>{hk}</th>
+                <th key={h} style={{ ...headStyle, position: 'sticky', top: 0, zIndex: 2 }}>{hk}</th>
               ); })}
-              <th style={{ ...headStyle, width: 50, textAlign: 'center' }}>{tr('ga.operation')}</th>
+              <th style={{ ...headStyle, width: 50, textAlign: 'center', position: 'sticky', top: 0, zIndex: 2 }}>{tr('ga.operation')}</th>
             </tr>
           </thead>
           <tbody>

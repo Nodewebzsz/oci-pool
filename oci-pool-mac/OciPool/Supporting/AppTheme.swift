@@ -41,6 +41,8 @@ enum AppTheme {
     static let danger = Color(hex: "f05653")
     /// Web `var(--cyan)`（oklch(0.70 0.13 200)）。
     static let cyan = Color(hex: "00b6be")
+    /// Web `var(--violet)`（oklch(0.70 0.15 305)）。用于「API 调用」环境徽章。
+    static let violet = Color(hex: "8b7bd8")
     /// Web `var(--fg-2)`：次要文本（dark oklch(0.66 0.01 240) / light oklch(0.50 0.012 240)）。
     static func textSecondary(_ dark: Bool) -> Color { dark ? Color(hex: "8d9398") : Color(hex: "5d646a") }
     /// Web `var(--fg-3)`：弱化文本/标签。

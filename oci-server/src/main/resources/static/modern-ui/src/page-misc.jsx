@@ -101,9 +101,12 @@ function MailPage() {
           };
         }));
       } catch (e) { if (alive) shell.showToast(e.message || tr('mail.loadTenantsFail'), { kind: 'error' }); }
+      finally { if (alive) setHasLoadedOnce(true); }
     })();
     return () => { alive = false; };
   }, []);
+
+  const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
 
   // ─── 真实后端 · 联系人列表(POST /email/receive/list) ──────
   const [contacts, setContacts] = React.useState([]);
@@ -121,9 +124,10 @@ function MailPage() {
   const [tenantPage, setTenantPage] = React.useState(1);
   const [contactPage, setContactPage] = React.useState(1);
   const [recordPage, setRecordPage] = React.useState(1);
-  const tenantPageSize = 6;
-  const contactPageSize = 8;
-  const recordPageSize = 8;
+  // 对齐 UI_STANDARD.md 4.1：统一默认每页 20 条
+  const tenantPageSize = 20;
+  const contactPageSize = 20;
+  const recordPageSize = 20;
 
   const reloadContacts = React.useCallback(async () => {
     try {
@@ -474,11 +478,17 @@ function MailPage() {
 
             {/* Tenant rows */}
             <div style={{ minHeight: 340 }}>
-              {tenantPageRows.length === 0 ? (
-                <div style={{ padding: 50, textAlign: 'center', color: 'var(--fg-3)', fontSize: 12 }}>
-                  <Icon name="inbox" size={24} style={{ opacity: 0.4 }} />
-                  <div style={{ marginTop: 6 }}>{tenantTab === 'enabled' ? tr('mail.noEnabled') : tr('mail.allEnabled')}</div>
+              {!hasLoadedOnce ? (
+                <div style={{ padding: 60, textAlign: 'center', color: 'var(--fg-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                  <Icon name="loader-2" size={18} className="spin" style={{ opacity: 0.6 }} />
+                  <span style={{ fontSize: 13 }}>加载中…</span>
                 </div>
+              ) : tenantPageRows.length === 0 ? (
+                <EmptyState
+                  icon={tenantTab === 'enabled' ? 'server' : 'check-circle'}
+                  title={tenantTab === 'enabled' ? '暂无已开启租户' : '全部租户均已开启'}
+                  subtitle={tenantTab === 'enabled' ? '可在「未开启」中为租户启用邮件服务' : '没有待开启的租户'}
+                />
               ) : tenantPageRows.map((r, i) => (
                 <div key={r.tenantId} style={{
                   display: 'flex', alignItems: 'center', gap: 10,
@@ -559,11 +569,19 @@ function MailPage() {
             </div>
 
             <div style={{ minHeight: 390 }}>
-              {contactPageRows.length === 0 ? (
-                <div style={{ padding: 50, textAlign: 'center', color: 'var(--fg-3)', fontSize: 12 }}>
-                  <Icon name="user-plus" size={24} style={{ opacity: 0.4 }} />
-                  <div style={{ marginTop: 6 }}>{tr('mail.noContacts')}</div>
+              {!hasLoadedOnce ? (
+                <div style={{ padding: 60, textAlign: 'center', color: 'var(--fg-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                  <Icon name="loader-2" size={18} className="spin" style={{ opacity: 0.6 }} />
+                  <span style={{ fontSize: 13 }}>加载中…</span>
                 </div>
+              ) : contactPageRows.length === 0 ? (
+                <EmptyState
+                  icon="users"
+                  title="暂无收件人"
+                  subtitle="添加收件人后即可发送邮件"
+                  actionLabel="添加收件人"
+                  onAction={openAddContact}
+                />
               ) : contactPageRows.map((c, i) => (
                 <div key={c.id} style={{
                   display: 'flex', alignItems: 'center', gap: 10,
@@ -673,11 +691,23 @@ function MailPage() {
                 </tr>
               </thead>
               <tbody>
-                {recordPageRows.length === 0 ? (
+                {!hasLoadedOnce ? (
                   <tr>
-                    <td colSpan={5} style={{ padding: 40, textAlign: 'center', color: 'var(--fg-3)', fontSize: 12 }}>
-                      <Icon name="inbox" size={22} style={{ opacity: 0.4 }} />
-                      <div style={{ marginTop: 6 }}>{tr('mail.noRecords')}</div>
+                    <td colSpan={5} style={{ padding: 48, textAlign: 'center', color: 'var(--fg-3)' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+                        <Icon name="loader-2" size={18} className="spin" style={{ opacity: 0.6 }} />
+                        <span style={{ fontSize: 13 }}>加载中…</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : recordPageRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ padding: 0 }}>
+                      <EmptyState
+                        icon="mail"
+                        title="暂无发送记录"
+                        subtitle="发送邮件后此处将显示历史发送日志"
+                      />
                     </td>
                   </tr>
                 ) : recordPageRows.map((r, i) => {
@@ -758,7 +788,16 @@ function ObjectPage() {
     // 与实例列表一致：走 listParentTenants（TenantResp：id/tenancyName/region编码），
     // 避免 /tenants/list/json 的 region 被覆盖成中文导致下拉无法匹配。
     window.ociServices.tenant.listParentTenants()
-      .then(rows => { if (alive) setTenants((Array.isArray(rows) ? rows : []).map(t => ({ ...t, id: String(t.id) }))); })
+      .then(rows => {
+        if (!alive) return;
+        const normalized = (Array.isArray(rows) ? rows : []).map(t => ({ ...t, id: String(t.id) }));
+        normalized.sort((a, b) => {
+          const na = a.tenancyName || a.name || a.userName || '';
+          const nb = b.tenancyName || b.name || b.userName || '';
+          return na.localeCompare(nb, undefined, { sensitivity: 'base' });
+        });
+        setTenants(normalized);
+      })
       .catch(() => { if (alive) setTenants([]); });
     return () => { alive = false; };
   }, []);
@@ -768,7 +807,7 @@ function ObjectPage() {
   const [bucketSearch, setBucketSearch] = React.useState('');
   const [activeBucket, setActiveBucket] = React.useState(null);
   const [objectPage, setObjectPage] = React.useState(1);
-  const objectPageSize = 10;
+  const objectPageSize = 20;
 
   const currentTenant = tenants.find(t => t.id === tenantId);
 
@@ -944,7 +983,7 @@ function ObjectPage() {
         actions={
           <>
             <span style={{ fontSize: 12, color: 'var(--fg-3)', whiteSpace: 'nowrap' }}>{tr('obj.selectTenant')}</span>
-            <CustomDropdown value={tenantId} onChange={e => setTenantId(e)} height={32} width="240px">
+            <CustomDropdown value={tenantId} onChange={e => setTenantId(e)} height={32} width="240px" searchable={tenants.length > 5}>
               <option value="">{tr('obj.selectTenantPh')}</option>
               {tenants.map(t => (
                 <option key={t.id} value={t.id}>{getTenantLabel(t, lang)}</option>
@@ -1177,11 +1216,6 @@ function ObjectPage() {
                   {tr('obj.selectBucketHint')}
                 </div>
               </div>
-            ) : objectPageRows.length === 0 ? (
-              <div style={{ padding: 60, textAlign: 'center', color: 'var(--fg-3)', fontSize: 12 }}>
-                <Icon name="inbox" size={26} style={{ opacity: 0.35 }} />
-                <div style={{ marginTop: 6 }}>{objectsUnavailable ? tr('obj.objectsUnavailable') : tr('obj.noObjects')}</div>
-              </div>
             ) : (
               <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12 }}>
                 <thead>
@@ -1203,7 +1237,14 @@ function ObjectPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {objectPageRows.map((obj, i) => {
+                  {objectPageRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} style={{ padding: 60, textAlign: 'center', color: 'var(--fg-3)', fontSize: 12 }}>
+                        <Icon name="inbox" size={26} style={{ opacity: 0.35 }} />
+                        <div style={{ marginTop: 6 }}>{objectsUnavailable ? tr('obj.objectsUnavailable') : tr('obj.noObjects')}</div>
+                      </td>
+                    </tr>
+                  ) : objectPageRows.map((obj, i) => {
                     const info = objTypeInfo(obj.name);
                     return (
                       <tr key={obj.name} style={{ background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent' }}>
@@ -4432,8 +4473,9 @@ function SysVpnProxyPage() {
   const [proxies, setProxies] = React.useState([]);
   const [totalElements, setTotalElements] = React.useState(0);
   const [page, setPage] = React.useState(1);
-  const [perPage, setPerPage] = React.useState(10);
-  const [loading, setLoading] = React.useState(false);
+  const [perPage, setPerPage] = React.useState(20);
+  const [loading, setLoading] = React.useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
   const [parentTenants, setParentTenants] = React.useState([]);
   const [testingId, setTestingId] = React.useState(null);
   const [testingAll, setTestingAll] = React.useState(false);
@@ -4453,6 +4495,7 @@ function SysVpnProxyPage() {
       shell.showToast(e.message || tr('pageMisc.be71f1'), { kind: 'error' });
     } finally {
       setLoading(false);
+      setHasLoadedOnce(true);
     }
   }, []);
 
@@ -4632,11 +4675,23 @@ function SysVpnProxyPage() {
                   ))}
                 </tr>
               </thead>
-              <tbody>
-                {proxies.length === 0 ? (
-                  <tr><td colSpan={10} style={{ padding: 60, textAlign: 'center', color: 'var(--fg-3)', fontSize: 12 }}>
-                    <Icon name="inbox" size={26} style={{ opacity: 0.35 }} />
-                    <div style={{ marginTop: 6 }}>{tr('pageMisc.907619')}</div>
+              <tbody style={{ opacity: (loading && proxies.length > 0) ? 0.6 : 1, transition: 'opacity 120ms' }}>
+                {(loading || !hasLoadedOnce) && proxies.length === 0 ? (
+                  <tr><td colSpan={10} style={{ padding: 48, textAlign: 'center', color: 'var(--fg-3)' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+                      <Icon name="loader-2" size={18} className="spin" style={{ opacity: 0.6 }} />
+                      <span style={{ fontSize: 13 }}>加载中…</span>
+                    </div>
+                  </td></tr>
+                ) : proxies.length === 0 ? (
+                  <tr><td colSpan={10} style={{ padding: 0 }}>
+                    <EmptyState
+                      icon="shield"
+                      title="暂无代理配置"
+                      subtitle="点击「新增代理」配置 HTTP/HTTPS 出口代理"
+                      actionLabel="新增代理"
+                      onAction={() => openProxyModal(null)}
+                    />
                   </td></tr>
                 ) : proxies.map((p, i) => {
                   const st = statusCfg(p);

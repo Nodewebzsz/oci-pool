@@ -152,56 +152,128 @@ public class VerifyServiceImpl implements VerifyService {
 
     @Override
     public boolean isMessageEnabled() {
-        boolean flag = false;
-        // 获取Telegram配置
         TelegramConfig telegramConfig = systemConfigService.getTelegramConfig();
-        // 获取钉钉配置
         DingTalkConfig dingTalkConfig = systemConfigService.getDingTalkConfig();
-        //bark配置
         BarkConfig barkConfig = systemConfigService.getBarkConfig();
-
         FeishuConfig feishuConfig = systemConfigService.getFeishuConfig();
 
-        if (null != telegramConfig && telegramConfig.isEnabled()){
-            flag = true;
-        }
+        // 仅当通道处于启用状态且必要连接凭证完整时，才判定为可用验证码通道（防止未配置导致登录死锁）
+        boolean tgValid = telegramConfig != null && telegramConfig.isEnabled()
+                && org.apache.commons.lang3.StringUtils.isNotBlank(telegramConfig.getBotToken())
+                && org.apache.commons.lang3.StringUtils.isNotBlank(telegramConfig.getChatId());
 
-        if (null != dingTalkConfig && dingTalkConfig.isEnabled()){
-            flag = true;
-        }
+        boolean barkValid = barkConfig != null && barkConfig.isEnabled()
+                && org.apache.commons.lang3.StringUtils.isNotBlank(barkConfig.getDeviceKey());
 
-        if (null != barkConfig && barkConfig.isEnabled()){
-            flag = true;
-        }
+        boolean dingValid = dingTalkConfig != null && dingTalkConfig.isEnabled()
+                && org.apache.commons.lang3.StringUtils.isNotBlank(dingTalkConfig.getWebhook());
 
-        if (null != feishuConfig && feishuConfig.isEnabled()){
-            flag = true;
-        }
-        return flag;
+        boolean feishuValid = feishuConfig != null && feishuConfig.isEnabled()
+                && org.apache.commons.lang3.StringUtils.isNotBlank(feishuConfig.getWebhook());
+
+        return tgValid || barkValid || dingValid || feishuValid;
     }
 
     @Override
-    public void sendVerificationCodeForLogin(String username,HttpServletRequest  request) {
+    public void sendVerificationCodeForLogin(String username, HttpServletRequest request) {
         Optional<LoginUser> loginUserOptional = loginUserRepository.findByUsername(username);
-        if (!loginUserOptional.isPresent()){
+        if (!loginUserOptional.isPresent()) {
             final String clientIpAddress = getClientIpAddress(request).replace('.', '_');
-            messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplateText(String.format(MESSAGE_MALICIOUS_LOGIN_TEMPLATE_V_2,
-                    getCurrentPublicIpAndAddress(request), username,clientIpAddress,clientIpAddress));
+            sendToActiveChannels(String.format(MESSAGE_MALICIOUS_LOGIN_TEMPLATE_V_2,
+                    getCurrentPublicIpAndAddress(request), username, clientIpAddress, clientIpAddress));
             throw new IllegalStateException("用户名或密码错误");
         }
         LoginUser loginUser = loginUserOptional.get();
         log.debug("当前的用户信息是:{}", JSONUtil.toJsonStr(loginUser));
         // 生成6位随机验证码
         String verificationCode = generateVerificationCode();
-        log.info("当前用户:{} 登录的验证码是:{}",username,verificationCode);
+        log.info("当前用户:{} 登录的验证码是:{}", username, verificationCode);
         // 将验证码存入Guava Cache
         String cacheKey = VERIFICATION_CODE_LOGIN_PREFIX + username;
         verificationCodeCache.put(cacheKey, verificationCode);
 
-        try {
-            messageFactory.getType(MessageEnum.TELEGRAM).sendVerificationCodeMessage(username,verificationCode);
-        } catch (Exception e) {
-            log.error("消息发送失败,{}", e.getMessage(),e);
+        // 广播发送到所有已启用并配置完整的通道（TG、Bark、钉钉、飞书）
+        broadcastVerificationCode(username, verificationCode);
+    }
+
+    /**
+     * 将验证码广播到所有已配置并启用的通道
+     */
+    private void broadcastVerificationCode(String username, String verificationCode) {
+        TelegramConfig tg = systemConfigService.getTelegramConfig();
+        BarkConfig bark = systemConfigService.getBarkConfig();
+        DingTalkConfig ding = systemConfigService.getDingTalkConfig();
+        FeishuConfig feishu = systemConfigService.getFeishuConfig();
+
+        boolean sent = false;
+
+        if (tg != null && tg.isEnabled()
+                && org.apache.commons.lang3.StringUtils.isNotBlank(tg.getBotToken())
+                && org.apache.commons.lang3.StringUtils.isNotBlank(tg.getChatId())) {
+            try {
+                messageFactory.getType(MessageEnum.TELEGRAM).sendVerificationCodeMessage(username, verificationCode);
+                sent = true;
+                log.info("Telegram 验证码已发送给用户: {}", username);
+            } catch (Exception e) {
+                log.error("Telegram 验证码发送失败: {}", e.getMessage());
+            }
+        }
+
+        if (bark != null && bark.isEnabled() && org.apache.commons.lang3.StringUtils.isNotBlank(bark.getDeviceKey())) {
+            try {
+                messageFactory.getType(MessageEnum.BARK).sendVerificationCodeMessage(username, verificationCode);
+                sent = true;
+                log.info("Bark 验证码已发送给用户: {}", username);
+            } catch (Exception e) {
+                log.error("Bark 验证码发送失败: {}", e.getMessage());
+            }
+        }
+
+        if (ding != null && ding.isEnabled() && org.apache.commons.lang3.StringUtils.isNotBlank(ding.getWebhook())) {
+            try {
+                messageFactory.getType(MessageEnum.DING_DING).sendVerificationCodeMessage(username, verificationCode);
+                sent = true;
+                log.info("钉钉验证码已发送给用户: {}", username);
+            } catch (Exception e) {
+                log.error("钉钉验证码发送失败: {}", e.getMessage());
+            }
+        }
+
+        if (feishu != null && feishu.isEnabled() && org.apache.commons.lang3.StringUtils.isNotBlank(feishu.getWebhook())) {
+            try {
+                messageFactory.getType(MessageEnum.FEISHU).sendVerificationCodeMessage(username, verificationCode);
+                sent = true;
+                log.info("飞书验证码已发送给用户: {}", username);
+            } catch (Exception e) {
+                log.error("飞书验证码发送失败: {}", e.getMessage());
+            }
+        }
+
+        if (!sent) {
+            log.warn("用户 [{}] 触发了验证码，但未检测到任何已启用且配置完整的通道！", username);
+        }
+    }
+
+    /**
+     * 将普通模板消息发送到所有已启用的通道
+     */
+    private void sendToActiveChannels(String message) {
+        TelegramConfig tg = systemConfigService.getTelegramConfig();
+        BarkConfig bark = systemConfigService.getBarkConfig();
+        DingTalkConfig ding = systemConfigService.getDingTalkConfig();
+        FeishuConfig feishu = systemConfigService.getFeishuConfig();
+
+        if (tg != null && tg.isEnabled() && org.apache.commons.lang3.StringUtils.isNotBlank(tg.getBotToken())) {
+            try { messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplateText(message); } catch (Exception ignored) {}
+        }
+        if (bark != null && bark.isEnabled() && org.apache.commons.lang3.StringUtils.isNotBlank(bark.getDeviceKey())) {
+            try { messageFactory.getType(MessageEnum.BARK).sendMessageTemplate(message); } catch (Exception ignored) {}
+        }
+        if (ding != null && ding.isEnabled() && org.apache.commons.lang3.StringUtils.isNotBlank(ding.getWebhook())) {
+            try { messageFactory.getType(MessageEnum.DING_DING).sendMessageTemplate(message); } catch (Exception ignored) {}
+        }
+        if (feishu != null && feishu.isEnabled() && org.apache.commons.lang3.StringUtils.isNotBlank(feishu.getWebhook())) {
+            try { messageFactory.getType(MessageEnum.FEISHU).sendMessageTemplate(message); } catch (Exception ignored) {}
         }
     }
 
@@ -257,12 +329,12 @@ public class VerifyServiceImpl implements VerifyService {
         // 5. 设置发送频率限制（1分钟）
         verificationCodeCache.put(rateLimitKey, String.valueOf(System.currentTimeMillis()));
 
-        // 6. 发送验证码到消息通知
+        // 6. 发送验证码到消息通知（广播到所有已配置并启用的通道）
         try {
-            messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplate(String.format(MESSAGE_PASSWORD_RESET_CODE_TEMPLATE,username, verificationCode));
+            String resetMsg = String.format(MESSAGE_PASSWORD_RESET_CODE_TEMPLATE, username, verificationCode);
+            sendToActiveChannels(resetMsg);
         } catch (Exception e) {
             log.error("密码重置验证码发送失败，用户:{}, 错误:{}", username, e.getMessage(), e);
-            // 发送失败，清除验证码
             verificationCodeCache.invalidate(cacheKey);
             throw new IllegalStateException("验证码发送失败，请稍后重试");
         }

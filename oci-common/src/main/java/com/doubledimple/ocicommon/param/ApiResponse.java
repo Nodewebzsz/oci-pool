@@ -67,4 +67,17 @@ public class ApiResponse {
                 .code(500)
                 .build();
     }
+
+    /**
+     * 带自定义返回码的错误响应。
+     * 用于区分「参数非法（400）」与「服务端失败（500）」，前端只读 success / message，
+     * 因此该重载对既有调用方完全兼容。
+     */
+    public static ApiResponse error(int code, String message) {
+        return ApiResponse.builder()
+                .success(false)
+                .message(message)
+                .code(code)
+                .build();
+    }
 }

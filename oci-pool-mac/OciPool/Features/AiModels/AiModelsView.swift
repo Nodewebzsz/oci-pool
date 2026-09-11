@@ -14,7 +14,7 @@ struct AiModelsView: View {
     private var kpiGrid: some View {
         let enabledCount = model.configs.filter(\.enabled).count
         let region = model.configs.first(where: { !$0.region.isEmpty })?.region ?? "—"
-        return HStack(spacing: 14) {
+        return HStack(alignment: .top, spacing: 12) {
             kpiCard(icon: "cpu", color: AppTheme.info, label: "可用模型", value: "\(model.models.count)")
             kpiCard(icon: "checkmark.circle", color: AppTheme.sidebarActive, label: "已配置", value: "\(model.configs.count)")
             kpiCard(icon: "zap.fill", color: Color(hex: "b484e8"), label: "已启用", value: "\(enabledCount)")
@@ -23,24 +23,34 @@ struct AiModelsView: View {
     }
 
     private func kpiCard(icon: String, color: Color, label: String, value: String) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(color.opacity(0.18))
                     .frame(width: 36, height: 36)
                 Image(systemName: icon)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 17, weight: .medium))
                     .foregroundColor(color)
             }
-            VStack(alignment: .leading, spacing: 3) {
-                Text(label).font(.system(size: 11)).foregroundColor(AppTheme.sidebarText(dark))
-                Text(value).font(.system(size: 20, weight: .bold)).foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary).lineLimit(1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(AppTheme.textTertiary(dark))
+                    .lineLimit(1)
+                Text(value)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
             }
+            Spacer(minLength: 0)
         }
-        .padding(14)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.sidebarBg(dark)))
+        .background(AppTheme.sidebarBg(dark))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.border(dark), lineWidth: 1))
+        .cornerRadius(8)
     }
 
     /// Web 分类徽章：embed→向量(violet)、vision→视觉(cyan)、其余→对话(info)
@@ -102,22 +112,20 @@ struct AiModelsView: View {
                 VStack(spacing: 0) {
                     if !model.selectedTenantId.isEmpty {
                         kpiGrid
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
+                            .padding(.bottom, 12)
                     }
                     filterBar
+                        .padding(.bottom, 12)
                     if let err = model.errorText, !err.isEmpty {
                         Text(err)
                             .font(.system(size: 12))
                             .foregroundColor(AppTheme.danger)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 8)
+                            .padding(.bottom, 12)
                     }
-                    HStack(alignment: .top, spacing: 14) {
+                    HStack(alignment: .top, spacing: 12) {
                         availablePanel
                         configuredPanel
                     }
-                    .padding(16)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
@@ -131,33 +139,36 @@ struct AiModelsView: View {
     }
 
     private var filterBar: some View {
-        FilterBar(
-            leading: {
-                HStack(spacing: 10) {
-                    Text("租户")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(AppTheme.sidebarText(dark))
-                    SelectMenu(
-                        options: model.tenants.map { SelectOption(id: $0.id, title: $0.tname.isEmpty ? $0.name : $0.tname) },
-                        selection: Binding(
-                            get: { model.selectedTenantId.isEmpty ? nil : model.selectedTenantId },
-                            set: { model.onTenantChanged($0) }
-                        ),
-                        placeholder: model.isLoadingTenants ? "加载中…" : "选择支持 AI 的租户…",
-                        width: 280,
-                        allowClear: true,
-                        searchable: true
-                    )
-                }
-            },
-            trailing: {
-                Toggle(isOn: $model.linkTenantFilter) {
-                    Text("关联租户")
-                        .font(.system(size: 12))
-                }
-                .toggleStyle(SwitchToggleStyle(tint: AppTheme.sidebarActive))
+        HStack(spacing: 12) {
+            Text("租户")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(AppTheme.sidebarText(dark))
+            SelectMenu(
+                options: model.tenants.map { SelectOption(id: $0.id, title: $0.tname.isEmpty ? $0.name : $0.tname) },
+                selection: Binding(
+                    get: { model.selectedTenantId.isEmpty ? nil : model.selectedTenantId },
+                    set: { model.onTenantChanged($0) }
+                ),
+                placeholder: model.isLoadingTenants ? "加载中…" : "选择支持 AI 的租户…",
+                width: 280,
+                allowClear: true,
+                searchable: model.tenants.count > 5
+            )
+            Spacer()
+            Toggle(isOn: $model.linkTenantFilter) {
+                Text("关联租户")
+                    .font(.system(size: 12))
             }
+            .toggleStyle(SwitchToggleStyle(tint: AppTheme.sidebarActive))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
         )
+        .cornerRadius(8)
     }
 
     private var availablePanel: some View {

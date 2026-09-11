@@ -99,7 +99,7 @@ function ToastStack({ toasts }) {
 }
 
 // ─── Modal ───────────────────────────────────────────────────────
-function ModalShell({ title, subtitle, icon, iconColor = 'var(--accent)', size = 'md', body, footer, onClose }) {
+function ModalShell({ title, subtitle, icon, iconColor = 'var(--accent)', size = 'md', height, body, footer, onClose }) {
   React.useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -122,6 +122,7 @@ function ModalShell({ title, subtitle, icon, iconColor = 'var(--accent)', size =
         top: '50%', left: '50%',
         transform: 'translate(-50%, -50%)',
         width: w, maxWidth: '92vw',
+        height: height || undefined,
         maxHeight: '90vh',
         background: 'var(--bg-1)',
         border: '1px solid var(--border-strong)',
@@ -158,7 +159,11 @@ function ModalShell({ title, subtitle, icon, iconColor = 'var(--accent)', size =
             <IconButton icon="x" onClick={onClose} size={28} style={{ border: '1px solid var(--border)' }} />
           </div>
         )}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div style={{
+          flex: 1, minHeight: 0,
+          overflowY: height ? 'hidden' : 'auto',
+          display: 'flex', flexDirection: 'column',
+        }}>
           {body}
         </div>
         {footer && (
@@ -963,5 +968,5 @@ Object.assign(window, {
   DropdownMenu, RowActionMenu,
   KVList, SectionLabel, Stepper,
   FormRow, TextInput, PasswordInput, TextArea, NumberInput,
-  ToggleSwitch, RadioGroup, CheckboxGroup,
+  ToggleSwitch, Switch: ToggleSwitch, RadioGroup, CheckboxGroup,
 });

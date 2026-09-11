@@ -21,11 +21,10 @@ struct KeyConfigView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         if let err = model.errorText, !err.isEmpty {
                             errorBanner(err)
+                                .padding(.bottom, 12)
                         }
                         providerGroup
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -70,6 +69,7 @@ struct KeyConfigView: View {
                     icon: "cloud",
                     iconColor: AppTheme.orange,
                     enabled: $model.cloudflare.enabled,
+                    connected: model.cfConnected,
                     fields: {
                         secretField(
                             label: "API Key",
@@ -101,6 +101,7 @@ struct KeyConfigView: View {
                     icon: "drop.fill",
                     iconColor: AppTheme.info,
                     enabled: $model.edgeOne.enabled,
+                    connected: model.eoConnected,
                     fields: {
                         secretField(
                             label: "SecretId",
@@ -142,11 +143,12 @@ struct KeyConfigView: View {
         icon: String,
         iconColor: Color,
         enabled: Binding<Bool>,
+        connected: Bool? = nil,
         @ViewBuilder fields: () -> Fields,
         @ViewBuilder footer: () -> Footer
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            // ProviderHeader：icon 26(22% 底) + 名称 + 连接徽章 + 启用开关
+            // ProviderHeader：icon 26(22% 底) + 名称 + 状态徽章 + 启用开关
             HStack(spacing: 10) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 5)
@@ -159,7 +161,7 @@ struct KeyConfigView: View {
                 Text(name)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(AppTheme.navIcon(dark))
-                connectedBadge(connected: enabled.wrappedValue)
+                statusBadge(enabled: enabled.wrappedValue, connected: connected)
                 Spacer(minLength: 8)
                 Toggle("", isOn: enabled)
                     .toggleStyle(SwitchToggleStyle(tint: AppTheme.sidebarActive))
@@ -193,21 +195,43 @@ struct KeyConfigView: View {
         .animation(.easeInOut(duration: 0.2), value: enabled.wrappedValue)
     }
 
-    /// 连接徽章：accent-soft/danger-soft 底 + 描边 + 圆点
-    private func connectedBadge(connected: Bool) -> some View {
-        let color = connected ? AppTheme.sidebarActive : AppTheme.danger
+    /// 状态徽章：对齐 Web 模式A
+    /// 未测活时显示 已启用 / 未启用；测活后显示 已连接 / 未连接
+    private func statusBadge(enabled: Bool, connected: Bool?) -> some View {
+        let text: String
+        let color: Color
+        let bg: Color
+
+        if let c = connected {
+            if c {
+                text = "已连接"
+                color = AppTheme.sidebarActive
+                bg = AppearanceController.shared.accent.accentSoft(dark)
+            } else {
+                text = "未连接"
+                color = AppTheme.danger
+                bg = AppTheme.dangerSoft(dark)
+            }
+        } else if enabled {
+            text = "已启用"
+            color = AppTheme.sidebarActive
+            bg = AppearanceController.shared.accent.accentSoft(dark)
+        } else {
+            text = "未启用"
+            color = AppTheme.navIcon(dark).opacity(0.6)
+            bg = AppTheme.sidebarBg(dark)
+        }
+
         return HStack(spacing: 4) {
             Circle().fill(color).frame(width: 5, height: 5)
-            Text(connected ? "已连接" : "未连接")
+            Text(text)
                 .font(.system(size: 10.5, weight: .semibold))
                 .foregroundColor(color)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 2)
-        .background(
-            Capsule().fill(connected ? AppearanceController.shared.accent.accentSoft(dark) : AppTheme.dangerSoft(dark))
-        )
-        .overlay(Capsule().stroke(color, lineWidth: 1))
+        .background(Capsule().fill(bg))
+        .overlay(Capsule().stroke(color.opacity(0.8), lineWidth: 1))
     }
 
     /// 密码型字段：label(12 fg-1)+红* → 安全输入 + 复制钮 → hint(10.5 fg-3)

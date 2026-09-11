@@ -14,7 +14,8 @@ struct CloudflareDnsSheet: View {
             title: isEdit ? "编辑 DNS 记录" : "添加 DNS 记录",
             systemImage: isEdit ? "pencil" : "plus.circle",
             width: 480,
-            height: isEdit ? 420 : 460,
+            height: isEdit ? 410 : 440,
+            scrollableContent: false,
             onClose: { model.closeDnsForm() },
             footer: {
                 HStack {
@@ -98,45 +99,49 @@ struct CloudflareDnsSheet: View {
                             )
                         }
 
-                        FormFieldRow(label: "TTL") {
-                            SelectMenu(
-                                options: CloudflareJSON.ttlOptions,
-                                selection: Binding(
-                                    get: { "\(model.dnsForm?.ttl ?? 1)" },
-                                    set: { val in
-                                        guard var f = model.dnsForm else { return }
-                                        f.ttl = Int(val ?? "1") ?? 1
-                                        model.dnsForm = f
-                                    }
-                                ),
-                                placeholder: "TTL",
-                                width: 160,
-                                allowClear: false,
-                                searchable: false
-                            )
-                        }
+                        HStack(alignment: .top, spacing: 24) {
+                            FormFieldRow(label: "TTL") {
+                                SelectMenu(
+                                    options: CloudflareJSON.ttlOptions,
+                                    selection: Binding(
+                                        get: { "\(model.dnsForm?.ttl ?? 1)" },
+                                        set: { val in
+                                            guard var f = model.dnsForm else { return }
+                                            f.ttl = Int(val ?? "1") ?? 1
+                                            model.dnsForm = f
+                                        }
+                                    ),
+                                    placeholder: "TTL",
+                                    width: 140,
+                                    allowClear: false,
+                                    searchable: false
+                                )
+                            }
 
-                        if canProxy {
-                            Toggle(isOn: Binding(
-                                get: { model.dnsForm?.proxied ?? false },
-                                set: { val in
-                                    guard var f = model.dnsForm else { return }
-                                    f.proxied = val
-                                    model.dnsForm = f
-                                }
-                            )) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Cloudflare 代理")
-                                        .font(.system(size: 13, weight: .medium))
-                                    Text("橙云代理可隐藏源站 IP")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(AppTheme.sidebarText(dark))
+                            if canProxy {
+                                FormFieldRow(label: "Cloudflare 代理") {
+                                    HStack(spacing: 8) {
+                                        Toggle("", isOn: Binding(
+                                            get: { model.dnsForm?.proxied ?? false },
+                                            set: { val in
+                                                guard var f = model.dnsForm else { return }
+                                                f.proxied = val
+                                                model.dnsForm = f
+                                            }
+                                        ))
+                                        .toggleStyle(SwitchToggleStyle(tint: Color(hex: "f38020")))
+                                        .labelsHidden()
+
+                                        Text("橙云代理可隐藏源站 IP")
+                                            .font(.system(size: 11))
+                                            .foregroundColor(AppTheme.sidebarText(dark))
+                                    }
+                                    .frame(height: AppInputStyle.height)
                                 }
                             }
-                            .toggleStyle(SwitchToggleStyle(tint: Color(hex: "f38020")))
                         }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
             }
         )
@@ -202,7 +207,7 @@ struct CloudflareConfigSheet: View {
                                 }
                             ))
                             .labelsHidden()
-                            .toggleStyle(SwitchToggleStyle(tint: Color(hex: "f38020")))
+                            .toggleStyle(SwitchToggleStyle(tint: AppTheme.sidebarActive))
                         }
 
                         FormFieldRow(label: "API Key", required: true) {

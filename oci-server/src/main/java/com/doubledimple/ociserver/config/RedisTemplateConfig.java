@@ -49,12 +49,19 @@ public class RedisTemplateConfig {
         return dao;
     }
 
-    // 全部 bean 创建完成后,强制 sa-token 用 Redis dao(此时不再有其它 setSaTokenDao 覆盖)
+    // 全部 bean 创建完成后,检查 Redis 连通性:连通则启用 Redis 会话持久化;不可用时自动回退内存实现(本地单机/无Redis环境免配置)
     @Bean
-    public ApplicationListener<ContextRefreshedEvent> saTokenDaoProbe(SaTokenDao saTokenDaoRedis) {
+    public ApplicationListener<ContextRefreshedEvent> saTokenDaoProbe(RedisConnectionFactory factory, SaTokenDao saTokenDaoRedis) {
         return ev -> {
-            SaManager.setSaTokenDao(saTokenDaoRedis);
-            log.info("[sa-token] 生效 SaTokenDao = {}", SaManager.getSaTokenDao().getClass().getName());
+            try {
+                factory.getConnection().ping();
+                SaManager.setSaTokenDao(saTokenDaoRedis);
+                log.info("[sa-token] Redis 连接正常，生效 SaTokenDao = {}", SaManager.getSaTokenDao().getClass().getName());
+            } catch (Exception e) {
+                cn.dev33.satoken.dao.SaTokenDaoDefaultImpl memoryDao = new cn.dev33.satoken.dao.SaTokenDaoDefaultImpl();
+                SaManager.setSaTokenDao(memoryDao);
+                log.warn("[sa-token] Redis 连接不可用 ({}），已自动回退到内存会话 SaTokenDaoDefaultImpl", e.getMessage());
+            }
         };
     }
 }

@@ -37,6 +37,8 @@ final class NavigationState: ObservableObject {
     private var pendingInstancesFilter: PendingTenantListFilter?
     /// Consumed once by BootViewModel on appear.
     private var pendingBootFilter: PendingTenantListFilter?
+    /// Consumed once by TenantsViewModel on start: return from sub-page → tenant detail.
+    private var pendingDetailParent: TenantItem?
     /// 租户列表「AI」→ AI 对话页预选租户；由 AiChatViewModel 消费一次。
     private var pendingAiChatTenantId: Int64?
     /// 递增以通知已在 AI 对话页时再次切入（同页不重建 VC）。
@@ -55,25 +57,30 @@ final class NavigationState: ObservableObject {
     /// 子页面包屑显示的租户名（查看开机/资源列表共用）
     @Published private(set) var tenantSubPageName: String = ""
 
+    /// 从租户详情跳入时保存父租户对象，返回时可精准回到该租户详情
+    @Published var fromTenantDetailParent: TenantItem? = nil
+
     /// 租户详情 → 实例列表子页（对齐 Web page-tenant-resources）
-    func openInstances(parentId: String, regionId: String, tenantName: String = "") {
+    func openInstances(parentId: String, regionId: String, tenantName: String = "", parentTenant: TenantItem? = nil) {
         pendingInstancesFilter = PendingTenantListFilter(
             parentTenantId: parentId,
             regionTenantId: regionId,
             tenantName: tenantName
         )
         tenantSubPageName = tenantName
+        fromTenantDetailParent = parentTenant
         select(.tenantResources)
     }
 
     /// 租户详情 → 开机/抢机任务子页（对齐 Web page-tenant-grab）
-    func openBootTasks(parentId: String, regionId: String, tenantName: String = "") {
+    func openBootTasks(parentId: String, regionId: String, tenantName: String = "", parentTenant: TenantItem? = nil) {
         pendingBootFilter = PendingTenantListFilter(
             parentTenantId: parentId,
             regionTenantId: regionId,
             tenantName: tenantName
         )
         tenantSubPageName = tenantName
+        fromTenantDetailParent = parentTenant
         select(.tenantGrab)
     }
 
@@ -85,8 +92,18 @@ final class NavigationState: ObservableObject {
         }
     }
 
-    /// 子页返回租户列表
+    /// 子页返回上一级：若来自租户详情则返回该租户详情页，否则返回租户列表
     func closeTenantSubPage() {
+        if let parent = fromTenantDetailParent {
+            pendingDetailParent = parent
+            fromTenantDetailParent = nil
+        }
+        select(.tenants)
+    }
+
+    /// 点击面包屑最外层「OCI 租户管理」：清空层级直退大列表
+    func closeToTenantsList() {
+        fromTenantDetailParent = nil
         select(.tenants)
     }
 
@@ -100,6 +117,12 @@ final class NavigationState: ObservableObject {
         let f = pendingBootFilter
         pendingBootFilter = nil
         return f
+    }
+
+    func takePendingDetailParent() -> TenantItem? {
+        let p = pendingDetailParent
+        pendingDetailParent = nil
+        return p
     }
 
     /// 租户管理「AI」按钮 → 跳转 AI 对话整页并预选该租户（对齐 Web `/ai/chat?tenantId=`）

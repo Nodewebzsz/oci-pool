@@ -1881,7 +1881,7 @@ function openNetworkManageModal(shell, inst) {
               <span className="num" style={{ color: 'var(--fg-3)', fontSize: 11 }}>({state.vnics.length})</span>
             </div>
 
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 440 }}>
               <table style={{ width: '100%', minWidth: 980, borderCollapse: 'separate', borderSpacing: 0, fontSize: 12 }}>
                 <thead>
                   <tr>
@@ -1901,6 +1901,7 @@ function openNetworkManageModal(shell, inst) {
                         background: 'var(--bg-2)', color: 'var(--fg-3)',
                         fontSize: 10.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
                         borderBottom: '1px solid var(--border)',
+                        position: 'sticky', top: 0, zIndex: 1,
                       }}>{c.h}</th>
                     ))}
                   </tr>

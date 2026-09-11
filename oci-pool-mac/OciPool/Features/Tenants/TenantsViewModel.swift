@@ -8,7 +8,9 @@ final class TenantsViewModel: ObservableObject {
     @Published private(set) var rows: [TenantItem] = []
     @Published private(set) var isLoading = false
     @Published private(set) var errorText: String?
-    @Published var pageState = PageState(page: 0, size: 10)
+    /// 首次加载完成哨兵标记：首屏未加载完成前为 false，杜绝幽灵空态闪现
+    @Published private(set) var hasLoadedOnce = false
+    @Published var pageState = PageState(page: 0, size: 20)
     @Published var searchText = ""
     @Published var namesHidden = true
     @Published var activeSheet: TenantSheet?
@@ -19,8 +21,9 @@ final class TenantsViewModel: ObservableObject {
     @Published var addTenantId = ""
     @Published var addFingerprint = ""
     @Published var addTenancy = ""
-    @Published var addRegion = "ap-singapore-1"
+    @Published var addRegion = ""
     @Published var addKeyFileURL: URL?
+    @Published var addParsedCount = 0
     @Published var formError: String?
 
     // Generic edit
@@ -58,26 +61,28 @@ final class TenantsViewModel: ObservableObject {
     @Published var trafficAutoShutdown = false
     @Published var trafficStats = true
 
-    // Audit (full page, not sheet) — token 游标分页 + 统一 PaginationBar
+    // Audit (full page, not sheet) — OCI token 游标分页 + 「加载更多」追加模式
+    // 依据 UI_STANDARD.md 第四章 4.3/4.4：游标接口不得使用页码条 / 跳页框 / 「共 N 条」。
     @Published var auditParent: TenantItem?
     @Published var auditPageItems: [TenantAuditLogEntry] = []
-    @Published var auditPageState = PageState(page: 0, size: 50)
     @Published var auditStart = ""
     @Published var auditEnd = ""
+    /// 首屏加载中（骨架屏）
     @Published var auditLoading = false
+    /// 「加载更多」进行中（仅尾部追加，已有行保留）
+    @Published var auditLoadingMore = false
     @Published var auditError: String?
-    /// 当前页是否还有下一页（用于 range 文案的 + 提示）
+    /// 是否还有下一页（nextToken 非空）
     @Published var auditHasMore = false
-    /// 当前页展示序号起点（1-based）
-    @Published var auditRowStart = 1
+    /// 后端标记为演示数据（MODERN_UI_MOCK_DATA=true 且真实查询为空或失败）
+    @Published var auditMock = false
 
-    /// 已缓存的服务端页（0-based）
-    private var auditPageCache: [Int: [TenantAuditLogEntry]] = [:]
-    /// 请求第 N 页所需 pageToken（第 0 页无 token，不写入）
-    private var auditTokenForPage: [Int: String] = [:]
-    /// 第 N 页返回的 nextPageToken（有下一页才写入）
-    private var auditNextTokenByPage: [Int: String] = [:]
-    private var auditMaxKnownPageIndex = 0
+    /// 下一页 token —— 游标分页的唯一状态（原先四个字典 + 序号累加循环已收敛至此）
+    private var auditNextToken: String?
+    /// 已加载行数上限，防止无限追加拖垮界面
+    private let auditRowLimit = 2000
+    /// 与后端一致的区间上限
+    private static let auditMaxRangeDays = 90
 
     // Email
     @Published var emailDomain = ""
@@ -114,6 +119,8 @@ final class TenantsViewModel: ObservableObject {
     @Published var quotaRegionLabel = ""
     @Published var quotaError = ""
     @Published var quotaLoading = false
+    @Published var quotaHasLoadedOnce = false
+    @Published var costHasLoadedOnce = false
 
     // Boot volumes
     @Published var volumes: [TenantBootVolume] = []
@@ -156,22 +163,44 @@ final class TenantsViewModel: ObservableObject {
     @Published var regionSubscribedCount = 0
     @Published var regionUnsubscribedCount = 0
 
-    // 租户详情整页（Web `/tenants/regionList` → tenant_region_list.ftl）
+    // 租户详情整页（Web `/tenants/regionList` → 100% 对齐 Web page-tenant-detail.jsx）
     @Published var detailParent: TenantItem?
     @Published var detailRows: [TenantItem] = []
     @Published var detailLoading = false
     @Published var detailError: String?
     @Published var detailNamesHidden = true
 
+    // 租户详情选中的活跃区域与统计指标（100% 对齐 Web 4 项指标卡片与 7 大区域操作）
+    @Published var selectedRegionId: Int64? = nil
+    @Published var detailInstanceCount: Int = 0
+    @Published var detailRunningCount: Int = 0
+    @Published var detailBootTaskCount: Int = 0
+    @Published var detailScopedLoading: Bool = false
+    @Published var isSyncingRegion: Bool = false
+
+    var activeRegionRow: TenantItem? {
+        if let id = selectedRegionId, let match = detailRows.first(where: { $0.id == id }) {
+            return match
+        }
+        return detailRows.first(where: { $0.isHomeRegion }) ?? detailRows.first
+    }
+
     // Security rules sheet
     @Published var rulesTab = "ingress"
-    @Published var securityRules: [TenantSecurityRule] = []
+    @Published var ingressRules: [TenantSecurityRule] = []
+    @Published var egressRules: [TenantSecurityRule] = []
     @Published var rulesLoading = false
     @Published var rulesBusy = false
     @Published var ruleProtocol = "tcp"
     @Published var ruleSource = "0.0.0.0/0"
     @Published var rulePorts = ""
+    @Published var rulePortStart = ""
+    @Published var rulePortEnd = ""
     @Published var showAddRule = false
+    /// 正在编辑的规则索引（nil = 新增）
+    @Published var editingRuleIndex: Int? = nil
+    /// 一键模板选择器是否展开
+    @Published var showRuleTemplatePicker = false
 
     // MySQL sheet
     @Published var mysqlRows: [TenantMysqlInstance] = []
@@ -247,12 +276,22 @@ final class TenantsViewModel: ObservableObject {
 
     // MARK: - Lifecycle
 
-    func start() { Task { await reload() } }
+    func start() {
+        if let parent = NavigationState.shared.takePendingDetailParent() {
+            openRegionList(parent)
+            return
+        }
+        isLoading = true
+        Task { await reload() }
+    }
 
     func reload() async {
         isLoading = true
         errorText = nil
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoadedOnce = true
+        }
         do {
             let cloud = max(1, session.cloudProvider)
             let kw = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -275,6 +314,8 @@ final class TenantsViewModel: ObservableObject {
 
     func onSearchSubmit() {
         pageState.page = 0
+        rows = []
+        isLoading = true
         Task { await reload() }
     }
 
@@ -284,6 +325,8 @@ final class TenantsViewModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 400_000_000)
             guard !Task.isCancelled else { return }
             pageState.page = 0
+            rows = []
+            isLoading = true
             await reload()
         }
     }
@@ -482,20 +525,55 @@ final class TenantsViewModel: ObservableObject {
         activeSheet = .add
     }
 
-    func resetAdd() {
-        addConfigText = ""
+    func resetAddFields() {
         addUserName = ""
         addTenantId = ""
         addFingerprint = ""
         addTenancy = ""
-        addRegion = "ap-singapore-1"
+        addRegion = ""
         addKeyFileURL = nil
+        addParsedCount = 0
         formError = nil
     }
 
-    func parseAddConfig() {
+    func resetAdd() {
+        addConfigText = ""
+        resetAddFields()
+    }
+
+    func readFromClipboard() {
+        if let text = NSPasteboard.general.string(forType: .string), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            addConfigText = text
+            parseAddConfig(silent: false)
+            ToastCenter.shared.show("已从剪贴板读取配置", style: .info)
+        } else {
+            ToastCenter.shared.warn("剪贴板中没有有效配置文本")
+        }
+    }
+
+    func parseAddConfig(silent: Bool = true) {
         let text = addConfigText
-        // 1) key=value / key: value lines (Web parseOracleConfig)
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            // 清空配置输入框时，整个弹窗表单彻底重置
+            resetAddFields()
+            return
+        }
+
+        var fieldCount = 0
+
+        // 1) 提取 profile 名称作为自定义别名 (如 [DEFAULT] 或 [sanjose-free])
+        if let profileRegex = try? NSRegularExpression(pattern: #"^\s*\[([^\]]+)\]\s*$"#, options: .anchorsMatchLines) {
+            let ns = text as NSString
+            if let m = profileRegex.firstMatch(in: text, range: NSRange(location: 0, length: ns.length)), m.numberOfRanges > 1 {
+                let prof = ns.substring(with: m.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !prof.isEmpty && addUserName.isEmpty {
+                    addUserName = prof
+                    fieldCount += 1
+                }
+            }
+        }
+
+        // 2) key=value / key: value lines (Web parseOracleConfig)
         var map: [String: String] = [:]
         for line in text.split(whereSeparator: \.isNewline) {
             let s = line.trimmingCharacters(in: .whitespaces)
@@ -509,12 +587,30 @@ final class TenantsViewModel: ObservableObject {
             v = v.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
             map[k] = v
         }
-        if let v = map["user"] ?? map["username"] ?? map["userocid"] ?? map["apiuser"] { addTenantId = v }
-        if let v = map["fingerprint"] ?? map["apifingerprint"] { addFingerprint = v }
-        if let v = map["tenancy"] ?? map["tenancyocid"] ?? map["rootcompartment"] { addTenancy = v }
-        if let v = map["region"] ?? map["homeregion"] { addRegion = v }
-        if let v = map["name"] ?? map["label"] ?? map["username"] { if addUserName.isEmpty { addUserName = v } }
-        // 2) OCI config file style [DEFAULT]
+        if let v = map["user"] ?? map["username"] ?? map["userocid"] ?? map["apiuser"], !v.isEmpty {
+            addTenantId = v
+            fieldCount += 1
+        }
+        if let v = map["fingerprint"] ?? map["apifingerprint"], !v.isEmpty {
+            addFingerprint = v
+            fieldCount += 1
+        }
+        if let v = map["tenancy"] ?? map["tenancyocid"] ?? map["rootcompartment"], !v.isEmpty {
+            addTenancy = v
+            fieldCount += 1
+        }
+        if let v = map["region"] ?? map["homeregion"], !v.isEmpty {
+            addRegion = v
+            fieldCount += 1
+        }
+        if let v = map["name"] ?? map["label"] ?? map["alias"], !v.isEmpty {
+            if addUserName.isEmpty {
+                addUserName = v
+                fieldCount += 1
+            }
+        }
+
+        // 3) OCID 自动兜底提取
         if text.contains("ocid1.user") || text.contains("ocid1.tenancy") {
             let pattern = "ocid1\\.[a-z]+\\.oc1\\.[^\\s\"',}]+"
             if let regex = try? NSRegularExpression(pattern: pattern) {
@@ -522,21 +618,58 @@ final class TenantsViewModel: ObservableObject {
                 let matches = regex.matches(in: text, range: NSRange(location: 0, length: ns.length))
                 for m in matches {
                     let ocid = ns.substring(with: m.range)
-                    if ocid.contains(".user.") { addTenantId = ocid }
-                    if ocid.contains(".tenancy.") { addTenancy = ocid }
+                    if ocid.contains(".user.") && addTenantId.isEmpty {
+                        addTenantId = ocid
+                        fieldCount += 1
+                    }
+                    if ocid.contains(".tenancy.") && addTenancy.isEmpty {
+                        addTenancy = ocid
+                        fieldCount += 1
+                    }
                 }
             }
         }
-        // 3) fingerprint pattern
+
+        // 4) fingerprint pattern
         if addFingerprint.isEmpty {
             let fp = "([0-9a-fA-F]{2}:){15}[0-9a-fA-F]{2}"
             if let regex = try? NSRegularExpression(pattern: fp),
                let m = regex.firstMatch(in: text, range: NSRange(location: 0, length: (text as NSString).length)) {
                 addFingerprint = (text as NSString).substring(with: m.range)
+                fieldCount += 1
             }
         }
-        if addUserName.isEmpty, !addTenantId.isEmpty {
-            addUserName = "api-\(String(addTenantId.suffix(6)))"
+
+        // 5) 自动提取 PEM 私钥块并保存到临时文件
+        let pemPattern = "-----BEGIN[^-]+-----[\\s\\S]+?-----END[^-]+-----"
+        if let regex = try? NSRegularExpression(pattern: pemPattern) {
+            let ns = text as NSString
+            if let m = regex.firstMatch(in: text, range: NSRange(location: 0, length: ns.length)) {
+                let pem = ns.substring(with: m.range).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !pem.isEmpty {
+                    let tmpPath = NSTemporaryDirectory() + "oci_key_\(UUID().uuidString).pem"
+                    if let _ = try? pem.write(toFile: tmpPath, atomically: true, encoding: .utf8) {
+                        addKeyFileURL = URL(fileURLWithPath: tmpPath)
+                        fieldCount += 1
+                    }
+                }
+            }
+        }
+
+        // 6) 别名缺省兜底
+        if addUserName.isEmpty, !addTenancy.isEmpty {
+            addUserName = "oci-\(String(addTenancy.suffix(6)))"
+            fieldCount += 1
+        }
+
+        addParsedCount = fieldCount
+
+        if !silent {
+            if fieldCount > 0 {
+                ToastCenter.shared.show("✓ 已成功识别并填充 \(fieldCount) 个字段", style: .info)
+            } else {
+                ToastCenter.shared.warn("未识别到任何有效配置字段")
+            }
         }
     }
 
@@ -580,9 +713,11 @@ final class TenantsViewModel: ObservableObject {
                     ], keyFileURL: keyURL)
                     activeSheet = nil
                     pageState.page = 0
+                    ToastCenter.shared.show("✓ 租户导入成功", style: .info)
                     await reload()
                 } catch {
                     formError = error.localizedDescription
+                    ToastCenter.shared.error(error.localizedDescription)
                 }
             }
         }
@@ -590,9 +725,10 @@ final class TenantsViewModel: ObservableObject {
 
     // MARK: - Users sheet (users / notifications / mfa + password policy)
 
-    func openUsers(_ item: TenantItem) {
-        userManageParent = item
-        userTab = .users
+    func openUsers(_ item: TenantItem, tab: TenantUserTab = .users) {
+        userManageParent = nil
+        activeSheet = .users(item)
+        userTab = tab
         users = []
         groups = []
         showAddUser = false
@@ -600,11 +736,20 @@ final class TenantsViewModel: ObservableObject {
         notifyEmails = []
         mfaStatusText = "加载中…"
         mfaDetailLines = []
-        Task { await loadUsersAndGroups(item) }
+        Task {
+            if tab == .notifications {
+                await loadNotifyEmails(item)
+            } else if tab == .mfa {
+                await loadMfa(item)
+            } else {
+                await loadUsersAndGroups(item)
+            }
+        }
     }
 
     func closeUserManage() {
         userManageParent = nil
+        activeSheet = nil
         users = []
         groups = []
         showAddUser = false
@@ -854,6 +999,8 @@ final class TenantsViewModel: ObservableObject {
             } catch {
                 trafficThreshold = ""
             }
+            // 同步加载通知邮箱列表供预警弹窗展示
+            await loadNotifyEmails(item)
         }
     }
 
@@ -883,158 +1030,173 @@ final class TenantsViewModel: ObservableObject {
         let today = Self.todayDateString()
         auditParent = item
         resetAuditPagination()
+        // 默认近 1 天，对齐原项目 mobile/audit_log.ftl
         auditStart = today
         auditEnd = today
-        Task { await loadAuditPage(0) }
+        Task { await loadAuditFirstPage() }
     }
 
     func closeAudit() {
         auditParent = nil
         resetAuditPagination()
         auditLoading = false
+        auditLoadingMore = false
+    }
+
+    /// 快捷区间按钮：近 N 天（含今天）
+    func applyAuditQuickRange(_ days: Int) {
+        guard days > 0 else { return }
+        let today = Date()
+        let calendar = Calendar.current
+        let from = calendar.date(byAdding: .day, value: -(days - 1), to: today) ?? today
+        auditStart = Self.auditDateFormatter.string(from: from)
+        auditEnd = Self.auditDateFormatter.string(from: today)
+        guard let item = auditParent else { return }
+        searchAudit(item)
+    }
+
+    /// 快捷区间「近 N 天」当前是否生效（用于 chip 高亮）。
+    /// 用日期值反推而非存状态，避免手动改日期后 chip 高亮与实际区间不一致。
+    func isAuditQuickRangeActive(_ days: Int) -> Bool {
+        guard days > 0 else { return false }
+        let today = Date()
+        let calendar = Calendar.current
+        let from = calendar.date(byAdding: .day, value: -(days - 1), to: today) ?? today
+        return auditStart == Self.auditDateFormatter.string(from: from)
+            && auditEnd == Self.auditDateFormatter.string(from: today)
+    }
+
+    /// 当前日期区间是否不匹配任何快捷区间（「自定义」高亮）
+    var isAuditRangeCustom: Bool {
+        [1, 3, 7, 30].allSatisfy { !isAuditQuickRangeActive($0) }
     }
 
     func searchAudit(_ item: TenantItem) {
         let start = auditStart.trimmingCharacters(in: .whitespacesAndNewlines)
         let endRaw = auditEnd.trimmingCharacters(in: .whitespacesAndNewlines)
         let end = endRaw.isEmpty ? start : endRaw
+
         guard !start.isEmpty else {
             ToastCenter.shared.error("请选择开始日期")
             return
         }
-        if start > end {
+        // 格式校验：非 yyyy-MM-dd 直接拦下。后端 LocalDate.parse 会抛参数异常，
+        // 若不在前端拦住，用户会拿到一条语义不清的错误。
+        guard Self.isValidAuditDate(start), Self.isValidAuditDate(end),
+              let startDate = Self.auditDateFormatter.date(from: start),
+              let endDate = Self.auditDateFormatter.date(from: end) else {
+            ToastCenter.shared.error("日期格式不正确，应为 yyyy-MM-dd")
+            return
+        }
+        guard startDate <= endDate else {
             ToastCenter.shared.error("开始日期不能晚于结束日期")
             return
         }
+        // 区间上限 90 天：与后端一致，提前拦下（超限在后端会被参数异常拦掉）
+        let spanDays = (Calendar.current.dateComponents([.day], from: startDate, to: endDate).day ?? 0) + 1
+        guard spanDays <= Self.auditMaxRangeDays else {
+            ToastCenter.shared.error("日期范围不能超过 90 天（当前 \(spanDays) 天）")
+            return
+        }
+
         auditEnd = end
         resetAuditPagination()
-        Task { await loadAuditPage(0) }
+        Task { await loadAuditFirstPage() }
     }
 
-    /// 刷新当前查询（从第 1 页重拉）
+    /// 刷新当前查询（清空已加载行，从第一页重拉）
     func reloadAudit() {
         guard auditParent != nil else { return }
         resetAuditPagination()
-        Task { await loadAuditPage(0) }
+        Task { await loadAuditFirstPage() }
     }
 
-    /// PaginationBar 页码变化
-    func onAuditPageChange() {
-        let page = auditPageState.page
-        if let cached = auditPageCache[page] {
-            applyAuditPage(page, items: cached)
-            return
+    /// 「加载更多」：带 nextToken 请求并追加到列表尾部，已有行不消失
+    func loadMoreAudit() {
+        guard auditHasMore, !auditLoading, !auditLoadingMore else { return }
+        guard auditPageItems.count < auditRowLimit else { return }
+        auditLoadingMore = true
+        Task {
+            await fetchAuditPage(token: auditNextToken, append: true)
+            auditLoadingMore = false
         }
-        Task { await loadAuditPage(page) }
+    }
+
+    /// 是否已达加载上限
+    var auditReachedLimit: Bool {
+        auditPageItems.count >= auditRowLimit
+    }
+
+    /// 底部文案：已加载 N 条 [· 还有更多 / · 已达上限，请缩小时间范围]
+    var auditFooterText: String {
+        let loaded = auditPageItems.count
+        if auditReachedLimit {
+            return "已加载 \(loaded) 条 · 已达上限，请缩小时间范围"
+        }
+        return auditHasMore ? "已加载 \(loaded) 条 · 还有更多" : "已加载 \(loaded) 条"
     }
 
     private func resetAuditPagination() {
-        auditPageCache = [:]
-        auditTokenForPage = [:]
-        auditNextTokenByPage = [:]
-        auditMaxKnownPageIndex = 0
+        auditNextToken = nil
         auditPageItems = []
-        auditPageState = PageState(page: 0, size: 50)
         auditHasMore = false
-        auditRowStart = 1
+        auditMock = false
         auditError = nil
     }
 
-    func loadAuditPage(_ page: Int) async {
-        if page > 0, auditTokenForPage[page] == nil, auditPageCache[page] == nil {
-            // 未发现的页不可跳
-            if let fallback = auditPageCache.keys.sorted().last {
-                applyAuditPage(fallback, items: auditPageCache[fallback] ?? [])
-            }
-            return
-        }
-        if let cached = auditPageCache[page] {
-            applyAuditPage(page, items: cached)
-            return
-        }
-
+    private func loadAuditFirstPage() async {
         auditLoading = true
         defer { auditLoading = false }
+        await fetchAuditPage(token: nil, append: false)
+    }
 
-        let token: String? = page == 0 ? nil : auditTokenForPage[page]
-
+    /// 统一取数：append=false 覆盖（首屏/刷新），append=true 追加（加载更多）
+    private func fetchAuditPage(token: String?, append: Bool) async {
+        guard let item = auditParent else { return }
         do {
-            guard let item = auditParent else { return }
             let result = try await service.auditLogs(
                 tenantId: item.id,
                 start: auditStart.isEmpty ? nil : auditStart,
                 end: auditEnd.isEmpty ? nil : auditEnd,
                 pageToken: token
             )
-            auditPageCache[page] = result.items
-            if let next = result.nextPageToken, !next.isEmpty {
-                auditNextTokenByPage[page] = next
-                auditTokenForPage[page + 1] = next
-                auditMaxKnownPageIndex = max(auditMaxKnownPageIndex, page + 1)
+            auditMock = result.mock
+            if append {
+                auditPageItems.append(contentsOf: result.items)
             } else {
-                auditNextTokenByPage.removeValue(forKey: page)
-                auditMaxKnownPageIndex = max(auditMaxKnownPageIndex, page)
+                auditPageItems = result.items
             }
-            applyAuditPage(page, items: result.items)
+            if auditPageItems.count >= auditRowLimit {
+                auditPageItems = Array(auditPageItems.prefix(auditRowLimit))
+                auditNextToken = nil
+            } else {
+                auditNextToken = result.nextPageToken
+            }
+            auditHasMore = !(auditNextToken ?? "").isEmpty
+            auditError = nil
         } catch {
             auditError = error.localizedDescription
             ToastCenter.shared.error(error.localizedDescription)
         }
     }
 
-    private func applyAuditPage(_ page: Int, items: [TenantAuditLogEntry]) {
-        auditPageItems = items
-        auditPageState.page = page
-
-        var start = 0
-        if page > 0 {
-            for p in 0..<page {
-                start += (auditPageCache[p]?.count ?? 0)
-            }
-        }
-        auditRowStart = start + 1
-
-        let loaded = auditPageCache.values.reduce(0) { $0 + $1.count }
-        let hasMore = auditNextTokenByPage[page] != nil
-        auditHasMore = hasMore
-
-        var totalPages = auditMaxKnownPageIndex + 1
-        if hasMore {
-            totalPages = max(totalPages, page + 2)
-        }
-        if items.isEmpty && page == 0 && !hasMore {
-            auditPageState.apply(totalElements: 0, totalPages: 0)
-        } else {
-            // size 取当前页条数，避免 range 文案与真实行数偏差过大
-            let pageSize = max(items.count, 1)
-            if auditPageState.size != pageSize {
-                auditPageState.size = pageSize
-            }
-            auditPageState.apply(
-                totalElements: Int64(max(loaded, 0)),
-                totalPages: max(totalPages, 1)
-            )
-        }
-    }
-
-    /// PaginationBar 右侧统计文案
-    var auditRangeText: String {
-        let loaded = auditPageCache.values.reduce(0) { $0 + $1.count }
-        let pageCount = auditPageItems.count
-        let cur = auditPageState.displayPage
-        let total = max(auditPageState.totalPages, 1)
-        let plus = auditHasMore ? "+" : ""
-        if loaded == 0 {
-            return "共 0 条"
-        }
-        return "第 \(cur)/\(total)\(plus) 页 · 本页 \(pageCount) 条 · 已加载 \(loaded)\(plus) 条"
-    }
-
-    private static func todayDateString() -> String {
+    private static let auditDateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "yyyy-MM-dd"
-        return f.string(from: Date())
+        return f
+    }()
+
+    /// 严格校验 yyyy-MM-dd：正则 + 实际可解析（拦掉 2026-02-31 这类）
+    private static func isValidAuditDate(_ s: String) -> Bool {
+        guard s.range(of: "^\\d{4}-\\d{2}-\\d{2}$", options: .regularExpression) != nil else {
+            return false
+        }
+        return auditDateFormatter.date(from: s) != nil
+    }
+
+    private static func todayDateString() -> String {
+        auditDateFormatter.string(from: Date())
     }
 
     func openEmail(_ item: TenantItem) {
@@ -1237,7 +1399,10 @@ final class TenantsViewModel: ObservableObject {
         }
         quotaLoading = true
         quotaError = ""
-        defer { quotaLoading = false }
+        defer {
+            quotaLoading = false
+            quotaHasLoadedOnce = true
+        }
         do {
             let r = try await service.quota(
                 tenantId: tid,
@@ -1573,9 +1738,13 @@ final class TenantsViewModel: ObservableObject {
         FloatingMenuDismiss.all()
         detailParent = item
         detailRows = []
+        selectedRegionId = item.id
         detailError = nil
         detailNamesHidden = namesHidden
         detailLoading = true
+        detailInstanceCount = 0
+        detailRunningCount = 0
+        detailBootTaskCount = 0
         Task { await reloadDetail() }
     }
 
@@ -1583,6 +1752,10 @@ final class TenantsViewModel: ObservableObject {
         FloatingMenuDismiss.all()
         detailParent = nil
         detailRows = []
+        selectedRegionId = nil
+        detailInstanceCount = 0
+        detailRunningCount = 0
+        detailBootTaskCount = 0
         detailError = nil
         detailLoading = false
         regionChildren = []
@@ -1610,12 +1783,12 @@ final class TenantsViewModel: ObservableObject {
                         hasChildren: $0.hasChildren
                     )
                 }
-                return
+            } else {
+                // 空结果时兜底 listRegions
+                let regs = try await service.listRegions(parentId: parent.id)
+                regionChildren = regs
+                detailRows = Self.uniqueDetailRows(detailRowsFallback(parent: parent, regs: regs))
             }
-            // 空结果时兜底 listRegions
-            let regs = try await service.listRegions(parentId: parent.id)
-            regionChildren = regs
-            detailRows = Self.uniqueDetailRows(detailRowsFallback(parent: parent, regs: regs))
         } catch {
             detailError = error.localizedDescription
             // 兜底：列表上的 children（按 id 去重，避免 SwiftUI ForEach 崩溃）
@@ -1624,6 +1797,61 @@ final class TenantsViewModel: ObservableObject {
             } else {
                 detailRows = [parent]
             }
+        }
+
+        // 默认选中 home region 或首个区域
+        if selectedRegionId == nil || !detailRows.contains(where: { $0.id == selectedRegionId }) {
+            selectedRegionId = detailRows.first(where: { $0.isHomeRegion })?.id ?? detailRows.first?.id
+        }
+
+        if let active = activeRegionRow {
+            await loadScopedResources(for: active.id)
+        }
+    }
+
+    func selectRegion(_ id: Int64) {
+        selectedRegionId = id
+        Task {
+            await loadScopedResources(for: id)
+        }
+    }
+
+    func loadScopedResources(for tenantId: Int64) async {
+        detailScopedLoading = true
+        defer { detailScopedLoading = false }
+        let instService = InstancesService(baseURL: session.serverURL)
+        let bootService = BootService(baseURL: session.serverURL)
+        do {
+            async let instTask = instService.list(page: 0, size: 500, tenantId: "\(tenantId)")
+            async let bootTask = bootService.list(page: 0, size: 500, tenantId: "\(tenantId)")
+            let (instList, bootList) = try await (instTask, bootTask)
+            await MainActor.run {
+                self.detailInstanceCount = instList.content.count
+                self.detailRunningCount = instList.content.filter { $0.state.uppercased() == "RUNNING" }.count
+                // 仅统计正在进行中（开机中/高频发包）的任务数：openBootFlag 为 true 或 status == 1
+                let runningTasks = bootList.content.filter { $0.openBootFlag || $0.status == 1 }
+                self.detailBootTaskCount = runningTasks.count
+            }
+        } catch {
+            await MainActor.run {
+                self.detailInstanceCount = 0
+                self.detailRunningCount = 0
+                self.detailBootTaskCount = 0
+            }
+        }
+    }
+
+    func syncActiveRegion() async {
+        guard let row = activeRegionRow else { return }
+        isSyncingRegion = true
+        defer { isSyncingRegion = false }
+        do {
+            ToastCenter.shared.show("开始同步区域 \(row.region) 实例…", style: .info)
+            try await service.syncOci(tenantId: row.id)
+            await reloadDetail()
+            ToastCenter.shared.success("实例同步完成（\(detailInstanceCount) 个实例）")
+        } catch {
+            ToastCenter.shared.error("同步失败: \(error.localizedDescription)")
         }
     }
 
@@ -1749,23 +1977,33 @@ final class TenantsViewModel: ObservableObject {
 
     /// 详情页 → 实例列表（Web `/oci/list?tenantId=`）
     func openInstancesList(_ item: TenantItem) {
-        let parentId = detailParent.map { "\($0.id)" } ?? "\(item.id)"
+        let parent = detailParent ?? item
+        let parentId = "\(parent.id)"
         let regionId = "\(item.id)"
-        let name = detailParent.map { $0.defName.isEmpty ? $0.userName : $0.defName } ?? item.userName
-        NavigationState.shared.openInstances(parentId: parentId, regionId: regionId, tenantName: name)
+        // 租户名优先使用真实的租户名称（如 lsrndzz2），而非自定义别名
+        let name = parent.displayName
+        NavigationState.shared.openInstances(parentId: parentId, regionId: regionId, tenantName: name, parentTenant: parent)
     }
 
     /// 详情页 → 抢机/开机任务（Web `/boot/fullBootList?tenantId=`）
     func openBootTaskList(_ item: TenantItem) {
-        let parentId = detailParent.map { "\($0.id)" } ?? "\(item.id)"
+        let parent = detailParent ?? item
+        let parentId = "\(parent.id)"
         let regionId = "\(item.id)"
-        let name = detailParent.map { $0.defName.isEmpty ? $0.userName : $0.defName } ?? item.userName
-        NavigationState.shared.openBootTasks(parentId: parentId, regionId: regionId, tenantName: name)
+        // 租户名优先使用真实的租户名称（如 lsrndzz2），而非自定义别名
+        let name = parent.displayName
+        NavigationState.shared.openBootTasks(parentId: parentId, regionId: regionId, tenantName: name, parentTenant: parent)
+    }
+
+    /// 当前 tab 的规则（computed，供 UI/内部统一取当前展示列表）
+    var currentRules: [TenantSecurityRule] {
+        rulesTab == "egress" ? egressRules : ingressRules
     }
 
     func openSecurityRules(_ item: TenantItem) {
         rulesTab = "ingress"
-        securityRules = []
+        ingressRules = []
+        egressRules = []
         showAddRule = false
         rulesBusy = false
         activeSheet = .securityRules(item)
@@ -1774,19 +2012,22 @@ final class TenantsViewModel: ObservableObject {
 
     func loadSecurityRules(_ item: TenantItem) {
         rulesLoading = true
-        let tab = rulesTab
         let tid = item.id
         Task {
+            async let a = service.securityRules(tenantId: tid, type: "ingress")
+            async let e = service.securityRules(tenantId: tid, type: "egress")
             do {
-                let list = try await service.securityRules(tenantId: tid, type: tab)
+                let (ingress, egress) = try await (a, e)
                 await MainActor.run {
-                    self.securityRules = list
+                    self.ingressRules = ingress
+                    self.egressRules = egress
                     self.rulesLoading = false
                 }
             } catch {
                 await MainActor.run {
                     ToastCenter.shared.error(error.localizedDescription)
-                    self.securityRules = []
+                    self.ingressRules = []
+                    self.egressRules = []
                     self.rulesLoading = false
                 }
             }
@@ -1795,31 +2036,144 @@ final class TenantsViewModel: ObservableObject {
 
     func switchRulesTab(_ tab: String, item: TenantItem) {
         rulesTab = tab
-        securityRules = []
-        loadSecurityRules(item)
+    }
+
+    /// 由起止端口合并为提交字符串（对齐 Web portsToStr）
+    private var mergedRulePorts: String {
+        let s = rulePortStart.trimmingCharacters(in: .whitespacesAndNewlines)
+        let e = rulePortEnd.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.isEmpty { return "" }
+        if e.isEmpty || e == s { return s }
+        return "\(s)-\(e)"
     }
 
     func saveSecurityRule(_ item: TenantItem) {
         let source = ruleSource.trimmingCharacters(in: .whitespacesAndNewlines)
-        let ports = rulePorts.trimmingCharacters(in: .whitespacesAndNewlines)
+        let protocolValue = ruleProtocol
+        let ports = mergedRulePorts
         guard !source.isEmpty else {
             ToastCenter.shared.error("请填写源地址")
             return
+        }
+        // 对齐 Web isDangerForm：开放全地址 + 全协议 / 高危端口 → 保存前二次确认
+        if isDangerSecurityRule(protocolValue: protocolValue, source: source, ports: ports) {
+            let ruleDesc = "\(protocolValue.uppercased()) · \(source)" + (ports.isEmpty ? "" : " · 端口: \(ports)")
+            guard AppAlert.confirm(
+                title: "高危安全规则",
+                message: "该规则面向全网开放，可能将服务器暴露于公网攻击面，请确认是否继续？规则：\(ruleDesc)",
+                confirmTitle: "已知晓风险，确认添加",
+                style: .critical
+            ) else { return }
         }
         Task {
             await self.runSheetBusy(flag: \.rulesBusy) {
                 try await self.service.addSecurityRule(
                     tenantId: item.id,
                     type: self.rulesTab,
-                    protocolValue: self.ruleProtocol,
+                    protocolValue: protocolValue,
                     source: source,
                     ports: ports
                 )
-                self.showAddRule = false
-                self.rulePorts = ""
+                self.closeRuleForm()
                 self.loadSecurityRules(item)
             }
         }
+    }
+
+    /// 对齐 Web openConfirm：开始编辑已有规则（回填表单）
+    func beginEditRule(at index: Int) {        guard index < currentRules.count else { return }
+        let rule = currentRules[index]
+        editingRuleIndex = index
+        ruleProtocol = normalizeProtocolForForm(rule.protocolValue)
+        ruleSource = rule.source.isEmpty ? "0.0.0.0/0" : rule.source
+        let portStr = rule.portsDisplay == "—" ? "" : rule.ports
+        let split = splitPortRange(portStr)
+        rulePortStart = split.start
+        rulePortEnd = split.end
+        rulePorts = portStr
+        showAddRule = true
+    }
+
+    /// 对齐 Web strToPorts：拆分端口范围为起止（"80-443"→(80,443)，否则("80-443","")）
+    private func splitPortRange(_ s: String) -> (start: String, end: String) {
+        let parts = s.split(separator: "-", maxSplits: 1).map(String.init)
+        if parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty {
+            return (parts[0], parts[1])
+        }
+        return (s, "")
+    }
+
+    /// 对齐 Web 行「复制」：直接复制一条相同规则（应用高危二次确认）
+    func copyRule(at index: Int, item: TenantItem) {
+        guard index < currentRules.count else { return }
+        let rule = currentRules[index]
+        let source = rule.source.isEmpty ? "0.0.0.0/0" : rule.source
+        let ports = rule.portsDisplay == "—" ? "" : rule.ports
+        let proto = normalizeProtocolForForm(rule.protocolValue)
+        // 复制高危规则同样需要二次确认
+        if isDangerSecurityRule(protocolValue: proto, source: source, ports: ports) {
+            let ruleDesc = "\(proto.uppercased()) · \(source)" + (ports.isEmpty ? "" : " · 端口: \(ports)")
+            guard AppAlert.confirm(
+                title: "高危安全规则",
+                message: "该规则面向全网开放，可能将服务器暴露于公网攻击面，请确认是否继续？规则：\(ruleDesc)",
+                confirmTitle: "已知晓风险，确认添加",
+                style: .critical
+            ) else { return }
+        }
+        Task {
+            await self.runSheetBusy(flag: \.rulesBusy) {
+                try await self.service.addSecurityRule(
+                    tenantId: item.id,
+                    type: self.rulesTab,
+                    protocolValue: proto,
+                    source: source,
+                    ports: ports
+                )
+                self.loadSecurityRules(item)
+            }
+        }
+    }
+
+    func closeRuleForm() {
+        showAddRule = false
+        editingRuleIndex = nil
+        // 重置表单字段（未保存取消时清空，避免残留）
+        ruleProtocol = "tcp"
+        ruleSource = "0.0.0.0/0"
+        rulePorts = ""
+        rulePortStart = ""
+        rulePortEnd = ""
+    }
+
+    /// 新增规则：重置表单为默认值并打开表单
+    func startAddRule() {
+        editingRuleIndex = nil
+        ruleProtocol = "tcp"
+        ruleSource = "0.0.0.0/0"
+        rulePorts = ""
+        rulePortStart = ""
+        rulePortEnd = ""
+        showAddRule = true
+    }
+
+    private func normalizeProtocolForForm(_ proto: String) -> String {
+        switch proto.lowercased() {
+        case "6": return "tcp"
+        case "17": return "udp"
+        case "1", "icmp": return "icmp"
+        case "all", "all protocols": return "all"
+        default: return proto.isEmpty ? "tcp" : proto.lowercased()
+        }
+    }
+
+    /// 对齐 Web isDangerForm：开放全地址(0.0.0.0/0 或 ::/0)且(全协议 或 高危端口) → 高危
+    private func isDangerSecurityRule(protocolValue: String, source: String, ports: String) -> Bool {
+        let openAll = source == "0.0.0.0/0" || source == "::/0"
+        guard openAll else { return false }
+        if protocolValue.lowercased() == "all" { return true }
+        let dangerPortsPattern = "(^|,|-|\\b)(22|3389|3306|5432|6379|27017)(\\b|,|-|$)"
+        if !ports.isEmpty, ports.range(of: dangerPortsPattern, options: .regularExpression) != nil { return true }
+        return false
     }
 
     func deleteSecurityRule(at index: Int, item: TenantItem) {
@@ -1829,6 +2183,37 @@ final class TenantsViewModel: ObservableObject {
             await self.runSheetBusy(flag: \.rulesBusy) {
                 try await self.service.deleteSecurityRule(compositeId: composite)
                 self.loadSecurityRules(item)
+            }
+        }
+    }
+
+    /// 一键模板：批量添加一组规则（对齐 Web TEMPLATES 一键导入）
+    func applySecurityTemplate(_ rules: [SecurityRuleTemplate], item: TenantItem) {
+        let type = rulesTab
+        Task {
+            await self.runSheetBusy(flag: \.rulesBusy) {
+                do {
+                    for r in rules {
+                        var ports = r.ports
+                        if !r.portStart.isEmpty || !r.portEnd.isEmpty {
+                            let s = r.portStart.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let e = r.portEnd.trimmingCharacters(in: .whitespacesAndNewlines)
+                            ports = s.isEmpty ? "" : (e.isEmpty || e == s ? s : "\(s)-\(e)")
+                        }
+                        _ = try await self.service.addSecurityRule(
+                            tenantId: item.id,
+                            type: type,
+                            protocolValue: r.protocolValue,
+                            source: r.source,
+                            ports: ports
+                        )
+                    }
+                    ToastCenter.shared.success("已应用模板：\(rules.count) 条规则")
+                    self.closeRuleForm()
+                    self.loadSecurityRules(item)
+                } catch {
+                    ToastCenter.shared.error(error.localizedDescription)
+                }
             }
         }
     }
@@ -1969,12 +2354,14 @@ final class TenantsViewModel: ObservableObject {
         regionTotalCount = 0
         regionSubscribedCount = 0
         regionUnsubscribedCount = 0
-        regionSubParent = item
+        regionSubParent = nil
+        activeSheet = .regionSub(item)
         Task { await refreshRegionSub(item) }
     }
 
     func closeRegionSub() {
         regionSubParent = nil
+        activeSheet = nil
         subscribedRegions = []
         unsubscribedRegions = []
         selectedUnsubKeys = []
@@ -2023,8 +2410,7 @@ final class TenantsViewModel: ObservableObject {
         else { selectedUnsubKeys.insert(key) }
     }
 
-    func subscribeSelected(_ item: TenantItem) {
-        let keys = Array(selectedUnsubKeys)
+    func subscribeRegions(item: TenantItem, keys: [String]) {
         guard !keys.isEmpty else {
             ToastCenter.shared.error("请先勾选要订阅的区域")
             return
@@ -2033,14 +2419,19 @@ final class TenantsViewModel: ObservableObject {
             await LoadingHUD.shared.during {
                 do {
                     let msg = try await service.subscribeRegions(tenantId: item.id, regionKeys: keys)
-                    selectedUnsubKeys = []
+                    for k in keys { selectedUnsubKeys.remove(k) }
                     await refreshRegionSub(item)
-                    AppAlert.info(title: "订阅结果", message: msg)
+                    ToastCenter.shared.success(msg.isEmpty ? "订阅成功" : msg)
                 } catch {
                     ToastCenter.shared.error(error.localizedDescription)
                 }
             }
         }
+    }
+
+    func subscribeSelected(_ item: TenantItem) {
+        let keys = Array(selectedUnsubKeys)
+        subscribeRegions(item: item, keys: keys)
     }
 
     func openCost(_ item: TenantItem) {
@@ -2100,7 +2491,10 @@ final class TenantsViewModel: ObservableObject {
         }
         costLoading = true
         costError = nil
-        defer { costLoading = false }
+        defer {
+            costLoading = false
+            costHasLoadedOnce = true
+        }
         do {
             costItems = try await service.queryCost(tenantId: item.id, start: start, end: end)
             costPageState.page = 0

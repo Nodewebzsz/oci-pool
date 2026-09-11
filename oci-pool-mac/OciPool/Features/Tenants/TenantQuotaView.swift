@@ -6,6 +6,8 @@ struct TenantQuotaView: View {
     @ObservedObject var model: TenantsViewModel
     @EnvironmentObject private var appearance: AppearanceController
 
+    @State private var hoveredRowId: String? = nil
+
     private var dark: Bool { appearance.isDarkEffective }
     private var tenant: TenantItem? { model.quotaParent }
 
@@ -34,36 +36,42 @@ struct TenantQuotaView: View {
         model.quotaItems.contains { $0.hasInstanceType }
     }
 
-    private var showPagination: Bool {
-        model.quotaPage > 0 || model.quotaHasNext
+    private var shouldShowPagination: Bool {
+        !model.quotaItems.isEmpty
     }
 
     private var cardBorder: Color { AppTheme.border(dark) }
-    private var surface: Color { dark ? Color(hex: "1a1d27") : Color.white }
+    private var surface: Color { AppTheme.sidebarBg(dark) }
     private var headerBg: Color { AppTheme.sidebarHover(dark).opacity(0.65) }
     private var primaryText: Color { dark ? Color.white.opacity(0.9) : Color(hex: "1e293b") }
     private var secondaryText: Color { AppTheme.sidebarText(dark) }
 
     var body: some View {
-        PageScaffold(
+        let regionCn = tenant.map { t -> String in
+            let reg = t.regionNameText.isEmpty ? (t.region.isEmpty ? "—" : t.region) : t.regionNameText
+            return "\(t.displayName) · \(reg)"
+        }
+
+        return PageScaffold(
             title: "账号配额",
-            subtitle: tenant.map { $0.displayName },
+            subtitle: regionCn,
             systemImage: "chart.bar.fill",
+            parentTitle: "租户管理",
+            onParentClick: {
+                model.closeQuota()
+            },
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
                     filterBar
+                        .padding(.bottom, 12)
                     if !model.quotaError.isEmpty {
                         errorBanner(model.quotaError)
+                            .padding(.bottom, 12)
                     }
-                    statusLine
-                    listBody
-                    if showPagination && !model.quotaItems.isEmpty {
-                        paginationBar
-                    }
+                    tableCard
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .appLoading(model.quotaLoading)
             }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
@@ -87,7 +95,7 @@ struct TenantQuotaView: View {
         }
     }
 
-    // MARK: - Filter（对齐 Web：仅租户 + 服务 + 查询）
+    // MARK: - Filter
 
     private var filterBar: some View {
         FilterBar(
@@ -131,56 +139,44 @@ struct TenantQuotaView: View {
         )
     }
 
-    private var statusLine: some View {
-        HStack {
-            Text(statusText)
-                .font(.system(size: 12))
-                .foregroundColor(secondaryText)
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(AppTheme.sidebarHover(dark).opacity(0.35))
-        .overlay(
-            Rectangle().frame(height: 1).foregroundColor(cardBorder.opacity(0.5)),
-            alignment: .bottom
-        )
-    }
+    // MARK: - Table Card (UI_STANDARD.md 第一章)
 
-    private var statusText: String {
-        if model.quotaRegionLabel.isEmpty {
-            return "选择租户和服务后点击查询"
-        }
-        return "\(model.quotaRegionLabel) · \(serviceTitle) · 第 \(model.quotaPage + 1) 页，共 \(model.quotaItems.count) 条"
-    }
-
-    private func errorBanner(_ text: String) -> some View {
-        HStack {
-            Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 12))
-            Spacer()
-            Button("重试") {
-                Task { await model.queryQuota(page: model.quotaPage) }
+    private var tableCard: some View {
+        VStack(spacing: 0) {
+            tableArea
+            if shouldShowPagination {
+                bottomBar
             }
-            .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(AppTheme.danger)
-        .padding(12)
-        .background(AppTheme.danger.opacity(0.1))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(surface)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(cardBorder, lineWidth: 1)
+        )
+        .cornerRadius(8)
     }
-
-    // MARK: - Table
 
     @ViewBuilder
-    private var listBody: some View {
-        if model.quotaItems.isEmpty {
+    private var tableArea: some View {
+        if model.quotaLoading && model.quotaItems.isEmpty {
+            VStack(spacing: 10) {
+                Spacer()
+                ProgressView()
+                Text("加载配额数据…")
+                    .font(.system(size: 12))
+                    .foregroundColor(secondaryText)
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if model.quotaItems.isEmpty {
             EmptyStateView(
-                icon: model.quotaError.isEmpty ? "tray" : "exclamationmark.circle",
+                icon: model.quotaError.isEmpty ? "chart.bar" : "exclamationmark.circle",
                 title: model.quotaError.isEmpty
-                    ? (model.quotaRegionLabel.isEmpty ? "请先查询" : "该服务暂无配额数据")
+                    ? (model.quotaRegionLabel.isEmpty ? "请先查询配额" : "该服务暂无配额数据")
                     : "查询失败",
                 subtitle: model.quotaError.isEmpty
-                    ? "选择租户和服务类型后点击查询"
+                    ? (model.quotaRegionLabel.isEmpty ? "选择租户和服务类型后点击「查询」" : "未查询到当前服务的配额指标，可尝试切换其他服务")
                     : model.quotaError,
                 actionTitle: model.quotaLoading ? nil : (model.quotaError.isEmpty ? "查询" : "重试"),
                 action: model.quotaLoading ? nil : { Task { await model.queryQuota(page: 0) } }
@@ -190,10 +186,11 @@ struct TenantQuotaView: View {
             GeometryReader { geo in
                 let typeW = hasTypeColumn ? wType : 0
                 let fixed = typeW + wNum * 3 + wBar + wPct + minName + hPad * 2
-                let totalW = max(geo.size.width - 32, fixed)
+                let totalW = max(geo.size.width, fixed)
                 let wName = minName + max(0, totalW - fixed)
+                let needsHScroll = totalW > geo.size.width + 0.5
 
-                VStack(spacing: 0) {
+                let table = VStack(spacing: 0) {
                     headerRow(wName: wName, typeW: typeW, width: totalW)
                     ScrollView {
                         LazyVStack(spacing: 0) {
@@ -203,17 +200,33 @@ struct TenantQuotaView: View {
                         }
                     }
                 }
-                .frame(width: totalW, alignment: .topLeading)
-                .background(surface)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(cardBorder, lineWidth: 1)
-                )
-                .cornerRadius(10)
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, showPagination ? 4 : 12)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
+
+                ZStack {
+                    Group {
+                        if needsHScroll {
+                            ScrollView(.horizontal, showsIndicators: true) { table }
+                                .frame(width: geo.size.width, height: geo.size.height)
+                        } else {
+                            table
+                        }
+                    }
+                    .opacity(model.quotaLoading ? 0.6 : 1.0)
+
+                    if model.quotaLoading && !model.quotaItems.isEmpty {
+                        VStack(spacing: 8) {
+                            ProgressView().scaleEffect(0.9)
+                            Text("更新中…")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(secondaryText)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(surface.opacity(0.85)))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(cardBorder, lineWidth: 1))
+                        .shadow(color: Color.black.opacity(dark ? 0.3 : 0.08), radius: 6, y: 2)
+                    }
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -221,15 +234,15 @@ struct TenantQuotaView: View {
 
     private func headerRow(wName: CGFloat, typeW: CGFloat, width: CGFloat) -> some View {
         HStack(spacing: 0) {
-            colHeader("限额名称", wName, align: .leading)
+            colHeader("限额名称", wName)
             if typeW > 0 {
-                colHeader("实例类型", typeW, align: .center)
+                colHeader("实例类型", typeW)
             }
-            colHeader("总量", wNum, align: .center)
-            colHeader("已用", wNum, align: .center)
-            colHeader("可用", wNum, align: .center)
-            colHeader("进度条", wBar, align: .leading)
-            colHeader("占比", wPct, align: .center)
+            colHeader("总量", wNum)
+            colHeader("已用", wNum)
+            colHeader("可用", wNum)
+            colHeader("进度条", wBar)
+            colHeader("占比", wPct)
         }
         .padding(.horizontal, hPad)
         .padding(.vertical, 9)
@@ -243,14 +256,12 @@ struct TenantQuotaView: View {
 
     private func dataRow(index: Int, row: TenantQuotaItem, wName: CGFloat, typeW: CGFloat, width: CGFloat) -> some View {
         let pct = row.usagePercent
-        let stripe = index % 2 == 1 ? AppTheme.sidebarHover(dark).opacity(0.14) : Color.clear
+        let hovered = hoveredRowId == row.id
         return HStack(spacing: 0) {
             // 限额名称 + 状态点
-            HStack(alignment: .top, spacing: 8) {
-                Circle()
-                    .fill(usageColor(pct))
-                    .frame(width: 7, height: 7)
-                    .padding(.top, 4)
+            HStack(alignment: .center, spacing: 8) {
+                MenuPulseDot(color: usageColor(pct), pulse: pct >= 90)
+                    .padding(.leading, 2)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(row.name.isEmpty ? "—" : row.name)
                         .font(.system(size: 11, weight: .medium))
@@ -298,87 +309,133 @@ struct TenantQuotaView: View {
         .padding(.horizontal, hPad)
         .padding(.vertical, appearance.density.rowPadding)
         .frame(width: width, alignment: .leading)
-        .background(stripe)
+        .background(
+            hovered
+                ? AppTheme.sidebarActive.opacity(dark ? 0.12 : 0.08)
+                : ((index % 2 == 1)
+                   ? AppTheme.sidebarHover(dark).opacity(0.18)
+                   : Color.clear)
+        )
         .overlay(
             Rectangle().frame(height: 1).foregroundColor(cardBorder.opacity(0.35)),
             alignment: .bottom
         )
-    }
-
-    // MARK: - Pagination（对齐 Web 底部条）
-
-    private var paginationBar: some View {
-        HStack(spacing: 12) {
-            AppButton(
-                title: "上一页",
-                systemImage: "chevron.left",
-                kind: .secondary,
-                enabled: model.quotaPage > 0 && !model.quotaLoading
-            ) {
-                Task { await model.queryQuota(page: model.quotaPage - 1) }
-            }
-
-            Spacer(minLength: 8)
-
-            HStack(spacing: 10) {
-                Text("第 \(model.quotaPage + 1) 页")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(primaryText)
-                Text("|")
-                    .foregroundColor(cardBorder)
-                Text("每页")
-                    .font(.system(size: 12))
-                    .foregroundColor(secondaryText)
-                SelectMenu(
-                    options: [10, 20, 50].map { SelectOption(id: "\($0)", title: "\($0)") },
-                    selection: Binding(
-                        get: { "\(model.quotaPageSize)" },
-                        set: {
-                            if let v = Int($0 ?? "20"), v != model.quotaPageSize {
-                                model.quotaPageSize = v
-                                Task { await model.queryQuota(page: 0) }
-                            }
-                        }
-                    ),
-                    placeholder: "20",
-                    width: 72,
-                    allowClear: false
-                )
-                Text("条")
-                    .font(.system(size: 12))
-                    .foregroundColor(secondaryText)
-            }
-
-            Spacer(minLength: 8)
-
-            AppButton(
-                title: "下一页",
-                systemImage: "chevron.right",
-                kind: .secondary,
-                enabled: model.quotaHasNext && !model.quotaLoading
-            ) {
-                Task { await model.queryQuota(page: model.quotaPage + 1) }
+        .onHover { inside in
+            withAnimation(.easeInOut(duration: 0.12)) {
+                hoveredRowId = inside ? row.id : (hoveredRowId == row.id ? nil : hoveredRowId)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+    }
+
+    // MARK: - Bottom Bar (Pagination)
+
+    private var bottomBar: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Text(statusText)
+                .font(.system(size: 12))
+                .foregroundColor(secondaryText)
+
+            Spacer(minLength: 8)
+
+            HStack(spacing: 12) {
+                AppButton(
+                    title: "上一页",
+                    systemImage: "chevron.left",
+                    kind: .secondary,
+                    enabled: model.quotaPage > 0 && !model.quotaLoading
+                ) {
+                    Task { await model.queryQuota(page: model.quotaPage - 1) }
+                }
+
+                HStack(spacing: 6) {
+                    Text("第 \(model.quotaPage + 1) 页")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(primaryText)
+                    Text("|")
+                        .foregroundColor(cardBorder.opacity(0.6))
+                    Text("每页")
+                        .font(.system(size: 12))
+                        .foregroundColor(secondaryText)
+                    SelectMenu(
+                        options: [10, 20, 50].map { SelectOption(id: "\($0)", title: "\($0)") },
+                        selection: Binding(
+                            get: { "\(model.quotaPageSize)" },
+                            set: {
+                                if let v = Int($0 ?? "20"), v != model.quotaPageSize {
+                                    model.quotaPageSize = v
+                                    Task { await model.queryQuota(page: 0) }
+                                }
+                            }
+                        ),
+                        placeholder: "20",
+                        width: 72,
+                        allowClear: false
+                    )
+                    Text("条")
+                        .font(.system(size: 12))
+                        .foregroundColor(secondaryText)
+                }
+
+                AppButton(
+                    title: "下一页",
+                    systemImage: "chevron.right",
+                    kind: .secondary,
+                    enabled: model.quotaHasNext && !model.quotaLoading
+                ) {
+                    Task { await model.queryQuota(page: model.quotaPage + 1) }
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(surface.opacity(0.55))
+        .overlay(
+            Rectangle().frame(height: 1).foregroundColor(cardBorder.opacity(0.7)),
+            alignment: .top
+        )
+    }
+
+    private var statusText: String {
+        if model.quotaRegionLabel.isEmpty {
+            return "共 \(model.quotaItems.count) 条配额"
+        }
+        return "\(model.quotaRegionLabel) · \(serviceTitle) · 第 \(model.quotaPage + 1) 页，共 \(model.quotaItems.count) 条"
+    }
+
+    private func errorBanner(_ text: String) -> some View {
+        HStack {
+            Image(systemName: "exclamationmark.triangle.fill")
+            Text(text).font(.system(size: 12))
+            Spacer()
+            Button("重试") {
+                Task { await model.queryQuota(page: model.quotaPage) }
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .foregroundColor(AppTheme.danger)
+        .padding(12)
+        .background(AppTheme.danger.opacity(0.1))
+        .cornerRadius(8)
     }
 
     // MARK: - Cells / chrome
 
-    private func colHeader(_ title: String, _ w: CGFloat, align: Alignment) -> some View {
+    private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .center) -> some View {
         Text(title)
-            .font(.system(size: 10, weight: .bold))
+            .font(.system(size: 11, weight: .semibold))
             .foregroundColor(secondaryText)
+            .lineLimit(1)
             .frame(width: w, alignment: align)
+            .clipped()
     }
 
     private func numCell(_ text: String, _ w: CGFloat, color: Color, bold: Bool = false) -> some View {
         Text(text.isEmpty ? "—" : text)
-            .font(.system(size: 12, weight: bold ? .bold : .regular))
+            .font(.system(size: 12, weight: bold ? .semibold : .regular))
             .foregroundColor(color)
             .lineLimit(1)
             .frame(width: w, alignment: .center)
+            .help(text)
     }
 
     private func progressBar(pct: Int) -> some View {

@@ -26,6 +26,7 @@ struct NotifyView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         if let err = model.errorText, !err.isEmpty {
                             errorBanner(err)
+                                .padding(.bottom, 12)
                         }
 
                         // 1) 定时任务：全宽独立区（与 Web 一致，避免与通道表单混排）
@@ -49,7 +50,6 @@ struct NotifyView: View {
                             Color.clear
                         }
                     }
-                    .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

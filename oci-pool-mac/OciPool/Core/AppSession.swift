@@ -43,13 +43,17 @@ final class AppSession: ObservableObject {
 
     var serverURL: String {
         get {
-            let raw = UserDefaults.standard.string(forKey: defaultsKey) ?? Self.localDefaultURL
-            return Self.normalize(raw)
+            let raw = UserDefaults.standard.string(forKey: defaultsKey)
+            if let r = raw, !r.isEmpty {
+                let n = Self.normalize(r)
+                if !n.isEmpty { return n }
+            }
+            return deploymentMode == .local ? Self.localDefaultURL : ""
         }
         set {
             let normalized = Self.normalize(newValue)
             UserDefaults.standard.set(normalized, forKey: defaultsKey)
-            if !Self.isLocalServerURL(normalized) {
+            if !normalized.isEmpty && !Self.isLocalServerURL(normalized) {
                 UserDefaults.standard.set(normalized, forKey: remoteURLKey)
             }
             objectWillChange.send()
@@ -60,8 +64,10 @@ final class AppSession: ObservableObject {
     var lastRemoteServerURL: String {
         get {
             let raw = UserDefaults.standard.string(forKey: remoteURLKey) ?? ""
-            let n = Self.normalize(raw.isEmpty ? "https://" : raw)
-            return Self.isLocalServerURL(n) ? "https://" : n
+            if raw.isEmpty || raw == "https://" || raw == "http://" || Self.isLocalServerURL(raw) {
+                return ""
+            }
+            return raw
         }
         set {
             let n = Self.normalize(newValue)
@@ -147,7 +153,7 @@ final class AppSession: ObservableObject {
             if Self.isLocalServerURL(serverURL) {
                 let restored = lastRemoteServerURL
                 UserDefaults.standard.set(
-                    restored == "https://" ? restored : Self.normalize(restored),
+                    restored.isEmpty ? "" : Self.normalize(restored),
                     forKey: defaultsKey
                 )
             }
@@ -295,7 +301,7 @@ final class AppSession: ObservableObject {
 
     private static func normalize(_ raw: String) -> String {
         var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if s.isEmpty { return "http://localhost:9856" }
+        if s.isEmpty || s == "http://" || s == "https://" { return "" }
         if !s.hasPrefix("http://") && !s.hasPrefix("https://") {
             s = "http://\(s)"
         }

@@ -282,33 +282,44 @@ private struct SelectMenuPanelView: View {
 
 // MARK: - Window-level floating panel bridge
 
-/// Anchor under the trigger. When open, attaches the option panel to
-/// `window.contentView` so it paints and receives clicks above ScrollView siblings.
+/// Anchor under the trigger. When open, creates a floating NSPanel at `.popUpMenu` level
+/// so it floats above all sheets, ScrollViews, and layer-backed views without occlusion.
 private struct SelectMenuFloatBridge: NSViewRepresentable {
     final class AnchorView: NSView {
         var panelWidth: CGFloat = 160
         var gap: CGFloat = 4
         var panelState: SelectMenuPanelState?
 
-        private var panelHost: NSHostingView<AnyView>?
+        private var popupPanel: NSPanel?
         private var mouseMonitor: Any?
         private var keyMonitor: Any?
 
         override var isFlipped: Bool { true }
 
-        var isPresented: Bool { panelHost != nil }
+        var isPresented: Bool { popupPanel != nil }
 
         func present() {
-            guard let window = window, let content = window.contentView, let state = panelState else { return }
+            guard let window = window, let state = panelState else { return }
 
-            if panelHost == nil {
+            if popupPanel == nil {
                 let root = SelectMenuPanelView(state: state)
                     .environmentObject(AppearanceController.shared)
                 let host = NSHostingView(rootView: AnyView(root))
-                host.wantsLayer = true
-                host.layer?.zPosition = 10_000
-                content.addSubview(host, positioned: .above, relativeTo: nil)
-                panelHost = host
+
+                let panel = NSPanel(
+                    contentRect: NSRect(x: 0, y: 0, width: panelWidth, height: 100),
+                    styleMask: [.nonactivatingPanel, .fullSizeContentView],
+                    backing: .buffered,
+                    defer: false
+                )
+                panel.isFloatingPanel = true
+                panel.level = .popUpMenu
+                panel.hasShadow = false
+                panel.backgroundColor = .clear
+                panel.isOpaque = false
+                panel.contentView = host
+                popupPanel = panel
+                window.addChildWindow(panel, ordered: .above)
             }
 
             layoutPanel()
@@ -317,13 +328,16 @@ private struct SelectMenuFloatBridge: NSViewRepresentable {
 
         func dismiss() {
             stopMonitoring()
-            panelHost?.removeFromSuperview()
-            panelHost = nil
+            if let panel = popupPanel {
+                panel.parent?.removeChildWindow(panel)
+                panel.orderOut(nil)
+                popupPanel = nil
+            }
         }
 
         override func layout() {
             super.layout()
-            if panelHost != nil {
+            if popupPanel != nil {
                 layoutPanel()
             }
         }
@@ -336,7 +350,7 @@ private struct SelectMenuFloatBridge: NSViewRepresentable {
         }
 
         func layoutPanel() {
-            guard let host = panelHost, let content = window?.contentView else { return }
+            guard let panel = popupPanel, let window = window, let host = panel.contentView as? NSHostingView<AnyView> else { return }
 
             let fitting = host.fittingSize
             let w = max(panelWidth, 1)
@@ -350,43 +364,39 @@ private struct SelectMenuFloatBridge: NSViewRepresentable {
                 return min(h, state.maxPanelHeight + (state.showSearch ? 38 : 0) + 8)
             }()
             let h = max(fitting.height > 10 ? fitting.height : estimated, 40)
-            host.frame.size = NSSize(width: w, height: h)
 
-            // Trigger in window base coordinates (origin bottom-left).
+            // Trigger frame converted to screen coordinates
             let triggerWin = convert(bounds, to: nil)
+            let triggerScreen = window.convertToScreen(triggerWin)
 
-            var panelWin = NSRect(
-                x: triggerWin.minX,
-                y: triggerWin.minY - gap - h,
-                width: w,
-                height: h
-            )
+            var panelX = triggerScreen.minX
+            var panelY = triggerScreen.minY - gap - h
 
-            let contentBounds = content.convert(content.bounds, to: nil)
-            if panelWin.minY < contentBounds.minY + 4 {
-                let aboveY = triggerWin.maxY + gap
-                if aboveY + h <= contentBounds.maxY - 4 {
-                    panelWin.origin.y = aboveY
+            // Screen bounds clamp
+            let screenFrame = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
+            if panelY < screenFrame.minY + 4 {
+                let aboveY = triggerScreen.maxY + gap
+                if aboveY + h <= screenFrame.maxY - 4 {
+                    panelY = aboveY
                 } else {
-                    panelWin.origin.y = max(contentBounds.minY + 4, panelWin.minY)
+                    panelY = max(screenFrame.minY + 4, panelY)
                 }
             }
-            if panelWin.maxX > contentBounds.maxX - 4 {
-                panelWin.origin.x = max(contentBounds.minX + 4, contentBounds.maxX - 4 - w)
+            if panelX + w > screenFrame.maxX - 4 {
+                panelX = max(screenFrame.minX + 4, screenFrame.maxX - 4 - w)
             }
-            if panelWin.minX < contentBounds.minX + 4 {
-                panelWin.origin.x = contentBounds.minX + 4
+            if panelX < screenFrame.minX + 4 {
+                panelX = screenFrame.minX + 4
             }
 
-            host.frame = content.convert(panelWin, from: nil)
-            content.addSubview(host, positioned: .above, relativeTo: nil)
+            panel.setFrame(NSRect(x: panelX, y: panelY, width: w, height: h), display: true)
         }
 
         func startMonitoring() {
             stopMonitoring()
             mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
                 guard let self = self else { return event }
-                if !self.eventHitsMenu(event) {
+                if !self.eventHitsMenu() {
                     DispatchQueue.main.async {
                         self.panelState?.close()
                     }
@@ -394,7 +404,7 @@ private struct SelectMenuFloatBridge: NSViewRepresentable {
                 return event
             }
             keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                if event.keyCode == 53 {
+                if event.keyCode == 53 { // ESC
                     DispatchQueue.main.async {
                         self?.panelState?.close()
                     }
@@ -415,18 +425,14 @@ private struct SelectMenuFloatBridge: NSViewRepresentable {
             }
         }
 
-        private func eventHitsMenu(_ event: NSEvent) -> Bool {
-            guard let window = self.window, event.window == window else {
-                return false
+        private func eventHitsMenu() -> Bool {
+            let p = NSEvent.mouseLocation // screen points
+            if let panel = popupPanel, panel.frame.insetBy(dx: -4, dy: -4).contains(p) {
+                return true
             }
-            let p = event.locationInWindow
-
-            let trigger = convert(bounds, to: nil).insetBy(dx: -4, dy: -4)
-            if trigger.contains(p) { return true }
-
-            if let host = panelHost {
-                let panel = host.convert(host.bounds, to: nil).insetBy(dx: -4, dy: -4)
-                if panel.contains(p) { return true }
+            if let window = self.window {
+                let triggerScreen = window.convertToScreen(convert(bounds, to: nil)).insetBy(dx: -4, dy: -4)
+                if triggerScreen.contains(p) { return true }
             }
             return false
         }
@@ -494,7 +500,8 @@ struct SelectMenu: View {
 
     private var resolvedWidth: CGFloat { width ?? 160 }
     private var resolvedHeight: CGFloat { controlHeight ?? AppInputStyle.height }
-    private var panelWidth: CGFloat { resolvedWidth }
+    // 下拉浮层面板宽度：至少保证 100px，避免在触发框较窄（如每页 72px）时导致选项文字与对勾被挤压截断成 ...
+    private var panelWidth: CGFloat { max(resolvedWidth, 100) }
 
     private var displayTitle: String {
         if let id = selection, let opt = options.first(where: { $0.id == id }) {

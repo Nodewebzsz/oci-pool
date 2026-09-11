@@ -122,6 +122,7 @@
 		A058A7858059157340FF8F0A /* ToastCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A788B7F3994FBDF14325A5E2 /* ToastCenter.swift */; };
 		A068237B43A5EAB6AAAD5FCD /* PaginationBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA60FF9432615ED1B8859A71 /* PaginationBar.swift */; };
 		A135A4ED22E63E6C848C0C72 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E364567873E54CF61D4F3BD6 /* AuthService.swift */; };
+		A2127B74FC85E0E49A73D925 /* RegionFlagView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E7D15B95B84A6AC359D11A1 /* RegionFlagView.swift */; };
 		A3F13A397ADDD22341C5A1D1 /* OpenLogsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F050373CD899339437623964 /* OpenLogsViewModel.swift */; };
 		A56651ACFD0FE5C413C6B1B6 /* AppSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40A459F6906D8BAD66286EC3 /* AppSession.swift */; };
 		A6ABCBB77484CE55572B072D /* SearchField.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBEE095B045B1A8D4F2F65FD /* SearchField.swift */; };
@@ -273,6 +274,7 @@
 		8C218889BA0855C224527D61 /* NativeWSClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeWSClient.swift; sourceTree = "<group>"; };
 		8C3BCFD39E98B08323FDAE6C /* EdgeOneModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeOneModels.swift; sourceTree = "<group>"; };
 		8D074586CDD5438265ED11BB /* LoginFormModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginFormModel.swift; sourceTree = "<group>"; };
+		8E7D15B95B84A6AC359D11A1 /* RegionFlagView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegionFlagView.swift; sourceTree = "<group>"; };
 		9043941F5024C794E0805F6F /* OpenLogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenLogsView.swift; sourceTree = "<group>"; };
 		932F23678DD34C1D52809C02 /* IpQualityViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IpQualityViewModel.swift; sourceTree = "<group>"; };
 		961823899CD82F4A64E6C42C /* TenantCostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TenantCostView.swift; sourceTree = "<group>"; };
@@ -715,6 +717,7 @@
 				DDCA5F5346079498772E82B5 /* PageScaffold.swift */,
 				BA60FF9432615ED1B8859A71 /* PaginationBar.swift */,
 				C43B9129874D0FC784FC5D11 /* PrimaryButton.swift */,
+				8E7D15B95B84A6AC359D11A1 /* RegionFlagView.swift */,
 				FBEE095B045B1A8D4F2F65FD /* SearchField.swift */,
 				A42E5432CC9219A29D3EC0F5 /* SectionCard.swift */,
 				7A8C17101D8E694E81A06680 /* SelectMenu.swift */,
@@ -1052,6 +1055,7 @@
 				2F66B287B6F4214350C2579F /* ProxyConfigViewModel.swift in Sources */,
 				D66AF341F10BE840877F82A0 /* RSAHelper.swift in Sources */,
 				FCD34789E35EF283F41D0B2B /* RegionDetailSheet.swift in Sources */,
+				A2127B74FC85E0E49A73D925 /* RegionFlagView.swift in Sources */,
 				07F5E0A32ABA61A29D546CCE /* RegionWorldMapView.swift in Sources */,
 				C5B96BDDA0788B1915873131 /* RegionsModels.swift in Sources */,
 				B57FF8F6AB85CC9AB616B9B0 /* RegionsView.swift in Sources */,
@@ -1118,7 +1122,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 28;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = OciPool/Info.plist;
@@ -1127,7 +1131,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.0.11;
 				PRODUCT_BUNDLE_IDENTIFIER = com.nodewebzsz.ocipool;
 				PRODUCT_NAME = OciPool;
 				SDKROOT = macosx;
@@ -1200,7 +1204,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 28;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = OciPool/Info.plist;
@@ -1209,7 +1213,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.0.11;
 				PRODUCT_BUNDLE_IDENTIFIER = com.nodewebzsz.ocipool;
 				PRODUCT_NAME = OciPool;
 				SDKROOT = macosx;

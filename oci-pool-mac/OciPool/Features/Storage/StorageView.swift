@@ -18,25 +18,24 @@ struct StorageView: View {
             content: {
                 VStack(spacing: 0) {
                     filterBar
+                        .padding(.bottom, 12)
                     if let err = model.errorText, !err.isEmpty {
                         errorBanner(err)
+                            .padding(.bottom, 12)
                     }
                     if model.selectedTenantId.isEmpty == false {
                         kpiGrid
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
+                            .padding(.bottom, 12)
                     }
-                    HStack(alignment: .top, spacing: 14) {
+                    HStack(alignment: .top, spacing: 12) {
                         bucketPanel
                             .frame(minWidth: 260, idealWidth: 320, maxWidth: 380)
                         objectPanel
                             .frame(minWidth: 0, maxWidth: .infinity)
                     }
-                    .padding(16)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .appLoading(model.isLoading)
             }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
@@ -62,48 +61,61 @@ struct StorageView: View {
     }
 
     private var filterBar: some View {
-        FilterBar(
-            leading: {
-                HStack(spacing: 10) {
-                    Text("租户")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(AppTheme.sidebarText(dark))
-                    SelectMenu(
-                        options: model.parentTenants.map {
-                            SelectOption(id: $0.id, title: model.tenantLabel($0))
-                        },
-                        selection: Binding(
-                            get: { model.selectedTenantId.isEmpty ? nil : model.selectedTenantId },
-                            set: { model.onTenantChanged($0) }
-                        ),
-                        placeholder: "选择租户…",
-                        width: 220,
-                        allowClear: true
-                    )
-                }
-            },
-            trailing: {
-                AppButton(title: "刷新桶", systemImage: "arrow.clockwise", kind: .secondary) {
-                    model.refreshBuckets()
-                }
+        HStack(spacing: 12) {
+            Text("租户")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(AppTheme.sidebarText(dark))
+            SelectMenu(
+                options: model.parentTenants.map {
+                    SelectOption(id: $0.id, title: model.tenantLabel($0))
+                },
+                selection: Binding(
+                    get: { model.selectedTenantId.isEmpty ? nil : model.selectedTenantId },
+                    set: { model.onTenantChanged($0) }
+                ),
+                placeholder: "选择租户…",
+                width: 220,
+                allowClear: true,
+                searchable: model.parentTenants.count > 5
+            )
+            Spacer()
+            AppButton(title: "刷新桶", systemImage: "arrow.clockwise", kind: .secondary) {
+                model.refreshBuckets()
             }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
         )
+        .cornerRadius(8)
     }
 
     private func errorBanner(_ text: String) -> some View {
-        HStack {
+        HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 12))
+            Text(text)
+                .font(.system(size: 12))
+                .lineLimit(2)
             Spacer()
             Button("重试") { Task { await model.reloadAll() } }
                 .buttonStyle(PlainButtonStyle())
+                .font(.system(size: 12, weight: .semibold))
+            Button(action: { model.clearError() }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(AppTheme.danger.opacity(0.8))
+                    .padding(4)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .help("关闭提示")
         }
         .foregroundColor(AppTheme.danger)
         .padding(12)
         .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(8)
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
     }
 
     // MARK: - Bucket panel
@@ -127,15 +139,28 @@ struct StorageView: View {
             )
 
             Group {
-                if model.bucketsLoading && model.buckets.isEmpty {
-                    loadingBox
+                if model.selectedTenantId.isEmpty {
+                    EmptyStateView(
+                        icon: "externaldrive",
+                        title: "请选择租户",
+                        subtitle: "先在上方选择 OCI 租户以查看存储桶"
+                    )
+                    .frame(minHeight: 180)
+                } else if (!model.hasLoadedOnce || model.bucketsLoading) && model.buckets.isEmpty {
+                    VStack(spacing: 8) {
+                        Spacer()
+                        ProgressView()
+                        Text("正在加载存储桶…")
+                            .font(.system(size: 12))
+                            .foregroundColor(AppTheme.sidebarText(dark))
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if model.filteredBuckets.isEmpty {
                     EmptyStateView(
                         icon: "externaldrive",
-                        title: model.selectedTenantId.isEmpty ? "请选择租户" : "暂无存储桶",
-                        subtitle: model.selectedTenantId.isEmpty
-                            ? "先在上方选择 OCI 租户"
-                            : "点击「创建」新建存储桶"
+                        title: "暂无存储桶",
+                        subtitle: "点击右上角「创建」新建存储桶"
                     )
                     .frame(minHeight: 180)
                 } else {
@@ -163,6 +188,7 @@ struct StorageView: View {
                             }
                         }
                     }
+                    .opacity(model.bucketsLoading ? 0.6 : 1.0)
                 }
             }
             .frame(maxHeight: .infinity)
@@ -246,26 +272,52 @@ struct StorageView: View {
                         subtitle: "查看并管理桶中的对象"
                     )
                     .frame(minHeight: 220)
-                } else if model.objectsLoading && model.objects.isEmpty {
-                    loadingBox
-                } else if model.objects.isEmpty {
-                    EmptyStateView(
-                        icon: "doc",
-                        title: "桶内暂无对象",
-                        subtitle: "点击「上传」添加文件",
-                        actionTitle: "上传文件",
-                        action: { model.pickAndUpload() }
-                    )
-                    .frame(minHeight: 220)
                 } else {
                     VStack(spacing: 0) {
                         objectHeader
-                        ScrollView {
-                            VStack(spacing: 0) {
-                                ForEach(model.objects) { o in
-                                    objectRow(o)
-                                    Divider().opacity(0.3)
+                        ZStack {
+                            if model.objectsLoading && model.objects.isEmpty {
+                                VStack(spacing: 10) {
+                                    Spacer()
+                                    ProgressView()
+                                    Text("正在加载对象列表…")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(AppTheme.sidebarText(dark))
+                                    Spacer()
                                 }
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            } else if model.objects.isEmpty {
+                                EmptyStateView(
+                                    icon: "doc",
+                                    title: "桶内暂无对象",
+                                    subtitle: "点击「上传」添加文件",
+                                    actionTitle: "上传文件",
+                                    action: { model.pickAndUpload() }
+                                )
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            } else {
+                                ScrollView {
+                                    VStack(spacing: 0) {
+                                        ForEach(model.objects) { o in
+                                            objectRow(o)
+                                            Divider().opacity(0.3)
+                                        }
+                                    }
+                                }
+                                .opacity(model.objectsLoading ? 0.6 : 1.0)
+                            }
+
+                            if model.objectsLoading && !model.objects.isEmpty {
+                                VStack(spacing: 8) {
+                                    ProgressView().scaleEffect(0.85)
+                                    Text("更新中…")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundColor(AppTheme.sidebarText(dark))
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.sidebarBg(dark).opacity(0.85)))
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.border(dark), lineWidth: 1))
                             }
                         }
                         objectPager
@@ -391,11 +443,11 @@ struct StorageView: View {
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(AppTheme.sidebarBg(dark))
-        .cornerRadius(8)
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(AppTheme.border(dark).opacity(0.7), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
         )
+        .cornerRadius(8)
     }
 
     private func panelHeader<Trailing: View>(
@@ -416,48 +468,63 @@ struct StorageView: View {
         }
     }
 
-    // MARK: - KPI（对齐 Web obj.kpi.* 4 卡）
+    // MARK: - KPI（对齐 Web obj.kpi.* 4 卡与 InstancesView 标准卡片）
 
     private var kpiGrid: some View {
         let buckets = model.buckets
         let publicCount = buckets.filter { $0.publicAccess != "NoPublicAccess" && !$0.publicAccess.isEmpty }.count
-        return HStack(spacing: 14) {
-            kpiCard(icon: "database", color: AppTheme.info,
+        let ns = model.namespace.isEmpty ? (model.selectedBucket?.namespace ?? "—") : model.namespace
+        let objectCountText: String = {
+            if model.selectedBucket != nil {
+                return model.objectsLoading ? "..." : "\(model.objects.count)"
+            }
+            return "—"
+        }()
+        return HStack(alignment: .top, spacing: 12) {
+            kpiCard(icon: "externaldrive", color: AppTheme.info,
                     label: "存储桶数量", value: "\(buckets.count)")
-            kpiCard(icon: "package", color: Color(hex: "00b6be"),
-                    label: "对象总数", value: "—")
+            kpiCard(icon: "shippingbox", color: Color(hex: "00b6be"),
+                    label: "对象总数", value: objectCountText)
             kpiCard(icon: "globe",
                     color: publicCount > 0 ? AppTheme.orange : AppTheme.sidebarText(dark),
                     label: "公开访问桶", value: "\(publicCount)")
-            kpiCard(icon: "hash", color: Color(hex: "b484e8"),
-                    label: "Namespace", value: model.selectedBucket?.namespace ?? "—")
+            kpiCard(icon: "number", color: Color(hex: "b484e8"),
+                    label: "Namespace", value: ns.isEmpty ? "—" : ns)
         }
     }
 
     private func kpiCard(icon: String, color: Color, label: String, value: String) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(color.opacity(0.18))
                     .frame(width: 36, height: 36)
                 Image(systemName: icon)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 17, weight: .medium))
                     .foregroundColor(color)
             }
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(label)
-                    .font(.system(size: 11))
-                    .foregroundColor(AppTheme.sidebarText(dark))
-                Text(value)
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(AppTheme.textTertiary(dark))
                     .lineLimit(1)
+                Text(value)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(AppTheme.navIcon(dark))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
             }
+            Spacer(minLength: 0)
         }
-        .padding(14)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.sidebarBg(dark)))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.border(dark), lineWidth: 1))
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
+        )
+        .cornerRadius(8)
     }
 
     private var loadingBox: some View {

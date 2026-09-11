@@ -25,14 +25,20 @@ struct MemoView: View {
                 VStack(spacing: 0) {
                     if let err = model.errorText, !err.isEmpty {
                         errorBanner(err)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
+                            .padding(.bottom, 12)
                     }
-                    FilterBar {
-                        SearchField(text: $model.searchText, placeholder: "按标题或摘要搜索...")
+                    HStack {
+                        SearchField(text: $model.searchText, placeholder: "按标题或摘要搜索...", fillsWidth: true)
                     }
                     .padding(.horizontal, 16)
-                    .padding(.top, 12)
+                    .padding(.vertical, 10)
+                    .background(AppTheme.sidebarBg(dark))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(AppTheme.border(dark), lineWidth: 1)
+                    )
+                    .cornerRadius(8)
+                    .padding(.bottom, 12)
 
                     ScrollView {
                         if model.filtered.isEmpty && !model.isLoading {
@@ -44,7 +50,6 @@ struct MemoView: View {
                                 action: model.items.isEmpty ? { model.openCreate() } : nil
                             )
                             .frame(maxWidth: .infinity, minHeight: 280)
-                            .padding(16)
                         } else {
                             LazyVStack(spacing: 14) {
                                 ForEach(pairRows(model.filtered), id: \.0) { row in
@@ -59,7 +64,6 @@ struct MemoView: View {
                                     }
                                 }
                             }
-                            .padding(16)
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

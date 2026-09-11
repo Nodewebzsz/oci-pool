@@ -11,6 +11,8 @@ struct AiChatView: View {
     @State private var inputFocused = false
     /// 租户列默认隐藏，给聊天区最大宽度；点顶栏按钮展开
     @State private var showTenantRail = false
+    /// 输入框动态行高（单行 24px，随多行自适应增长，上限 96px）
+    @State private var inputEditorHeight: CGFloat = 24
 
     private var dark: Bool { appearance.isDarkEffective }
 
@@ -785,16 +787,20 @@ struct AiChatView: View {
             }
 
             HStack(alignment: .center, spacing: 10) {
-                ZStack(alignment: .leading) {
+                ZStack(alignment: .topLeading) {
                     if model.input.isEmpty {
                         Text("畅所欲问…")
                             .font(.system(size: 14))
                             .foregroundColor(muted.opacity(0.55))
-                            .padding(.leading, 4)
+                            .padding(.top, 2)
                             .allowsHitTesting(false)
                     }
-                    MacChatTextEditor(text: $model.input, onSubmit: { model.send() })
-                        .frame(minHeight: 24, maxHeight: 88)
+                    MacChatTextEditor(
+                        text: $model.input,
+                        calculatedHeight: $inputEditorHeight,
+                        onSubmit: { model.send() }
+                    )
+                    .frame(height: inputEditorHeight)
                 }
                 .frame(maxWidth: .infinity)
 
@@ -821,9 +827,9 @@ struct AiChatView: View {
                 .buttonStyle(PlainButtonStyle())
                 .disabled(!canSend)
             }
-            .padding(.leading, 16)
+            .padding(.leading, 20)
             .padding(.trailing, 8)
-            .padding(.vertical, 8)
+            .padding(.vertical, 7)
             .background(
                 Capsule(style: .continuous)
                     .fill(dark ? Color.white.opacity(0.08) : Color(hex: "f4f4f5"))
@@ -879,13 +885,15 @@ struct AiChatView: View {
 
 private struct MacChatTextEditor: NSViewRepresentable {
     @Binding var text: String
+    @Binding var calculatedHeight: CGFloat
     var onSubmit: () -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView()
-        scroll.hasVerticalScroller = true
+        scroll.hasVerticalScroller = false
+        scroll.hasHorizontalScroller = false
         scroll.borderType = .noBorder
         scroll.drawsBackground = false
         scroll.scrollerStyle = .overlay
@@ -895,7 +903,8 @@ private struct MacChatTextEditor: NSViewRepresentable {
         tv.isRichText = false
         tv.allowsUndo = true
         tv.font = NSFont.systemFont(ofSize: 14)
-        tv.textContainerInset = NSSize(width: 2, height: 4)
+        tv.textContainer?.lineFragmentPadding = 0
+        tv.textContainerInset = NSSize(width: 0, height: 2)
         tv.isHorizontallyResizable = false
         tv.isVerticallyResizable = true
         tv.autoresizingMask = [.width]
@@ -904,8 +913,12 @@ private struct MacChatTextEditor: NSViewRepresentable {
         tv.drawsBackground = false
         tv.string = text
         context.coordinator.textView = tv
+        context.coordinator.scrollView = scroll
 
         scroll.documentView = tv
+        DispatchQueue.main.async {
+            context.coordinator.updateHeight()
+        }
         return scroll
     }
 
@@ -913,6 +926,7 @@ private struct MacChatTextEditor: NSViewRepresentable {
         guard let tv = nsView.documentView as? NSTextView else { return }
         if tv.string != text {
             tv.string = text
+            context.coordinator.updateHeight()
         }
         let dark = AppearanceController.shared.isDarkEffective
         tv.textColor = dark ? NSColor.white.withAlphaComponent(0.92) : NSColor.labelColor
@@ -922,12 +936,29 @@ private struct MacChatTextEditor: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: MacChatTextEditor
         weak var textView: NSTextView?
+        weak var scrollView: NSScrollView?
 
         init(_ parent: MacChatTextEditor) { self.parent = parent }
 
         func textDidChange(_ notification: Notification) {
             guard let tv = notification.object as? NSTextView else { return }
             parent.text = tv.string
+            updateHeight()
+        }
+
+        func updateHeight() {
+            guard let tv = textView, let layoutManager = tv.layoutManager, let textContainer = tv.textContainer else { return }
+            layoutManager.glyphRange(for: textContainer)
+            let usedRect = layoutManager.usedRect(for: textContainer)
+            let baseHeight: CGFloat = 22
+            let contentHeight = max(baseHeight, ceil(usedRect.height))
+            let targetHeight = min(max(22, contentHeight + 2), 96)
+            if parent.calculatedHeight != targetHeight {
+                DispatchQueue.main.async {
+                    self.parent.calculatedHeight = targetHeight
+                    self.scrollView?.hasVerticalScroller = targetHeight >= 96
+                }
+            }
         }
 
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {

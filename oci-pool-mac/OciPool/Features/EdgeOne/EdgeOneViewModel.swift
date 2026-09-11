@@ -13,10 +13,12 @@ final class EdgeOneViewModel: ObservableObject {
     @Published var pageState = PageState(page: 0, size: 20)
     @Published var searchName = ""
     @Published var searchContent = ""
+    @Published var domainStatusFilter = ""
 
     @Published var dnsForm: EoDnsForm?
     @Published var configForm: EoConfigForm?
     @Published private(set) var isLoading = false
+    @Published private(set) var hasLoadedOnce = false
     @Published private(set) var isZonesLoading = false
     @Published private(set) var isSaving = false
     @Published private(set) var isSyncing = false
@@ -28,6 +30,20 @@ final class EdgeOneViewModel: ObservableObject {
 
     var zoneOptions: [SelectOption] {
         zones.map { SelectOption(id: $0.id, title: $0.title) }
+    }
+
+    var statusOptions: [SelectOption] {
+        [
+            SelectOption(id: "", title: "全部"),
+            SelectOption(id: "online", title: "在线"),
+            SelectOption(id: "offline", title: "离线"),
+            SelectOption(id: "pending", title: "审核中")
+        ]
+    }
+
+    var isNotConfigured: Bool {
+        let msg = (errorText ?? "").lowercased()
+        return msg.contains("未配置") || msg.contains("未启用") || (!isLoading && zones.isEmpty)
     }
 
     var selectedZoneName: String {
@@ -50,14 +66,18 @@ final class EdgeOneViewModel: ObservableObject {
     var filteredDomains: [EoAccelDomain] {
         let n = searchName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let c = searchContent.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let s = domainStatusFilter.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         var list = accelDomains
         if !n.isEmpty {
             list = list.filter {
-                $0.domainName.lowercased().contains(n) || $0.status.lowercased().contains(n)
+                $0.domainName.lowercased().contains(n)
             }
         }
         if !c.isEmpty {
             list = list.filter { $0.cname.lowercased().contains(c) }
+        }
+        if !s.isEmpty {
+            list = list.filter { $0.status.lowercased() == s }
         }
         return list
     }
@@ -108,6 +128,10 @@ final class EdgeOneViewModel: ObservableObject {
         pageState.page = 0
         searchName = ""
         searchContent = ""
+        domainStatusFilter = ""
+        clearLists()
+        isLoading = true
+        errorText = nil
         Task { await reloadRecords() }
     }
 
@@ -117,30 +141,38 @@ final class EdgeOneViewModel: ObservableObject {
         pageState.page = 0
         searchName = ""
         searchContent = ""
-        Task { await reloadRecords() }
+        domainStatusFilter = ""
+        applyPageTotal(mode == .dns ? filteredDns.count : filteredDomains.count)
     }
 
     func reloadRecords() async {
         guard let zoneId = selectedZoneId, !zoneId.isEmpty else {
             clearLists()
+            hasLoadedOnce = true
             return
         }
         isLoading = true
         errorText = nil
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoadedOnce = true
+        }
         do {
-            switch mode {
-            case .dns:
-                dnsRecords = try await service.fetchDnsRecords(zoneId: zoneId)
-                applyPageTotal(filteredDns.count)
-            case .domain:
-                accelDomains = try await service.fetchAccelDomains(zoneId: zoneId)
-                applyPageTotal(filteredDomains.count)
-            }
+            // 对齐 Web 端：同时并行加载 DNS 记录与加速域名，切 Tab 即可纯本地秒切
+            async let dnsTask = service.fetchDnsRecords(zoneId: zoneId)
+            async let domainTask = service.fetchAccelDomains(zoneId: zoneId)
+            let (dns, domains) = try await (dnsTask, domainTask)
+            dnsRecords = dns
+            accelDomains = domains
+            applyPageTotal(mode == .dns ? filteredDns.count : filteredDomains.count)
         } catch {
             clearLists()
             errorText = (error as? APIError)?.errorDescription ?? error.localizedDescription
         }
+    }
+
+    func clearError() {
+        errorText = nil
     }
 
     func onPageChange() {
@@ -158,6 +190,7 @@ final class EdgeOneViewModel: ObservableObject {
     func clearSearch() {
         searchName = ""
         searchContent = ""
+        domainStatusFilter = ""
         onSearchChanged()
     }
 
@@ -269,9 +302,12 @@ final class EdgeOneViewModel: ObservableObject {
         do {
             try await LoadingHUD.shared.during {
                 try await service.deleteAccelDomain(domainId: domain.id)
+                if let zid = selectedZoneId, let list = try? await service.fetchAccelDomains(zoneId: zid) {
+                    accelDomains = list
+                    applyPageTotal(filteredDomains.count)
+                }
             }
             ToastCenter.shared.success("已删除")
-            await reloadRecords()
         } catch {
             ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
         }
@@ -303,15 +339,24 @@ final class EdgeOneViewModel: ObservableObject {
         let syncMode = mode
         do {
             let msg: String = try await LoadingHUD.shared.during {
+                let syncMsg: String
                 switch syncMode {
                 case .dns:
-                    return try await service.syncDns(zoneId: zoneId, domainName: name)
+                    syncMsg = try await service.syncDns(zoneId: zoneId, domainName: name)
+                    if let list = try? await service.fetchDnsRecords(zoneId: zoneId) {
+                        dnsRecords = list
+                        applyPageTotal(filteredDns.count)
+                    }
                 case .domain:
-                    return try await service.syncDomains(zoneId: zoneId, domainName: name)
+                    syncMsg = try await service.syncDomains(zoneId: zoneId, domainName: name)
+                    if let list = try? await service.fetchAccelDomains(zoneId: zoneId) {
+                        accelDomains = list
+                        applyPageTotal(filteredDomains.count)
+                    }
                 }
+                return syncMsg
             }
-            AppAlert.info(title: "同步完成", message: msg)
-            await reloadRecords()
+            ToastCenter.shared.success(msg.isEmpty ? "同步完成" : msg)
         } catch {
             ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
         }

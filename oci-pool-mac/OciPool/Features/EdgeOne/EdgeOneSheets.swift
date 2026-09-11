@@ -189,7 +189,7 @@ struct EdgeOneConfigSheet: View {
                                 }
                             ))
                             .labelsHidden()
-                            .toggleStyle(SwitchToggleStyle(tint: Color(hex: "00b9ff")))
+                            .toggleStyle(SwitchToggleStyle(tint: AppTheme.sidebarActive))
                         }
 
                         FormFieldRow(label: "SecretId", required: true) {

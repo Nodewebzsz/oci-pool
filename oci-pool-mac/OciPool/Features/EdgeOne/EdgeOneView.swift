@@ -17,22 +17,29 @@ struct EdgeOneView: View {
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
-                    if let err = model.errorText, !err.isEmpty {
+                    if let err = model.errorText, !err.isEmpty, !model.isNotConfigured {
                         errorBanner(err)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
+                            .padding(.bottom, 12)
                     }
-                    modePicker
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
-                        .padding(.bottom, 12)
-                    searchBar
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 12)
-                    listBody
+
+                    if model.isNotConfigured {
+                        EmptyStateView(
+                            icon: "key.fill",
+                            title: "腾讯云 EdgeOne 未配置或未启用",
+                            subtitle: "请先在「密钥配置」中填写 Tencent Cloud SecretId / SecretKey 并开启启用开关，保存后即可管理 DNS 记录与加速域名。",
+                            actionTitle: "立即配置密钥",
+                            action: { model.openConfig() }
+                        )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        modePicker
+                            .padding(.bottom, 12)
+                        searchBar
+                            .padding(.bottom, 12)
+                        listBody
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 }
-                .appLoading((model.isLoading || model.isZonesLoading) && model.zones.isEmpty)
             },
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
@@ -69,8 +76,9 @@ struct EdgeOneView: View {
                     get: { model.selectedZoneId },
                     set: { model.onZoneChange($0) }
                 ),
-                placeholder: "请选择域名",
+                placeholder: model.isNotConfigured ? "未配置域名" : "请选择域名",
                 width: 220,
+                enabled: !model.isNotConfigured && !model.zones.isEmpty,
                 allowClear: true,
                 searchable: true
             )
@@ -78,7 +86,7 @@ struct EdgeOneView: View {
                 model.openConfig()
             }
             if model.mode == .dns {
-                AppButton(title: "添加记录", systemImage: "plus", kind: .primary, enabled: hasZone) {
+                AppButton(title: "添加记录", systemImage: "plus", kind: .primary, enabled: hasZone && !model.isNotConfigured) {
                     model.openAdd()
                 }
             }
@@ -87,7 +95,7 @@ struct EdgeOneView: View {
                 systemImage: "arrow.triangle.2.circlepath",
                 kind: .primary,
                 isLoading: model.isSyncing,
-                enabled: hasZone
+                enabled: hasZone && !model.isNotConfigured
             ) {
                 model.sync()
             }
@@ -95,7 +103,8 @@ struct EdgeOneView: View {
                 title: "刷新",
                 systemImage: "arrow.clockwise",
                 kind: .secondary,
-                isLoading: model.isLoading
+                isLoading: model.isLoading,
+                enabled: !model.isNotConfigured
             ) {
                 Task { await model.reloadRecords() }
             }
@@ -105,45 +114,46 @@ struct EdgeOneView: View {
     // MARK: - Mode picker (pill)
 
     private var modePicker: some View {
-        HStack(spacing: 0) {
-            ForEach(EdgeOneMode.allCases) { m in
-                Button(action: {
-                    withAnimation(.easeInOut(duration: 0.18)) {
+        HStack {
+            HStack(spacing: 0) {
+                ForEach(EdgeOneMode.allCases) { m in
+                    let active = model.mode == m
+                    Button(action: {
                         model.switchMode(m)
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: m.systemImage)
+                                .font(.system(size: 11, weight: .medium))
+                                .frame(width: 14)
+                            Text(m.title)
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                        .foregroundColor(active
+                                         ? AppearanceController.shared.accent.accentFg(dark)
+                                         : AppTheme.sidebarText(dark))
+                        .frame(width: 104, height: 26)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(active
+                                      ? AppTheme.sidebarActive
+                                      : Color.clear)
+                        )
+                        .contentShape(Rectangle())
                     }
-                }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: m.systemImage)
-                            .font(.system(size: 11, weight: .medium))
-                        Text(m.title)
-                            .font(.system(size: 12, weight: model.mode == m ? .semibold : .regular))
-                    }
-                    .foregroundColor(model.mode == m
-                                     ? AppearanceController.shared.accent.accentFg(dark)
-                                     : AppTheme.sidebarText(dark))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 6)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(model.mode == m
-                                  ? AppTheme.sidebarActive
-                                  : Color.clear)
-                    )
+                    .buttonStyle(NoAnimTabButtonStyle())
                 }
-                .buttonStyle(PlainButtonStyle())
             }
+            .padding(3)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(AppTheme.sidebarBg(dark))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(AppTheme.border(dark), lineWidth: 1)
+            )
             Spacer()
         }
-        .padding(3)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(AppTheme.sidebarBg(dark))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(AppTheme.border(dark), lineWidth: 1)
-        )
     }
 
     // MARK: - Filter
@@ -155,20 +165,48 @@ struct EdgeOneView: View {
                 Text("按名称:")
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.textTertiary(dark))
-                SearchField(text: $model.searchName, placeholder: "e.g. www")
+                    .fixedSize()
+                SearchField(text: $model.searchName, placeholder: "e.g. www", maxWidth: 220)
                 Text("按值:")
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.textTertiary(dark))
-                SearchField(text: $model.searchContent, placeholder: "e.g. 129.146")
+                    .fixedSize()
+                SearchField(text: $model.searchContent, placeholder: "e.g. 129.146", maxWidth: 220)
+                AppButton(title: "清除搜索", systemImage: "xmark", kind: .secondary,
+                          enabled: !model.searchName.isEmpty || !model.searchContent.isEmpty) {
+                    model.clearSearch()
+                }
+                .fixedSize()
+                Spacer()
             } else {
                 Text("域名:")
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.textTertiary(dark))
-                SearchField(text: $model.searchName, placeholder: "e.g. www.example.com")
-            }
-            AppButton(title: "清除搜索", systemImage: "xmark", kind: .secondary,
-                      enabled: !model.searchName.isEmpty || !model.searchContent.isEmpty) {
-                model.clearSearch()
+                    .fixedSize()
+                SearchField(text: $model.searchName, placeholder: "e.g. www.example.com", maxWidth: 240)
+                Text("状态:")
+                    .font(.system(size: 11))
+                    .foregroundColor(AppTheme.textTertiary(dark))
+                    .fixedSize()
+                SelectMenu(
+                    options: model.statusOptions,
+                    selection: Binding(
+                        get: { model.domainStatusFilter },
+                        set: {
+                            model.domainStatusFilter = $0 ?? ""
+                            model.onSearchChanged()
+                        }
+                    ),
+                    placeholder: "全部",
+                    width: 130,
+                    allowClear: false
+                )
+                AppButton(title: "清除搜索", systemImage: "xmark", kind: .secondary,
+                          enabled: !model.searchName.isEmpty || !model.searchContent.isEmpty || !model.domainStatusFilter.isEmpty) {
+                    model.clearSearch()
+                }
+                .fixedSize()
+                Spacer()
             }
         }
         .padding(10)
@@ -201,114 +239,125 @@ struct EdgeOneView: View {
 
     private var listBody: some View {
         Group {
-            if model.selectedZoneId == nil || model.selectedZoneId?.isEmpty == true {
-                EmptyStateView(
-                    icon: "globe",
-                    title: model.zones.isEmpty ? "暂无可用域名" : "请选择域名",
-                    subtitle: model.zones.isEmpty
-                        ? "请先配置腾讯云 SecretId / SecretKey"
-                        : "从上方下拉选择 EdgeOne 站点",
-                    actionTitle: "密钥配置",
-                    action: { model.openConfig() }
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if model.mode == .dns {
+            switch model.mode {
+            case .dns:
                 dnsList
-            } else {
+            case .domain:
                 domainList
             }
         }
     }
 
     private var dnsList: some View {
-        Group {
-            if model.pagedDns.isEmpty && !model.isLoading {
-                EmptyStateView(
-                    icon: "list.bullet.rectangle",
-                    title: model.filteredDns.isEmpty && !model.dnsRecords.isEmpty
-                        ? "无匹配结果"
-                        : "暂无 DNS 记录",
-                    subtitle: model.dnsRecords.isEmpty
-                        ? "点击「添加记录」或「同步记录」"
-                        : "试试其他关键词",
-                    actionTitle: model.dnsRecords.isEmpty ? "添加记录" : nil,
-                    action: model.dnsRecords.isEmpty ? { model.openAdd() } : nil
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                VStack(spacing: 0) {
-                    listTitleStrip(icon: "list.bullet", title: "DNS 记录",
-                                   count: "\(model.filteredDns.count)")
-                    DataList {
-                        DataListColumnHeader(title: "类型", width: 80)
-                        DataListColumnHeader(title: "记录名", width: 180)
-                        DataListColumnHeader(title: "记录值", width: nil)
-                        DataListColumnHeader(title: "TTL", width: 100)
-                        DataListColumnHeader(title: "优先级", width: 90)
-                        DataListColumnHeader(title: "操作", width: 100)
-                    } content: {
-                        ForEach(model.filteredDns) { item in
-                            DataListRow {
-                                dnsRow(item)
-                            }
+        VStack(spacing: 0) {
+            listTitleStrip(icon: "list.bullet", title: "DNS 记录",
+                           count: "\(model.filteredDns.count)")
+            DataList {
+                DataListColumnHeader(title: "类型", width: 80)
+                DataListColumnHeader(title: "记录名", width: 180)
+                DataListColumnHeader(title: "记录值", width: nil)
+                DataListColumnHeader(title: "TTL", width: 100)
+                DataListColumnHeader(title: "优先级", width: 90)
+                DataListColumnHeader(title: "操作", width: 100)
+            } content: {
+                if (!model.hasLoadedOnce || model.isLoading) && model.dnsRecords.isEmpty {
+                    VStack(spacing: 10) {
+                        Spacer()
+                        ProgressView()
+                        Text("正在加载 DNS 记录…")
+                            .font(.system(size: 12))
+                            .foregroundColor(AppTheme.sidebarText(dark))
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 260)
+                } else if model.selectedZoneId == nil || model.selectedZoneId?.isEmpty == true {
+                    EmptyStateView(
+                        icon: "cloud",
+                        title: model.zones.isEmpty ? "暂无可用域名" : "请选择域名",
+                        subtitle: model.zones.isEmpty
+                            ? "请先在「密钥配置」中填写 EdgeOne API Key"
+                            : "从上方下拉选择要管理的 Zone"
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 260)
+                } else if model.filteredDns.isEmpty {
+                    EmptyStateView(
+                        icon: "list.bullet.rectangle",
+                        title: model.dnsRecords.isEmpty ? "暂无 DNS 记录" : "无匹配结果",
+                        subtitle: model.dnsRecords.isEmpty
+                            ? "点击「添加记录」或「同步记录」"
+                            : "试试其他关键词",
+                        actionTitle: model.dnsRecords.isEmpty ? "添加记录" : nil,
+                        action: model.dnsRecords.isEmpty ? { model.openAdd() } : nil
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 260)
+                } else {
+                    ForEach(model.filteredDns) { item in
+                        DataListRow {
+                            dnsRow(item)
                         }
                     }
+                    .opacity(model.isLoading ? 0.6 : 1.0)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(AppTheme.sidebarBg(dark))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppTheme.border(dark), lineWidth: 1)
-                )
-                .cornerRadius(8)
-                .appLoading(model.isLoading)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
+        )
+        .cornerRadius(8)
     }
 
     private var domainList: some View {
-        Group {
-            if model.pagedDomains.isEmpty && !model.isLoading {
-                EmptyStateView(
-                    icon: "zap",
-                    title: model.filteredDomains.isEmpty && !model.accelDomains.isEmpty
-                        ? "无匹配结果"
-                        : "暂无加速域名",
-                    subtitle: model.accelDomains.isEmpty
-                        ? "点击「同步域名」从腾讯云拉取"
-                        : "试试其他关键词",
-                    actionTitle: model.accelDomains.isEmpty ? "同步域名" : nil,
-                    action: model.accelDomains.isEmpty ? { model.sync() } : nil
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                VStack(spacing: 0) {
-                    listTitleStrip(icon: "bolt", title: "加速域名",
-                                   count: "\(model.filteredDomains.count)")
-                    DataList {
-                        DataListColumnHeader(title: "域名", width: nil)
-                        DataListColumnHeader(title: "状态", width: 100)
-                        DataListColumnHeader(title: "CNAME", width: nil)
-                        DataListColumnHeader(title: "协议", width: 130)
-                        DataListColumnHeader(title: "操作", width: 100)
-                    } content: {
-                        ForEach(model.filteredDomains) { item in
-                            DataListRow {
-                                domainRow(item)
-                            }
+        VStack(spacing: 0) {
+            listTitleStrip(icon: "bolt", title: "加速域名",
+                           count: "\(model.filteredDomains.count)")
+            DataList {
+                DataListColumnHeader(title: "域名", width: nil)
+                DataListColumnHeader(title: "状态", width: 100)
+                DataListColumnHeader(title: "CNAME", width: nil)
+                DataListColumnHeader(title: "协议", width: 130)
+                DataListColumnHeader(title: "操作", width: 100)
+            } content: {
+                if (!model.hasLoadedOnce || model.isLoading) && model.accelDomains.isEmpty {
+                    VStack(spacing: 10) {
+                        Spacer()
+                        ProgressView()
+                        Text("正在加载加速域名…")
+                            .font(.system(size: 12))
+                            .foregroundColor(AppTheme.sidebarText(dark))
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 260)
+                } else if model.filteredDomains.isEmpty {
+                    EmptyStateView(
+                        icon: "zap",
+                        title: model.accelDomains.isEmpty ? "暂无加速域名" : "无匹配结果",
+                        subtitle: model.accelDomains.isEmpty
+                            ? "点击「同步域名」从腾讯云拉取"
+                            : "试试其他关键词",
+                        actionTitle: model.accelDomains.isEmpty ? "同步域名" : nil,
+                        action: model.accelDomains.isEmpty ? { model.sync() } : nil
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 260)
+                } else {
+                    ForEach(model.filteredDomains) { item in
+                        DataListRow {
+                            domainRow(item)
                         }
                     }
+                    .opacity(model.isLoading ? 0.6 : 1.0)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(AppTheme.sidebarBg(dark))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppTheme.border(dark), lineWidth: 1)
-                )
-                .cornerRadius(8)
-                .appLoading(model.isLoading)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
+        )
+        .cornerRadius(8)
     }
 
     private func dnsRow(_ item: EoDnsRecord) -> some View {
@@ -319,14 +368,15 @@ struct EdgeOneView: View {
             cell(item.content, width: nil)
             cell(EdgeOneJSON.formatTTL(item.ttl), width: 100)
             cell(item.priority.map { "\($0)" } ?? "—", width: 90)
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 Spacer(minLength: 0)
-                actionBtn("pencil", color: AppTheme.sidebarActive, tip: "编辑") {
+                actionBtn("pencil", color: AppTheme.info, tip: "编辑") {
                     model.openEdit(item)
                 }
                 actionBtn("trash", color: AppTheme.danger, tip: "删除") {
                     model.deleteDns(item)
                 }
+                Spacer(minLength: 0)
             }
             .frame(width: 100)
         }
@@ -346,11 +396,24 @@ struct EdgeOneView: View {
             .frame(width: 100)
             cell(item.cname.isEmpty ? "—" : item.cname, width: nil)
             cell(item.protocolLabel, width: 130)
-            HStack {
+            HStack(spacing: 4) {
                 Spacer(minLength: 0)
+                Button(action: {}) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(AppTheme.sidebarText(dark))
+                        .frame(width: 26, height: 26)
+                        .background(RoundedRectangle(cornerRadius: 4).fill(AppTheme.sidebarHover(dark)))
+                }
+                .buttonStyle(PlainButtonStyle())
+                .disabled(true)
+                .opacity(0.4)
+                .help("不可编辑")
+
                 actionBtn("trash", color: AppTheme.danger, tip: "删除") {
                     model.deleteDomain(item)
                 }
+                Spacer(minLength: 0)
             }
             .frame(width: 100)
         }
@@ -402,10 +465,25 @@ struct EdgeOneView: View {
                 Task { await model.loadZones(selectFirst: true) }
             }
             .buttonStyle(PlainButtonStyle())
+            Button(action: { model.clearError() }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(AppTheme.danger.opacity(0.8))
+                    .padding(4)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .help("关闭提示")
         }
         .foregroundColor(AppTheme.danger)
         .padding(12)
         .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(8)
+    }
+}
+
+/// 无动画/无点击透明度闪烁的 Tab 按钮样式，彻底杜绝切换抖动
+private struct NoAnimTabButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
     }
 }

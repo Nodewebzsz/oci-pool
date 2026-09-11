@@ -42,8 +42,7 @@ struct VpsListView: View {
                             .font(.system(size: 12))
                             .foregroundColor(AppTheme.danger)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 10)
+                            .padding(.bottom, 12)
                     }
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
@@ -51,7 +50,6 @@ struct VpsListView: View {
                             controlBar
                             cardGrid
                         }
-                        .padding(16)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -84,7 +84,31 @@ public class SecurityRuleServiceImpl implements SecurityRuleService {
 
         addSecurityBaseRule(tenant, ruleDTO);
 
+        // 后端兜底：检测危险规则（开放全地址 + 全协议/高危端口）→ 填充 warning 供前端提示，不阻断写入
+        if (isDangerRule(ruleDTO)) {
+            ruleDTO.setWarning("该规则面向全網开放，可能将服务器暴露于公网攻击面，请确认配置无误。");
+        }
+
         return ruleDTO;
+    }
+
+    /**
+     * 后端兜底危险规则检测：开放全地址(0.0.0.0/0 或 ::/0)且(全协议 或 高危端口)
+     */
+    private boolean isDangerRule(SecurityRuleDTO ruleDTO) {
+        String source = ruleDTO.getSource();
+        if (!"0.0.0.0/0".equals(source) && !"::/0".equals(source)) {
+            return false;
+        }
+        String protocol = ruleDTO.getProtocol() == null ? "" : ruleDTO.getProtocol().toLowerCase();
+        if ("all".equals(protocol) || "all protocols".equals(protocol)) {
+            return true;
+        }
+        String ports = ruleDTO.getPorts();
+        if (ports != null && !ports.isEmpty()) {
+            return ports.matches("(^|,|-|\\b)(22|3389|3306|5432|6379|27017)(\\b|,|-|$)");
+        }
+        return false;
     }
 
     /**
@@ -109,8 +133,43 @@ public class SecurityRuleServiceImpl implements SecurityRuleService {
                 addEgressRuleWithReplace(vcnClient, securityList, ruleDTO);
             }
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            log.error("添加安全规则失败 tenantId={} type={} protocol={} source={} ports={}",
+                    ruleDTO.getTenantId(), ruleDTO.getType(), ruleDTO.getProtocol(),
+                    ruleDTO.getSource(), ruleDTO.getPorts(), e);
+            throw new RuntimeException(friendlyRuleError(e));
         }
+    }
+
+    /**
+     * 将底层异常转为对用户友好的简短提示（不泄漏 OCI 原始异常全文，原文仅记入日志）。
+     */
+    private String friendlyRuleError(Throwable e) {
+        String msg = e == null ? "" : String.valueOf(e.getMessage());
+        String lower = msg.toLowerCase();
+        // 认证失败：OCI 返回 401 NotAuthenticated（凭证无效/过期/权限不足）
+        if (e instanceof com.oracle.bmc.model.BmcException) {
+            com.oracle.bmc.model.BmcException bmc = (com.oracle.bmc.model.BmcException) e;
+            if (bmc.getStatusCode() == 401) {
+                return "该租户的 OCI API 凭证无效或已过期，请检查 API Key/指纹配置";
+            }
+            if (bmc.getStatusCode() == 404) {
+                return "未找到该租户的安全列表，请确认区域/凭证是否正确";
+            }
+            if (bmc.getStatusCode() == 403) {
+                return "该租户的 OCI 凭证权限不足，无法修改安全规则";
+            }
+            return "OCI 接口调用失败（" + bmc.getStatusCode() + "），请稍后重试";
+        }
+        if (lower.contains("notauthenticated") || lower.contains(" 401") || lower.contains("(401")) {
+            return "该租户的 OCI API 凭证无效或已过期，请检查 API Key/指纹配置";
+        }
+        if (lower.contains("invalid port") || lower.contains("numberformatexception")) {
+            return "端口格式不正确，请填写单个端口或端口范围（如 80 或 80-443）";
+        }
+        if (lower.contains("timeout") || lower.contains("timed out") || lower.contains("connect")) {
+            return "连接 OCI 超时，请检查网络或代理配置后重试";
+        }
+        return "添加安全规则失败，请稍后重试或检查该租户凭证";
     }
 
     /**

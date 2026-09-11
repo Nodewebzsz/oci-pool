@@ -136,7 +136,7 @@ struct LoginView: View {
         if skip { return }
 
         await MainActor.run {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(.easeInOut(duration: 0.12)) {
                 model.isLoadingMeta = true
                 model.metaError = nil
                 model.infoText = nil
@@ -145,10 +145,12 @@ struct LoginView: View {
         }
 
         do {
-            let meta = try await session.fetchLoginPageMeta()
-            let factors = await session.fetchLoginFactors()
+            async let metaTask = session.fetchLoginPageMeta()
+            async let factorsTask = session.fetchLoginFactors()
+            let (meta, factors) = try await (metaTask, factorsTask)
+
             await MainActor.run {
-                withAnimation(.easeInOut(duration: 0.28)) {
+                withAnimation(.easeInOut(duration: 0.15)) {
                     model.allowRegister = meta.allowRegister
                     model.githubEnabled = meta.githubEnabled
                     model.googleEnabled = meta.googleEnabled
@@ -162,13 +164,13 @@ struct LoginView: View {
                     model.metaLoadedURL = target
                     model.isLoadingMeta = false
                     if model.isRemoteServer {
-                        model.infoText = model.locale == .enUS ? "Remote server connected" : "已连接远程服务器"
+                        model.infoText = nil
                     }
                 }
             }
         } catch {
             await MainActor.run {
-                withAnimation(.easeInOut(duration: 0.22)) {
+                withAnimation(.easeInOut(duration: 0.15)) {
                     model.isLoadingMeta = false
                     model.metaLoadedURL = nil
                     model.metaError = error.localizedDescription
@@ -241,10 +243,10 @@ struct LoginView: View {
         model.serverURL = session.serverURL
 
         if mode == .remote {
-            // Free local Java if previously started this session.
-            await Task.detached(priority: .userInitiated) {
+            // Free local Java asynchronously in background without blocking UI
+            Task.detached(priority: .utility) {
                 BackendController.shared.stop()
-            }.value
+            }
             // User connects via「连接」when URL ready; auto-try if host already filled.
             await loadMeta(force: false)
         } else {

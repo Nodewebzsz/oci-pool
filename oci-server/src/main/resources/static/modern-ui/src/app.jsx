@@ -277,8 +277,8 @@ function AppInner() {
   }, [authState, route]);
 
   const page = route.page;
-  // 子页面上下文(tenant-detail/grab/resources):从路由参数/查询还原
-  const CHILD_PAGE_IDS = ['tenant-detail', 'tenant-grab', 'tenant-resources'];
+  // 子页面上下文(tenant-detail/grab/resources/traffic/audit/cost/quota):从路由参数/查询还原
+  const CHILD_PAGE_IDS = ['tenant-detail', 'tenant-grab', 'tenant-resources', 'tenant-traffic', 'tenant-audit', 'tenant-cost', 'tenant-quota'];
   const detailCtx = CHILD_PAGE_IDS.includes(page)
     ? {
         tenantId: route.params.tenantDbId,
@@ -359,6 +359,10 @@ function AppInner() {
     'tenant-detail': TenantDetailPage,
     'tenant-grab': TenantGrabPage,
     'tenant-resources': TenantResourcesPage,
+    'tenant-traffic': TenantTrafficPage,
+    'tenant-audit': TenantAuditPage,
+    'tenant-cost': TenantCostPage,
+    'tenant-quota': TenantQuotaPage,
     instances: InstancesPage,
     grab: GrabPage,
     regions: RegionsPage,
@@ -393,6 +397,10 @@ function AppInner() {
     'tenant-detail': 'tenants',
     'tenant-grab': 'tenants',      // 从租户菜单进的"查看开机"归属"租户管理"
     'tenant-resources': 'tenants', // 资源列表也是租户的下钻
+    'tenant-traffic': 'tenants',   // 实例流量监控归属"租户管理"
+    'tenant-audit': 'tenants',     // 审计日志归属"租户管理"
+    'tenant-cost': 'tenants',      // 费用统计归属"租户管理"
+    'tenant-quota': 'tenants',     // 账号配额归属"租户管理"
   };
   // 若上次停在依赖 ctx 的子页但 ctx 丢了,回退到 tenants 列表。
   // 租户是否仍存在由详情页对应的后端请求判定，不能依赖本地模拟列表。
@@ -577,6 +585,9 @@ function labelFor(page) {
     'tenant-detail': tr('app.6046be'),
     'tenant-grab': tr('app.2f047d'),
     'tenant-resources': tr('app.73d1f1'),
+    'tenant-traffic': '实例流量监控',
+    'tenant-audit': '审计日志',
+    'tenant-cost': '费用统计',
     instances: tr('app.cd50e3'),
     grab: tr('app.8c19ed'), regions: tr('app.d3d0e3'), logs: tr('app.61eb6d'),
     proxyKeyConfig: tr('app.215666'), cfManage: tr('app.ed4f87'), eoManage: tr('app.4c89a3'),

@@ -98,8 +98,8 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
 
   // 区域切换下拉的开关状态
   const [regionMenuOpen, setRegionMenuOpen] = useStateTD(false);
-  // 敏感信息脱敏切换(详情页默认展示完整名称，亦可通过眼睛按钮或点击标题切换)
-  const [masked, setMasked] = useStateTD(false);
+  // 敏感信息脱敏切换(默认脱敏，与租户列表保持一致；亦可通过眼睛按钮或点击标题切换)
+  const [masked, setMasked] = useStateTD(true);
 
   // 若 tenant 不存在(数据变化/直链非法),让 app 层已经处理了回退,这里兜底
   if (loading) {
@@ -148,21 +148,21 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
         return;
       }
       case 'view-boot':
-        // 跳转到独立的"查看开机"页面(预开列表)
+        // 跳转到专属开机任务子页(对齐客户端 .tenantGrab 独立子路由，侧栏归属租户管理)
         navigate('tenant-grab', {
-          tenantId: tenant.id,
-          regionTenantId: activeRow.id,
-          tab: 'grab',
-          regionCode: activeRegionCode,
+          tenantDbId: tenant.id,
+          regionId: activeRow.id,
+          region: activeRegionCode,
+          from: 'detail',
         });
         return;
       case 'resource-list':
-        // 跳转到独立的"资源列表"页面(OCI 实例管理)
+        // 跳转到专属实例列表子页(对齐客户端 .tenantResources 独立子路由，侧栏归属租户管理)
         navigate('tenant-resources', {
-          tenantId: tenant.id,
-          regionTenantId: activeRow.id,
-          tab: 'resources',
-          regionCode: activeRegionCode,
+          tenantDbId: tenant.id,
+          regionId: activeRow.id,
+          region: activeRegionCode,
+          from: 'detail',
         });
         return;
       case 'disk-info':      return showDiskModal(shell, selectedRegion, activeRow);
@@ -172,13 +172,13 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
   };
 
   const SUB_ACTIONS = [
-    { id: 'sync-instance',  label: tr('td.action.sync'), icon: 'refresh-cw', variant: 'primary'   },
-    { id: 'add-boot',       label: tr('td.action.addBoot'), icon: 'plus',       variant: 'outline'   },
-    { id: 'view-boot',      label: tr('td.action.viewBoot'), icon: 'eye',        variant: 'outline'   },
-    { id: 'disk-info',      label: tr('td.action.disk'), icon: 'hard-drive', variant: 'outline'   },
-    { id: 'security-rules', label: tr('td.action.rules'), icon: 'shield',     variant: 'outline'   },
-    { id: 'resource-list',  label: tr('td.action.resources'), icon: 'list',       variant: 'outline'   },
-    { id: 'database-case',  label: tr('td.action.storage'), icon: 'database',   variant: 'outline'   },
+    { id: 'sync-instance',  label: '实例同步', icon: 'refresh-cw', variant: 'primary'   },
+    { id: 'add-boot',       label: '添加开机', icon: 'plus',       variant: 'outline'   },
+    { id: 'view-boot',      label: '查看开机', icon: 'eye',        variant: 'outline'   },
+    { id: 'disk-info',      label: '硬盘信息', icon: 'hard-drive', variant: 'outline'   },
+    { id: 'security-rules', label: '安全规则', icon: 'shield',     variant: 'outline'   },
+    { id: 'resource-list',  label: '实例列表', icon: 'list',       variant: 'outline'   },
+    { id: 'database-case',  label: '数据库管理', icon: 'database',   variant: 'outline'   },
   ];
 
   return (
@@ -186,10 +186,10 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
       display: 'flex', flexDirection: 'column',
       flex: 1, minHeight: 0,
     }}>
-      {/* ── 面包屑 + 返回 ─────────────────────────── */}
+      {/* ── 面包屑 + 返回 (对齐客户端) ─────────────────────────── */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 12,
-        marginBottom: 10,
+        marginBottom: 12,
         fontSize: 12, color: 'var(--fg-2)',
       }}>
         <button
@@ -220,11 +220,11 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
             onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
             onMouseLeave={e => e.currentTarget.style.color = 'var(--fg-2)'}
           >
-            {tr('nav.tenants')}
+            租户管理
           </a>
           <Icon name="chevron-right" size={12} style={{ color: 'var(--fg-3)' }} />
           <span style={{ color: 'var(--fg-1)', fontWeight: 500 }}>
-            {tr('td.detail')} · <span className="mono">{masked ? window.maskName(getTenantName(tenant) || '') : (getTenantName(tenant) || '')}</span>
+            租户详情 · <span className="mono">{masked ? window.maskName(getTenantName(tenant) || '') : (getTenantName(tenant) || '')}</span>
           </span>
         </nav>
       </div>
@@ -244,27 +244,26 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
           <div style={{
             width: 40, height: 40, borderRadius: 10,
-            background: 'color-mix(in oklab, var(--accent) 18%, transparent)',
+            background: 'color-mix(in srgb, var(--accent) 18%, transparent)',
             color: 'var(--accent)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0,
           }}>
-            <Icon name="diamond" size={20} />
+            <Icon name="users" size={20} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <h1
                 onClick={() => setMasked(!masked)}
                 title={masked ? tr('td.toggleMask') : ''}
-                style={{ fontSize: 18, fontWeight: 600, margin: 0, color: 'var(--fg-0)', letterSpacing: -0.2, cursor: 'pointer' }}
+                style={{ fontSize: 18, fontWeight: 700, margin: 0, color: 'var(--fg-0)', letterSpacing: -0.2, cursor: 'pointer' }}
               >
                 {masked ? window.maskName(getTenantName(tenant) || '') : (getTenantName(tenant) || '')}
               </h1>
-              {/* 自定义别名徽章：只有在设置了别名且与租户名不同时才展示，彻底消除双份重复 */}
+              {/* 自定义别名徽章：只要设置了自定义别名(非空且非OCID)就展示，对齐租户列表 */}
               {(() => {
                 const alias = getTenantAlias(tenant);
-                const fullName = getTenantName(tenant);
-                if (!alias || alias === fullName) return null;
+                if (!alias) return null;
                 return (
                   <span className="mono" title={tr('tenants.col.defName')} style={{
                     padding: '2px 8px', background: 'var(--bg-3)',
@@ -274,9 +273,17 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
                   </span>
                 );
               })()}
-              <StatusPill status={tenant._ui.status === 'active' ? 'active' : tenant._ui.status} label={tr('status.' + tenant._ui.status)} />
+              <span style={{
+                padding: '2px 8px',
+                borderRadius: 999,
+                background: (tenant._ui?.status === 'active' || tenant.status === 'active' || tenant.status === 0 || tenant.status === '0') ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'color-mix(in srgb, var(--danger) 14%, transparent)',
+                color: (tenant._ui?.status === 'active' || tenant.status === 'active' || tenant.status === 0 || tenant.status === '0') ? 'var(--accent)' : 'var(--danger)',
+                fontSize: 11, fontWeight: 600,
+              }}>
+                {(tenant._ui?.status === 'active' || tenant.status === 'active' || tenant.status === 0 || tenant.status === '0') ? '有效' : '停用'}
+              </span>
             </div>
-            <div style={{ marginTop: 4, fontSize: 12, color: 'var(--fg-3)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ marginTop: 4, fontSize: 12, color: 'var(--fg-3)', display: 'flex', alignItems: 'center', gap: 8 }}>
               {(() => {
                 const isMulti = Boolean(tenant._ui?.hasChildren || regionOptions.length > 1);
                 return <span>{isMulti ? tr('td.multiRegion') : tr('td.singleRegion')}</span>;
@@ -314,6 +321,109 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
         <Button size="md" variant="primary" icon="zap" onClick={apiImport}>{tr('tenants.action.apiImport')}</Button>
       </div>
 
+      {/* ── 4 项核心指标卡片 (移动到区域操作上方，100% 对齐客户端) ── */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12,
+        marginBottom: 12,
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '12px 16px',
+          background: 'var(--bg-1)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+        }}>
+          <div style={{
+            width: 38, height: 38, borderRadius: 8,
+            background: 'color-mix(in srgb, var(--cyan) 15%, transparent)',
+            color: 'var(--cyan)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <Icon name="server" size={18} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-2)' }}>实例总数</div>
+            <div className="num" style={{ fontSize: 18, fontWeight: 700, color: 'var(--fg-0)', letterSpacing: -0.3 }}>{instances.length}</div>
+          </div>
+        </div>
+
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '12px 16px',
+          background: 'var(--bg-1)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+        }}>
+          <div style={{
+            width: 38, height: 38, borderRadius: 8,
+            background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+            color: 'var(--accent)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <Icon name="play" size={18} style={{ fill: 'currentColor' }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-2)' }}>运行中</div>
+            <div className="num" style={{ fontSize: 18, fontWeight: 700, color: 'var(--fg-0)', letterSpacing: -0.3 }}>{instances.filter(i => getInstanceStatus(i) === 'running').length}</div>
+          </div>
+        </div>
+
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '12px 16px',
+          background: 'var(--bg-1)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+        }}>
+          <div style={{
+            width: 38, height: 38, borderRadius: 8,
+            background: 'color-mix(in srgb, var(--info) 15%, transparent)',
+            color: 'var(--info)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <Icon name="zap" size={18} style={{ fill: 'currentColor' }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-2)' }}>开机任务</div>
+            <div className="num" style={{ fontSize: 18, fontWeight: 700, color: 'var(--fg-0)', letterSpacing: -0.3 }}>
+              {bootTasks.filter(t => t.openBootFlag || t.status === 1 || t.status === 'running').length}
+            </div>
+          </div>
+        </div>
+
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '12px 16px',
+          background: 'var(--bg-1)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+        }}>
+          <div style={{
+            width: 38, height: 38, borderRadius: 8,
+            background: 'color-mix(in srgb, var(--orange) 15%, transparent)',
+            color: 'var(--orange)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <Icon name="dollar-sign" size={18} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-2)' }}>本月花费</div>
+            <div className="num" style={{ fontSize: 18, fontWeight: 700, color: 'var(--fg-0)', letterSpacing: -0.3 }}>
+              {(() => {
+                const raw = tenant.accountCost ?? tenant.cost;
+                const num = parseFloat(String(raw || '').replace(/[^0-9.-]/g, ''));
+                const costVal = (!isNaN(num) && num > 0.001) ? num : 0.0;
+                return `$${costVal.toFixed(2)}`;
+              })()}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ── 7 项操作按钮组 ─────────────────────────── */}
       <div style={{
         background: 'var(--bg-1)',
@@ -330,10 +440,10 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
           display: 'inline-flex', alignItems: 'center', gap: 6,
           fontSize: 11, color: 'var(--fg-3)', fontWeight: 600,
           textTransform: 'uppercase', letterSpacing: 0.5,
-          marginRight: 4,
+          marginRight: 6,
         }}>
-          <Icon name="settings-2" size={12} />
-          <span>{tr('td.regionActions')}</span>
+          <Icon name="settings-2" size={13} />
+          <span>区域操作</span>
         </div>
         {SUB_ACTIONS.map(a => (
           <Button
@@ -348,12 +458,10 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
         ))}
       </div>
 
-      {/* ── 主体:表格 + 指标 ───────────────────────── */}
+      {/* ── 核心表格卡片 ───────────────────────── */}
       <div style={{
         flex: 1, minHeight: 0, overflow: 'auto',
-        display: 'flex', flexDirection: 'column', gap: 12,
       }}>
-        {/* 核心表格(只显示当前选中的区域行) */}
         <div style={{
           background: 'var(--bg-1)',
           border: '1px solid var(--border)',
@@ -368,9 +476,16 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
           }}>
             <thead>
               <tr>
-                {['td.col.seq','td.col.tenant','td.col.name','td.col.tasks','td.col.region','td.col.home','td.col.sync','common.createdAt'].map((key, i) => {
-                  const h = tr(key);
-                  return (
+                {[
+                  { label: '#', w: 44 },
+                  { label: '租户名', w: 140 },
+                  { label: '自定义名称', w: 130 },
+                  { label: '开机任务', w: 90 },
+                  { label: '区域', w: 140 },
+                  { label: '主区域', w: 70 },
+                  { label: '实例同步', w: 96 },
+                  { label: '创建时间', w: 150 },
+                ].map((col, i) => (
                   <th key={i} style={{
                     textAlign: 'left',
                     padding: '10px 14px',
@@ -380,9 +495,9 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
                     textTransform: 'uppercase', letterSpacing: 0.5,
                     borderBottom: '1px solid var(--border)',
                     whiteSpace: 'nowrap',
-                  }}>{h}</th>
-                );
-                })}
+                    width: col.w,
+                  }}>{col.label}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -396,46 +511,69 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
                     borderRadius: 3, fontSize: 11, color: 'var(--fg-1)',
                   }}>{masked ? window.maskName(activeRow.name || '') : (activeRow.name || '')}</span>
                 </td>
-                <td style={{ padding: '12px 14px', color: 'var(--fg-0)' }}>{getTenantName(activeRow)}</td>
                 <td style={{ padding: '12px 14px' }}>
-                  {activeRow.tasks > 0
-                    ? <span style={{
-                        padding: '1px 8px', background: 'var(--info-soft)', color: 'var(--info)',
-                        borderRadius: 3, fontSize: 11, fontWeight: 500,
-                      }}>{activeRow.tasks}{tr('td.task.countSuffix')}</span>
-                    : <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{tr('td.task.none')}</span>
-                  }
+                  {(() => {
+                    const alias = activeRow.custom || getTenantAlias(activeRow);
+                    if (!alias) return <span style={{ color: 'var(--fg-3)' }}>—</span>;
+                    return <span className="mono" style={{ color: 'var(--fg-1)' }}>{alias}</span>;
+                  })()}
                 </td>
-                <td style={{ padding: '12px 14px' }}><RegionBadge code={activeRow.region} lang={lang} /></td>
                 <td style={{ padding: '12px 14px' }}>
-                  {activeRow.isHomeRegion
-                    ? <span style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                        padding: '1px 8px', background: 'var(--accent-soft)', color: 'var(--accent)',
-                        borderRadius: 3, fontSize: 11, fontWeight: 500,
-                      }}><Icon name="check" size={10} strokeWidth={3} />{tr('common.yes')}</span>
-                    : <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{tr('common.no')}</span>
-                  }
+                  {(() => {
+                    const runningTasks = bootTasks.filter(t => t.openBootFlag || t.status === 1 || t.status === 'running').length;
+                    if (runningTasks > 0) {
+                      return (
+                        <span style={{
+                          padding: '1px 8px', background: 'var(--info-soft)', color: 'var(--info)',
+                          borderRadius: 3, fontSize: 11, fontWeight: 500,
+                        }}>{runningTasks} 个任务</span>
+                      );
+                    }
+                    return <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>无任务</span>;
+                  })()}
+                </td>
+                <td style={{ padding: '12px 14px' }}>
+                  {(() => {
+                    const r = REGIONS.find(x => x.code === activeRow.region);
+                    const cn = r ? (r.simpleName || r.cn) : activeRow.region;
+                    return <span style={{ color: 'var(--fg-0)' }}>{cn}</span>;
+                  })()}
+                </td>
+                <td style={{ padding: '12px 14px' }}>
+                  {activeRow.isHomeRegion ? (
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                      padding: '2px 8px', background: 'color-mix(in srgb, var(--accent) 14%, transparent)', color: 'var(--accent)',
+                      borderRadius: 4, fontSize: 11, fontWeight: 500,
+                    }}>✓ 是</span>
+                  ) : (
+                    <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>否</span>
+                  )}
                 </td>
                 <td style={{ padding: '12px 14px' }}>
                   {activeRow.syncStatus === 'synced' ? (
                     <span style={{
                       display: 'inline-flex', alignItems: 'center', gap: 4,
-                      padding: '2px 8px', background: 'var(--accent-soft)', color: 'var(--accent)',
-                      borderRadius: 3, fontSize: 11, fontWeight: 500,
-                    }}><StatusDot status="running" size={5} />{tr('td.sync.synced')}</span>
+                      padding: '2px 8px', background: 'color-mix(in srgb, var(--accent) 14%, transparent)', color: 'var(--accent)',
+                      borderRadius: 4, fontSize: 11, fontWeight: 500,
+                    }}>
+                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }} />
+                      已同步
+                    </span>
                   ) : activeRow.syncStatus === 'syncing' ? (
                     <span style={{
                       display: 'inline-flex', alignItems: 'center', gap: 4,
                       padding: '2px 8px', background: 'var(--info-soft)', color: 'var(--info)',
-                      borderRadius: 3, fontSize: 11, fontWeight: 500,
-                    }}><Icon name="loader" size={10} />{tr('td.sync.syncing')}</span>
+                      borderRadius: 4, fontSize: 11, fontWeight: 500,
+                    }}>
+                      <Icon name="loader" size={10} />同步中
+                    </span>
                   ) : (
                     <span style={{
                       display: 'inline-flex', alignItems: 'center', gap: 4,
                       padding: '2px 8px', background: 'var(--bg-3)', color: 'var(--fg-3)',
-                      borderRadius: 3, fontSize: 11,
-                    }}>{tr('td.sync.unsynced')}</span>
+                      borderRadius: 4, fontSize: 11,
+                    }}>未同步</span>
                   )}
                 </td>
                 <td style={{ padding: '12px 14px' }}>
@@ -444,16 +582,6 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
               </tr>
             </tbody>
           </table>
-        </div>
-
-        {/* 4 项指标 */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12,
-        }}>
-          <MiniMetric label={tr('td.metric.instances')}  value={instances.length} color="var(--cyan)"   />
-          <MiniMetric label={tr('status.running')}    value={instances.filter(i => getInstanceStatus(i) === 'running').length} color="var(--accent)" />
-          <MiniMetric label={tr('td.metric.tasks')}  value={bootTasks.length} color="var(--info)"   />
-          <MiniMetric label={tr('td.metric.cost')}  value={`$${tenant.accountCost ?? tenant.cost ?? 0}`} color="var(--orange)" />
         </div>
       </div>
     </div>
