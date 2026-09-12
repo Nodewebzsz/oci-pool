@@ -8,6 +8,9 @@ final class KeyConfigViewModel: ObservableObject {
     @Published var cloudflare = CloudflareKeyConfig()
     @Published var edgeOne = EdgeOneKeyConfig()
 
+    @Published var cfConnected: Bool? = nil
+    @Published var eoConnected: Bool? = nil
+
     @Published private(set) var isLoading = false
     @Published private(set) var savingKey: String?
     @Published private(set) var errorText: String?
@@ -26,6 +29,8 @@ final class KeyConfigViewModel: ObservableObject {
     func reload() async {
         isLoading = true
         errorText = nil
+        cfConnected = nil
+        eoConnected = nil
         defer { isLoading = false }
         do {
             let cfg = try await service.fetchConfigs()
@@ -91,8 +96,10 @@ final class KeyConfigViewModel: ObservableObject {
             let msg = try await LoadingHUD.shared.during {
                 try await service.testCloudflare(cfg)
             }
+            cfConnected = true
             AppAlert.info(title: "连接测试", message: msg)
         } catch {
+            cfConnected = false
             ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
         }
     }
@@ -152,8 +159,10 @@ final class KeyConfigViewModel: ObservableObject {
             let msg = try await LoadingHUD.shared.during {
                 try await service.testEdgeOne(cfg)
             }
+            eoConnected = true
             AppAlert.info(title: "连接测试", message: msg)
         } catch {
+            eoConnected = false
             ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
         }
     }
@@ -161,11 +170,11 @@ final class KeyConfigViewModel: ObservableObject {
     func copy(_ text: String, label: String) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else {
-            ToastCenter.shared.error("暂无 \(label) 可复制")
+            ToastCenter.shared.error("内容为空，无法复制")
             return
         }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(t, forType: .string)
-        ToastCenter.shared.success("已复制 \(label)")
+        ToastCenter.shared.success("✓ 已复制 · \(label)")
     }
 }

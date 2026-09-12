@@ -7,13 +7,15 @@ final class CloudflareViewModel: ObservableObject {
     @Published private(set) var zones: [CfZone] = []
     @Published var selectedZoneId: String?
     @Published private(set) var records: [CfDnsRecord] = []
-    @Published var pageState = PageState(page: 0, size: 20)
+    @Published var pageState = PageState(page: 0, size: 100)
     @Published var searchName = ""
     @Published var searchContent = ""
+    @Published var selectedType: String = ""
 
     @Published var dnsForm: CfDnsForm?
     @Published var configForm: CfConfigForm?
     @Published private(set) var isLoading = false
+    @Published private(set) var hasLoadedOnce = false
     @Published private(set) var isZonesLoading = false
     @Published private(set) var isSaving = false
     @Published private(set) var isSyncing = false
@@ -34,11 +36,12 @@ final class CloudflareViewModel: ObservableObject {
     var filteredRecords: [CfDnsRecord] {
         let n = searchName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let c = searchContent.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if n.isEmpty && c.isEmpty { return records }
+        let t = selectedType.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         return records.filter { r in
             let nameOK = n.isEmpty || r.name.lowercased().contains(n)
             let contentOK = c.isEmpty || r.content.lowercased().contains(c)
-            return nameOK && contentOK
+            let typeOK = t.isEmpty || r.type.uppercased() == t
+            return nameOK && contentOK && typeOK
         }
     }
 
@@ -80,6 +83,9 @@ final class CloudflareViewModel: ObservableObject {
         pageState.page = 0
         searchName = ""
         searchContent = ""
+        records = []
+        isLoading = true
+        errorText = nil
         Task { await reloadRecords() }
     }
 
@@ -87,11 +93,15 @@ final class CloudflareViewModel: ObservableObject {
         guard let zoneId = selectedZoneId, !zoneId.isEmpty else {
             records = []
             pageState.apply(totalElements: 0, totalPages: 0)
+            hasLoadedOnce = true
             return
         }
         isLoading = true
         errorText = nil
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoadedOnce = true
+        }
         do {
             // API page is 1-based
             let result = try await service.fetchRecords(
@@ -107,6 +117,10 @@ final class CloudflareViewModel: ObservableObject {
         }
     }
 
+    func clearError() {
+        errorText = nil
+    }
+
     func onPageChange() {
         Task { await reloadRecords() }
     }
@@ -114,6 +128,7 @@ final class CloudflareViewModel: ObservableObject {
     func clearSearch() {
         searchName = ""
         searchContent = ""
+        selectedType = ""
     }
 
     // MARK: - DNS form
@@ -194,9 +209,12 @@ final class CloudflareViewModel: ObservableObject {
         do {
             try await LoadingHUD.shared.during {
                 try await service.deleteRecord(recordId: record.id, zoneId: zoneId)
+                if let result = try? await service.fetchRecords(zoneId: zoneId, page: pageState.page + 1, size: pageState.size) {
+                    records = result.items
+                    pageState.apply(totalElements: result.total, totalPages: result.pages)
+                }
             }
             ToastCenter.shared.success("已删除")
-            await reloadRecords()
         } catch {
             ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
         }
@@ -226,10 +244,15 @@ final class CloudflareViewModel: ObservableObject {
         defer { isSyncing = false }
         do {
             let msg = try await LoadingHUD.shared.during {
-                try await service.syncZone(zoneId: zoneId, domainName: name)
+                let syncMsg = try await service.syncZone(zoneId: zoneId, domainName: name)
+                // 在单次 loading 中一并拉取最新列表，彻底消除二次转圈
+                if let result = try? await service.fetchRecords(zoneId: zoneId, page: pageState.page + 1, size: pageState.size) {
+                    records = result.items
+                    pageState.apply(totalElements: result.total, totalPages: result.pages)
+                }
+                return syncMsg
             }
-            AppAlert.info(title: "同步完成", message: msg)
-            await reloadRecords()
+            ToastCenter.shared.success(msg.isEmpty ? "同步完成" : msg)
         } catch {
             ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
         }

@@ -29,9 +29,13 @@ function GrabPage({ density }) {
   const { t: tr, lang } = useT();
   const shell = useShell();
 
-  const routeQuery = (() => { try { return window.ociRouter?.read?.().query || {}; } catch { return {}; } })();
-  const [tenantFilter, setTenantFilter] = useStateG(routeQuery.tenantId || '');
-  const [regionFilter, setRegionFilter] = useStateG(routeQuery.regionId || '');
+  const route = (() => { try { return window.ociRouter?.read?.() || {}; } catch { return {}; } })();
+  const routeQuery = route.query || {};
+  const routeParams = route.params || {};
+  const isSubPage = (route.page === 'tenant-grab') || (routeQuery.from === 'detail') || Boolean(routeParams.tenantDbId);
+  const targetTenantId = routeParams.tenantDbId || routeQuery.tenantId || '';
+  const [tenantFilter, setTenantFilter] = useStateG(targetTenantId);
+  const [regionFilter, setRegionFilter] = useStateG(routeQuery.regionId || routeQuery.region || '');
   const [page, setPage] = useStateG(Math.max(1, Number(routeQuery.page || 1)));
   const [perPage, setPerPage] = useStateG(Math.max(1, Number(routeQuery.size || 20)));
   const [menuFor, setMenuFor] = useStateG(null);
@@ -49,23 +53,85 @@ function GrabPage({ density }) {
   const showInsts = useTaskInstancesDrawer();
 
   const [tasks, setTasks] = useStateG([]);
+  // 租户/区域筛选下拉独立加载（对齐实例管理：listParentTenants → TenantResp）
+  const [tenantOptions, setTenantOptions] = useStateG([]);
+  useEffectG(() => {
+    let alive = true;
+    window.ociServices.tenant.listParentTenants()
+      .then(rows => {
+        if (!alive) return;
+        const normalized = (Array.isArray(rows) ? rows : []).map(row => (window.ociTenantRow ? window.ociTenantRow.normalize(row, REGIONS) : row));
+        normalized.sort((a, b) => {
+          const na = a.tenancyName || a.name || a.userName || '';
+          const nb = b.tenancyName || b.name || b.userName || '';
+          return na.localeCompare(nb, undefined, { sensitivity: 'base' });
+        });
+        setTenantOptions(normalized);
+      })
+      .catch(() => { if (alive) setTenantOptions([]); });
+    return () => { alive = false; };
+  }, []);
+  // 区域下拉：与实例管理一致 —— 选中租户后调 listRegions 重建区域选项
+  const [regionOptions, setRegionOptions] = useStateG([]);
+  const [regionLoading, setRegionLoading] = useStateG(false);
+  useEffectG(() => {
+    let alive = true;
+    setRegionOptions([]);
+    setTasks([]); // 切换租户时立即清空旧任务，杜绝旧数据残留！
+    setLoading(true); // 同步开启 loading，杜绝拉取区域子级选项期间空态抢跑闪现！
+    if (!tenantFilter) { setRegionLoading(false); setRegionFilter(''); setLoading(false); return () => { alive = false; }; }
+    setRegionLoading(true);
+    (async () => {
+      try {
+        const rows = await window.ociServices.tenant.listRegions({ parentId: tenantFilter });
+        if (!alive) return;
+        const options = (Array.isArray(rows) ? rows : [])
+          .map(row => {
+            const base = row.region || row.tenancyName || row.userName || row.id || '';
+            // 多区域账户：主区域(add)追加 i18n 主区域标识
+            const label = row.isHomeRegion ? `${base} · ${tr('tenants.col.mainRegion')}` : base;
+            return { id: String(row.id ?? ''), label, region: row.region || '' };
+          })
+          .filter(row => row.id);
+        setRegionOptions(options);
+        const requested = String(regionFilter || '');
+        if (requested && options.some(row => row.id === requested)) return;
+        if (options.length === 1) { const only = options[0].id; setRegionFilter(only); writeRouteQuery({ regionId: only, page: 1 }); }
+        else if (requested) { setRegionFilter(''); writeRouteQuery({ regionId: '', page: 1 }); }
+      } catch (err) {
+        if (!alive) return;
+        setRegionOptions([]); setRegionFilter('');
+      } finally {
+        if (alive) setRegionLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [tenantFilter]);
   const [totalElements, setTotalElements] = useStateG(0);
   const [loading, setLoading] = useStateG(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useStateG(false);
   const [loadError, setLoadError] = useStateG('');
 
   const writeRouteQuery = React.useCallback((patch) => {
-    const current = (() => { try { return window.ociRouter?.read?.().query || {}; } catch { return {}; } })();
-    window.ociRouter?.go('grab', {
-      ...current,
+    const current = (() => { try { return window.ociRouter?.read?.() || {}; } catch { return {}; } })();
+    const curQuery = current.query || {};
+    const curParams = current.params || {};
+    const pageId = (current.page === 'tenant-grab' || isSubPage) ? 'tenant-grab' : 'grab';
+    const nextTenantId = patch.tenantId == null ? tenantFilter : patch.tenantId;
+    window.ociRouter?.go(pageId, {
+      ...curQuery,
+      ...curParams,
+      tenantDbId: curParams.tenantDbId || nextTenantId,
       page: patch.page == null ? page : patch.page,
       size: patch.size == null ? perPage : patch.size,
-      tenantId: patch.tenantId == null ? tenantFilter : patch.tenantId,
+      tenantId: nextTenantId,
       regionId: patch.regionId == null ? regionFilter : patch.regionId,
     }, { replace: true });
-  }, [page, perPage, tenantFilter, regionFilter]);
+  }, [page, perPage, tenantFilter, regionFilter, isSubPage]);
 
   const loadTasks = React.useCallback(async () => {
     setLoading(true);
+    setTasks([]); // 刷新与重新加载时立即清空旧数据，杜绝旧数据与 loading 共存！
     setLoadError('');
     try {
       const pageData = await window.ociServices.boot.fullBootList({
@@ -87,6 +153,7 @@ function GrabPage({ density }) {
       setLoadError(error.message || tr('grab.err.load'));
     } finally {
       setLoading(false);
+      setHasLoadedOnce(true);
     }
   }, [page, perPage, tenantFilter, writeRouteQuery]);
 
@@ -112,11 +179,11 @@ function GrabPage({ density }) {
 
   const stats = [
     { label: tr('grab.stat.totalTasks'), value: liveStats.totalTasks, icon: 'list-checks', color: 'var(--cyan)' },
-    { label: tr('grab.stat.executing'), value: liveStats.executing, icon: 'loader', color: 'var(--orange)', pulse: true },
+    { label: tr('grab.stat.executing'), value: liveStats.executing, icon: 'hourglass', color: 'var(--orange)', pulse: false },
     { label: tr('grab.stat.totalAttempts'), value: liveStats.totalAttempts.toLocaleString(), icon: 'refresh-cw', color: 'var(--info)' },
     { label: tr('grab.stat.yesterday'), value: liveStats.yesterdayAttempts.toLocaleString(), icon: 'clock', color: 'var(--fg-2)' },
     { label: tr('grab.stat.today'), value: liveStats.todayAttempts.toLocaleString(), icon: 'trending-up', color: 'var(--cyan)' },
-    { label: tr('grab.stat.failed'), value: liveStats.failed.toLocaleString(), icon: 'x-octagon', color: 'var(--danger)' },
+    { label: tr('grab.stat.failed'), value: liveStats.failed.toLocaleString(), icon: 'x-circle', color: 'var(--danger)' },
     { label: tr('grab.stat.success'), value: liveStats.success, icon: 'check-circle-2', color: 'var(--accent)' },
   ];
 
@@ -220,67 +287,76 @@ function GrabPage({ density }) {
   // (Note: this is rendered as a 2-col GrabTaskMenu, not a DropdownMenu with sections)
 
   const columns = [
-    { key: 'seq', label: tr('grab.col.seq'), width: 40,
+    { key: 'seq', label: tr('grab.col.seq'), width: 44, minWidth: 44, align: 'center',
       render: r => <span className="mono" style={{ color: 'var(--fg-3)', fontSize: 11 }}>{r.seq}</span> },
-    { key: 'tenantName', label: tr('grab.col.tenant'),
+    { key: 'tenantName', label: tr('grab.col.tenant'), width: 110, minWidth: 100, tooltip: r => r.tenantName || '',
       render: r => {
         // 与租户管理/实例列表页一致 · 展开时把 *** 替换为 user(z***n → zusern)
-        const shownName = unmask ? r.tenantName.replace('***', 'user') : r.tenantName;
+        const shownName = unmask ? r.tenantName : window.maskName(r.tenantName);
         return (
-          <span className="mono" style={{
-            padding: '2px 6px', background: 'var(--bg-3)',
-            borderRadius: 4, fontSize: 11, color: 'var(--fg-1)',
-          }}>{shownName}</span>
+          <span
+            title={r.tenantName || ''}
+            className="mono"
+            style={{
+              padding: '2px 6px', background: 'var(--bg-3)',
+              borderRadius: 4, fontSize: 11, color: 'var(--fg-1)',
+              display: 'inline-block', maxWidth: 96, overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'middle',
+              cursor: 'pointer',
+            }}
+          >{shownName}</span>
         );
       } },
-    { key: 'custom', label: tr('grab.col.custom'), width: 120,
-      render: r => <span style={{ color: 'var(--fg-1)', fontWeight: 500 }}>{getTenantAlias(r) || '-'}</span> },
-    { key: 'region', label: tr('grab.col.region'), width: 90,
-      render: r => <RegionBadge code={r.region} lang={lang} /> },
-    { key: 'status', label: tr('grab.col.taskStatus'), width: 170,
+    { key: 'custom', label: tr('grab.col.custom'), width: 130, minWidth: 110, tooltip: r => r.defName || getTenantAlias(r) || '',
       render: r => {
-        // 状态语义对齐原项目 statusInt(0未开机/1开机中/2已开机/3失败/4暂停)
-        // paused = 人为暂停(可点"启动"恢复) · failed = 系统判定失败(连续失败超阈值,需先"重置")
-        const meta = {
-          running: { hint: tr('grab.status.running') },
-          paused:  { hint: tr('grab.status.paused') },
-          failed:  { hint: tr('grab.status.failed') },
-          idle:    { hint: tr('grab.status.idle') },
-        };
-        const info = meta[r.status] || { hint: '' };
+        const alias = (r.defName && r.defName !== '未设置') ? r.defName : (getTenantAlias(r) || '');
         return (
-          <span title={info.hint} style={{
+          <span
+            title={alias || ''}
+            className="mono"
+            style={{
+              color: 'var(--fg-1)', fontWeight: 500,
+              display: 'inline-block', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'middle', whiteSpace: 'nowrap',
+            }}
+          >{alias || '—'}</span>
+        );
+      } },
+    { key: 'region', label: tr('grab.col.region'), width: 80, minWidth: 70,
+      render: r => {
+        const reg = REGIONS.find(x => x.code === r.region);
+        const name = reg ? (reg.simpleName || reg.cn) : r.region;
+        return <span style={{ color: 'var(--fg-0)' }}>{name}</span>;
+      } },
+    { key: 'status', label: tr('grab.col.taskStatus'), width: 84, minWidth: 74, align: 'center',
+      render: r => {
+        const isRunning = r.openBootFlag === true || r.status === 'running';
+        return (
+          <span style={{
             padding: '2px 8px',
-            background: r.status === 'running' ? 'var(--accent-soft)' :
-                         r.status === 'paused' ? 'var(--orange-soft)' :
-                         r.status === 'failed' ? 'var(--danger-soft)' : 'var(--bg-3)',
-            color: r.status === 'running' ? 'var(--accent)' :
-                    r.status === 'paused' ? 'var(--orange)' :
-                    r.status === 'failed' ? 'var(--danger)' : 'var(--fg-2)',
-            borderRadius: 4, fontSize: 11, fontWeight: 500,
+            background: isRunning ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'var(--bg-3)',
+            color: isRunning ? 'var(--accent)' : 'var(--fg-2)',
+            borderRadius: 999, fontSize: 11, fontWeight: 500,
             display: 'inline-flex', alignItems: 'center', gap: 5,
-            cursor: 'help',
           }}>
-            {r.status === 'running' && <StatusDot status="running" size={5} pulse />}
-            {tr('status.' + r.status)}
+            {isRunning && <StatusDot status="running" size={5} pulse />}
+            {isRunning ? tr('status.running') : '无任务'}
           </span>
         );
       } },
-    { key: 'totalTasks', label: tr('grab.col.total'), align: 'right',
+    { key: 'totalTasks', label: tr('grab.col.total'), width: 68, minWidth: 60, align: 'right',
       render: r => <span className="num" style={{ color: 'var(--fg-0)', fontWeight: 500 }}>{r.totalTasks}</span> },
-    { key: 'executing', label: tr('grab.col.executing'), align: 'right',
+    { key: 'executing', label: tr('grab.col.executing'), width: 68, minWidth: 60, align: 'right',
       render: r => (
         <span className="num" style={{ color: r.executing > 0 ? 'var(--accent)' : 'var(--fg-3)', fontWeight: r.executing > 0 ? 600 : 400 }}>{r.executing}</span>
       ) },
-    { key: 'totalAttempts', label: tr('grab.col.attempts'), align: 'right',
+    { key: 'totalAttempts', label: tr('grab.col.attempts'), width: 68, minWidth: 60, align: 'right',
       render: r => <span className="num" style={{ color: 'var(--fg-1)', fontWeight: 500 }}>{getGrabAttempts(r).toLocaleString()}</span> },
-    { key: 'yesterdayAttempts', label: tr('grab.col.yesterday'), align: 'right',
+    { key: 'yesterdayAttempts', label: tr('grab.col.yesterday'), width: 68, minWidth: 60, align: 'right',
       render: r => <span className="num" style={{ color: 'var(--fg-2)' }}>{getGrabYesterday(r)}</span> },
-    { key: 'todayAttempts', label: tr('grab.col.today'), align: 'right',
+    { key: 'todayAttempts', label: tr('grab.col.today'), width: 68, minWidth: 60, align: 'right',
       render: r => <span className="num" style={{ color: 'var(--cyan)', fontWeight: 500 }}>{getGrabToday(r)}</span> },
-    { key: 'failed', label: tr('grab.col.failed'), align: 'right',
+    { key: 'failed', label: tr('grab.col.failed'), width: 68, minWidth: 60, align: 'right',
       render: r => <span className="num" style={{ color: 'var(--danger)' }}>{getGrabFailed(r).toLocaleString()}</span> },
-    { key: 'succeeded', label: tr('grab.col.success'), align: 'right',
+    { key: 'succeeded', label: tr('grab.col.success'), width: 68, minWidth: 60, align: 'right',
       render: r => getGrabSucceeded(r) > 0
         ? (
           <button
@@ -310,11 +386,11 @@ function GrabPage({ density }) {
         )
         : <span className="num" style={{ color: 'var(--fg-3)' }}>0</span>
     },
-    { key: 'arch', label: tr('grab.col.arch'), width: 80,
-      render: r => <span style={{ padding: '1px 6px', background: 'var(--info-soft)', color: 'var(--info)', borderRadius: 3, fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{getInstanceArch(r)}</span> },
-    { key: 'createdAt', label: tr('common.createdAt'),
+    { key: 'arch', label: tr('grab.col.arch'), width: 76, minWidth: 70, align: 'center',
+      render: r => <span style={{ padding: '1px 6px', background: getInstanceArch(r) === 'ARM' ? 'var(--info-soft)' : 'var(--violet-soft)', color: getInstanceArch(r) === 'ARM' ? 'var(--info)' : 'var(--violet)', borderRadius: 3, fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{getInstanceArch(r)}</span> },
+    { key: 'createdAt', label: tr('common.createdAt'), width: 140, minWidth: 130,
       render: r => <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>{r.createdAt}</span> },
-    { key: 'actions', label: tr('common.operation'), width: 40, align: 'center',
+    { key: 'actions', label: tr('common.operation'), width: 48, minWidth: 48, align: 'center', ellipsis: false,
       render: r => {
         const isOpen = menuFor?.task === r;
         return (
@@ -343,32 +419,50 @@ function GrabPage({ density }) {
     },
   ];
 
+  const fromTenant = tenantOptions.find(t => String(t.id) === String(tenantFilter));
+  const tenantDisplayName = fromTenant ? (getTenantName(fromTenant) || fromTenant.name || fromTenant.userName || '') : '';
+
   return (
     <div style={{
       display: 'flex', flexDirection: 'column',
       flex: 1, minHeight: 0,
     }}>
       <PageHeader
-        title={tr('grab.title')}
+        title={isSubPage && tenantDisplayName
+          ? `${tenantDisplayName} · 抢机任务`
+          : tr('grab.title')}
+        subtitle={isSubPage ? `共 ${tasks.length} 组任务` : null}
         icon="zap"
         iconColor="var(--orange)"
         actions={
           <>
-            <Select
-              value={tenantFilter}
-              onChange={v => { setTenantFilter(v); setRegionFilter(''); setPage(1); writeRouteQuery({ tenantId: v, regionId: '', page: 1 }); }}
-              placeholder={tr('common.selectTenant')}
-              width={160}
-              options={Array.from(new Map(tasks.map(t => [t.tenantId, { value: t.tenantId, label: `${t.tenantName} · ${getTenantAlias(t) || '-'}` }])).values())}
-            />
+            {!isSubPage ? (
+              <Select
+                value={tenantFilter}
+                onChange={v => { setTenantFilter(v); setRegionOptions([]); setRegionFilter(''); setTasks([]); setLoading(true); setPage(1); writeRouteQuery({ tenantId: v, regionId: '', page: 1 }); }}
+                placeholder={tr('common.selectTenant')}
+                width={220}
+                searchable={tenantOptions.length > 5}
+                options={Array.from(new Map(tenantOptions.map(t => [t.id, { value: t.id, label: getTenantLabel(t, lang) }])).values())}
+              />
+            ) : (
+              <span style={{ fontSize: 12, color: 'var(--fg-3)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <Icon name="globe" size={12} />
+                <span>当前区域:</span>
+              </span>
+            )}
             <Select
               value={regionFilter}
-              onChange={v => { setRegionFilter(v); setPage(1); writeRouteQuery({ regionId: v, page: 1 }); }}
+              onChange={v => { setRegionFilter(v); setTasks([]); setLoading(true); setPage(1); writeRouteQuery({ regionId: v, page: 1 }); }}
               placeholder={tr('common.selectRegion')}
               width={160}
-              options={[...new Set(tasks.map(t => t.region).filter(Boolean))].map(region => ({ value: region, label: region }))}
+              disabled={!tenantFilter || regionLoading || regionOptions.length === 0}
+              searchable={regionOptions.length > 1}
+              options={regionOptions.map(r => ({ value: r.id, label: r.label }))}
             />
-            <Button variant="primary" size="md" icon="search" onClick={() => shell.showToast(`${tr('grab.filter.result')}${filtered.length}${tr('grab.filter.count')}`, { kind: 'info' })}>{tr('common.search')}</Button>
+            {!isSubPage && (
+              <Button variant="primary" size="md" icon="search" onClick={() => shell.showToast(`${tr('grab.filter.result')}${filtered.length}${tr('grab.filter.count')}`, { kind: 'info' })}>{tr('common.search')}</Button>
+            )}
             <IconButton
               icon={unmask ? 'eye-off' : 'eye'}
               tooltip={unmask ? tr('grab.tooltip.eyeOn') : tr('grab.tooltip.eyeOff')}
@@ -380,16 +474,85 @@ function GrabPage({ density }) {
                 color: unmask ? 'var(--accent)' : undefined,
               }}
             />
-            <Button variant="primary" size="md" icon="play-circle" onClick={() => addBoot(null)}>{tr('grab.action.create')}</Button>
-            <Button variant="orange" size="md" icon="square" onClick={stopAll}>{tr('grab.action.stop')}</Button>
-            <Button variant="danger" size="md" icon="rotate-ccw" onClick={resetAll}>{tr('grab.action.reset')}</Button>
+            <Button variant="primary" size="md" icon="play-circle" onClick={() => addBoot(null)} style={{ color: '#ffffff' }}>{tr('grab.action.create')}</Button>
+            <Button variant="orange" size="md" icon="pause-circle" onClick={stopAll} style={{ color: '#ffffff' }}>批量停止</Button>
+            <Button variant="danger" size="md" icon="rotate-ccw" onClick={resetAll} style={{ color: '#ffffff' }}>{tr('grab.action.reset')}</Button>
           </>
         }
       />
 
+      {/* ── 面包屑 + 返回 (租户下钻模式，在页头卡片下方，100% 对齐客户端) ── */}
+      {isSubPage && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          marginTop: 12, marginBottom: 12,
+          fontSize: 12, color: 'var(--fg-2)',
+        }}>
+          <button
+            type="button"
+            onClick={() => window.ociRouter.go('tenant-detail', { tenantDbId: tenantFilter })}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '4px 8px',
+              background: 'var(--bg-1)',
+              border: '1px solid var(--border)',
+              borderRadius: 5,
+              color: 'var(--fg-2)',
+              fontFamily: 'inherit', fontSize: 12, fontWeight: 500,
+              cursor: 'pointer',
+              transition: 'background 100ms, border-color 100ms',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-2)'; e.currentTarget.style.borderColor = 'var(--border-strong)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-1)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
+            title={tr('common.back')}
+          >
+            <Icon name="chevron-left" size={12} />
+            <span>{tr('common.back')}</span>
+          </button>
+          <span style={{ color: 'var(--fg-3)', opacity: 0.5 }}>›</span>
+          <nav style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <a
+              onClick={() => window.ociRouter.go('tenants')}
+              style={{ cursor: 'pointer', color: 'var(--fg-2)', textDecoration: 'none' }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--fg-2)'}
+            >
+              OCI 租户管理
+            </a>
+            <span style={{ color: 'var(--fg-3)', opacity: 0.5 }}>›</span>
+            <a
+              onClick={() => window.ociRouter.go('tenant-detail', { tenantDbId: tenantFilter })}
+              style={{ cursor: 'pointer', color: 'var(--fg-2)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--fg-2)'}
+            >
+              <span>租户详情</span>
+              {tenantDisplayName && (
+                <>
+                  <span>·</span>
+                  <span className="mono" style={{ fontWeight: 600 }}>{tenantDisplayName}</span>
+                </>
+              )}
+            </a>
+            <span style={{ color: 'var(--fg-3)', opacity: 0.5 }}>›</span>
+            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>查看开机</span>
+          </nav>
+        </div>
+      )}
+
       {loadError && (
-        <div role="alert" style={{ marginBottom: 12, color: 'var(--danger)' }}>
-          {loadError} <button type="button" onClick={loadTasks}>{tr('grab.retry')}</button>
+        <div style={{ marginBottom: 12, padding: '10px 14px', border: '1px solid var(--danger)', borderRadius: 6, background: 'var(--danger-soft)', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Icon name="alert-circle" size={15} />
+          <span style={{ flex: 1 }}>{loadError}</span>
+          <Button size="xs" variant="outline" onClick={loadTasks}>{tr('grab.retry')}</Button>
+          <button
+            type="button"
+            onClick={() => setLoadError('')}
+            style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', display: 'inline-flex', padding: 2 }}
+            title={tr('common.close')}
+          >
+            <Icon name="x" size={14} />
+          </button>
         </div>
       )}
 
@@ -428,7 +591,24 @@ function GrabPage({ density }) {
         borderRadius: 'var(--radius)',
       }}>
         <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-          <Table columns={columns} rows={loading ? [] : paged} density={density} onRowClick={showLogs} />
+          <Table
+            columns={columns}
+            rows={paged}
+            loading={!hasLoadedOnce || loading}
+            empty={
+              <EmptyState
+                icon="play-circle"
+                title={!tenantFilter ? '暂无开机任务' : (!regionFilter ? '请选择区域' : '暂无开机任务')}
+                subtitle={!tenantFilter
+                  ? '可在租户管理中创建抢机配置，或调整筛选后查询'
+                  : (!regionFilter ? '当前租户包含多个可用区域，请在上方选择具体区域后查看开机任务' : '当前筛选条件下没有抢机配置')}
+                actionLabel="刷新"
+                onAction={loadTasks}
+              />
+            }
+            density={density}
+            onRowClick={showLogs}
+          />
         </div>
         <div style={{ flexShrink: 0, borderTop: '1px solid var(--border)', background: 'var(--bg-1)' }}>
           <Pagination
@@ -472,12 +652,7 @@ function GrabTaskMenu({ task, anchorEl, onClose, onAction }) {
   const header = (
     <>
       <StatusDot status={task.status} size={5} pulse={task.status === 'running'} />
-      <span className="mono" style={{
-        padding: '1px 6px', borderRadius: 3,
-        background: 'var(--bg-3)', color: 'var(--fg-0)',
-        fontSize: 11, fontWeight: 500,
-      }}>{task.tenantName}</span>
-      <span style={{ color: 'var(--fg-2)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <span style={{ color: 'var(--fg-0)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
         {getTenantName(task)}
       </span>
     </>

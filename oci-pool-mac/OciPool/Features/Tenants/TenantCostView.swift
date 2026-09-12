@@ -6,33 +6,44 @@ struct TenantCostView: View {
     @ObservedObject var model: TenantsViewModel
     @EnvironmentObject private var appearance: AppearanceController
 
+    @State private var tableWidth: CGFloat = 800
+    @State private var hoveredRowId: Int? = nil
+
     private var dark: Bool { appearance.isDarkEffective }
     private var tenant: TenantItem? { model.costParent }
 
-    // tokens（对齐 oci_cost / oci_monitor）
+    // tokens（对齐 oci_cost / oci_monitor / AppTheme）
     private var accentGreen: Color { AppTheme.sidebarActive }
     private var computeColor: Color { Color(hex: "4a73ff") }
     private var storageColor: Color { Color(hex: "ff9f40") }
-    private var networkColor: Color { Color(hex: "1abc9c") }
+    private var networkColor: Color { AppTheme.sidebarActive }
     private var otherColor: Color { Color(hex: "6b7280") }
-    private var surface: Color { dark ? Color(hex: "1a1d27") : Color.white }
-    private var cardBorder: Color { dark ? Color(hex: "2a2d3a") : Color(hex: "e2e8f0") }
-    private var primaryText: Color { dark ? Color(hex: "e2e8f0") : Color(hex: "222222") }
-    private var secondaryText: Color { dark ? Color(hex: "8892a4") : Color(hex: "555555") }
-    private var pageBg: Color { dark ? Color(hex: "0f1117") : Color(hex: "f3f6fa") }
+    private var surface: Color { AppTheme.sidebarBg(dark) }
+    private var cardBorder: Color { AppTheme.border(dark) }
+    private var primaryText: Color { dark ? Color.white.opacity(0.92) : Color.primary }
+    private var secondaryText: Color { AppTheme.sidebarText(dark) }
 
-    private let wDay: CGFloat = 110
-    private let wType: CGFloat = 120
+    private let wDay: CGFloat = 100
+    private let wType: CGFloat = 110
     private let wCost: CGFloat = 100
     private let minSku: CGFloat = 140
-    private let minRes: CGFloat = 160
+    private let minRes: CGFloat = 200
     private let hPad: CGFloat = 12
 
     var body: some View {
-        PageScaffold(
+        let regionCn = tenant.map { t -> String in
+            let reg = t.regionNameText.isEmpty ? (t.region.isEmpty ? "—" : t.region) : t.regionNameText
+            return "\(t.displayName) · \(reg)"
+        }
+
+        return PageScaffold(
             title: "费用统计",
-            subtitle: tenant.map { $0.displayName },
+            subtitle: regionCn,
             systemImage: "creditcard",
+            parentTitle: "租户管理",
+            onParentClick: {
+                model.closeCost()
+            },
             toolbar: { toolbar },
             content: { mainContent }
         )
@@ -69,10 +80,9 @@ struct TenantCostView: View {
                 trendCard
                 detailTable
             }
-            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, 16)
         }
-        .background(pageBg)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -163,9 +173,9 @@ struct TenantCostView: View {
             }
             .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(8)
     }
 
@@ -201,7 +211,6 @@ struct TenantCostView: View {
         .background(surface)
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(cardBorder, lineWidth: 1))
         .cornerRadius(8)
-        .shadow(color: Color.black.opacity(dark ? 0.25 : 0.05), radius: 3, y: 1)
     }
 
     // MARK: - Trend
@@ -228,8 +237,20 @@ struct TenantCostView: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 chartLegend
-                if series.days.isEmpty {
-                    Text(model.costLoading ? "加载中…" : "请选择时间范围后查询")
+                if model.costLoading && series.days.isEmpty {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Text("加载费用趋势…")
+                            .font(.system(size: 12))
+                            .foregroundColor(secondaryText)
+                            .padding(.leading, 8)
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 220)
+                } else if series.days.isEmpty {
+                    Text(model.costItems.isEmpty ? "暂无费用趋势数据，请选择时间范围后查询" : "该分类暂无趋势数据")
                         .font(.system(size: 13))
                         .foregroundColor(secondaryText)
                         .frame(maxWidth: .infinity)
@@ -354,7 +375,7 @@ struct TenantCostView: View {
                 HStack {
                     Spacer()
                     ProgressView()
-                    Text("加载费用…")
+                    Text("加载费用明细…")
                         .font(.system(size: 12))
                         .foregroundColor(secondaryText)
                         .padding(.leading, 8)
@@ -362,31 +383,51 @@ struct TenantCostView: View {
                 }
                 .frame(height: 120)
             } else if model.filteredCostItems.isEmpty {
-                Text(model.costItems.isEmpty ? "暂无费用数据，请选择时间范围后查询" : "筛选后无数据")
+                Text(model.costItems.isEmpty ? "暂无费用明细数据，请选择时间范围后查询" : "筛选后无明细数据")
                     .font(.system(size: 13))
                     .foregroundColor(secondaryText)
                     .frame(maxWidth: .infinity)
                     .padding(28)
             } else {
-                GeometryReader { geo in
-                    let fixed = wDay + wType + wCost + minSku + minRes + hPad * 2
-                    let totalW = max(geo.size.width, fixed)
-                    let flex = max(0, totalW - fixed)
-                    let wSku = minSku + flex * 0.45
-                    let wRes = minRes + flex * 0.55
+                let baseFixed = wDay + wType + minSku + minRes + wCost + hPad * 2
+                let totalW = max(tableWidth, baseFixed)
+                let flex = max(0, totalW - baseFixed)
+                // 弹性分配：长文本两列吸收全部弹性空间（SKU 40%，资源ID 60%）
+                let wSku = minSku + flex * 0.40
+                let wRes = minRes + flex * 0.60
+                let needsHScroll = totalW > tableWidth + 0.5 && tableWidth > 0
 
-                    VStack(spacing: 0) {
-                        costHeader(wSku: wSku, wRes: wRes, width: totalW)
-                        ForEach(Array(model.costPageItems.enumerated()), id: \.offset) { idx, item in
-                            costRow(index: idx, item: item, wSku: wSku, wRes: wRes, width: totalW)
-                        }
-                        PaginationBar(state: $model.costPageState) {
-                            model.syncCostPagination()
-                        }
+                let tableContent = VStack(spacing: 0) {
+                    costHeader(wSku: wSku, wRes: wRes, width: totalW)
+                    ForEach(Array(model.costPageItems.enumerated()), id: \.offset) { idx, item in
+                        costRow(index: idx, item: item, wSku: wSku, wRes: wRes, width: totalW)
                     }
-                    .frame(width: totalW, alignment: .topLeading)
                 }
-                .frame(minHeight: CGFloat(44 + model.costPageItems.count * 36 + 52))
+                .frame(width: totalW, alignment: .topLeading)
+
+                Group {
+                    if needsHScroll {
+                        ScrollView(.horizontal, showsIndicators: true) {
+                            tableContent
+                        }
+                    } else {
+                        tableContent
+                    }
+                }
+
+                PaginationBar(state: $model.costPageState) {
+                    model.syncCostPagination()
+                }
+            }
+        }
+        .background(
+            GeometryReader { geo in
+                Color.clear.preference(key: CostTableWidthKey.self, value: geo.size.width)
+            }
+        )
+        .onPreferenceChange(CostTableWidthKey.self) { w in
+            if w > 0 && abs(tableWidth - w) > 1 {
+                tableWidth = w
             }
         }
         .background(surface)
@@ -400,17 +441,21 @@ struct TenantCostView: View {
             colHeader("资源类型", wType)
             colHeader("SKU", wSku)
             colHeader("资源 ID", wRes)
-            colHeader("费用", wCost, align: .trailing)
+            colHeader("费用", wCost)
         }
         .padding(.horizontal, hPad)
         .padding(.vertical, 9)
         .frame(width: width, alignment: .leading)
         .background(AppTheme.sidebarHover(dark).opacity(0.65))
+        .overlay(
+            Rectangle().frame(height: 1).foregroundColor(cardBorder.opacity(0.6)),
+            alignment: .bottom
+        )
     }
 
     private func costRow(index: Int, item: TenantCostItem, wSku: CGFloat, wRes: CGFloat, width: CGFloat) -> some View {
         let positive = item.cost > 0
-        let stripe = index % 2 == 1 ? AppTheme.sidebarHover(dark).opacity(0.18) : Color.clear
+        let hovered = hoveredRowId == index
         return HStack(spacing: 0) {
             cell(item.day.isEmpty ? "—" : item.day, wDay, muted: true)
             cell(item.resourceType.isEmpty ? "—" : item.resourceType, wType)
@@ -419,24 +464,40 @@ struct TenantCostView: View {
             Text(money6(item.cost))
                 .font(.system(size: 12, weight: positive ? .semibold : .regular, design: .monospaced))
                 .foregroundColor(positive ? accentGreen : secondaryText)
-                .frame(width: wCost, alignment: .trailing)
                 .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(width: wCost, alignment: .center)
+                .clipped()
+                .help(money6(item.cost))
         }
         .padding(.horizontal, hPad)
-        .padding(.vertical, 8)
+        .padding(.vertical, appearance.density.rowPadding)
         .frame(width: width, alignment: .leading)
-        .background(stripe)
+        .background(
+            hovered
+                ? AppTheme.sidebarActive.opacity(dark ? 0.12 : 0.08)
+                : ((index % 2 == 1)
+                   ? AppTheme.sidebarHover(dark).opacity(0.18)
+                   : Color.clear)
+        )
         .overlay(
-            Rectangle().frame(height: 1).foregroundColor(cardBorder.opacity(0.6)),
+            Rectangle().frame(height: 1).foregroundColor(cardBorder.opacity(0.4)),
             alignment: .bottom
         )
+        .onHover { inside in
+            withAnimation(.easeInOut(duration: 0.12)) {
+                hoveredRowId = inside ? index : (hoveredRowId == index ? nil : hoveredRowId)
+            }
+        }
     }
 
-    private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .leading) -> some View {
+    private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .center) -> some View {
         Text(title)
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(AppTheme.sidebarText(dark))
+            .lineLimit(1)
             .frame(width: w, alignment: align)
+            .clipped()
     }
 
     private func cell(_ text: String, _ w: CGFloat, muted: Bool = false, mono: Bool = false) -> some View {
@@ -444,8 +505,10 @@ struct TenantCostView: View {
             .font(mono ? .system(size: 11, design: .monospaced) : .system(size: 12))
             .foregroundColor(muted ? secondaryText : primaryText)
             .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(width: w, alignment: .center)
+            .clipped()
             .help(text)
-            .frame(width: w, alignment: .leading)
     }
 
     private func money(_ v: Double) -> String {
@@ -454,6 +517,14 @@ struct TenantCostView: View {
 
     private func money6(_ v: Double) -> String {
         String(format: "$%.6f", v)
+    }
+}
+
+private struct CostTableWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        let n = nextValue()
+        if n > 0 { value = n }
     }
 }
 

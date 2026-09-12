@@ -75,3 +75,12 @@ GeoLite2-City*.tar.gz
 
 # 本地 gitleaks 扫描产物（构建/扫描生成）
 gitleaks.sarif
+
+# ZCode internals
+.zcode/
+
+# 本地数据应急备份文件
+deploy/data_backup_incident/
+
+# Workbuddy AI internals
+.workbuddy-ai/

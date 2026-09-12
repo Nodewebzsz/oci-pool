@@ -10,7 +10,7 @@ struct ProxyConfigSheet: View {
 
     var body: some View {
         AppSheetChrome(
-            title: (model.activeForm?.isEditing == true) ? "编辑代理" : "新增代理",
+            title: (model.activeForm?.isEditing == true) ? "编辑代理配置" : "新增代理配置",
             systemImage: "arrow.left.arrow.right",
             width: 760,
             height: 520,
@@ -127,7 +127,7 @@ struct ProxyConfigSheet: View {
                                 model.activeForm = f
                             }
                         ),
-                        placeholder: "可选",
+                        placeholder: "留空表示无鉴权",
                         leadingSystemImage: "person"
                     )
                 }
@@ -141,7 +141,7 @@ struct ProxyConfigSheet: View {
                                 model.activeForm = f
                             }
                         ),
-                        placeholder: "可选",
+                        placeholder: "留空表示无鉴权",
                         secure: true,
                         leadingSystemImage: "key"
                     )
@@ -165,7 +165,7 @@ struct ProxyConfigSheet: View {
                         searchable: false
                     )
                 }
-                FormFieldRow(label: "强制代理", required: true) {
+                FormFieldRow(label: "强制使用代理", required: true) {
                     SelectMenu(
                         options: model.forceOptions,
                         selection: Binding(
@@ -188,8 +188,8 @@ struct ProxyConfigSheet: View {
                     .font(.system(size: 11))
                     .foregroundColor(
                         (model.activeForm?.forceProxy == 1)
-                            ? Color(hex: "e67e22")
-                            : Color(hex: "1abc9c")
+                            ? AppTheme.orange
+                            : AppTheme.sidebarActive
                     )
                 Text(
                     (model.activeForm?.forceProxy == 1)

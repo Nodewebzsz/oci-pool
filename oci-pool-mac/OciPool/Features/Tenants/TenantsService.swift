@@ -45,10 +45,40 @@ struct TenantsService {
     }
 
     func saveTenant(fields: [String: String], keyFileURL: URL) async throws {
-        let url = try client.makeURL(baseURL, path: "/tenants/save")
-        let raw = try await client.postMultipart(url, fields: fields, fileFieldName: "keyFileStr", fileURL: keyFileURL)
-        if let env = try? JSONDecoder().decode(TenantApiEnvelope.self, from: raw), !env.ok {
-            throw APIError.serverMessage(env.text)
+        // 对齐 Web 端统一走 /tenants/import 接口，享受统一的健康探测、封号即时拦截与数据一致性
+        let keyContent = (try? String(contentsOf: keyFileURL, encoding: .utf8)) ?? ""
+        let tenancy = fields["tenancy"] ?? ""
+        let customName = (fields["userName"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let hashed = tenancy.utf8.reduce(7) { ($0 * 31 + Int($1)) & 0x7fffffff }
+        let id = (hashed % 900000000) + 100000000
+
+        var record: [String: Any] = [
+            "id": id,
+            "tenant_id": tenancy,
+            "user_name": fields["tenantId"] ?? "",
+            "fingerprint": fields["fingerprint"] ?? "",
+            "tenancy": tenancy,
+            "region": fields["region"] ?? "",
+            "cloud_type": 1,
+            "tenancy_name": customName.isEmpty ? (fields["region"] ?? "oci-tenant") : customName,
+            "key_file_content": keyContent
+        ]
+        if !customName.isEmpty {
+            record["custom_name"] = customName
+        }
+
+        let payload: [[String: Any]] = [record]
+        let url = try client.makeURL(baseURL, path: "/tenants/import")
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        req.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        let (resp, http) = try await client.data(for: req)
+        guard (200..<300).contains(http.statusCode) else {
+            let msg = String(data: resp, encoding: .utf8) ?? "导入失败"
+            throw APIError.serverMessage(msg)
         }
     }
 
@@ -198,7 +228,7 @@ struct TenantsService {
         }
     }
 
-    /// 审计日志分页。后端：`ApiResponse.data` = `OciPageResult{ data, nextPageToken }`。
+    /// 审计日志分页。后端：`ApiResponse.data` = `OciPageResult{ data, nextPageToken, mock }`。
     func auditLogs(tenantId: Int64, start: String?, end: String?, pageToken: String?) async throws -> TenantAuditLogPage {
         let url = try client.makeURL(baseURL, path: "/tenants/audit/log")
         var body: [String: Any] = ["tenantId": "\(tenantId)"]
@@ -218,10 +248,14 @@ struct TenantsService {
                     return TenantAuditLogPage(items: list, nextPageToken: extractNextPageToken(pageObj))
                 }
                 if let dict = pageObj as? [String: Any] {
-                    // OciPageResult: { data: [...], nextPageToken }
+                    // OciPageResult: { data: [...], nextPageToken, mock }
                     let nested = dict["data"] ?? dict["items"] ?? dict["logs"] ?? dict["content"]
                     if let nested = nested, let list = tryDecodeAuditList(nested) {
-                        return TenantAuditLogPage(items: list, nextPageToken: extractNextPageToken(dict))
+                        return TenantAuditLogPage(
+                            items: list,
+                            nextPageToken: extractNextPageToken(dict),
+                            mock: (dict["mock"] as? Bool) ?? false
+                        )
                     }
                 }
             }

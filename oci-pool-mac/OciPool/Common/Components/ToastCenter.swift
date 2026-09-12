@@ -3,7 +3,7 @@ import Combine
 import SwiftUI
 
 enum ToastStyle {
-    case info, success, error
+    case info, success, warn, error
 }
 
 /// Lightweight error/info banner. Prefer `LoadingHUD` for action-in-progress feedback.
@@ -17,12 +17,8 @@ final class ToastCenter: ObservableObject {
 
     private init() {}
 
-    /// Error (and rare info) banner. Success-style operational tips should use `LoadingHUD` instead.
+    /// 对齐 Web shell.showToast：success 带 ✓ 前缀、warn 用于删除/警告、error 用于失败。
     func show(_ text: String, style: ToastStyle = .error, duration: TimeInterval = 2.8) {
-        // Map legacy success to no banner — callers should use LoadingHUD during the op.
-        if style == .success {
-            return
-        }
         let apply = { [weak self] in
             guard let self = self else { return }
             self.hideTask?.cancel()
@@ -42,10 +38,14 @@ final class ToastCenter: ObservableObject {
         }
     }
 
-    /// No-op: operational success no longer shows green text; use `LoadingHUD` around the work.
+    /// Web 成功 toast 带 ✓ 前缀
     func success(_ text: String) {
-        // Intentionally empty — keep API so call sites can be cleaned gradually.
-        _ = text
+        show(text.hasPrefix("✓") ? text : "✓ " + text, style: .success)
+    }
+
+    /// Web 删除/警告 toast（warn 语义色）
+    func warn(_ text: String) {
+        show(text, style: .warn)
     }
 
     func error(_ text: String) { show(text, style: .error) }
@@ -80,9 +80,10 @@ struct ToastHost: View {
 
     private var background: Color {
         switch center.style {
-        case .info: return AppTheme.sidebarActive
-        case .success: return Color(hex: "3fb950")
-        case .error: return Color(hex: "f85149")
+        case .info: return AppTheme.info
+        case .success: return AppTheme.sidebarActive
+        case .warn: return AppTheme.orange
+        case .error: return AppTheme.danger
         }
     }
 }

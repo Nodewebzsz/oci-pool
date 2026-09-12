@@ -90,25 +90,31 @@ function LogsPage() {
         iconColor="var(--accent)"
         actions={
           <>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', background: 'var(--bg-2)', borderRadius: 6, fontSize: 11.5, color: 'var(--fg-2)' }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '5px 10px', background: 'var(--bg-2)',
+              border: '1px solid var(--border)', borderRadius: 6,
+              fontSize: 11.5, color: 'var(--fg-1)',
+            }}>
               <StatusDot status={paused ? 'idle' : 'running'} size={6} pulse={!paused} />
-              {paused ? tr('logs.paused') : tr('logs.streaming')}
+              {paused ? tr('logs.paused') : tr('logs.connected')}
             </span>
             <Button variant={paused ? 'primary' : 'outline'} size="md" icon={paused ? 'play' : 'pause'} onClick={() => setPaused(!paused)}>
               {paused ? tr('logs.action.resume') : tr('logs.action.pause')}
             </Button>
             <Button variant="outline" size="md" icon="download" onClick={() => {
               const fname = `grab_log_${new Date().toISOString().slice(0, 10)}.txt`;
-              const content = filtered.map(l => `${l.time ? `${l.time} ` : ''}[${l.level}] ${l.msg}`).join('\n');
+              const targetLogs = filtered.length > 0 ? filtered : logs;
+              const content = targetLogs.map(l => `${l.time ? `${l.time} ` : ''}[${l.level}] ${l.msg}`).join('\n');
               const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }));
               const anchor = document.createElement('a');
               anchor.href = url;
               anchor.download = fname;
               anchor.click();
               URL.revokeObjectURL(url);
-              shell.showToast(tr('logs.toast.export').replace('{n}', filtered.length).replace('{fname}', fname), { kind: 'success' });
+              shell.showToast(tr('logs.toast.export').replace('{n}', targetLogs.length).replace('{fname}', fname), { kind: 'success' });
             }}>{tr('logs.action.download')}</Button>
-            <Button variant="danger_soft" size="md" icon="trash" onClick={() => setLogs([])}>{tr('logs.action.clear')}</Button>
+            <Button variant="outline" size="md" icon="trash" onClick={() => setLogs([])}>{tr('logs.action.clear')}</Button>
           </>
         }
       />
@@ -117,8 +123,8 @@ function LogsPage() {
 
       {/* Filters */}
       <div style={{
-        display: 'flex', gap: 10, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap',
-        padding: 12,
+        display: 'flex', gap: 10, marginBottom: 10, alignItems: 'center', flexWrap: 'wrap',
+        padding: '8px 12px',
         background: 'var(--bg-1)',
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius)',
@@ -129,18 +135,19 @@ function LogsPage() {
               key={l}
               onClick={() => setLevelFilter(l)}
               style={{
-                padding: '4px 12px',
+                padding: '4px 10px',
                 background: levelFilter === l ? (l === 'all' ? 'var(--bg-3)' : logColor(l).bg) : 'transparent',
                 color: levelFilter === l ? (l === 'all' ? 'var(--fg-0)' : logColor(l).fg) : 'var(--fg-2)',
                 border: `1px solid ${levelFilter === l ? (l === 'all' ? 'var(--border-strong)' : logColor(l).fg) : 'var(--border)'}`,
                 borderRadius: 4,
-                fontFamily: 'inherit', fontSize: 11.5, fontWeight: 500,
+                fontFamily: 'inherit', fontSize: 11.5, fontWeight: levelFilter === l ? 600 : 500,
                 cursor: 'pointer',
+                transition: 'all 120ms',
               }}
             >
               {l === 'all' ? tr('common.all') : l}
               {' '}
-              <span className="num" style={{ fontSize: 10, opacity: 0.7 }}>
+              <span className="num" style={{ fontSize: 9.5, opacity: levelFilter === l ? 0.9 : 0.6 }}>
                 {l === 'all' ? logs.length : logs.filter(x => x.level === l).length}
               </span>
             </button>
@@ -151,7 +158,7 @@ function LogsPage() {
           placeholder={tr('logs.filter.keyword')}
           value={keyword}
           onChange={setKeyword}
-          width={220}
+          width={180}
         />
 
         <div style={{ flex: 1 }} />
@@ -161,7 +168,7 @@ function LogsPage() {
         </span>
       </div>
 
-      {/* ════ Terminal card · 对齐原项目 open_boot_log.ftl 三段布局 ════ */}
+      {/* ════ Terminal card · 对齐客户端 TerminalCard 布局 ════ */}
       <div style={{
         flex: 1, minHeight: 0,
         display: 'flex', flexDirection: 'column',
@@ -174,13 +181,14 @@ function LogsPage() {
         {/* ─── terminal-header ─── */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '10px 16px',
+          padding: '10px 14px',
           background: 'oklch(0.13 0.010 240)',
           borderBottom: '1px solid var(--border)',
         }}>
           <h2 style={{
             display: 'flex', alignItems: 'center', gap: 8, margin: 0,
-            fontSize: 13, fontWeight: 600, color: 'var(--fg-0)',
+            fontSize: 13, fontWeight: 600, color: 'var(--accent)',
+            fontFamily: 'var(--font-mono)',
           }}>
             <Icon name="terminal" size={14} style={{ color: 'var(--accent)' }} />
             <span>{tr('logs.terminalTitle')}</span>
@@ -192,14 +200,11 @@ function LogsPage() {
               marginLeft: 2,
             }} />
           </h2>
-          {/* 连接状态徽章(对齐原项目 .connection-status) */}
+          {/* 右侧轻量连接状态指示(对齐客户端：微绿点 + 灰色半透明等宽文本) */}
           <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            padding: '3px 10px', borderRadius: 3,
-            background: paused ? 'var(--bg-3)' : 'color-mix(in oklab, var(--accent) 20%, transparent)',
-            color: paused ? 'var(--fg-3)' : 'var(--accent)',
-            fontSize: 10.5, fontWeight: 600,
-            border: '1px solid ' + (paused ? 'var(--border)' : 'var(--accent)'),
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            fontSize: 11, fontFamily: 'var(--font-mono)',
+            color: 'rgba(255,255,255,0.65)',
           }}>
             <span style={{
               width: 6, height: 6, borderRadius: '50%',
@@ -215,15 +220,21 @@ function LogsPage() {
           ref={terminalRef}
           style={{
             flex: 1, minHeight: 0, overflowY: 'auto',
-            padding: 14,
+            padding: '10px 14px',
             fontFamily: 'var(--font-mono)',
             fontSize: 12,
             lineHeight: 1.65,
           }}
         >
-          {filtered.length === 0 && (
-            <div style={{ color: 'var(--fg-3)', textAlign: 'center', padding: 40 }}>{tr('logs.noMatch')}</div>
-          )}
+          {logs.length === 0 ? (
+            <div style={{ color: 'rgba(255,255,255,0.35)', padding: '8px 0' }}>
+              {tr('logs.emptyWaiting')}
+            </div>
+          ) : filtered.length === 0 ? (
+            <div style={{ color: 'rgba(255,255,255,0.35)', padding: '8px 0' }}>
+              {tr('logs.noMatch')}
+            </div>
+          ) : null}
           {filtered.map((l, i) => (
             <div key={i}
               onClick={() => showLogDetail(l)}

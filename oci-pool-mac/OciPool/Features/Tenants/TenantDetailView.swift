@@ -1,8 +1,13 @@
 import SwiftUI
 import AppKit
 
-/// Web 整页「租户详情」`/tenants/regionList` → `tenant_region_list.ftl`
-/// 从租户列表进入，非弹框。布局对齐列表页 + 质量管理页的间距/圆角体系。
+/// Web 整页「租户详情」— 100% 对齐 Web `page-tenant-detail.jsx`
+/// 五段式架构：
+/// 1. 面包屑与返回栏（返回租户管理导航）
+/// 2. 租户信息卡片（菱形图标、租户名、别名标签、状态、副标题、多区域切换器、脱敏切换、API导入）
+/// 3. 区域操作按钮组（实例同步、添加开机、查看开机、硬盘信息、安全规则、资源列表、数据库管理）
+/// 4. 核心表格卡片（序号、租户名、自定义名称、开机任务、区域、主区域、实例同步、创建时间）
+/// 5. 底部 4 项核心指标卡片（实例总数、运行中、开机任务、本月花费）
 struct TenantDetailView: View {
     @ObservedObject var model: TenantsViewModel
     @EnvironmentObject private var appearance: AppearanceController
@@ -12,168 +17,569 @@ struct TenantDetailView: View {
 
     private var dark: Bool { appearance.isDarkEffective }
     private var parent: TenantItem? { model.detailParent }
+    private var activeRow: TenantItem? { model.activeRegionRow }
 
-    // 列宽（遮罩态）
-    private let wIndex: CGFloat = 40
-    private let wTask: CGFloat = 72
-    private let wRegion: CGFloat = 110
-    private let wHome: CGFloat = 64
-    private let wSync: CGFloat = 72
-    private let wTime: CGFloat = 132
-    private let wAction: CGFloat = 168
-    private let minNameHidden: CGFloat = 120
-    private let minDefHidden: CGFloat = 96
-    private let hPad: CGFloat = 14
+    private var primaryText: Color {
+        dark ? Color(hex: "cdd9e5") : Color(hex: "1a202c")
+    }
+    private var mutedText: Color {
+        dark ? Color(hex: "768390") : Color(hex: "64748b")
+    }
 
-    /// 显示全名时压缩其它列，名称列单行加宽（禁止换行）
-    private func detailColMetrics(namesHidden: Bool) -> (
-        task: CGFloat, region: CGFloat, home: CGFloat, sync: CGFloat, time: CGFloat,
-        action: CGFloat, minName: CGFloat, minDef: CGFloat
-    ) {
-        if namesHidden {
-            return (wTask, wRegion, wHome, wSync, wTime, wAction, minNameHidden, minDefHidden)
+    private var displayName: String {
+        guard let p = parent else { return "租户详情" }
+        if model.detailNamesHidden {
+            return p.maskedName
         }
-        return (60, 88, 52, 60, 108, 148, 200, 72)
-    }
-
-    private func estimatedDetailNameWidth(floor: CGFloat) -> CGFloat {
-        let longest = model.detailRows.map(\.displayName).max(by: { $0.count < $1.count }) ?? ""
-        let estimated = CGFloat(longest.count) * 8.0 + 12
-        return max(floor, min(estimated, 720))
-    }
-
-    private var syncedCount: Int {
-        model.detailRows.filter(\.apiSynced).count
-    }
-    private var bootTaskCount: Int {
-        model.detailRows.filter(\.openBootFlag).count
-    }
-    private var homeCount: Int {
-        model.detailRows.filter(\.isHomeRegion).count
+        return p.displayName.isEmpty ? p.userName : p.displayName
     }
 
     var body: some View {
-        PageScaffold(
-            title: "租户详情",
-            subtitle: parent.map {
-                let region = $0.region.isEmpty ? "—" : $0.region
-                return "\($0.displayName) · \(region)"
-            },
-            systemImage: "key.fill",
-            toolbar: { toolbar },
-            content: {
-                VStack(spacing: 0) {
-                    if let err = model.detailError, !err.isEmpty {
-                        errorBanner(err)
-                    }
-                    summaryBar
-                    listBody
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 16)
+        ScrollView([.vertical], showsIndicators: true) {
+            VStack(spacing: 12) {
+                // 1. 面包屑与返回栏
+                breadcrumbsBar
+
+                // 2. 租户信息卡片
+                headerCard
+
+                // 错误横幅（如有）
+                if let err = model.detailError, !err.isEmpty {
+                    errorBanner(err)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                // 3. 4 项核心指标卡片（移动到区域操作上方）
+                metricsGrid
+
+                // 4. 区域操作按钮组卡片（7 项核心操作）
+                actionsBar
+
+                // 5. 核心表格卡片
+                tableCard
             }
-        )
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 20)
+        }
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-        .appLoading(model.detailLoading && !model.detailRows.isEmpty)
+        .background(dark ? Color(hex: "13161a") : Color(hex: "f4f6f8"))
+        .appLoading(model.detailLoading && model.detailRows.isEmpty)
     }
 
-    // MARK: - Toolbar
+    // MARK: - 1. 面包屑与返回栏
 
-    private var toolbar: some View {
-        HStack(spacing: 8) {
-            AppButton(title: "返回列表", systemImage: "chevron.left", kind: .secondary) {
-                model.closeDetail()
+    private var breadcrumbsBar: some View {
+        HStack(spacing: 12) {
+            Button(action: { model.closeDetail() }) {
+                HStack(spacing: 5) {
+                    Image(systemName: "arrow.left")
+                        .font(.system(size: 11, weight: .bold))
+                    Text("返回")
+                        .font(.system(size: 12))
+                }
+                .foregroundColor(primaryText)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(AppTheme.sidebarBg(dark))
+                .cornerRadius(6)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(AppTheme.border(dark), lineWidth: 1)
+                )
             }
-            AppButton(
-                title: model.detailNamesHidden ? "显示名称" : "隐藏名称",
-                systemImage: model.detailNamesHidden ? "eye" : "eye.slash",
-                kind: .secondary
-            ) {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    model.detailNamesHidden.toggle()
+            .buttonStyle(PlainButtonStyle())
+
+            HStack(spacing: 6) {
+                Button(action: { model.closeDetail() }) {
+                    Text("租户管理")
+                        .font(.system(size: 12))
+                        .foregroundColor(mutedText)
+                }
+                .buttonStyle(PlainButtonStyle())
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(mutedText.opacity(0.6))
+
+                HStack(spacing: 4) {
+                    Text("租户详情")
+                        .font(.system(size: 12))
+                        .foregroundColor(mutedText)
+                    Text("·")
+                        .foregroundColor(mutedText)
+                    Text(displayName)
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .foregroundColor(primaryText)
                 }
             }
-            AppButton(title: "API 导入", systemImage: "bolt.fill", kind: .primary) {
-                model.openAdd()
-            }
-            AppButton(
-                title: "刷新",
-                systemImage: "arrow.clockwise",
-                kind: .secondary,
-                isLoading: model.detailLoading
-            ) {
-                Task { await model.reloadDetail() }
-            }
+
+            Spacer()
         }
     }
 
-    // MARK: - Summary
+    // MARK: - 2. 租户信息页头卡片
 
-    private var summaryBar: some View {
-        HStack(spacing: 10) {
-            summaryChip(
-                icon: "globe",
-                title: "区域",
-                value: "\(model.detailRows.count)",
-                accent: AppTheme.sidebarActive
-            )
-            summaryChip(
-                icon: "arrow.2.circlepath",
-                title: "已同步",
-                value: "\(syncedCount)",
-                accent: Color(hex: "3fb950")
-            )
-            summaryChip(
-                icon: "play.circle",
-                title: "开机任务",
-                value: "\(bootTaskCount)",
-                accent: Color(hex: "d29922")
-            )
-            summaryChip(
-                icon: "house",
-                title: "主区域",
-                value: "\(homeCount)",
-                accent: Color(hex: "a371f7")
-            )
+    private var headerCard: some View {
+        HStack(spacing: 16) {
+            // 菜单对应租户管理图标（MenuGlyph "users" 与左侧菜单栏 100% 一致）
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(AppTheme.sidebarActive.opacity(0.18))
+                    .frame(width: 42, height: 42)
+                MenuGlyph(name: "users", size: 22, lineWidth: 2, color: AppTheme.sidebarActive)
+            }
+
+            // 标题与副标题信息
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .center, spacing: 8) {
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            model.detailNamesHidden.toggle()
+                        }
+                    }) {
+                        Text(displayName)
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(primaryText)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .help(model.detailNamesHidden ? "点击显示完整名称" : "点击脱敏隐藏名称")
+
+                    // 自定义别名徽章：只有设置了别名且与租户名不同时才展示
+                    if let alias = parent?.customAlias, !alias.isEmpty, alias != parent?.displayName {
+                        Text(alias)
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .foregroundColor(primaryText)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(AppTheme.sidebarHover(dark))
+                            .cornerRadius(4)
+                    }
+
+                    // 状态徽章
+                    StatusBadge(
+                        text: (parent?.isActive ?? true) ? "有效" : "停用",
+                        tone: (parent?.isActive ?? true) ? .success : .danger
+                    )
+                }
+
+                // 副标题：多区域/单区域 · 账号类型 · 运行天数
+                HStack(spacing: 8) {
+                    let isMulti = (parent?.isMultiRegion == true || model.detailRows.count > 1)
+                    Text(isMulti ? "多区域账号" : "单区域账号")
+                    Text("·")
+                    let type = (parent?.accountTypeName.isEmpty == false) ? parent!.accountTypeName : "未知"
+                    Text(type)
+                    Text("·")
+                    Text("已运行 \(parent?.activeDaysText ?? "0") 天")
+                }
+                .font(.system(size: 12))
+                .foregroundColor(mutedText)
+            }
+
             Spacer(minLength: 0)
-            Text("行内快捷：同步 · 开机 · 实例 · 更多")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark).opacity(0.85))
+
+            // 右侧工具组：区域切换器（仅多区域时展示）、脱敏、API 导入
+            HStack(spacing: 8) {
+                if model.detailRows.count > 1 {
+                    regionSwitcherMenu
+                }
+
+                // 脱敏眼睛按钮
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        model.detailNamesHidden.toggle()
+                    }
+                }) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(AppTheme.sidebarBg(dark))
+                            .frame(width: 32, height: 32)
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(AppTheme.border(dark), lineWidth: 1)
+                            .frame(width: 32, height: 32)
+                        Image(systemName: model.detailNamesHidden ? "eye" : "eye.slash")
+                            .font(.system(size: 12))
+                            .foregroundColor(mutedText)
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+                .help(model.detailNamesHidden ? "显示名称" : "隐藏名称")
+
+                // API 导入按钮
+                AppButton(title: "API 导入", systemImage: "bolt.fill", kind: .primary) {
+                    model.openAdd()
+                }
+            }
+        }
+        .padding(16)
+        .background(cardBackground)
+    }
+
+    /// 多区域切换器下拉组件（对齐 Web RegionSwitcher）
+    private var regionSwitcherMenu: some View {
+        Menu {
+            ForEach(model.detailRows) { row in
+                Button(action: {
+                    model.selectRegion(row.id)
+                }) {
+                    let flag = RegionFlag.emoji(row.region)
+                    let cn = RegionCnName.table[row.region] ?? row.region
+                    let regionSuffix = (cn != row.region) ? " (\(row.region))" : ""
+                    let homeTag = row.isHomeRegion ? " [主区域]" : ""
+                    let check = (row.id == model.selectedRegionId) ? "✓ " : ""
+                    Text("\(check)\(flag) \(cn)\(regionSuffix)\(homeTag)")
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "globe")
+                    .font(.system(size: 12))
+                    .foregroundColor(mutedText)
+                Text("区域")
+                    .font(.system(size: 11))
+                    .foregroundColor(mutedText)
+
+                let curCode = activeRow?.region ?? ""
+                let curCn = RegionCnName.table[curCode] ?? curCode
+                Text(curCn)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(primaryText)
+
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(mutedText)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(AppTheme.sidebarBg(dark))
+            .cornerRadius(6)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(AppTheme.border(dark), lineWidth: 1)
+            )
+        }
+        .menuStyle(BorderlessButtonMenuStyle())
+    }
+
+    // MARK: - 3. 区域操作 7 项按钮组卡片
+
+    private var actionsBar: some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "gearshape.2")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("区域操作")
+                    .font(.system(size: 11, weight: .bold))
+            }
+            .foregroundColor(mutedText)
+            .padding(.trailing, 6)
+
+            // 1. 实例同步（Primary 绿色）
+            AppButton(
+                title: "实例同步",
+                systemImage: "arrow.2.circlepath",
+                kind: .primary,
+                isLoading: model.isSyncingRegion
+            ) {
+                Task { await model.syncActiveRegion() }
+            }
+
+            // 2. 添加开机
+            AppButton(title: "添加开机", systemImage: "plus", kind: .secondary) {
+                if let target = activeRow { model.openBoot(target) }
+            }
+
+            // 3. 查看开机
+            AppButton(title: "查看开机", systemImage: "eye", kind: .secondary) {
+                if let target = activeRow { model.openBootTaskList(target) }
+            }
+
+            // 4. 硬盘信息
+            AppButton(title: "硬盘信息", systemImage: "externaldrive", kind: .secondary) {
+                if let target = activeRow { model.openVolumes(target) }
+            }
+
+            // 5. 安全规则
+            AppButton(title: "安全规则", systemImage: "shield", kind: .secondary) {
+                if let target = activeRow { model.openSecurityRules(target) }
+            }
+
+            // 6. 实例列表
+            AppButton(title: "实例列表", systemImage: "list.bullet", kind: .secondary) {
+                if let target = activeRow { model.openInstancesList(target) }
+            }
+
+            // 7. 数据库管理
+            AppButton(title: "数据库管理", systemImage: "cylinder.split.1x2", kind: .secondary) {
+                if let target = activeRow { model.openMysql(target) }
+            }
+
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .background(cardBackground)
     }
 
-    private func summaryChip(icon: String, title: String, value: String, accent: Color) -> some View {
-        HStack(spacing: 8) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(accent.opacity(0.15))
-                    .frame(width: 28, height: 28)
-                Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(accent)
+    // MARK: - 4. 核心表格卡片
+
+    private var tableCard: some View {
+        VStack(spacing: 0) {
+            // 表头
+            HStack(spacing: 0) {
+                headerCol("#", width: 44)
+                headerCol("租户名", width: 140)
+                headerCol("自定义名称", width: 130)
+                headerCol("开机任务", width: 90)
+                headerCol("区域", width: 140)
+                headerCol("主区域", width: 70)
+                headerCol("实例同步", width: 96)
+                headerCol("创建时间", width: 150)
+                Spacer(minLength: 0)
             }
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(AppTheme.sidebarText(dark))
-                Text(value)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(AppTheme.sidebarHover(dark).opacity(0.6))
+            .overlay(
+                Rectangle().frame(height: 1).foregroundColor(AppTheme.border(dark).opacity(0.4)),
+                alignment: .bottom
+            )
+
+            // 数据行
+            if model.detailRows.isEmpty {
+                VStack(spacing: 8) {
+                    Spacer()
+                    Text("暂无区域数据")
+                        .font(.system(size: 12))
+                        .foregroundColor(mutedText)
+                    Spacer()
+                }
+                .frame(height: 120)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(model.detailRows.enumerated()), id: \.offset) { idx, row in
+                        rowView(index: idx, item: row)
+                            .id("region-row-\(row.id)")
+                    }
+                }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(AppTheme.sidebarBg(dark))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1)
-        )
+        .background(cardBackground)
+    }
+
+    private func headerCol(_ text: String, width: CGFloat) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .bold))
+            .foregroundColor(mutedText)
+            .frame(width: width, alignment: .leading)
+    }
+
+    private func rowView(index: Int, item: TenantItem) -> some View {
+        let isSelected = item.id == activeRow?.id
+        let isHovered = hoveredRowId == item.id
+
+        return Button(action: {
+            model.selectRegion(item.id)
+        }) {
+            HStack(spacing: 0) {
+                // #
+                Text("\(index + 1)")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(mutedText)
+                    .frame(width: 44, alignment: .leading)
+
+                // 租户名标签
+                let nameShown = !model.detailNamesHidden
+                let tName = nameShown ? item.displayName : item.maskedName
+                Text(tName)
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundColor(primaryText)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(AppTheme.sidebarHover(dark))
+                    .cornerRadius(4)
+                    .frame(width: 140, alignment: .leading)
+
+                // 自定义名称
+                Text(item.defNameText)
+                    .font(.system(size: 12))
+                    .foregroundColor(primaryText)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(width: 130, alignment: .leading)
+
+                // 开机任务（仅统计正在进行中的任务数，与指标卡片一致）
+                HStack {
+                    let taskCount = isSelected ? model.detailBootTaskCount : (item.openBootFlag ? 1 : 0)
+                    if taskCount > 0 {
+                        Text("\(taskCount)项进行中")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(AppTheme.info)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(AppTheme.info.opacity(0.14))
+                            .cornerRadius(4)
+                    } else {
+                        Text("无任务")
+                            .font(.system(size: 11))
+                            .foregroundColor(mutedText.opacity(0.8))
+                    }
+                }
+                .frame(width: 90, alignment: .leading)
+
+                // 区域（仅展示区域名称，去掉地球图标与括号重复项）
+                let cn = RegionCnName.table[item.region] ?? item.region
+                Text(cn)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(primaryText)
+                    .lineLimit(1)
+                    .frame(width: 140, alignment: .leading)
+
+                // 主区域
+                HStack {
+                    if item.isHomeRegion {
+                        HStack(spacing: 3) {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 9, weight: .bold))
+                            Text("是")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .foregroundColor(AppTheme.sidebarActive)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(AppTheme.sidebarActive.opacity(0.14))
+                        .cornerRadius(4)
+                    } else {
+                        Text("否")
+                            .font(.system(size: 11))
+                            .foregroundColor(mutedText.opacity(0.8))
+                    }
+                }
+                .frame(width: 70, alignment: .leading)
+
+                // 实例同步
+                HStack {
+                    if item.apiSynced {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(AppTheme.sidebarActive)
+                                .frame(width: 5, height: 5)
+                            Text("已同步")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(AppTheme.sidebarActive)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(AppTheme.sidebarActive.opacity(0.12))
+                        .cornerRadius(4)
+                    } else {
+                        Text("未同步")
+                            .font(.system(size: 11))
+                            .foregroundColor(mutedText)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(AppTheme.sidebarHover(dark).opacity(0.6))
+                            .cornerRadius(4)
+                    }
+                }
+                .frame(width: 96, alignment: .leading)
+
+                // 创建时间
+                Text(item.createdAt.isEmpty ? "—" : item.createdAt)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(mutedText)
+                    .lineLimit(1)
+                    .frame(width: 150, alignment: .leading)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                isHovered ? AppTheme.sidebarHover(dark).opacity(0.4) : Color.clear
+            )
+            .overlay(
+                Rectangle().frame(height: 1).foregroundColor(AppTheme.border(dark).opacity(0.25)),
+                alignment: .bottom
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .onHover { inside in
+            hoveredRowId = inside ? item.id : (hoveredRowId == item.id ? nil : hoveredRowId)
+        }
+    }
+
+    // MARK: - 5. 底部 4 项核心指标卡片（MiniMetric Grid）
+
+    private var metricsGrid: some View {
+        HStack(spacing: 12) {
+            miniMetricCard(
+                label: "实例总数",
+                value: "\(model.detailInstanceCount)",
+                icon: "server.rack",
+                color: Color(hex: "00b6be")
+            )
+            miniMetricCard(
+                label: "运行中",
+                value: "\(model.detailRunningCount)",
+                icon: "play.circle.fill",
+                color: AppTheme.sidebarActive
+            )
+            miniMetricCard(
+                label: "开机任务",
+                value: "\(model.detailBootTaskCount)",
+                icon: "bolt.circle.fill",
+                color: AppTheme.info
+            )
+            let costVal: Double = {
+                if let str = parent?.accountCost, let d = Double(str), d > 0.001 {
+                    return d
+                }
+                return 0.0
+            }()
+            miniMetricCard(
+                label: "本月花费",
+                value: String(format: "$%.2f", costVal),
+                icon: "dollarsign.circle.fill",
+                color: AppTheme.orange
+            )
+        }
+    }
+
+    private func miniMetricCard(label: String, value: String, icon: String, color: Color) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(color.opacity(0.15))
+                    .frame(width: 38, height: 38)
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(color)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(mutedText)
+                Text(value)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(primaryText)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity)
+        .background(cardBackground)
+    }
+
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: 10)
+            .fill(AppTheme.sidebarBg(dark))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1)
+            )
     }
 
     private func errorBanner(_ text: String) -> some View {
@@ -185,413 +591,9 @@ struct TenantDetailView: View {
                 .buttonStyle(PlainButtonStyle())
                 .font(.system(size: 12, weight: .semibold))
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(10)
-        .padding(.horizontal, 16)
-        .padding(.top, 4)
-    }
-
-    // MARK: - Table
-
-    @ViewBuilder
-    private var listBody: some View {
-        if model.detailLoading && model.detailRows.isEmpty {
-            VStack(spacing: 10) {
-                Spacer()
-                ProgressView()
-                Text("加载区域列表…")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
-                Spacer()
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(tableCardBackground)
-        } else if model.detailRows.isEmpty {
-            EmptyStateView(
-                icon: "globe",
-                title: "暂无区域",
-                subtitle: "该租户下没有可展示的区域",
-                actionTitle: "返回",
-                action: { model.closeDetail() }
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(tableCardBackground)
-        } else {
-            GeometryReader { geo in
-                let m = detailColMetrics(namesHidden: model.detailNamesHidden)
-                let nameNeed: CGFloat = model.detailNamesHidden
-                    ? m.minName
-                    : estimatedDetailNameWidth(floor: m.minName)
-                let fixed = wIndex + m.task + m.region + m.home + m.sync + m.time + m.action
-                    + nameNeed + m.minDef + hPad * 2
-                let totalW = max(geo.size.width, fixed)
-                let flex = max(0, totalW - fixed)
-                let nameShare: CGFloat = model.detailNamesHidden ? 0.55 : 0.75
-                let wName = nameNeed + flex * nameShare
-                let wDef = m.minDef + flex * (1 - nameShare)
-
-                ScrollView([.horizontal, .vertical], showsIndicators: true) {
-                    VStack(spacing: 0) {
-                        headerRow(
-                            wName: wName, wDef: wDef,
-                            task: m.task, region: m.region, home: m.home,
-                            sync: m.sync, time: m.time, action: m.action,
-                            width: totalW
-                        )
-                        // 必须用 offset 做 identity：regionList 在异常/兜底数据下可能出现重复 id，
-                        // macOS 11 SwiftUI 会 fatalError「each layout item may only occur once」直接退出。
-                        LazyVStack(spacing: 0) {
-                            ForEach(Array(model.detailRows.enumerated()), id: \.offset) { idx, row in
-                                dataRow(
-                                    index: idx, item: row,
-                                    wName: wName, wDef: wDef,
-                                    task: m.task, region: m.region, home: m.home,
-                                    sync: m.sync, time: m.time, action: m.action,
-                                    width: totalW
-                                )
-                                .id("detail-row-\(idx)-\(row.id)")
-                            }
-                        }
-                    }
-                    .frame(width: totalW, alignment: .topLeading)
-                }
-                .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(tableCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(dark ? 0.22 : 0.06), radius: 8, x: 0, y: 2)
-        }
-    }
-
-    private var tableCardBackground: some View {
-        RoundedRectangle(cornerRadius: 12)
-            .fill(AppTheme.sidebarBg(dark))
-    }
-
-    private func headerRow(
-        wName: CGFloat, wDef: CGFloat,
-        task: CGFloat, region: CGFloat, home: CGFloat,
-        sync: CGFloat, time: CGFloat, action: CGFloat,
-        width: CGFloat
-    ) -> some View {
-        HStack(spacing: 0) {
-            colHeader("#", wIndex)
-            colHeader("名称", wName)
-            colHeader("自定义名", wDef)
-            colHeader("开机任务", task)
-            colHeader("区域", region)
-            colHeader("主区域", home)
-            colHeader("同步", sync)
-            colHeader("创建时间", time)
-            colHeader("操作", action, align: .center)
-        }
-        .padding(.horizontal, hPad)
-        .padding(.vertical, 10)
-        .frame(width: width, alignment: .leading)
-        .background(AppTheme.sidebarHover(dark).opacity(0.65))
-        .overlay(
-            Rectangle().frame(height: 1).foregroundColor(AppTheme.border(dark).opacity(0.5)),
-            alignment: .bottom
-        )
-    }
-
-    private func dataRow(
-        index: Int, item: TenantItem,
-        wName: CGFloat, wDef: CGFloat,
-        task: CGFloat, region: CGFloat, home: CGFloat,
-        sync: CGFloat, time: CGFloat, action: CGFloat,
-        width: CGFloat
-    ) -> some View {
-        let hovered = hoveredRowId == item.id
-        return HStack(spacing: 0) {
-            cell("\(index + 1)", wIndex, muted: true)
-            nameCell(item, width: wName)
-            cell(item.defNameText, wDef)
-            taskCell(item)
-                .frame(width: task, alignment: .leading)
-            regionCell(item, width: region)
-            homeBadge(item)
-                .frame(width: home, alignment: .leading)
-            StatusBadge(
-                text: item.syncStatusText,
-                tone: item.apiSynced ? .success : .danger
-            )
-            .frame(width: sync, alignment: .leading)
-            cell(item.createdAt.isEmpty ? "—" : item.createdAt, time, muted: true)
-            actionBar(item)
-                .frame(width: action, alignment: .center)
-        }
-        .padding(.horizontal, hPad)
-        .padding(.vertical, 10)
-        .frame(width: width, alignment: .leading)
-        .background(rowBackground(index: index, hovered: hovered))
-        .overlay(
-            Rectangle().frame(height: 1).foregroundColor(AppTheme.border(dark).opacity(0.28)),
-            alignment: .bottom
-        )
-        .onHover { inside in
-            withAnimation(.easeInOut(duration: 0.12)) {
-                hoveredRowId = inside ? item.id : (hoveredRowId == item.id ? nil : hoveredRowId)
-            }
-        }
-        .animation(.easeInOut(duration: 0.12), value: hovered)
-    }
-
-    private func rowBackground(index: Int, hovered: Bool) -> Color {
-        if hovered {
-            return AppTheme.sidebarActive.opacity(dark ? 0.12 : 0.08)
-        }
-        return index % 2 == 1
-            ? AppTheme.sidebarHover(dark).opacity(0.18)
-            : Color.clear
-    }
-
-    private func nameCell(_ item: TenantItem, width: CGFloat) -> some View {
-        let shown = !model.detailNamesHidden
-        return Button(action: {
-            withAnimation(.easeInOut(duration: 0.15)) {
-                model.detailNamesHidden.toggle()
-            }
-        }) {
-            Text(shown ? item.displayName : item.maskedName)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
-                // 始终单行，禁止换行
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(width: width, alignment: .leading)
-                .frame(height: 28, alignment: .center)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(PlainButtonStyle())
-        .help(item.displayName.isEmpty
-              ? (shown ? "点击隐藏名称" : "点击显示名称")
-              : item.displayName)
-    }
-
-    private func taskCell(_ item: TenantItem) -> some View {
-        Button(action: { model.openBootTaskList(item) }) {
-            StatusBadge(
-                text: item.openTaskText,
-                tone: item.openBootFlag ? .success : .neutral
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-        .help("查看该区域抢机任务")
-    }
-
-    private func regionCell(_ item: TenantItem, width: CGFloat) -> some View {
-        Button(action: { model.openInstancesList(item) }) {
-            HStack(spacing: 4) {
-                Text(item.region.isEmpty ? "—" : item.region)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(AppTheme.sidebarActive)
-                    .lineLimit(1)
-                Image(systemName: "arrow.up.right")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundColor(AppTheme.sidebarActive.opacity(0.75))
-            }
-            .frame(width: width, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(PlainButtonStyle())
-        .help("打开该区域实例列表")
-    }
-
-    private func homeBadge(_ item: TenantItem) -> some View {
-        Text(item.isHomeRegion ? "是" : "否")
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundColor(item.isHomeRegion ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(
-                Capsule().fill(
-                    item.isHomeRegion
-                        ? AppTheme.sidebarActive.opacity(0.15)
-                        : AppTheme.sidebarHover(dark).opacity(0.5)
-                )
-            )
-    }
-
-    /// 行内快捷：同步 / 创建开机 / 实例 + 更多（对齐 Web 全量菜单）
-    private func actionBar(_ item: TenantItem) -> some View {
-        HStack(spacing: 4) {
-            if item.cloudType == 1 {
-                quickIcon(
-                    systemImage: "arrow.2.circlepath",
-                    help: "同步",
-                    accent: false
-                ) {
-                    model.syncDetailRow(item)
-                }
-                quickIcon(
-                    systemImage: "plus.circle",
-                    help: "创建开机",
-                    accent: true
-                ) {
-                    model.openBoot(item)
-                }
-                quickIcon(
-                    systemImage: "desktopcomputer",
-                    help: "实例列表",
-                    accent: false
-                ) {
-                    model.openInstancesList(item)
-                }
-            } else if item.cloudType == 2 {
-                quickIcon(
-                    systemImage: "plus.circle",
-                    help: "创建开机",
-                    accent: true
-                ) {
-                    model.openBoot(item)
-                }
-                quickIcon(
-                    systemImage: "arrow.2.circlepath",
-                    help: "同步",
-                    accent: false
-                ) {
-                    model.syncDetailRow(item)
-                }
-            }
-            TenantDetailActionButton(dark: dark, item: item, model: model)
-                .environmentObject(appearance)
-                .frame(width: 30, height: 26)
-        }
-    }
-
-    private func quickIcon(
-        systemImage: String,
-        help: String,
-        accent: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(accent ? .white : (dark ? Color.white.opacity(0.9) : Color.primary))
-                .frame(width: 28, height: 26)
-                .background(
-                    RoundedRectangle(cornerRadius: 7)
-                        .fill(accent
-                              ? AppTheme.sidebarActive
-                              : (dark ? Color(hex: "2c3136") : Color(hex: "eef2f6")))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 7)
-                        .stroke(AppTheme.border(dark).opacity(accent ? 0 : 0.7), lineWidth: 1)
-                )
-        }
-        .buttonStyle(PlainButtonStyle())
-        .help(help)
-    }
-
-    private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .leading) -> some View {
-        Text(title)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundColor(AppTheme.sidebarText(dark))
-            .frame(width: w, alignment: align)
-    }
-
-    private func cell(_ text: String, _ w: CGFloat, muted: Bool = false) -> some View {
-        Text(text)
-            .font(.system(size: 12))
-            .foregroundColor(muted ? AppTheme.sidebarText(dark) : (dark ? Color.white.opacity(0.9) : Color.primary))
-            .lineLimit(1)
-            .frame(width: w, alignment: .leading)
-    }
-}
-
-// MARK: - 详情页「更多」菜单（对齐 Web dropdown 剩余项）
-
-private struct TenantDetailActionButton: NSViewRepresentable {
-    let dark: Bool
-    let item: TenantItem
-    @ObservedObject var model: TenantsViewModel
-    @EnvironmentObject var appearance: AppearanceController
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(item: item, model: model, appearance: appearance, dark: dark)
-    }
-
-    func makeNSView(context: Context) -> NSButton {
-        let b = NSButton(frame: NSRect(x: 0, y: 0, width: 30, height: 26))
-        b.bezelStyle = .shadowlessSquare
-        b.isBordered = false
-        b.title = ""
-        b.image = NSImage(systemSymbolName: "ellipsis", accessibilityDescription: "更多")
-        b.imagePosition = .imageOnly
-        b.imageScaling = .scaleProportionallyDown
-        b.contentTintColor = dark
-            ? NSColor.white.withAlphaComponent(0.9)
-            : NSColor.labelColor
-        b.wantsLayer = true
-        if let layer = b.layer {
-            layer.cornerRadius = 7
-            layer.backgroundColor = (dark
-                ? NSColor(calibratedRed: 0.17, green: 0.19, blue: 0.21, alpha: 1)
-                : NSColor(calibratedRed: 0.93, green: 0.95, blue: 0.96, alpha: 1)).cgColor
-            layer.borderWidth = 1
-            layer.borderColor = (dark
-                ? NSColor.white.withAlphaComponent(0.12)
-                : NSColor.black.withAlphaComponent(0.08)).cgColor
-        }
-        b.target = context.coordinator
-        b.action = #selector(Coordinator.toggle(_:))
-        b.setButtonType(.momentaryChange)
-        b.toolTip = "更多操作"
-        return b
-    }
-
-    func updateNSView(_ nsView: NSButton, context: Context) {
-        context.coordinator.item = item
-        context.coordinator.model = model
-        context.coordinator.appearance = appearance
-        context.coordinator.dark = dark
-        nsView.contentTintColor = dark
-            ? NSColor.white.withAlphaComponent(0.9)
-            : NSColor.labelColor
-        if let layer = nsView.layer {
-            layer.backgroundColor = (dark
-                ? NSColor(calibratedRed: 0.17, green: 0.19, blue: 0.21, alpha: 1)
-                : NSColor(calibratedRed: 0.93, green: 0.95, blue: 0.96, alpha: 1)).cgColor
-            layer.borderColor = (dark
-                ? NSColor.white.withAlphaComponent(0.12)
-                : NSColor.black.withAlphaComponent(0.08)).cgColor
-        }
-    }
-
-    final class Coordinator: NSObject {
-        var item: TenantItem
-        var model: TenantsViewModel
-        var appearance: AppearanceController
-        var dark: Bool
-
-        init(item: TenantItem, model: TenantsViewModel, appearance: AppearanceController, dark: Bool) {
-            self.item = item
-            self.model = model
-            self.appearance = appearance
-            self.dark = dark
-        }
-
-        @objc func toggle(_ sender: NSButton) {
-            let btn = sender
-            let it = item
-            let m = model
-            let ap = appearance
-            let d = dark
-            DispatchQueue.main.async {
-                TenantActionMenuPresenter.shared.toggleDetail(
-                    from: btn, item: it, model: m, appearance: ap, dark: d
-                )
-            }
-        }
     }
 }

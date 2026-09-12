@@ -49,21 +49,16 @@ struct DataListRow<Content: View>: View {
     }
 
     var body: some View {
-        Button(action: { action?() }) {
-            HStack(spacing: 0) {
-                content()
+        Group {
+            if let action = action {
+                Button(action: action) {
+                    rowContent
+                }
+                .buttonStyle(PlainButtonStyle())
+            } else {
+                rowContent
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                isSelected
-                    ? AppTheme.sidebarActive.opacity(0.18)
-                    : Color.clear
-            )
-            .contentShape(Rectangle())
         }
-        .buttonStyle(PlainButtonStyle())
         .overlay(
             Rectangle()
                 .frame(height: 1)
@@ -71,12 +66,27 @@ struct DataListRow<Content: View>: View {
             alignment: .bottom
         )
     }
+
+    private var rowContent: some View {
+        HStack(spacing: 0) {
+            content()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, appearance.density.rowPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            isSelected
+                ? AppTheme.sidebarActive.opacity(0.18)
+                : Color.clear
+        )
+        .contentShape(Rectangle())
+    }
 }
 
 struct DataListColumnHeader: View {
     let title: String
     var width: CGFloat? = nil
-    var alignment: Alignment = .leading
+    var alignment: Alignment = .center   // 数据表列头统一居中（对齐数据表居中标准）
 
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme

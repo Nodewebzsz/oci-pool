@@ -73,7 +73,7 @@ struct TenantUserManageView: View {
                 }
                 .padding(.horizontal, 12).padding(.vertical, 7)
                 .foregroundColor(.white)
-                .background(Color(hex: "f39c12"))
+                .background(AppTheme.orange)
                 .cornerRadius(8)
             }
             .buttonStyle(PlainButtonStyle())
@@ -271,8 +271,8 @@ struct TenantUserManageView: View {
             }
         }
         .padding(16)
-        .background(Color(hex: "f39c12").opacity(0.06))
-        .overlay(Rectangle().frame(height: 1).foregroundColor(Color(hex: "f39c12").opacity(0.3)), alignment: .bottom)
+        .background(AppTheme.orange.opacity(0.06))
+        .overlay(Rectangle().frame(height: 1).foregroundColor(AppTheme.orange.opacity(0.3)), alignment: .bottom)
     }
 
     private var usersTable: some View {
@@ -292,14 +292,19 @@ struct TenantUserManageView: View {
                 GeometryReader { geo in
                     let wDomain: CGFloat = 90
                     let wStatus: CGFloat = 88
-                    let wCreated: CGFloat = 130
-                    let wLogin: CGFloat = 130
+                    let wCreatedBase: CGFloat = 130
+                    let wLoginBase: CGFloat = 130
                     let wAction: CGFloat = 130
-                    let wUser: CGFloat = 120
+                    let wUserBase: CGFloat = 120
                     let hPad: CGFloat = 16
-                    let fixed = wDomain + wUser + wStatus + wCreated + wLogin + wAction + hPad * 2
-                    let totalW = max(geo.size.width, fixed + 160)
-                    let wEmail = max(120, totalW - fixed)
+                    let fixed = wDomain + wStatus + wAction + hPad * 2
+                    let totalW = max(geo.size.width, fixed + 400)
+                    // 多列均匀分配：用户名/邮箱/创建时间/最后登录弹性，其余固定
+                    let flex = max(0, totalW - fixed)
+                    let wUser = wUserBase + flex * 0.25
+                    let wEmail = 120 + flex * 0.25
+                    let wCreated = wCreatedBase + flex * 0.25
+                    let wLogin = wLoginBase + flex * 0.25
 
                     VStack(spacing: 0) {
                         usersHeader(wDomain: wDomain, wUser: wUser, wEmail: wEmail, wStatus: wStatus,
@@ -350,7 +355,7 @@ struct TenantUserManageView: View {
             cell(user.username, wUser, bold: true)
             cell(user.email.isEmpty ? "—" : user.email, wEmail)
             StatusBadge.state(user.lifecycleState)
-                .frame(width: wStatus, alignment: .leading)
+                .frame(width: wStatus, alignment: .center)
             cell(user.timeCreated.isEmpty ? "—" : user.timeCreated, wCreated, muted: true)
             cell(user.lastSuccessfulLoginTime.isEmpty ? "—" : user.lastSuccessfulLoginTime, wLogin, muted: true)
             HStack(spacing: 4) {
@@ -363,9 +368,9 @@ struct TenantUserManageView: View {
                     model.deleteUser(for: t, user: user)
                 }
             }
-            .frame(width: wAction, alignment: .leading)
+            .frame(width: wAction, alignment: .center)
         }
-        .padding(.horizontal, hPad).padding(.vertical, 9)
+        .padding(.horizontal, hPad).padding(.vertical, appearance.density.rowPadding)
         .frame(width: width, alignment: .leading)
         .background(index % 2 == 1 ? AppTheme.sidebarHover(dark).opacity(0.18) : Color.clear)
         .overlay(Rectangle().frame(height: 1).foregroundColor(border.opacity(0.3)), alignment: .bottom)
@@ -465,14 +470,14 @@ struct TenantUserManageView: View {
             cell("\(index + 1)", wNo, muted: true)
             cell(email, wEmail, bold: true)
             StatusBadge(text: "有效", tone: .success)
-                .frame(width: wStatus, alignment: .leading)
+                .frame(width: wStatus, alignment: .center)
             AppButton(title: "移除", kind: .danger) {
                 guard let t = tenant else { return }
                 model.removeNotifyEmail(t, email: email)
             }
-            .frame(width: wAction, alignment: .leading)
+            .frame(width: wAction, alignment: .center)
         }
-        .padding(.horizontal, hPad).padding(.vertical, 9)
+        .padding(.horizontal, hPad).padding(.vertical, appearance.density.rowPadding)
         .frame(width: width, alignment: .leading)
         .background(index % 2 == 1 ? AppTheme.sidebarHover(dark).opacity(0.18) : Color.clear)
         .overlay(Rectangle().frame(height: 1).foregroundColor(border.opacity(0.3)), alignment: .bottom)
@@ -570,7 +575,7 @@ struct TenantUserManageView: View {
         Text(title)
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(mutedText)
-            .frame(width: w, alignment: .leading)
+            .frame(width: w, alignment: .center)
     }
 
     private func cell(_ text: String, _ w: CGFloat, muted: Bool = false, bold: Bool = false) -> some View {
@@ -578,7 +583,7 @@ struct TenantUserManageView: View {
             .font(.system(size: 12, weight: bold ? .semibold : .regular))
             .foregroundColor(muted ? mutedText : primaryText)
             .lineLimit(1)
-            .frame(width: w, alignment: .leading)
+            .frame(width: w, alignment: .center)
     }
 
     private func formField(_ label: String, text: Binding<String>, width: CGFloat = 240) -> some View {

@@ -65,12 +65,16 @@ function InstancesPage({ density }) {
   const { t: tr, lang } = useT();
   const shell = useShell();
 
-  const routeQuery = (() => { try { return window.ociRouter?.read?.().query || {}; } catch { return {}; } })();
-  const [tenantFilter, setTenantFilter] = useStateIn(routeQuery.tenantId || '');
-  const [regionFilter, setRegionFilter] = useStateIn(routeQuery.regionId || '');
+  const route = (() => { try { return window.ociRouter?.read?.() || {}; } catch { return {}; } })();
+  const routeQuery = route.query || {};
+  const routeParams = route.params || {};
+  const isSubPage = (route.page === 'tenant-resources') || (routeQuery.from === 'detail') || Boolean(routeParams.tenantDbId);
+  const targetTenantId = routeParams.tenantDbId || routeQuery.tenantId || '';
+  const [tenantFilter, setTenantFilter] = useStateIn(targetTenantId);
+  const [regionFilter, setRegionFilter] = useStateIn(routeQuery.regionId || routeQuery.region || '');
   const [nameFilter, setNameFilter]   = useStateIn('');   // 精确实例名过滤(由外部跳转设置)
   const [page, setPage] = useStateIn(Math.max(1, Number(routeQuery.page || 1)));
-  const [perPage, setPerPage] = useStateIn(Math.max(1, Number(routeQuery.size || 10)));
+  const [perPage, setPerPage] = useStateIn(Math.max(1, Number(routeQuery.size || 20)));
   const [menuFor, setMenuFor] = useStateIn(null);
   // 脱敏开关 — 对齐租户管理页的眼睛切换交互
   const [masked, setMasked] = useStateIn(true);
@@ -80,6 +84,7 @@ function InstancesPage({ density }) {
   const [regionOptions, setRegionOptions] = useStateIn([]);
   const [regionLoading, setRegionLoading] = useStateIn(false);
   const [loading, setLoading] = useStateIn(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useStateIn(false);
   const [loadError, setLoadError] = useStateIn('');
   const [refreshToken, setRefreshToken] = useStateIn(0);
 
@@ -90,7 +95,13 @@ function InstancesPage({ density }) {
       try {
         const tenantRows = await window.ociServices.tenant.listParentTenants();
         if (!alive) return;
-        setTenantOptions((Array.isArray(tenantRows) ? tenantRows : []).map(row => window.ociTenantRow.normalize(row, REGIONS)));
+        const normalized = (Array.isArray(tenantRows) ? tenantRows : []).map(row => window.ociTenantRow.normalize(row, REGIONS));
+        normalized.sort((a, b) => {
+          const na = a.tenancyName || a.name || a.userName || '';
+          const nb = b.tenancyName || b.name || b.userName || '';
+          return na.localeCompare(nb, undefined, { sensitivity: 'base' });
+        });
+        setTenantOptions(normalized);
       } catch (error) {
         if (!alive) return;
         setTenantOptions([]);
@@ -104,9 +115,12 @@ function InstancesPage({ density }) {
   useEffectIn(() => {
     let alive = true;
     setRegionOptions([]);
+    setInstances([]); // 切换租户的一瞬间，立即清空旧实例，杜绝旧数据残留！
+    setLoading(true); // 同步开启 loading，杜绝拉取区域子级选项期间空态抢跑闪现！
     if (!tenantFilter) {
       setRegionLoading(false);
       setRegionFilter('');
+      setLoading(false);
       return () => { alive = false; };
     }
     setRegionLoading(true);
@@ -115,11 +129,12 @@ function InstancesPage({ density }) {
         const rows = await window.ociServices.tenant.listRegions({ parentId: tenantFilter });
         if (!alive) return;
         const options = (Array.isArray(rows) ? rows : [])
-          .map(row => ({
-            id: String(row.id ?? ''),
-            label: row.region || row.tenancyName || row.userName || row.tenantId || row.id || '',
-            region: row.region || '',
-          }))
+          .map(row => {
+            const base = row.region || row.tenancyName || row.userName || row.tenantId || row.id || '';
+            // 多区域账户：主区域(add)追加 i18n 主区域标识
+            const label = row.isHomeRegion ? `${base} · ${tr('tenants.col.mainRegion')}` : base;
+            return { id: String(row.id ?? ''), label, region: row.region || '' };
+          })
           .filter(row => row.id);
         setRegionOptions(options);
         const requested = String(regionFilter || '');
@@ -149,6 +164,7 @@ function InstancesPage({ density }) {
     let alive = true;
     (async () => {
       setLoading(true);
+      setInstances([]); // 刷新与重新加载时立即清空旧数据，杜绝旧数据与 loading 共存！
       setLoadError('');
       try {
         // 原项目 Web 端实例列表:GET /oci/list/json → {content,totalPages,totalElements}。
@@ -181,7 +197,10 @@ function InstancesPage({ density }) {
         setTotalElements(0);
         setLoadError(error.message || tr('instances.err.load'));
       } finally {
-        if (alive) setLoading(false);
+        if (alive) {
+          setLoading(false);
+          setHasLoadedOnce(true);
+        }
       }
     })();
     return () => { alive = false; };
@@ -218,15 +237,21 @@ function InstancesPage({ density }) {
   }, [showVnc]);
 
   const writeRouteQuery = React.useCallback((patch) => {
-    const current = (() => { try { return window.ociRouter?.read?.().query || {}; } catch { return {}; } })();
-    window.ociRouter?.go('instances', {
-      ...current,
+    const current = (() => { try { return window.ociRouter?.read?.() || {}; } catch { return {}; } })();
+    const curQuery = current.query || {};
+    const curParams = current.params || {};
+    const pageId = (current.page === 'tenant-resources' || isSubPage) ? 'tenant-resources' : 'instances';
+    const nextTenantId = patch.tenantId == null ? tenantFilter : patch.tenantId;
+    window.ociRouter?.go(pageId, {
+      ...curQuery,
+      ...curParams,
+      tenantDbId: curParams.tenantDbId || nextTenantId,
       page: patch.page == null ? page : patch.page,
       size: patch.size == null ? perPage : patch.size,
-      tenantId: patch.tenantId == null ? tenantFilter : patch.tenantId,
+      tenantId: nextTenantId,
       regionId: patch.regionId == null ? regionFilter : patch.regionId,
     }, { replace: true });
-  }, [page, perPage, tenantFilter, regionFilter]);
+  }, [page, perPage, tenantFilter, regionFilter, isSubPage]);
 
   const filtered = instances.filter(i => {
     // 区域下拉的 value 是区域子租户数据库 id；父租户只用于加载区域选项。
@@ -249,22 +274,21 @@ function InstancesPage({ density }) {
   const columns = [
     { key: 'seq', label: tr('instances.col.seq'), width: 40,
       render: r => <span className="mono" style={{ color: 'var(--fg-3)', fontSize: 11 }}>{r.seq}</span> },
-    { key: 'tenantName', label: tr('instances.col.tenant'),
+    { key: 'tenantName', label: tr('instances.col.tenant'), width: 110, tooltip: r => r.tenantName || '',
       render: r => {
         // 展开时显示反脱敏名 + 自定义名（对齐租户页的行为）
-        const t = tenantOptions.find(x => String(x.id) === String(r.tenantId));
-        // 后端只返回一个租户显示字段；未提供明文时不能在前端猜测或拼接名称。
-        const shownName = r.tenantName;
+        const fullTenantName = r.tenantName || '';
+        const shownName = masked ? window.maskName(fullTenantName) : fullTenantName;
         return (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }} title={t ? `${r.tenantName} · ${getTenantName(t)}` : r.tenantName}>
-            <span className="mono" style={{ padding: '2px 6px', background: 'var(--bg-3)', borderRadius: 4, fontSize: 11, color: 'var(--fg-1)' }}>{shownName}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }} title={fullTenantName}>
+            <span title={fullTenantName} className="mono" style={{ padding: '2px 6px', background: 'var(--bg-3)', borderRadius: 4, fontSize: 11, color: 'var(--fg-1)', display: 'inline-block', maxWidth: 96, overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'middle', cursor: 'pointer' }}>{shownName}</span>
             <Icon name="link" size={11} style={{ color: 'var(--fg-3)' }} />
           </span>
         );
       },
     },
     { key: 'region', label: tr('instances.col.region'), width: 100, render: r => <RegionBadge code={r.region} lang={lang} /> },
-    { key: 'name', label: tr('instances.col.name'), width: 160,
+    { key: 'name', label: tr('instances.col.name'), width: 160, tooltip: r => r.name || '',
       render: r => (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           <StatusDot status={r.status} size={7} pulse={r.status === 'running'} />
@@ -297,7 +321,7 @@ function InstancesPage({ density }) {
     },
     { key: 'createdAt', label: tr('instances.col.createdAt'),
       render: r => <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>{r.createdAt}</span> },
-    { key: 'actions', label: tr('common.operation'), width: 40, align: 'center',
+    { key: 'actions', label: tr('common.operation'), width: 48, minWidth: 48, align: 'center', ellipsis: false,
       render: r => (
         <button
           type="button"
@@ -324,39 +348,116 @@ function InstancesPage({ density }) {
     },
   ];
 
+  const fromTenant = tenantOptions.find(t => getTenantDbId(t) === String(tenantFilter));
+  const tenantDisplayName = fromTenant ? (instanceTenantDisplayAlias(fromTenant) || instanceTenantDisplayName(fromTenant)) : '';
+
   return (
     <div style={{
       display: 'flex', flexDirection: 'column',
       flex: 1, minHeight: 0,
     }}>
+      {/* ── 面包屑 + 返回 (租户下钻模式，100% 对齐客户端) ─────────────────────────── */}
+      {isSubPage && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          marginBottom: 10,
+          fontSize: 12, color: 'var(--fg-2)',
+        }}>
+          <button
+            type="button"
+            onClick={() => window.ociRouter.go('tenant-detail', { tenantDbId: tenantFilter })}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '4px 8px',
+              background: 'var(--bg-1)',
+              border: '1px solid var(--border)',
+              borderRadius: 5,
+              color: 'var(--fg-2)',
+              fontFamily: 'inherit', fontSize: 12, fontWeight: 500,
+              cursor: 'pointer',
+              transition: 'background 100ms, border-color 100ms',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-2)'; e.currentTarget.style.borderColor = 'var(--border-strong)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-1)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
+            title={tr('common.back')}
+          >
+            <Icon name="chevron-left" size={12} />
+            <span>{tr('common.back')}</span>
+          </button>
+          <span style={{ color: 'var(--fg-3)', opacity: 0.5 }}>›</span>
+          <nav style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <a
+              onClick={() => window.ociRouter.go('tenants')}
+              style={{ cursor: 'pointer', color: 'var(--fg-2)', textDecoration: 'none' }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--fg-2)'}
+            >
+              {tr('nav.tenants')}
+            </a>
+            <span style={{ color: 'var(--fg-3)', opacity: 0.5 }}>›</span>
+            <a
+              onClick={() => window.ociRouter.go('tenant-detail', { tenantDbId: tenantFilter })}
+              style={{ cursor: 'pointer', color: 'var(--fg-2)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--fg-2)'}
+            >
+              <span>{tr('td.detail')}</span>
+              {tenantDisplayName && (
+                <>
+                  <span>·</span>
+                  <span className="mono" style={{ fontWeight: 600 }}>{tenantDisplayName}</span>
+                </>
+              )}
+            </a>
+            <span style={{ color: 'var(--fg-3)', opacity: 0.5 }}>›</span>
+            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{tr('td.action.resources')}</span>
+          </nav>
+        </div>
+      )}
+
       <PageHeader
-        title={tr('instances.title')}
+        title={isSubPage && tenantDisplayName
+          ? `${tenantDisplayName} · ${tr('td.action.resources')}`
+          : tr('instances.title')}
+        subtitle={isSubPage ? `共 ${totalElements} 个实例` : null}
         icon="server"
         iconColor="var(--cyan)"
         actions={
           <>
-            <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>{tr('common.selectPlaceholder')}:</span>
-            <Select
-              value={tenantFilter}
-              onChange={v => {
-                setTenantFilter(v);
-                setRegionFilter('');
-                setRegionOptions([]);
-                setPage(1);
-                writeRouteQuery({ tenantId: v, regionId: '', page: 1 });
-              }}
-              placeholder={tr('common.selectTenant')}
-              width={160}
-            options={tenantOptions.map(t => ({
-              value: getTenantDbId(t),
-              label: `${instanceTenantDisplayName(t) || getTenantDbId(t)} · ${instanceTenantDisplayAlias(t) || t.region || ''}`,
-            }))}
-            />
+            {!isSubPage ? (
+              <>
+                <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>{tr('common.selectPlaceholder')}:</span>
+                <Select
+                  value={tenantFilter}
+                  onChange={v => {
+                    setTenantFilter(v);
+                    setRegionFilter('');
+                    setRegionOptions([]);
+                    setInstances([]);
+                    setLoading(true);
+                    setPage(1);
+                    writeRouteQuery({ tenantId: v, regionId: '', page: 1 });
+                  }}
+                  placeholder={tr('common.selectTenant')}
+                  width={220}
+                  searchable={tenantOptions.length > 5}
+                  options={tenantOptions.map(t => ({
+                    value: getTenantDbId(t),
+                    label: getTenantLabel(t, lang),
+                  }))}
+                />
+              </>
+            ) : (
+              <span style={{ fontSize: 12, color: 'var(--fg-3)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <Icon name="globe" size={12} />
+                <span>当前区域:</span>
+              </span>
+            )}
             <Select
               value={regionFilter}
               onChange={v => { setRegionFilter(v); setPage(1); writeRouteQuery({ regionId: v, page: 1 }); }}
               placeholder={tr('common.selectRegion')}
-              width={160}
+              width={200}
               disabled={!tenantFilter || regionLoading || regionOptions.length === 0}
               searchable={regionOptions.length > 1}
               options={regionOptions.map(r => ({ value: r.id, label: r.label }))}
@@ -368,7 +469,9 @@ function InstancesPage({ density }) {
               size={30}
               style={{ border: '1px solid var(--border)', background: 'var(--bg-2)' }}
             />
-            <Button variant="primary" size="md" icon="search" disabled={!regionFilter} onClick={() => shell.showToast(tr('instances.filter.applied').replace('{n}', filtered.length), { kind: 'info' })}>{tr('instances.action.view')}</Button>
+            {!isSubPage && (
+              <Button variant="primary" size="md" icon="search" disabled={!regionFilter} onClick={() => shell.showToast(tr('instances.filter.applied').replace('{n}', filtered.length), { kind: 'info' })}>{tr('instances.action.view')}</Button>
+            )}
             <Button variant="orange" size="md" icon="download" onClick={() => {
               // 原项目 confirmExportInstances 明确提示导出内容包含所有租户的
               // 明文 Root 密码；必须确认后才调用真实 /oci/export。
@@ -406,15 +509,16 @@ function InstancesPage({ density }) {
       <div style={{
           display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
           padding: '8px 12px', marginBottom: 12,
-          background: 'var(--accent-soft)', border: '1px solid color-mix(in oklab, var(--accent) 45%, transparent)',
+          background: 'color-mix(in srgb, var(--accent) 14%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--accent) 45%, transparent)',
           borderRadius: 6, fontSize: 12,
         }}>
           <Icon name="filter" size={13} style={{ color: 'var(--accent)' }} />
           <span style={{ color: 'var(--accent)', fontWeight: 500 }}>{tr('instances.filter.current')}</span>
           {nameFilter && (
-            <span style={{ padding: '2px 8px', background: 'var(--bg-1)', borderRadius: 3, display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--fg-0)' }}>
+            <span style={{ padding: '2px 8px', background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 3, display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--fg-0)' }}>
               <span style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>{tr('instances.filter.name')}</span>
-              <span className="mono">{nameFilter}</span>
+              <span className="mono" style={{ color: 'var(--fg-1)' }}>{nameFilter}</span>
                 <button onClick={() => { setNameFilter(''); setPage(1); writeRouteQuery({ page: 1 }); }} style={{
                 width: 14, height: 14, borderRadius: 3, background: 'transparent',
                 border: 'none', color: 'var(--fg-3)', cursor: 'pointer',
@@ -425,45 +529,59 @@ function InstancesPage({ density }) {
             </span>
           )}
           {tenantFilter && !nameFilter && (
-            <span style={{ padding: '2px 8px', background: 'var(--bg-1)', borderRadius: 3, display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--fg-0)' }}>
+            <span style={{ padding: '2px 8px', background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 3, display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--fg-0)' }}>
               <span style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>{tr('instances.filter.tenant')}</span>
               {(() => {
                 const selected = tenantOptions.find(t => getTenantDbId(t) === String(tenantFilter));
                 const label = selected && (instanceTenantDisplayAlias(selected) || instanceTenantDisplayName(selected));
-                return <span className="mono">{label || tenantFilter}</span>;
+                return <span className="mono" style={{ color: 'var(--fg-1)' }}>{label || tenantFilter}</span>;
               })()}
             </span>
           )}
           {regionFilter && (
-            <span style={{ padding: '2px 8px', background: 'var(--bg-1)', borderRadius: 3, display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--fg-0)' }}>
+            <span style={{ padding: '2px 8px', background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 3, display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--fg-0)' }}>
               <span style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>{tr('instances.filter.region')}</span>
-              <span className="mono">{regionOptions.find(r => r.id === String(regionFilter))?.label || regionFilter}</span>
+              <span className="mono" style={{ color: 'var(--fg-1)' }}>{regionOptions.find(r => r.id === String(regionFilter))?.label || regionFilter}</span>
             </span>
           )}
           {!hasFilter && (
             <>
-              <span style={{ padding: '2px 8px', background: 'var(--bg-1)', borderRadius: 3, display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--fg-0)' }}>
+              <span style={{ padding: '2px 8px', background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 3, display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--fg-0)' }}>
                 <span style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>{tr('instances.filter.tenant')}</span>
-                <span className="mono">{tr('instances.filter.unselected')}</span>
+                <span className="mono" style={{ color: 'var(--fg-1)' }}>{tr('instances.filter.unselected')}</span>
               </span>
-              <span style={{ padding: '2px 8px', background: 'var(--bg-1)', borderRadius: 3, display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--fg-0)' }}>
+              <span style={{ padding: '2px 8px', background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 3, display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--fg-0)' }}>
                 <span style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>{tr('instances.filter.region')}</span>
-                <span className="mono">{tr('instances.filter.unselected')}</span>
+                <span className="mono" style={{ color: 'var(--fg-1)' }}>{tr('instances.filter.unselected')}</span>
               </span>
             </>
           )}
           <span style={{ color: 'var(--fg-2)' }}>· {tr('instances.filter.matchedPrefix')}<b style={{ color: 'var(--accent)' }}>{filtered.length}</b>{tr('instances.filter.matchedSuffix')}</span>
-          <div style={{ flex: 1 }} />
-          <Button size="xs" variant="outline" icon="rotate-ccw"
-          disabled={!hasFilter}
-          onClick={() => { setTenantFilter(''); setRegionFilter(''); setRegionOptions([]); setNameFilter(''); setPage(1); writeRouteQuery({ tenantId: '', regionId: '', page: 1 }); }}
-          >{tr('instances.filter.clear')}</Button>
+          {!isSubPage && (
+            <>
+              <div style={{ flex: 1 }} />
+              <Button size="xs" variant="outline" icon="rotate-ccw"
+              disabled={!hasFilter}
+              onClick={() => {
+                setTenantFilter(''); setRegionFilter(''); setRegionOptions([]); setNameFilter(''); setPage(1); writeRouteQuery({ tenantId: '', regionId: '', page: 1 });
+              }}
+              >{tr('instances.filter.clear')}</Button>
+            </>
+          )}
       </div>
 
       {loadError && (
         <div style={{ marginBottom: 12, padding: '10px 14px', border: '1px solid var(--danger)', borderRadius: 6, background: 'var(--danger-soft)', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <Icon name="alert-circle" size={15} />
           <span style={{ flex: 1 }}>{loadError}</span>
+          <button
+            type="button"
+            onClick={() => setLoadError('')}
+            style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', display: 'inline-flex', padding: 2 }}
+            title={tr('common.close')}
+          >
+            <Icon name="x" size={14} />
+          </button>
         </div>
       )}
 
@@ -488,9 +606,24 @@ function InstancesPage({ density }) {
         borderRadius: 'var(--radius)',
       }}>
         <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-          {loading
-            ? <div style={{ padding: 40, textAlign: 'center', color: 'var(--fg-2)' }}>{tr('instances.loading')}</div>
-            : <Table columns={columns} rows={paged} density={density} onRowClick={showDetail} />}
+          <Table
+            columns={columns}
+            rows={paged}
+            loading={!hasLoadedOnce || loading}
+            empty={
+              <EmptyState
+                icon="server"
+                title={!tenantFilter ? '暂无实例' : (!regionFilter ? '请选择区域' : '暂无实例')}
+                subtitle={!tenantFilter
+                  ? '可从租户同步实例，或调整筛选后查询'
+                  : (!regionFilter ? '当前租户包含多个可用区域，请在上方选择具体区域后查看实例' : '当前筛选条件下没有实例')}
+                actionLabel={regionFilter ? '刷新' : null}
+                onAction={regionFilter ? () => setRefreshToken(v => v + 1) : null}
+              />
+            }
+            density={density}
+            onRowClick={showDetail}
+          />
         </div>
         <div style={{ flexShrink: 0, borderTop: '1px solid var(--border)', background: 'var(--bg-1)' }}>
           <Pagination

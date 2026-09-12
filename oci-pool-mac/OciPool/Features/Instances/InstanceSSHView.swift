@@ -603,7 +603,7 @@ struct InstanceSSHView: View {
             if let err = model.errorText, !err.isEmpty {
                 Text(err)
                     .font(.system(size: 12))
-                    .foregroundColor(Color(hex: "f85149"))
+                    .foregroundColor(AppTheme.danger)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 6)
@@ -655,11 +655,11 @@ struct InstanceSSHView: View {
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(model.isConnected ? Color(hex: "3fb950") : Color(hex: "8b949e"))
+                        .fill(model.isConnected ? AppTheme.sidebarActive : AppTheme.textSecondary(dark))
                         .frame(width: 7, height: 7)
                     Text(model.statusText)
                         .font(.system(size: 11))
-                        .foregroundColor(model.isConnected ? Color(hex: "3fb950") : AppTheme.sidebarText(dark))
+                        .foregroundColor(model.isConnected ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
                 }
             }
             Spacer()

@@ -76,14 +76,16 @@ struct RegionRow: Identifiable, Equatable {
     let monthlyOpenCount: Int
     let lastNotifyTime: String?
     let continent: String
+    let isMine: Bool
+    /// Web：openTime 为今日 → todayGrabs = openCount，否则 0
+    let todayGrabs: Int
 }
 
 enum RegionContinent: String, CaseIterable, Identifiable {
     case all = "all"
     case asia = "asia"
     case europe = "europe"
-    case americaNorth = "america-north"
-    case americaSouth = "america-south"
+    case americas = "americas"
     case middleEast = "middle-east"
 
     var id: String { rawValue }
@@ -91,10 +93,9 @@ enum RegionContinent: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .all: return "全部大洲"
-        case .asia: return "亚太地区"
+        case .asia: return "亚太"
         case .europe: return "欧洲"
-        case .americaNorth: return "北美"
-        case .americaSouth: return "南美"
+        case .americas: return "北美/南美"
         case .middleEast: return "中东/非洲"
         }
     }
@@ -107,10 +108,10 @@ enum RegionContinent: String, CaseIterable, Identifiable {
             ("il-", "europe"),
             ("me-", "middle-east"),
             ("af-", "middle-east"),
-            ("us-", "america-north"),
-            ("ca-", "america-north"),
-            ("mx-", "america-north"),
-            ("sa-", "america-south")
+            ("us-", "americas"),
+            ("ca-", "americas"),
+            ("mx-", "americas"),
+            ("sa-", "americas")
         ]
         for (p, c) in prefixes where regionCode.hasPrefix(p) { return c }
         return "other"
@@ -123,7 +124,7 @@ enum RegionStatusFilter: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .all: return "全部状态"
-        case .open: return "已开机"
+        case .open: return "已放货"
         case .closed: return "未放货"
         }
     }
@@ -132,6 +133,27 @@ enum RegionStatusFilter: String, CaseIterable, Identifiable {
 enum RegionsMapViewMode: String {
     case arm   // ARM 放货区域
     case mine  // 我的区域
+    case map   // 显示地图
+}
+
+// MARK: - 区域详情抽屉数据（对齐 Web useRegionDetailDrawer）
+
+struct RegionRelatedTenant: Identifiable, Equatable {
+    let id: Int64
+    let chipName: String   // userName（mono chip）
+    let displayName: String // defName || userName || tenancyName
+    let region: String
+    let activeDays: String
+    let isActive: Bool
+}
+
+struct RegionRelatedInstance: Identifiable, Equatable {
+    let id: Int64
+    let name: String
+    let state: String
+    let cpu: Int
+    let mem: Int
+    let ip: String
 }
 
 // MARK: - Known region codes (web arm_records.js REGION_COORDINATES keys)

@@ -13,18 +13,19 @@ struct SystemLogsView: View {
     var body: some View {
         PageScaffold(
             title: "系统日志",
-            subtitle: "应用运行日志 · 历史 + SSE 实时流",
-            systemImage: "doc.plaintext",
+            subtitle: "System Logs · 全站运行日志",
+            systemImage: "terminal",
+            iconColor: AppTheme.sidebarActive,
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
                     if let err = model.errorText, !err.isEmpty {
                         errorBanner(err)
+                            .padding(.bottom, 12)
                     }
                     terminalCard
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(12)
             }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
@@ -39,7 +40,7 @@ struct SystemLogsView: View {
         HStack(spacing: 8) {
             connectionBadge
             AppButton(title: "清空", systemImage: "trash", kind: .secondary) {
-                if AppAlert.confirm(title: "清空日志", message: "仅清空当前视图中的日志，不影响服务端文件。") {
+                if AppAlert.confirm(title: "清空系统日志?", message: "该操作将删除本地展示的 \(model.entries.count) 条日志。不影响后端日志文件。") {
                     model.clearLogs()
                 }
             }
@@ -76,9 +77,9 @@ struct SystemLogsView: View {
 
     private var connectionColor: Color {
         switch model.connection {
-        case .connected: return Color(hex: "1abc9c")
-        case .connecting: return Color(hex: "f39c12")
-        case .disconnected: return Color(hex: "ff6b6b")
+        case .connected: return AppTheme.sidebarActive
+        case .connecting: return AccentPreset.orange.color
+        case .disconnected: return Color(hex: "f05653")
         }
     }
 
@@ -92,23 +93,23 @@ struct SystemLogsView: View {
         .background(Color.black)
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(Color(hex: "4fc3f7").opacity(0.45), lineWidth: 1)
+                .stroke(AppTheme.sidebarActive.opacity(0.45), lineWidth: 1)
         )
         .cornerRadius(6)
-        .shadow(color: Color(hex: "4fc3f7").opacity(0.12), radius: 8, x: 0, y: 2)
+        .shadow(color: AppTheme.sidebarActive.opacity(0.12), radius: 8, x: 0, y: 2)
     }
 
     private var terminalHeader: some View {
         HStack(spacing: 10) {
             Image(systemName: "terminal")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Color(hex: "4fc3f7"))
-            Text("系统控制台")
+                .foregroundColor(AppTheme.sidebarActive)
+            Text("控制台输出")
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                .foregroundColor(Color(hex: "4fc3f7"))
+                .foregroundColor(AppTheme.sidebarActive)
             Text("▌")
                 .font(.system(size: 12, design: .monospaced))
-                .foregroundColor(Color(hex: "4fc3f7").opacity(0.7))
+                .foregroundColor(AppTheme.sidebarActive.opacity(0.7))
             Spacer()
             HStack(spacing: 6) {
                 Circle()
@@ -125,7 +126,7 @@ struct SystemLogsView: View {
         .overlay(
             Rectangle()
                 .frame(height: 1)
-                .foregroundColor(Color(hex: "4fc3f7").opacity(0.25)),
+                .foregroundColor(AppTheme.sidebarActive.opacity(0.25)),
             alignment: .bottom
         )
     }
@@ -135,7 +136,7 @@ struct SystemLogsView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     if model.entries.isEmpty && !model.isLoadingHistory {
-                        Text("// 暂无日志 — 等待系统输出…")
+                        Text("暂无日志")
                             .font(.system(size: 12, design: .monospaced))
                             .foregroundColor(Color.white.opacity(0.35))
                             .padding(.vertical, 8)
@@ -183,7 +184,7 @@ struct SystemLogsView: View {
             HStack(spacing: 6) {
                 Image(systemName: "list.bullet")
                     .font(.system(size: 10))
-                Text("\(model.entries.count) log entries")
+                Text("共 \(model.entries.count) 条")
                     .font(.system(size: 11, design: .monospaced))
             }
             .foregroundColor(Color.white.opacity(0.55))
@@ -208,7 +209,7 @@ struct SystemLogsView: View {
         .overlay(
             Rectangle()
                 .frame(height: 1)
-                .foregroundColor(Color(hex: "4fc3f7").opacity(0.2)),
+                .foregroundColor(AppTheme.sidebarActive.opacity(0.2)),
             alignment: .top
         )
     }
@@ -216,7 +217,7 @@ struct SystemLogsView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f39c12"))
+                .foregroundColor(AppTheme.orange)
             Text(text)
                 .font(.system(size: 12))
                 .foregroundColor(dark ? Color.white.opacity(0.85) : Color(hex: "1e2f42"))
@@ -231,7 +232,7 @@ struct SystemLogsView: View {
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color(hex: "f39c12").opacity(0.12))
+                .fill(AppTheme.orange.opacity(0.12))
         )
         .padding(.bottom, 8)
     }
@@ -243,7 +244,7 @@ private struct SystemLogCheckboxToggleStyle: ToggleStyle {
             HStack(spacing: 6) {
                 Image(systemName: configuration.isOn ? "checkmark.square.fill" : "square")
                     .font(.system(size: 12))
-                    .foregroundColor(configuration.isOn ? Color(hex: "4fc3f7") : Color.white.opacity(0.45))
+                    .foregroundColor(configuration.isOn ? AppTheme.sidebarActive : Color.white.opacity(0.45))
                 configuration.label
             }
         }

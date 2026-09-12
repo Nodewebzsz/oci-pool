@@ -112,7 +112,12 @@ function TenantResourcesPage({ density, ctx, navigate, updateDetailCtx }) {
   };
 
   if (loading && !tenant) {
-    return <div role="status" style={{ padding: 24, color: 'var(--fg-2)' }}>{tr('tr.loading')}</div>;
+    return (
+      <div role="status" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 280, gap: 12, color: 'var(--fg-3)' }}>
+        <Icon name="loader-2" size={20} className="spin" style={{ opacity: 0.6 }} />
+        <span style={{ fontSize: 13 }}>{tr('tr.loading') || '正在加载资源数据…'}</span>
+      </div>
+    );
   }
   if (!tenant) {
     return (
@@ -325,11 +330,12 @@ function TenantResourcesPage({ density, ctx, navigate, updateDetailCtx }) {
                   <td style={{ padding: '11px 12px', color: 'var(--fg-3)', borderBottom: '1px solid var(--border)' }}>
                     <span className="num">{(page - 1) * perPage + i + 1}</span>
                   </td>
-                  <td style={{ padding: '11px 12px', borderBottom: '1px solid var(--border)' }}>
-                    <span className="mono" style={{
+                  <td style={{ padding: '11px 12px', borderBottom: '1px solid var(--border)' }} title={inst.tenantName || ''}>
+                    <span title={inst.tenantName || ''} className="mono" style={{
                       padding: '2px 6px', background: 'var(--bg-3)',
                       borderRadius: 3, fontSize: 11, color: 'var(--fg-1)',
-                    }}>{inst.tenantName}</span>
+                      cursor: 'pointer',
+                    }}>{masked ? window.maskName(inst.tenantName) : inst.tenantName}</span>
                   </td>
                   <td style={{ padding: '11px 12px', color: 'var(--fg-0)', borderBottom: '1px solid var(--border)' }}>
                     {regionShortLabel(inst.region || getTenantRegion(tenant))}
@@ -346,7 +352,8 @@ function TenantResourcesPage({ density, ctx, navigate, updateDetailCtx }) {
                   <td style={{ padding: '11px 12px', borderBottom: '1px solid var(--border)' }}>
                     <span style={{
                       padding: '1px 6px',
-                      background: 'var(--info-soft)', color: 'var(--info)',
+                      background: getInstanceArch(inst) === 'ARM' ? 'var(--info-soft)' : 'var(--violet-soft)',
+                      color: getInstanceArch(inst) === 'ARM' ? 'var(--info)' : 'var(--violet)',
                       borderRadius: 3, fontSize: 10, fontWeight: 600,
                       fontFamily: 'var(--font-mono)',
                     }}>{getInstanceArch(inst)}</span>

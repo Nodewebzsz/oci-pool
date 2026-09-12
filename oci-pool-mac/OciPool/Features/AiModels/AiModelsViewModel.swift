@@ -41,7 +41,12 @@ final class AiModelsViewModel: ObservableObject {
         isLoadingTenants = true
         defer { isLoadingTenants = false }
         do {
-            tenants = try await service.listTenants()
+            tenants = try await service.listTenants().sorted {
+                let a = $0.tname.isEmpty ? $0.name : $0.tname
+                let b = $1.tname.isEmpty ? $1.name : $1.tname
+                return a.localizedCaseInsensitiveCompare(b) == .orderedAscending
+            }
+            // 对齐原项目 oci-start：默认自动选中第一个租户并加载模型，开箱即见数据
             if selectedTenantId.isEmpty, let first = tenants.first {
                 selectedTenantId = first.id
                 await loadModels()
@@ -96,7 +101,7 @@ final class AiModelsViewModel: ObservableObject {
             isBusy = true
             do {
                 try await service.addConfig(tenantId: tid, model: model)
-                ToastCenter.shared.success("已添加模型配置")
+                ToastCenter.shared.success("已添加 \(model.name) 到已配置模型")
                 await loadConfigs()
             } catch {
                 ToastCenter.shared.error(error.localizedDescription)
@@ -119,9 +124,10 @@ final class AiModelsViewModel: ObservableObject {
     }
 
     func delete(_ item: AiConfigItem) {
+        let name = item.modelName.isEmpty ? item.modelId : item.modelName
         guard AppAlert.confirm(
-            title: "删除配置",
-            message: "删除 \(item.modelName.isEmpty ? item.modelId : item.modelName)？",
+            title: "删除 \(name)?",
+            message: "该模型的配置将从租户中删除。调用中的会话不会立即中断,但重新连接后无法使用此模型。",
             confirmTitle: "删除",
             style: .critical
         ) else { return }
@@ -129,8 +135,8 @@ final class AiModelsViewModel: ObservableObject {
             isBusy = true
             do {
                 try await service.deleteConfig(id: item.id)
-                ToastCenter.shared.success("已删除")
                 await loadConfigs()
+                ToastCenter.shared.warn("✓ 已删除模型配置 \(name)")
             } catch {
                 ToastCenter.shared.error(error.localizedDescription)
             }
@@ -139,13 +145,14 @@ final class AiModelsViewModel: ObservableObject {
     }
 
     func batchEnable(_ enabled: Bool) {
+        // 对齐原项目：批量操作作用于全库配置，执行前需二次确认防误触
         let title = enabled ? "批量启用" : "批量禁用"
         guard AppAlert.confirm(title: title, message: "将对全部 AI 配置执行\(title)？") else { return }
         Task {
             isBusy = true
             do {
-                let msg = try await service.batchToggle(enabled: enabled)
-                ToastCenter.shared.success(msg)
+                try await service.batchToggle(enabled: enabled)
+                ToastCenter.shared.success(enabled ? "✓ 已启用所有模型" : "✓ 已禁用所有模型")
                 await loadConfigs()
             } catch {
                 ToastCenter.shared.error(error.localizedDescription)

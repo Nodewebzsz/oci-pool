@@ -470,8 +470,8 @@ struct InstanceVnicView: View {
     private var summaryBar: some View {
         HStack(spacing: 10) {
             chip("VNIC", "\(model.stats.totalVnicCount)", AppTheme.sidebarActive)
-            chip("活跃", "\(model.stats.activeVnicCount)", Color(hex: "3fb950"))
-            chip("辅助", "\(model.stats.secondaryVnicCount)", Color(hex: "d29922"))
+            chip("活跃", "\(model.stats.activeVnicCount)", AppTheme.sidebarActive)
+            chip("辅助", "\(model.stats.secondaryVnicCount)", AppTheme.orange)
             chip("IPv6", "\(model.stats.totalIpv6Count)", Color(hex: "a371f7"))
             Spacer()
         }
@@ -555,7 +555,7 @@ struct InstanceVnicView: View {
                 Spacer()
                 Text(v.lifecycleState.isEmpty ? "—" : v.lifecycleState)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(v.lifecycleState.uppercased() == "ATTACHED" ? Color(hex: "3fb950") : AppSheetSurface.mutedText(dark))
+                    .foregroundColor(v.lifecycleState.uppercased() == "ATTACHED" ? AppTheme.sidebarActive : AppSheetSurface.mutedText(dark))
             }
             infoRow("公网", v.publicIp.isEmpty ? "—" : v.publicIp) { model.copy(v.publicIp, label: "公网 IP") }
             infoRow("内网", v.privateIp.isEmpty ? "—" : v.privateIp) { model.copy(v.privateIp, label: "内网 IP") }
@@ -578,7 +578,7 @@ struct InstanceVnicView: View {
                             Button("删除") { model.deleteIpv6(vnic: v, address: ip) }
                                 .buttonStyle(PlainButtonStyle())
                                 .font(.system(size: 11))
-                                .foregroundColor(Color(hex: "f85149"))
+                                .foregroundColor(AppTheme.danger)
                         }
                     }
                 }
@@ -626,9 +626,9 @@ struct InstanceVnicView: View {
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .padding(.horizontal, 16)
         .padding(.top, 8)
     }
@@ -659,7 +659,7 @@ struct InstanceVnicView: View {
                         AppTextField(text: $model.formIpv6Count, placeholder: "0")
                     }
                     if let e = model.formError, !e.isEmpty {
-                        Text(e).font(.system(size: 12)).foregroundColor(Color(hex: "f85149"))
+                        Text(e).font(.system(size: 12)).foregroundColor(AppTheme.danger)
                     }
                 }
             }
@@ -690,7 +690,7 @@ struct InstanceVnicView: View {
                         AppTextField(text: $model.formIpv6AddCount, placeholder: "1")
                     }
                     if let e = model.formError, !e.isEmpty {
-                        Text(e).font(.system(size: 12)).foregroundColor(Color(hex: "f85149"))
+                        Text(e).font(.system(size: 12)).foregroundColor(AppTheme.danger)
                     }
                 }
             }

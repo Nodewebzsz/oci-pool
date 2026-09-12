@@ -16,7 +16,7 @@ function CircularGauge({
   const displayVal = Number.isFinite(safeVal) ? safeVal : '—';
   return (
     <div style={{ position: 'relative', width: size, height: size, display: 'inline-block' }}>
-      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)' }}>
         <circle cx={cx} cy={cy} r={r} fill="none" stroke={track} strokeWidth={thickness} />
         <circle
           cx={cx} cy={cy} r={r} fill="none"

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - List
 
@@ -141,17 +142,50 @@ struct TenantItem: Decodable, Identifiable, Equatable {
     }
 
     var isTransferred: Bool { transferStatus == 1 }
-    var openTaskText: String { openBootFlag ? "有任务" : "无任务" }
+
+    /// 区域中文名：code → RegionCnName；未知则返回原始 code（对齐 Web REGION_MAP 回落）
+    var regionNameText: String {
+        if region.isEmpty { return "" }
+        return RegionCnName.table[region] ?? region
+    }
+    // Web i18n tenants.task.active = 「进行中」
+    var openTaskText: String { openBootFlag ? "进行中" : "无任务" }
     var syncStatusText: String { apiSynced ? "已同步" : "未同步" }
     var multiRegionText: String { isMultiRegion ? "是" : "否" }
     var typeText: String {
         if !accountTypeName.isEmpty, accountTypeName != "未知" { return accountTypeName }
-        return hasChildren ? "简易多区域" : "未知"
+        // Web i18n tenants.type.fallback = 「普通多区号」
+        return hasChildren ? "普通多区号" : "未知"
     }
     var statusText: String { isActive ? "有效" : "失效" }
     var activeDaysText: String { activeDays.isEmpty ? "0" : activeDays }
     var costText: String { accountCost.isEmpty ? "—" : accountCost }
-    var defNameText: String { defName.isEmpty ? "—" : defName }
+    /// Web getTenantAlias：defName 等于 userName/租户ID 时视为「未设置」（后端历史数据回填），返回空
+    var customAlias: String {
+        let raw = defName
+        guard !raw.isEmpty else { return "" }
+        if raw == userName { return "" }
+        if raw == tenantId { return "" }
+        if raw == String(id) { return "" }
+        return raw
+    }
+
+    /// Web 表格展示：未设置为空白；有值截断 14 字符（truncateDisplayName(alias, 14)）
+    var defNameText: String {
+        let alias = customAlias
+        guard alias.count > 14 else { return alias }
+        return String(alias.prefix(14)) + "…"
+    }
+
+    /// 编辑弹窗默认值：未设置过自定义名称时输入框默认为空（Web editCustomName 同款逻辑）
+    var editNameDefault: String { customAlias }
+    /// Web：trial=violet / official=cyan / 其他=orange 软底徽章
+    var typeBadgeColor: Color {
+        let n = accountTypeName.lowercased()
+        if n.contains("trial") || accountTypeName.contains("试用") { return Color(hex: "b484e8") }
+        if n.contains("official") || accountTypeName.contains("官方") { return Color(hex: "00b6be") }
+        return AppTheme.orange
+    }
 
     private static func str(_ c: KeyedDecodingContainer<CodingKeys>, _ k: CodingKeys) -> String {
         if let s = try? c.decode(String.self, forKey: k) { return s }
@@ -386,11 +420,12 @@ struct TenantRegionOption: Decodable, Identifiable, Equatable {
     var userName: String = ""
     var region: String = ""
     var tenantId: String = ""
+    var defName: String = ""        // 自定义/显示名（对齐 Web getTenantAlias：自定义名优先）
     var isHomeRegion: Bool = false
     var hasChildren: Bool = false
 
     enum CodingKeys: String, CodingKey {
-        case id, tenancyName, userName, region, tenantId, isHomeRegion, hasChildren
+        case id, tenancyName, userName, region, tenantId, defName, isHomeRegion, hasChildren
     }
 
     init(
@@ -399,6 +434,7 @@ struct TenantRegionOption: Decodable, Identifiable, Equatable {
         userName: String = "",
         region: String = "",
         tenantId: String = "",
+        defName: String = "",
         isHomeRegion: Bool = false,
         hasChildren: Bool = false
     ) {
@@ -407,6 +443,7 @@ struct TenantRegionOption: Decodable, Identifiable, Equatable {
         self.userName = userName
         self.region = region
         self.tenantId = tenantId
+        self.defName = defName
         self.isHomeRegion = isHomeRegion
         self.hasChildren = hasChildren
     }
@@ -422,14 +459,60 @@ struct TenantRegionOption: Decodable, Identifiable, Equatable {
         userName = (try? c.decode(String.self, forKey: .userName)) ?? ""
         region = (try? c.decode(String.self, forKey: .region)) ?? ""
         tenantId = (try? c.decode(String.self, forKey: .tenantId)) ?? ""
+        defName = (try? c.decode(String.self, forKey: .defName)) ?? ""
         isHomeRegion = (try? c.decode(Bool.self, forKey: .isHomeRegion)) ?? false
         hasChildren = (try? c.decode(Bool.self, forKey: .hasChildren)) ?? false
     }
 
+    /// 自定义显示名：优先 defName；若回落为 OCID/ID 则视为未设置（对齐 Web getTenantAlias）
+    var customName: String {
+        let raw = defName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if raw.isEmpty { return "" }
+        let fallbacks = [userName, tenantId, id].filter { !$0.isEmpty }
+        if fallbacks.contains(raw) { return "" }
+        return raw
+    }
+
+    /// 租户展示名：自定义名优先，其次租户名，再用户名/ID（对齐 Web getTenantName）
+    var displayName: String {
+        if !customName.isEmpty { return customName }
+        if !tenancyName.isEmpty { return tenancyName }
+        if !userName.isEmpty { return userName }
+        return id
+    }
+
+    /// 租户真实展示名（方案 B：优先真实租户名 tenancyName，其次自定义名，再用户名/ID）
+    var tenantPrimaryName: String {
+        if !tenancyName.isEmpty && !tenancyName.hasPrefix("ocid1.") { return tenancyName }
+        if !customName.isEmpty && !customName.hasPrefix("ocid1.") { return customName }
+        if !userName.isEmpty && !userName.hasPrefix("ocid1.") { return userName }
+        return id
+    }
+
+    /// 区域中文名：code → RegionCnName；未知则返回原始 code（对齐 Web REGION_MAP 回落）
+    var regionNameText: String {
+        if region.isEmpty { return "" }
+        return RegionCnName.table[region] ?? region
+    }
+
+    /// 二级区域下拉显示：区域名(中文名或原始区码) + 主区域标识。
+    /// 主区域标识跟随系统语言：zh→"主" / en→"Home"（对齐 Web tenants.col.mainRegion）。
+    var regionDropdownLabel: String {
+        var base = region
+        if base.isEmpty {
+            base = tenancyName.isEmpty ? (userName.isEmpty ? id : userName) : tenancyName
+        } else {
+            base = regionNameText
+        }
+        return isHomeRegion ? "\(base) · 主" : base
+    }
+
+    /// 租户下拉统一显示（方案 B）：真实租户名优先 · 中文区域（对齐 Web getTenantLabel）
     var label: String {
-        var s = tenancyName.isEmpty ? (userName.isEmpty ? tenantId : userName) : tenancyName
+        var s = tenantPrimaryName
         if s.isEmpty { s = id }
-        if !region.isEmpty { s += " (\(region))" }
+        let rn = regionNameText
+        if !rn.isEmpty { s += " · \(rn)" }
         return s
     }
 
@@ -498,6 +581,67 @@ struct TenantSecurityRule: Decodable, Identifiable, Equatable {
         if ports.isEmpty || ports == "null" || ports == "N/A" || protocolValue == "1" { return "—" }
         return ports
     }
+}
+
+/// 安全规则一键模板的一条规则（对齐 Web TEMPLATES）
+struct SecurityRuleTemplate {
+    var protocolValue: String  // tcp / udp / icmp / all
+    var source: String         // CIDR
+    var ports: String = ""     // 提交用完整端口串，可空
+    var portStart: String = ""
+    var portEnd: String = ""
+}
+
+/// 安全规则一键模板（对齐 Web TEMPLATES：[web, db, k8s, docker, minimal, icmp]）
+enum SecurityRuleTemplates {
+    static let web = SecurityRuleTemplateGroup(
+        id: "web", name: "Web", desc: "SSH + HTTP + HTTPS",
+        rules: [
+            SecurityRuleTemplate(protocolValue: "tcp", source: "0.0.0.0/0", ports: "22"),
+            SecurityRuleTemplate(protocolValue: "tcp", source: "0.0.0.0/0", ports: "80"),
+            SecurityRuleTemplate(protocolValue: "tcp", source: "0.0.0.0/0", ports: "443"),
+        ])
+    static let db = SecurityRuleTemplateGroup(
+        id: "db", name: "数据库", desc: "MySQL + PostgreSQL + Redis",
+        rules: [
+            SecurityRuleTemplate(protocolValue: "tcp", source: "10.0.0.0/8", ports: "3306"),
+            SecurityRuleTemplate(protocolValue: "tcp", source: "10.0.0.0/8", ports: "5432"),
+            SecurityRuleTemplate(protocolValue: "tcp", source: "10.0.0.0/8", ports: "6379"),
+        ])
+    static let k8s = SecurityRuleTemplateGroup(
+        id: "k8s", name: "Kubernetes", desc: "API/etcd/Kubelet/NodePort",
+        rules: [
+            SecurityRuleTemplate(protocolValue: "tcp", source: "10.0.0.0/8", ports: "6443"),
+            SecurityRuleTemplate(protocolValue: "tcp", source: "10.0.0.0/8", ports: "2379-2380"),
+            SecurityRuleTemplate(protocolValue: "tcp", source: "10.0.0.0/8", ports: "10250"),
+            SecurityRuleTemplate(protocolValue: "tcp", source: "0.0.0.0/0", ports: "30000-32767"),
+        ])
+    static let docker = SecurityRuleTemplateGroup(
+        id: "docker", name: "Docker", desc: "SSH + Swarm",
+        rules: [
+            SecurityRuleTemplate(protocolValue: "tcp", source: "0.0.0.0/0", ports: "22"),
+            SecurityRuleTemplate(protocolValue: "tcp", source: "10.0.0.0/8", ports: "2375-2376"),
+        ])
+    static let minimal = SecurityRuleTemplateGroup(
+        id: "minimal", name: "最小化", desc: "仅 SSH",
+        rules: [
+            SecurityRuleTemplate(protocolValue: "tcp", source: "0.0.0.0/0", ports: "22"),
+        ])
+    static let icmp = SecurityRuleTemplateGroup(
+        id: "icmp", name: "ICMP", desc: "Ping 探测",
+        rules: [
+            SecurityRuleTemplate(protocolValue: "icmp", source: "0.0.0.0/0"),
+            SecurityRuleTemplate(protocolValue: "icmp", source: "::/0"),
+        ])
+
+    static let all: [SecurityRuleTemplateGroup] = [web, db, k8s, docker, minimal, icmp]
+}
+
+struct SecurityRuleTemplateGroup {
+    var id: String
+    var name: String
+    var desc: String
+    var rules: [SecurityRuleTemplate]
 }
 
 struct TenantMysqlInstance: Decodable, Identifiable, Equatable {
@@ -714,23 +858,72 @@ enum TenantUserTab: String, CaseIterable, Identifiable {
 /// 对齐后端 `OciAuditEventDto`（Web 审计日志表列）。
 struct TenantAuditLogEntry: Decodable, Identifiable, Equatable {
     var id: String { "\(eventType)-\(eventTime)-\(userName)-\(ipAddress)-\(responseStatus)" }
+    /// 事件短名（后端 `AuditEvent.Data.eventName`，如 LaunchInstance）
     var eventType: String = ""
+    /// 事件完整类型（如 com.oraclecloud.ComputeApi.LaunchInstance），用于 hover 排查
+    var eventFullType: String = ""
     var userName: String = ""
+    /// 认证类型原始码（authType）。无公开枚举，**不可**用于区分控制台/API
     var userType: String = ""
+    /// 控制台会话 ID。非空 = 控制台登录会话；为空 = API / SDK 调用
+    var consoleSessionId: String = ""
     var ipAddress: String = ""
+    /// 客户端原始 UserAgent（已降级为 hover 详情）
     var clientEnv: String = ""
     var eventTime: String = ""
+    /// 响应状态码；后端在 response 为空时填 "-"
     var responseStatus: String = ""
 
-    /// 非 200 时高亮错误行（对齐 Web `audit-error-row`）。
+    /// 状态未知：后端在 response 为 null 时填 "-"，不能据此判失败
+    var isUnknownStatus: Bool {
+        let s = responseStatus.trimmingCharacters(in: .whitespaces)
+        return s.isEmpty || s == "-"
+    }
+
+    /// 2xx 或 "OK" 视为成功（对齐原项目 `mobile/audit_log.ftl` 的 `startsWith('2')`）
+    var isSuccess: Bool {
+        if isUnknownStatus { return false }
+        let s = responseStatus.trimmingCharacters(in: .whitespaces).uppercased()
+        return s.hasPrefix("2") || s == "OK"
+    }
+
+    /// 只有「状态已知且非 2xx」才算失败，用于错误行高亮
     var isError: Bool {
-        !responseStatus.isEmpty && responseStatus != "200"
+        !isUnknownStatus && !isSuccess
+    }
+
+    /// 是否控制台会话：唯一可靠判据是 consoleSessionId 非空
+    var isConsoleSession: Bool {
+        !consoleSessionId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// 环境列展示值：控制台 / API / —
+    var envLabel: String {
+        let hasAnySignal = !consoleSessionId.isEmpty || !userType.isEmpty || !clientEnv.isEmpty
+        guard hasAnySignal else { return "—" }
+        return isConsoleSession ? "控制台" : "API"
+    }
+
+    /// 环境列 hover 详情：原始 UA + authType 原始码
+    var envDetail: String {
+        var parts: [String] = []
+        if !userType.isEmpty { parts.append("authType=\(userType)") }
+        if !clientEnv.isEmpty { parts.append("UA=\(clientEnv)") }
+        if !consoleSessionId.isEmpty { parts.append("consoleSessionId=\(consoleSessionId)") }
+        return parts.isEmpty ? "无环境信息" : parts.joined(separator: "\n")
+    }
+
+    /// 事件列 hover 详情：完整事件类型
+    var eventDetail: String {
+        eventFullType.isEmpty ? eventType : eventFullType
     }
 
     enum CodingKeys: String, CodingKey {
         case eventType, eventName, type
+        case eventFullType
         case userName, principalName, user
         case userType
+        case consoleSessionId
         case ipAddress, sourceIP, sourceIp, ip
         case clientEnv
         case eventTime, time
@@ -744,11 +937,13 @@ struct TenantAuditLogEntry: Decodable, Identifiable, Equatable {
             ?? (try? c.decode(String.self, forKey: .eventName))
             ?? (try? c.decode(String.self, forKey: .type))
             ?? ""
+        eventFullType = (try? c.decode(String.self, forKey: .eventFullType)) ?? ""
         userName = (try? c.decode(String.self, forKey: .userName))
             ?? (try? c.decode(String.self, forKey: .principalName))
             ?? (try? c.decode(String.self, forKey: .user))
             ?? ""
         userType = (try? c.decode(String.self, forKey: .userType)) ?? ""
+        consoleSessionId = (try? c.decode(String.self, forKey: .consoleSessionId)) ?? ""
         ipAddress = (try? c.decode(String.self, forKey: .ipAddress))
             ?? (try? c.decode(String.self, forKey: .sourceIP))
             ?? (try? c.decode(String.self, forKey: .sourceIp))
@@ -770,6 +965,8 @@ struct TenantAuditLogEntry: Decodable, Identifiable, Equatable {
 struct TenantAuditLogPage: Equatable {
     var items: [TenantAuditLogEntry] = []
     var nextPageToken: String?
+    /// 后端标记的演示数据（MODERN_UI_MOCK_DATA=true 且真实查询为空或失败）
+    var mock: Bool = false
 }
 
 // MARK: - Generic API helpers
@@ -1126,5 +1323,10 @@ enum TenantKnownRegions {
         "sa-bogota-1", "sa-santiago-1", "sa-saopaulo-1", "sa-vinhedo-1", "sa-valparaiso-1",
         "uk-cardiff-1", "uk-london-1",
         "us-ashburn-1", "us-chicago-1", "us-phoenix-1", "us-sanjose-1"
-    ].map { SelectOption(id: $0, title: $0) }
+    ].map { code in
+        let flag = RegionFlag.emoji(code)
+        let cn = RegionCnName.table[code] ?? code
+        let title = "\(flag) \(cn) (\(code))"
+        return SelectOption(id: code, title: title)
+    }
 }

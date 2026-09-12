@@ -4,6 +4,8 @@ import AppKit
 /// 原生开机管理（对齐 Web `/boot/fullBootList` · `full_machine_list.ftl`）。
 /// 列表视觉对齐实例列表：摘要 chip · 卡片表 · 行悬停 · 三点操作菜单 · 窗内两列菜单。
 struct BootView: View {
+    /// 租户详情 → 查看开机子页（对齐 Web page-tenant-grab：面包屑 + 租户上下文）
+    var tenantSubPage: Bool = false
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appearance: AppearanceController
     @StateObject private var model = BootViewModel()
@@ -13,17 +15,17 @@ struct BootView: View {
     private var dark: Bool { appearance.isDarkEffective }
 
     // 固定列宽；租户/备注/区域吃剩余宽度。操作列仅三点菜单。
-    private let wIndex: CGFloat = 36
-    private let wTenant: CGFloat = 108
-    private let wRemark: CGFloat = 80
-    private let wRegion: CGFloat = 84
-    private let wArch: CGFloat = 52
-    private let wStatus: CGFloat = 68
-    private let wNum: CGFloat = 48
-    private let wTime: CGFloat = 100
+    private let wIndex: CGFloat = 28
+    private let wTenant: CGFloat = 72
+    private let wRemark: CGFloat = 70
+    private let wRegion: CGFloat = 58
+    private let wArch: CGFloat = 72
+    private let wStatus: CGFloat = 66
+    private let wNum: CGFloat = 58
+    private let wTime: CGFloat = 140
     private let wAction: CGFloat = 48
     private let hPad: CGFloat = 12
-    private let minFlex: CGFloat = 72
+    private let minFlex: CGFloat = 12
 
     private var fixedColsWidth: CGFloat {
         wIndex + wTenant + wRemark + wRegion + wArch + wStatus
@@ -64,29 +66,105 @@ struct BootView: View {
         .environmentObject(appearance)
     }
 
+    private var pageTitle: String {
+        if tenantSubPage {
+            let name = NavigationState.shared.tenantSubPageName
+            return name.isEmpty ? "租户抢机任务" : "\(name) · 抢机任务"
+        }
+        return "预开列表"
+    }
+
     private var listPage: some View {
         PageScaffold(
-            title: "开机管理",
-            subtitle: filterSubtitle,
-            systemImage: "play.circle",
+            title: pageTitle,
+            subtitle: tenantSubPage ? tenantSubtitle : nil,
+            systemImage: "bolt.fill",
+            iconColor: AppTheme.orange,
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
-                    filterBar
-                    if let err = model.errorText, !err.isEmpty { errorBanner(err) }
-                    summaryBar
-                    listBody
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 12)
-                    PaginationBar(state: $model.pageState) {
-                        model.onPageChange()
+                    if tenantSubPage {
+                        breadcrumbBar
                     }
+                    if let err = model.errorText, !err.isEmpty {
+                        errorBanner(err)
+                            .padding(.bottom, 12)
+                    }
+                    statsStrip
+                        .padding(.bottom, 14)
+                    listBody
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .appLoading(model.isLoading && !model.rows.isEmpty)
             }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+    }
+
+    /// 子页面包屑（对齐 Web：返回 + OCI 租户管理 > 租户详情 · 租户名 > 查看开机）
+    private var tenantSubtitle: String {
+        "共 \(model.pageState.totalElements) 组任务"
+    }
+
+    private var breadcrumbBar: some View {
+        HStack(spacing: 8) {
+            // 返回按钮：返回上一级（若来自租户详情则精准回到租户详情页）
+            Button(action: { NavigationState.shared.closeTenantSubPage() }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.left").font(.system(size: 11, weight: .semibold))
+                    Text("返回").font(.system(size: 12, weight: .medium))
+                }
+                .foregroundColor(AppTheme.sidebarText(dark))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(AppTheme.sidebarBg(dark))
+                .cornerRadius(5)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5)
+                        .stroke(AppTheme.border(dark).opacity(0.8), lineWidth: 1)
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
+            .help("返回上一级")
+
+            Text("›").font(.system(size: 11)).foregroundColor(AppTheme.sidebarText(dark).opacity(0.5))
+
+            // 第一级：OCI 租户管理（点击直接返回租户大列表）
+            Button(action: { NavigationState.shared.closeToTenantsList() }) {
+                Text("OCI 租户管理")
+                    .font(.system(size: 12))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+            }
+            .buttonStyle(PlainButtonStyle())
+            .help("回到租户列表")
+
+            // 第二级：租户详情 · 租户名（若有上级租户详情上下文，点击即可返回该租户详情）
+            let name = NavigationState.shared.tenantSubPageName
+            Text("›").font(.system(size: 11)).foregroundColor(AppTheme.sidebarText(dark).opacity(0.5))
+            Button(action: { NavigationState.shared.closeTenantSubPage() }) {
+                HStack(spacing: 4) {
+                    Text("租户详情")
+                    if !name.isEmpty {
+                        Text("·")
+                        Text(name)
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    }
+                }
+                .font(.system(size: 12))
+                .foregroundColor(AppTheme.sidebarText(dark))
+            }
+            .buttonStyle(PlainButtonStyle())
+            .help("回到该租户详情页")
+
+            // 第三级：当前查看开机
+            Text("›").font(.system(size: 11)).foregroundColor(AppTheme.sidebarText(dark).opacity(0.5))
+            Text("查看开机")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(AppTheme.sidebarActive)
+
+            Spacer()
+        }
+        .padding(.vertical, 8)
+        .padding(.bottom, 4)
     }
 
     private var filterSubtitle: String {
@@ -98,35 +176,141 @@ struct BootView: View {
 
     // MARK: - Toolbar
 
+    /// Web 页头 actions：租户/区域 Select 160 + 搜索(primary) + eye 图标钮 + 预开(primary) + 批量停止(orange) + 重置(danger)
     private var toolbar: some View {
         HStack(spacing: 8) {
-            AppButton(
-                title: model.namesHidden ? "显示名称" : "隐藏名称",
-                systemImage: model.namesHidden ? "eye" : "eye.slash",
-                kind: .secondary
-            ) {
+            if !tenantSubPage {
+                SelectMenu(
+                    options: model.parentTenants.map {
+                        SelectOption(id: $0.id, title: model.tenantLabel($0))
+                    },
+                    selection: Binding(
+                        get: { model.selectedParentId.isEmpty ? nil : model.selectedParentId },
+                        set: { model.onParentChanged($0) }
+                    ),
+                    placeholder: "请选择租户",
+                    width: 220,
+                    allowClear: true,
+                    searchable: model.parentTenants.count > 5
+                )
+            } else {
+                HStack(spacing: 4) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 11))
+                    Text("当前区域:")
+                        .font(.system(size: 12))
+                }
+                .foregroundColor(AppTheme.textTertiary(dark))
+            }
+            SelectMenu(
+                options: model.regions.map {
+                    SelectOption(id: $0.id, title: model.regionLabel($0))
+                },
+                selection: Binding(
+                    get: { model.selectedRegionId.isEmpty ? nil : model.selectedRegionId },
+                    set: { model.onRegionChanged($0) }
+                ),
+                placeholder: "请选择区域",
+                width: 200,
+                enabled: !model.selectedParentId.isEmpty,
+                allowClear: !tenantSubPage,
+                searchable: true
+            )
+            if !tenantSubPage {
+                AppButton(title: "搜索", systemImage: "magnifyingglass", kind: .primary) {
+                    ToastCenter.shared.show("筛选结果 \(model.pageState.totalElements) 条", style: .info)
+                }
+            }
+            // eye 图标按钮：脱敏切换（显示完整时 accent 激活态）
+            Button {
                 withAnimation(.easeInOut(duration: 0.15)) {
                     model.namesHidden.toggle()
                 }
+            } label: {
+                Image(systemName: model.namesHidden ? "eye" : "eye.slash")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(model.namesHidden ? AppTheme.navIcon(dark) : AppTheme.sidebarActive)
+                    .frame(width: 30, height: 30)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(model.namesHidden ? AppTheme.sidebarHover(dark) : AppTheme.sidebarActive.opacity(0.14))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 5)
+                                    .stroke(model.namesHidden ? AppTheme.border(dark) : AppTheme.sidebarActive, lineWidth: 1)
+                            )
+                    )
             }
-            AppButton(title: "批量启动", systemImage: "play.circle", kind: .primary) {
-                model.batchStart()
+            .buttonStyle(PlainButtonStyle())
+            .help("显示/隐藏脱敏")
+
+            AppButton(title: "预开", systemImage: "play.circle", kind: .primary) {
+                model.openCreateBlank()
             }
-            AppButton(title: "批量停止", systemImage: "stop.circle", kind: .secondary) {
+            AppButton(title: "批量停止", systemImage: "stop.circle", kind: .orange) {
                 model.batchStop()
             }
-            AppButton(title: "重置失败", systemImage: "arrow.counterclockwise", kind: .secondary) {
+            AppButton(title: "重置", systemImage: "arrow.counterclockwise", kind: .danger) {
                 model.batchResetFail()
             }
-            AppButton(
-                title: "刷新",
-                systemImage: "arrow.clockwise",
-                kind: .secondary,
-                isLoading: model.isLoading
-            ) {
-                Task { await model.reload() }
-            }
         }
+    }
+
+    // MARK: - Stats strip（Web：7 列小卡 · icon 13 彩色 + label 10.5 + 数值 20/700 语义色）
+
+    private var statsStrip: some View {
+        let totalAttempts = model.rows.reduce(0) { $0 + $1.totalCount }
+        let yesterday = model.rows.reduce(0) { $0 + $1.yesterdayAttemptCount }
+        let today = model.rows.reduce(0) { $0 + $1.currentAttemptCount }
+        let failed = model.rows.reduce(0) { $0 + $1.failCount }
+        let success = model.rows.reduce(0) { $0 + $1.successCount }
+        return HStack(spacing: 10) {
+            grabStatCard(icon: "checklist", color: AppTheme.cyan, label: "总任务数",
+                         value: "\(model.pageState.totalElements)", pulse: false)
+            grabStatCard(icon: "hourglass", color: AppTheme.orange, label: "执行数量",
+                         value: "\(execSum)", pulse: execSum > 0)
+            grabStatCard(icon: "arrow.triangle.2.circlepath", color: AppTheme.info, label: "总抢机数",
+                         value: "\(totalAttempts)", pulse: false)
+            grabStatCard(icon: "clock", color: AppTheme.textSecondary(dark), label: "昨日次数",
+                         value: "\(yesterday)", pulse: false)
+            grabStatCard(icon: "chart.line.uptrend.xyaxis", color: AppTheme.cyan, label: "今日次数",
+                         value: "\(today)", pulse: false)
+            grabStatCard(icon: "xmark.octagon", color: AppTheme.danger, label: "失败次数",
+                         value: "\(failed)", pulse: false)
+            grabStatCard(icon: "checkmark.circle", color: AppTheme.sidebarActive, label: "成功次数",
+                         value: "\(success)", pulse: false)
+        }
+    }
+
+    private func grabStatCard(icon: String, color: Color, label: String, value: String, pulse: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(color)
+                Text(label)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundColor(AppTheme.textTertiary(dark))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                if pulse {
+                    Circle()
+                        .fill(AppTheme.sidebarActive)
+                        .frame(width: 5, height: 5)
+                        .shadow(color: AppTheme.sidebarActive.opacity(0.6), radius: 2)
+                }
+            }
+            Text(value)
+                .font(.system(size: 20, weight: .bold, design: .monospaced))
+                .foregroundColor(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.border(dark), lineWidth: 1))
+        .cornerRadius(8)
     }
 
     // MARK: - Filter
@@ -143,8 +327,8 @@ struct BootView: View {
                             get: { model.selectedParentId.isEmpty ? nil : model.selectedParentId },
                             set: { model.onParentChanged($0) }
                         ),
-                        placeholder: "选择租户…",
-                        width: 200,
+                        placeholder: "请选择租户",
+                        width: 220,
                         allowClear: true,
                         searchable: true
                     )
@@ -156,7 +340,7 @@ struct BootView: View {
                             get: { model.selectedRegionId.isEmpty ? nil : model.selectedRegionId },
                             set: { model.onRegionChanged($0) }
                         ),
-                        placeholder: model.selectedParentId.isEmpty ? "先选租户" : "选择区域…",
+                        placeholder: "请选择区域",
                         width: 200,
                         enabled: !model.selectedParentId.isEmpty,
                         allowClear: true,
@@ -172,7 +356,7 @@ struct BootView: View {
                         }
                     }
                     AppButton(
-                        title: "查询",
+                        title: "搜索",
                         systemImage: "magnifyingglass",
                         kind: .primary,
                         enabled: model.canQuery || model.hasActiveFilter
@@ -189,9 +373,9 @@ struct BootView: View {
     private var summaryBar: some View {
         HStack(spacing: 10) {
             summaryChip(icon: "square.stack.3d.up", title: "本页", value: "\(model.rows.count)", accent: AppTheme.sidebarActive)
-            summaryChip(icon: "bolt.circle.fill", title: "有任务", value: "\(activeCount)", accent: Color(hex: "3fb950"))
-            summaryChip(icon: "moon.circle", title: "无任务", value: "\(idleCount)", accent: Color(hex: "8b949e"))
-            summaryChip(icon: "arrow.triangle.2.circlepath", title: "执行中", value: "\(execSum)", accent: Color(hex: "f0881a"))
+            summaryChip(icon: "bolt.circle.fill", title: "有任务", value: "\(activeCount)", accent: AppTheme.sidebarActive)
+            summaryChip(icon: "moon.circle", title: "无任务", value: "\(idleCount)", accent: AppTheme.sidebarText(dark))
+            summaryChip(icon: "arrow.triangle.2.circlepath", title: "执行中", value: "\(execSum)", accent: AppTheme.orange)
             Spacer(minLength: 0)
             Text("快捷：启动 · 停止 · 详情 · 更多")
                 .font(.system(size: 11))
@@ -241,98 +425,140 @@ struct BootView: View {
                 .buttonStyle(PlainButtonStyle())
                 .font(.system(size: 12, weight: .semibold))
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
-        .cornerRadius(10)
-        .padding(.horizontal, 16)
-        .padding(.top, 4)
+        .background(AppTheme.danger.opacity(0.1))
+        .cornerRadius(8)
     }
 
     // MARK: - List
 
     @ViewBuilder
     private var listBody: some View {
-        if model.isLoading && model.rows.isEmpty {
-            VStack(spacing: 10) {
-                Spacer()
-                ProgressView()
-                Text("加载开机任务…")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
-                Spacer()
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(tableCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-        } else if model.rows.isEmpty {
-            EmptyStateView(
-                icon: "play.circle",
-                title: "暂无开机任务",
-                subtitle: model.hasActiveFilter
-                    ? "当前筛选条件下没有抢机配置"
-                    : "可在租户管理中创建抢机配置，或调整筛选后查询",
-                actionTitle: "刷新",
-                action: { Task { await model.reload() } }
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(tableCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-        } else {
-            GeometryReader { geo in
-                let totalW = max(geo.size.width, fixedColsWidth)
-                let flex = max(0, totalW - fixedColsWidth + minFlex)
-                let wTenantFlex = wTenant + flex * 0.4
-                let wRemarkFlex = wRemark + flex * 0.3
-                let wRegionFlex = wRegion + flex * 0.3
-                let needsHScroll = totalW > geo.size.width + 0.5
+        // Web 三段结构：卡片占满剩余高度，表格内部滚动，分页钉在卡片底部
+        VStack(spacing: 0) {
+            tableArea
 
-                let table = VStack(spacing: 0) {
-                    headerRow(
-                        wTenant: wTenantFlex,
-                        wRemark: wRemarkFlex,
-                        wRegion: wRegionFlex,
-                        width: totalW
-                    )
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            ForEach(Array(model.rows.enumerated()), id: \.element.id) { idx, item in
-                                dataRow(
-                                    index: idx,
-                                    item: item,
-                                    wTenant: wTenantFlex,
-                                    wRemark: wRemarkFlex,
-                                    wRegion: wRegionFlex,
-                                    width: totalW
-                                )
+            PaginationBar(state: $model.pageState) {
+                model.onPageChange()
+            }
+            .cornerRadius(8, corners: [.bottomLeft, .bottomRight])
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // 背景圆角单独画，避免 clipShape/cornerRadius 裁掉右侧操作按钮
+        .background(tableCardBackground)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
+        )
+    }
+
+    private var tableArea: some View {
+        GeometryReader { geo in
+            let totalW = max(geo.size.width, fixedColsWidth)
+            let flex = max(0, totalW - fixedColsWidth + minFlex)
+            // 多列均匀分配（对齐租户管理方案）：租户/自定义名称/区域/架构/时间分剩余，数值列固定
+            let wTenantFlex = wTenant + flex * 0.21
+            let wRemarkFlex = wRemark + flex * 0.24
+            let wRegionFlex = wRegion + flex * 0.18
+            let wArchFlex = wArch + flex * 0.11
+            let wTimeFlex = wTime + flex * 0.26
+            let needsHScroll = totalW > geo.size.width + 0.5
+
+            let table = VStack(spacing: 0) {
+                // 1. 表头置顶常驻，无论加载还是空态始终可见，结构骨架稳定零抖动
+                headerRow(
+                    wTenant: wTenantFlex,
+                    wRemark: wRemarkFlex,
+                    wRegion: wRegionFlex,
+                    wArch: wArchFlex,
+                    wTime: wTimeFlex,
+                    width: totalW
+                )
+
+                // 2. 表体内容区（数据行 / 空态 / 加载态）
+                ZStack {
+                    if (!model.hasLoadedOnce || model.isLoading) && model.rows.isEmpty {
+                        VStack(spacing: 10) {
+                            Spacer()
+                            ProgressView()
+                            Text("正在加载开机任务…")
+                                .font(.system(size: 12))
+                                .foregroundColor(AppTheme.sidebarText(dark))
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if model.rows.isEmpty {
+                        EmptyStateView(
+                            icon: "play.circle",
+                            title: model.selectedParentId.isEmpty ? "暂无开机任务" : (model.selectedRegionId.isEmpty ? "请选择区域" : "暂无开机任务"),
+                            subtitle: model.selectedParentId.isEmpty
+                                ? (model.hasActiveFilter ? "当前筛选条件下没有抢机配置" : "可在租户管理中创建抢机配置，或调整筛选后查询")
+                                : (model.selectedRegionId.isEmpty ? "当前租户包含多个可用区域，请在上方选择具体区域后查看开机任务" : "当前筛选条件下没有抢机配置"),
+                            actionTitle: model.selectedRegionId.isEmpty ? nil : "刷新",
+                            action: { Task { await model.reload() } }
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 0) {
+                                ForEach(Array(model.rows.enumerated()), id: \.element.id) { idx, row in
+                                    dataRow(
+                                        index: idx,
+                                        item: row,
+                                        wTenant: wTenantFlex,
+                                        wRemark: wRemarkFlex,
+                                        wRegion: wRegionFlex,
+                                        wArch: wArchFlex,
+                                        wTime: wTimeFlex,
+                                        width: totalW
+                                    )
+                                }
                             }
                         }
+                        .opacity(model.isLoading ? 0.6 : 1.0)
+                    }
+
+                    // 二次加载/筛选加载时，轻量且优雅的卡片内指示器（绝不遮罩全局 KPI 和筛选栏）
+                    if model.isLoading && !model.rows.isEmpty {
+                        VStack(spacing: 8) {
+                            ProgressView()
+                                .scaleEffect(0.9)
+                            Text("更新中…")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(AppTheme.sidebarText(dark))
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(AppTheme.sidebarBg(dark).opacity(0.85))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(AppTheme.border(dark), lineWidth: 1)
+                        )
+                        .shadow(color: Color.black.opacity(dark ? 0.3 : 0.08), radius: 6, y: 2)
                     }
                 }
-                .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
 
-                Group {
-                    if needsHScroll {
-                        ScrollView(.horizontal, showsIndicators: true) { table }
-                            .frame(width: geo.size.width, height: geo.size.height)
-                    } else {
-                        table
-                    }
+            Group {
+                if needsHScroll {
+                    ScrollView(.horizontal, showsIndicators: true) { table }
+                        .frame(width: geo.size.width, height: geo.size.height)
+                } else {
+                    table
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            // 背景圆角单独画，避免 clipShape/cornerRadius 裁掉右侧操作按钮
-            .background(tableCardBackground)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(dark ? 0.22 : 0.06), radius: 8, x: 0, y: 2)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var tableCardBackground: some View {
-        RoundedRectangle(cornerRadius: 12)
+        RoundedRectangle(cornerRadius: 8)
             .fill(AppTheme.sidebarBg(dark))
     }
 
@@ -340,27 +566,29 @@ struct BootView: View {
         wTenant: CGFloat,
         wRemark: CGFloat,
         wRegion: CGFloat,
+        wArch: CGFloat,
+        wTime: CGFloat,
         width: CGFloat
     ) -> some View {
         HStack(spacing: 0) {
             Group {
-                colHeader("#", wIndex)
-                colHeader("租户", wTenant)
-                colHeader("备注", wRemark)
-                colHeader("区域", wRegion)
-                colHeader("架构", wArch)
+                colHeader("序号", wIndex)
+                colHeader("租户名称", wTenant)
+                colHeader("自定义名称", wRemark)
+                colHeader("区域编码", wRegion)
             }
             Group {
-                colHeader("状态", wStatus)
-                colHeader("任务数", wNum)
-                colHeader("执行中", wNum)
-                colHeader("总次数", wNum)
-                colHeader("昨日", wNum)
+                colHeader("任务状态", wStatus)
+                colHeader("总任务数", wNum)
+                colHeader("执行数量", wNum)
+                colHeader("总抢机数", wNum)
+                colHeader("昨日次数", wNum)
             }
             Group {
-                colHeader("今日", wNum)
-                colHeader("失败", wNum)
-                colHeader("成功", wNum)
+                colHeader("今日次数", wNum)
+                colHeader("失败次数", wNum)
+                colHeader("成功次数", wNum)
+                colHeader("系统架构", wArch)
                 colHeader("创建时间", wTime)
                 colHeader("操作", wAction, align: .center)
             }
@@ -381,6 +609,8 @@ struct BootView: View {
         wTenant: CGFloat,
         wRemark: CGFloat,
         wRegion: CGFloat,
+        wArch: CGFloat,
+        wTime: CGFloat,
         width: CGFloat
     ) -> some View {
         let hovered = hoveredRowId == item.id
@@ -390,23 +620,23 @@ struct BootView: View {
                 tenantCell(item, width: wTenant)
                 cellText(item.remarkText, wRemark)
                 cellText(item.regionName.isEmpty ? "—" : item.regionName, wRegion)
-                archChip(item.archText)
-                    .frame(width: wArch, alignment: .leading)
-                    .clipped()
             }
             Group {
-                StatusBadge(text: item.taskStatusText, tone: item.taskStatusTone)
-                    .frame(width: wStatus, alignment: .leading)
+                bootStatusCell(item)
+                    .frame(width: wStatus, alignment: .center)
                     .clipped()
                 numCell(item.recordCount, wNum)
-                numCell(item.executingCount, wNum, accent: item.executingCount > 0 ? Color(hex: "f0881a") : nil)
+                numCell(item.executingCount, wNum, accent: item.executingCount > 0 ? AppTheme.sidebarActive : nil)
                 numCell(item.totalCount, wNum)
                 cellText(formatNum(Int64(item.yesterdayAttemptCount)), wNum, muted: true)
             }
             Group {
-                cellText(formatNum(Int64(item.currentAttemptCount)), wNum)
-                cellText(formatNum(Int64(item.failCount)), wNum)
+                cellText(formatNum(Int64(item.currentAttemptCount)), wNum, cyan: true)
+                cellText(formatNum(Int64(item.failCount)), wNum, danger: true)
                 successCell(item.successCount, wNum)
+                archChip(item.archText)
+                    .frame(width: wArch, alignment: .center)
+                    .clipped()
                 cellText(item.createText, wTime, muted: true)
                 actionBar(item)
                     .frame(width: wAction, alignment: .center)
@@ -423,11 +653,13 @@ struct BootView: View {
             alignment: .bottom
         )
         .onHover { inside in
+            // 弹窗浮层打开时不响应列表行 hover，避免悬停弹窗时底层列表误高亮
+            if BootActionMenuPresenter.shared.isPresented { return }
             withAnimation(.easeInOut(duration: 0.12)) {
                 hoveredRowId = inside ? item.id : (hoveredRowId == item.id ? nil : hoveredRowId)
             }
         }
-        .onTapGesture(count: 2) {
+        .onTapGesture {
             model.openDetail(item)
         }
     }
@@ -437,13 +669,13 @@ struct BootView: View {
             return AppTheme.sidebarActive.opacity(dark ? 0.12 : 0.08)
         }
         return index % 2 == 1
-            ? Color(hex: "63b3ed").opacity(dark ? 0.05 : 0.07)
+            ? AppTheme.border(dark).opacity(dark ? 0.05 : 0.07)
             : Color.clear
     }
 
     // MARK: - Cells
 
-    private func colHeader(_ title: String, _ width: CGFloat, align: Alignment = .leading) -> some View {
+    private func colHeader(_ title: String, _ width: CGFloat, align: Alignment = .center) -> some View {
         Text(title)
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(AppTheme.sidebarText(dark))
@@ -452,19 +684,41 @@ struct BootView: View {
             .clipped()
     }
 
-    private func cellText(_ text: String, _ width: CGFloat, muted: Bool = false) -> some View {
+    private func cellText(_ text: String, _ width: CGFloat, muted: Bool = false, cyan: Bool = false, danger: Bool = false) -> some View {
         Text(text)
             .font(.system(size: 12))
             .foregroundColor(
-                muted
+                cyan ? Color(hex: "00b6be")
+                : danger ? AppTheme.danger
+                : muted
                     ? AppTheme.sidebarText(dark)
                     : (dark ? Color.white.opacity(0.9) : Color.primary)
             )
             .lineLimit(1)
             .truncationMode(.tail)
-            .frame(width: width, alignment: .leading)
+            .frame(width: width, alignment: .center)
             .clipped()
             .help(text)
+    }
+
+    /// Web 任务状态徽章：running=accent-soft+脉冲圆点「运行中」，idle=bg-3 灰「无任务」
+    private func bootStatusCell(_ item: BootTaskItem) -> some View {
+        HStack(spacing: 5) {
+            if item.openBootFlag {
+                BootPulseDot(color: AppTheme.sidebarActive)
+            }
+            Text(item.openBootFlag ? "运行中" : "无任务")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(item.openBootFlag ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
+                .lineLimit(1)
+                .fixedSize()
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 2)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(item.openBootFlag ? AppTheme.sidebarActive.opacity(0.14) : AppTheme.sidebarHover(dark).opacity(0.6))
+        )
     }
 
     private func numCell(_ n: Int64, _ width: CGFloat, accent: Color? = nil) -> some View {
@@ -474,16 +728,16 @@ struct BootView: View {
                 accent ?? (dark ? Color.white.opacity(0.88) : Color.primary)
             )
             .lineLimit(1)
-            .frame(width: width, alignment: .leading)
+            .frame(width: width, alignment: .center)
             .clipped()
     }
 
     private func successCell(_ n: Int, _ width: CGFloat) -> some View {
         Text(formatNum(Int64(n)))
             .font(.system(size: 12, weight: n > 0 ? .semibold : .regular, design: .monospaced))
-            .foregroundColor(n > 0 ? Color(hex: "3fb950") : (dark ? Color.white.opacity(0.88) : Color.primary))
+            .foregroundColor(n > 0 ? AppTheme.sidebarActive : (dark ? Color.white.opacity(0.88) : Color.primary))
             .lineLimit(1)
-            .frame(width: width, alignment: .leading)
+            .frame(width: width, alignment: .center)
             .clipped()
     }
 
@@ -496,31 +750,37 @@ struct BootView: View {
                 .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .frame(width: width, alignment: .leading)
+                .frame(width: width, alignment: .center)
                 .clipped()
                 .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
-        .help(item.displayTenant + "\n点击切换名称显示")
+        .help(item.displayTenant)
     }
 
     private func archChip(_ text: String) -> some View {
         let t = text.isEmpty || text == "—" ? "—" : text
-        let isARM = t.uppercased().contains("ARM")
-        let c = isARM ? Color(hex: "a371f7") : Color(hex: "58a6ff")
+        // 对齐 Web：ARM=info 蓝 / AMD 等=violet 紫（区分颜色）
+        let isARM = t.uppercased() == "ARM"
+        let fg = isARM ? AppTheme.info : violetArch
         return Text(t)
-            .font(.system(size: 10, weight: .bold, design: .monospaced))
-            .foregroundColor(t == "—" ? AppTheme.sidebarText(dark) : c)
-            .padding(.horizontal, t == "—" ? 0 : 7)
+            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+            .foregroundColor(t == "—" ? AppTheme.sidebarText(dark) : fg)
+            .padding(.horizontal, t == "—" ? 0 : 6)
             .padding(.vertical, t == "—" ? 0 : 2)
             .background(
                 Group {
                     if t != "—" {
-                        Capsule().fill(c.opacity(0.14))
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(isARM
+                                  ? AppTheme.info.opacity(0.14)
+                                  : violetArch.opacity(0.14))
                     }
                 }
             )
     }
+
+    private var violetArch: Color { dark ? Color(hex: "a78bfa") : Color(hex: "7c3aed") }
 
     private func formatNum(_ n: Int64) -> String {
         if n >= 10_000 {
@@ -547,7 +807,17 @@ struct BootActionItem: Identifiable {
     let title: String
     let systemImage: String
     let isDanger: Bool
+    var disabled: Bool = false
+    let tone: Tone
     let action: () -> Void
+
+    enum Tone {
+        case accent    // 开机启动/手动开机（绿）
+        case danger    // 开机删除（红）
+        case info      // 已抢实例（青）
+        case orange    // 手动开机（橙）
+        case `default`
+    }
 }
 
 enum BootActionPanel {
@@ -562,22 +832,31 @@ enum BootActionPanel {
             _ title: String,
             _ icon: String,
             danger: Bool = false,
+            disabled: Bool = false,
+            tone: BootActionItem.Tone = .default,
             _ body: @escaping @MainActor () -> Void
         ) -> BootActionItem {
-            BootActionItem(
+            let t = danger ? BootActionItem.Tone.danger : tone
+            return BootActionItem(
                 id: id, title: title, systemImage: icon,
-                isDanger: danger, action: run(body)
+                isDanger: danger, disabled: disabled, tone: t, action: run(body)
             )
         }
+        // 任务状态（对齐原项目 BootInstanceStatusEnum：0未开机/1开机中/2已开机）
+        //   开机启动：仅 status == 0（未开机）可点
+        //   开机停止：仅 status == 1（开机中正在循环）可点
+        //   手动开机：status == 0 或 1 均可单次尝试（原项目不限制）；仅 status == 2（已开机成功）禁用防多开
+        let isNotStarted = item.status == 0
+        let isOpened = item.status == 2
         return [
             make("clone", "克隆开机", "doc.on.doc") { model.confirmClone(item) },
-            make("start", "启动", "play.fill") { model.confirmStart(item) },
-            make("stop", "停止", "stop.fill") { model.confirmStop(item) },
-            make("detail", "开机详情", "list.bullet.rectangle") { model.openDetail(item) },
-            make("log", "开机日志", "text.alignleft") { model.openBootLog(for: item) },
-            make("add", "添加抢机配置", "plus.circle") { model.openAddConfig(item) },
-            make("manual", "手动抢机", "hand.raised") { model.confirmManual(item) },
-            make("del", "删除", "trash", danger: true) { model.confirmDelete(item) }
+            make("start", "开机启动", "play.fill", disabled: !isNotStarted, tone: .accent) { model.confirmStart(item) },
+            make("stop", "开机停止", "stop.fill", disabled: isNotStarted || isOpened) { model.confirmStop(item) },
+            make("detail", "开机详情", "info.circle") { model.openDetail(item) },
+            make("cfg", "开机配置", "gearshape") { model.openAddConfig(item) },
+            make("instances", "已抢实例 (\(item.successCount))", "server.rack", tone: .info) { model.openDetail(item) },
+            make("manual", "手动开机", "bolt.fill", disabled: isOpened, tone: .orange) { model.confirmManual(item) },
+            make("del", "开机删除", "trash", danger: true) { model.confirmDelete(item) }
         ]
     }
 }
@@ -585,11 +864,11 @@ enum BootActionPanel {
 // MARK: - 窗内操作菜单（对齐实例列表，扁平两列 + 悬停）
 
 private enum BootActionMenuLayout {
-    static let width: CGFloat = 300
-    static let vPad: CGFloat = 12
-    static let titleH: CGFloat = 18
-    static let gridGap: CGFloat = 8
-    static let rowH: CGFloat = 36
+    static let width: CGFloat = 280
+    static let vPad: CGFloat = 8
+    static let titleH: CGFloat = 20
+    static let gridGap: CGFloat = 1
+    static let rowH: CGFloat = 30
     static let cols = 2
     static let margin: CGFloat = 10
     static let minHeight: CGFloat = 140
@@ -597,25 +876,37 @@ private enum BootActionMenuLayout {
 
     static func idealHeight(itemCount: Int) -> CGFloat {
         let rows = max(1, Int(ceil(Double(itemCount) / Double(cols))))
-        return vPad * 2 + titleH + 8
-            + CGFloat(rows) * rowH + CGFloat(max(0, rows - 1)) * gridGap
+        // 对齐 BootActionMenuContent：LazyVGrid spacing 8；每行 rowH 精确，给足 8 项展示、消除底部多余空隙。
+        return vPad * 2 + titleH + 4
+            + CGFloat(rows) * rowH
+            + CGFloat(max(0, rows - 1)) * 8
     }
 
     static func panelFrame(button: NSView, in container: NSView, itemCount: Int) -> NSRect {
         let ideal = idealHeight(itemCount: itemCount)
         let btn = button.convert(button.bounds, to: container)
-        let bounds = container.bounds.insetBy(dx: margin, dy: margin)
+        let bounds = container.bounds
         var h = min(ideal, bounds.height)
         h = max(minHeight, h)
 
-        var x = btn.minX - width - gap
-        if x < bounds.minX { x = btn.maxX + gap }
-        if x + width > bounds.maxX { x = bounds.maxX - width }
-        x = max(bounds.minX, x)
+        // 对齐实例/Web：菜单右缘对齐按钮右缘；下方 6px 缝隙；下方放不下翻到上方。
+        var x = btn.maxX - width
+        if x < bounds.minX { x = bounds.minX + margin }
+        if x + width > bounds.maxX { x = bounds.maxX - width - margin }
 
-        var y = btn.midY - h / 2
-        if y < bounds.minY { y = bounds.minY }
-        if y + h > bounds.maxY { y = bounds.maxY - h }
+        let spaceBelow = btn.minY - bounds.minY
+        let spaceAbove = bounds.maxY - btn.maxY
+        var y: CGFloat
+        if spaceBelow >= h + gap {
+            y = btn.minY - gap - h
+        } else if spaceAbove >= h + gap {
+            y = btn.maxY + gap
+        } else {
+            y = max(bounds.minY + margin, btn.minY - gap - h)
+        }
+        y = max(bounds.minY + margin, y)
+        if y + h > bounds.maxY - margin { y = bounds.maxY - margin - h }
+
         return NSRect(x: x, y: y, width: width, height: h)
     }
 }
@@ -627,6 +918,8 @@ final class BootActionMenuPresenter {
     private var panelHost: NSView?
     private var keyMonitor: Any?
     private var mouseMonitor: Any?
+    private var activeButton: NSButton?
+    private var activeDark = false
     private init() {}
 
     var isPresented: Bool { panelHost != nil }
@@ -642,6 +935,26 @@ final class BootActionMenuPresenter {
         }
         panelHost?.removeFromSuperview()
         panelHost = nil
+        if let btn = activeButton {
+            setButtonHighlight(btn, highlighted: false, dark: activeDark)
+            activeButton = nil
+        }
+    }
+
+    private func setButtonHighlight(_ button: NSButton, highlighted: Bool, dark: Bool) {
+        guard let layer = button.layer else { return }
+        let accent = NSColor(AppTheme.sidebarActive)
+        if highlighted {
+            layer.backgroundColor = accent.cgColor
+            button.contentTintColor = .white
+        } else {
+            layer.backgroundColor = (dark
+                ? NSColor(calibratedRed: 0.17, green: 0.19, blue: 0.21, alpha: 1)
+                : NSColor(calibratedRed: 0.93, green: 0.95, blue: 0.96, alpha: 1)).cgColor
+            button.contentTintColor = dark
+                ? NSColor.white.withAlphaComponent(0.9)
+                : NSColor.labelColor
+        }
     }
 
     func toggle(
@@ -658,6 +971,11 @@ final class BootActionMenuPresenter {
         guard let window = button.window, let content = window.contentView else { return }
         dismiss()
 
+        // 打开菜单时按钮高亮为主题色（对齐实例列表操作规范）
+        activeButton = button
+        activeDark = dark
+        setButtonHighlight(button, highlighted: true, dark: dark)
+
         let actions = BootActionPanel.actions(for: item, model: model)
         let frame = BootActionMenuLayout.panelFrame(
             button: button,
@@ -666,6 +984,7 @@ final class BootActionMenuPresenter {
         )
         let root = BootActionMenuContent(
             title: item.displayTenant,
+            running: item.openBootFlag,
             dark: dark,
             panelHeight: frame.height,
             actions: actions,
@@ -690,6 +1009,27 @@ final class BootActionMenuPresenter {
         }
 
         content.addSubview(host)
+        // 用 panelFrame 计算的高度（容纳内容，超屏时 content 内滚动）；add 后仅重定位
+        let realHeight = frame.height
+        var r = frame
+        r.size.height = realHeight
+        host.frame = r
+        // 重定位：保证贴紧按钮下方/上方且不出界
+        let btnRect2 = button.convert(button.bounds, to: content)
+        let bounds2 = content.bounds
+        let gap2 = BootActionMenuLayout.gap
+        let belowSpace = btnRect2.minY - bounds2.minY
+        let aboveSpace = bounds2.maxY - btnRect2.maxY
+        if belowSpace >= realHeight + gap2 {
+            r.origin.y = btnRect2.minY - gap2 - realHeight
+        } else if aboveSpace >= realHeight + gap2 {
+            r.origin.y = btnRect2.maxY + gap2
+        } else {
+            r.origin.y = max(bounds2.minY + 12, btnRect2.minY - gap2 - realHeight)
+        }
+        r.origin.y = max(bounds2.minY + 12, r.origin.y)
+        if r.origin.y + realHeight > bounds2.maxY - 12 { r.origin.y = bounds2.maxY - 12 - realHeight }
+        host.frame = r
         panelHost = host
 
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -703,6 +1043,11 @@ final class BootActionMenuPresenter {
             guard let self = self, let host = self.panelHost else { return event }
             let loc = event.locationInWindow
             let frameInWindow = host.convert(host.bounds, to: nil)
+            // 点击再次点击"..."按钮本体时交给按钮 toggle 处理（关闭），不在此 dismiss —— 避免多击状态错乱
+            if let btn = self.activeButton {
+                let btnFrame = btn.convert(btn.bounds, to: nil)
+                if btnFrame.contains(loc) { return event }
+            }
             if !frameInWindow.contains(loc) {
                 DispatchQueue.main.async { self.dismiss() }
             }
@@ -713,6 +1058,7 @@ final class BootActionMenuPresenter {
 
 struct BootActionMenuContent: View {
     var title: String = ""
+    var running: Bool = false
     let dark: Bool
     var panelHeight: CGFloat = 280
     let actions: [BootActionItem]
@@ -722,25 +1068,32 @@ struct BootActionMenuContent: View {
     @State private var hoveredId: String?
 
     private let columns = [
-        GridItem(.flexible(), spacing: 8),
-        GridItem(.flexible(), spacing: 8)
+        GridItem(.flexible(), spacing: BootActionMenuLayout.gridGap),
+        GridItem(.flexible(), spacing: BootActionMenuLayout.gridGap)
     ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if !title.isEmpty {
+            // 对齐 Web header：状态点 + 租户名（无重复灰块）
+            HStack(spacing: 6) {
+                // 运行中：任务状态同款脉冲动效原点；非运行：静态弱灰（统一 PulseDot，对齐 Web StatusDot pulse）
+                MenuPulseDot(color: running ? AppTheme.sidebarActive : AppTheme.sidebarText(dark), pulse: running)
                 Text(title)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                     .lineLimit(1)
-                    .padding(.horizontal, 2)
+                    .truncationMode(.tail)
+                Spacer(minLength: 0)
             }
+            .padding(.horizontal, 2)
+            .padding(.bottom, 2)
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(actions) { act in
                         actionButton(act)
                     }
                 }
+                .padding(.top, 2)
             }
         }
         .padding(12)
@@ -750,8 +1103,9 @@ struct BootActionMenuContent: View {
     }
 
     private func actionButton(_ act: BootActionItem) -> some View {
-        let hovered = hoveredId == act.id
+        let hovered = hoveredId == act.id && !act.disabled
         return Button(action: {
+            if act.disabled { return }
             let run = act.action
             onDismiss()
             DispatchQueue.main.async { run() }
@@ -765,13 +1119,9 @@ struct BootActionMenuContent: View {
                     .lineLimit(1)
                 Spacer(minLength: 0)
             }
-            .foregroundColor(
-                act.isDanger
-                    ? Color(hex: "f85149")
-                    : (dark ? Color.white.opacity(0.92) : Color.primary)
-            )
+            .foregroundColor(act.disabled ? AppTheme.sidebarText(dark).opacity(0.35) : toneColor(act.tone))
             .padding(.horizontal, 10)
-            .padding(.vertical, 9)
+            .padding(.vertical, 5)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 8)
@@ -782,7 +1132,7 @@ struct BootActionMenuContent: View {
                     .stroke(
                         hovered
                             ? (act.isDanger
-                               ? Color(hex: "f85149").opacity(0.45)
+                               ? AppTheme.danger.opacity(0.45)
                                : AppTheme.sidebarActive.opacity(0.45))
                             : AppTheme.border(dark).opacity(0.4),
                         lineWidth: 1
@@ -792,21 +1142,45 @@ struct BootActionMenuContent: View {
         }
         .buttonStyle(PlainButtonStyle())
         .onHover { inside in
+            // 禁用项不产生 hover 高亮
+            if act.disabled { return }
             withAnimation(.easeInOut(duration: 0.12)) {
                 hoveredId = inside ? act.id : (hoveredId == act.id ? nil : hoveredId)
             }
+        }
+        .help(disabledHelp(act))
+    }
+
+    /// 禁用项 hover 提示原因（非禁用返回空）
+    private func disabledHelp(_ act: BootActionItem) -> String {
+        guard act.disabled else { return "" }
+        switch act.id {
+        case "start":  return "任务正在运行或已完成，无需重复启动"
+        case "stop":   return "未在运行中，暂无可停止的任务"
+        case "manual": return "该任务已开机成功，无需手动抢机"
+        default:       return "当前不可用"
+        }
+    }
+
+    private func toneColor(_ tone: BootActionItem.Tone) -> Color {
+        switch tone {
+        case .accent: return AppTheme.sidebarActive
+        case .danger: return AppTheme.danger
+        case .info:   return AppTheme.cyan
+        case .orange: return AppTheme.orange
+        case .default: return dark ? Color.white.opacity(0.92) : Color.primary
         }
     }
 
     private func buttonFill(act: BootActionItem, hovered: Bool) -> Color {
         if hovered {
             if act.isDanger {
-                return Color(hex: "f85149").opacity(dark ? 0.22 : 0.16)
+                return AppTheme.danger.opacity(dark ? 0.22 : 0.16)
             }
             return AppTheme.sidebarActive.opacity(dark ? 0.22 : 0.14)
         }
         if act.isDanger {
-            return Color(hex: "f85149").opacity(0.06)
+            return AppTheme.danger.opacity(0.06)
         }
         return dark ? Color.white.opacity(0.04) : Color.black.opacity(0.03)
     }
@@ -823,7 +1197,7 @@ private struct BootActionMoreButton: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSButton {
-        let b = NSButton(frame: NSRect(x: 0, y: 0, width: 30, height: 26))
+        let b = NSButton(frame: NSRect(x: 0, y: 0, width: 28, height: 28))
         b.bezelStyle = .shadowlessSquare
         b.isBordered = false
         b.title = ""
@@ -835,7 +1209,7 @@ private struct BootActionMoreButton: NSViewRepresentable {
             : NSColor.labelColor
         b.wantsLayer = true
         if let layer = b.layer {
-            layer.cornerRadius = 7
+            layer.cornerRadius = 4
             layer.backgroundColor = (dark
                 ? NSColor(calibratedRed: 0.17, green: 0.19, blue: 0.21, alpha: 1)
                 : NSColor(calibratedRed: 0.93, green: 0.95, blue: 0.96, alpha: 1)).cgColor
@@ -894,5 +1268,21 @@ private struct BootActionMoreButton: NSViewRepresentable {
                 )
             }
         }
+    }
+}
+
+/// 任务状态「运行中」的脉冲圆点（对齐 Web StatusDot running pulse）。
+private struct BootPulseDot: View {
+    var color: Color
+    @State private var pulse = false
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: 5, height: 5)
+            .scaleEffect(pulse ? 1.0 : 0.72)
+            .opacity(pulse ? 1.0 : 0.55)
+            .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
+            .onAppear { pulse = true }
     }
 }

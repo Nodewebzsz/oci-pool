@@ -4,11 +4,11 @@ import AppKit
 // MARK: - Filled rounded field (web `.form-control` style, no underline)
 
 /// Smooth box input aligned with web `login_user.css` `.form-control`:
-/// height 48, radius 12, soft fill, focus border + glow — no bottom underline.
+/// height 40, radius 6, soft fill, focus border + glow — no bottom underline（对齐 Web 登录页输入框）.
 struct LoginField: View {
     /// Shared with trailing action buttons so rows stay equal height.
-    static let boxHeight: CGFloat = 48
-    static let boxRadius: CGFloat = AppInputStyle.radius
+    static let boxHeight: CGFloat = 40  // Web 登录页输入框高度
+    static let boxRadius: CGFloat = 6  // Web 登录页输入框圆角特例
 
     let title: String
     let placeholder: String

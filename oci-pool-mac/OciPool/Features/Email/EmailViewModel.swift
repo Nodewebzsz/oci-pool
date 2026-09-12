@@ -20,11 +20,13 @@ final class EmailViewModel: ObservableObject {
     @Published var enableDomainInput = ""
     @Published private(set) var enableTargetTenant: DisabledTenantItem?
 
-    @Published var enabledPage = PageState(page: 0, size: 5)
-    @Published var disabledPage = PageState(page: 0, size: 5)
-    @Published var contactPage = PageState(page: 0, size: 10)
-    @Published var recordPage = PageState(page: 0, size: 10)
-    @Published var detailPage = PageState(page: 0, size: 10)
+    // 对齐 UI_STANDARD.md 4.1：所有数据列表默认每页 20 条。
+    // （原 enabledPage/disabledPage 为 5，5 不在 PageState.sizeOptions 内，属自相矛盾）
+    @Published var enabledPage = PageState(page: 0, size: 20)
+    @Published var disabledPage = PageState(page: 0, size: 20)
+    @Published var contactPage = PageState(page: 0, size: 20)
+    @Published var recordPage = PageState(page: 0, size: 20)
+    @Published var detailPage = PageState(page: 0, size: 20)
 
     @Published private(set) var enabledTotal: Int64 = 0
     @Published private(set) var disabledTotal: Int64 = 0
@@ -32,6 +34,7 @@ final class EmailViewModel: ObservableObject {
     // MARK: - Loading / errors
 
     @Published private(set) var isLoading = false
+    @Published private(set) var hasLoadedOnce = false
     @Published private(set) var tenantsLoading = false
     @Published private(set) var contactsLoading = false
     @Published private(set) var recordsLoading = false
@@ -70,13 +73,18 @@ final class EmailViewModel: ObservableObject {
     // MARK: - Lifecycle
 
     func start() {
+        isLoading = true
+        tenantsLoading = true
         Task { await reloadAll() }
     }
 
     func reloadAll() async {
         isLoading = true
         errorText = nil
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoadedOnce = true
+        }
         async let t: Void = loadCurrentTenantTab()
         async let badge: Void = refreshOtherTenantBadge()
         async let c: Void = loadContacts()
@@ -105,6 +113,11 @@ final class EmailViewModel: ObservableObject {
         guard mainSection != section else { return }
         mainSection = section
         errorText = nil
+        switch section {
+        case .tenants: tenantsLoading = true
+        case .contacts: contactsLoading = true
+        case .records: recordsLoading = true
+        }
         Task {
             switch section {
             case .tenants:
@@ -129,6 +142,7 @@ final class EmailViewModel: ObservableObject {
         } else {
             disabledPage.page = 0
         }
+        tenantsLoading = true
         Task { await loadCurrentTenantTab() }
     }
 
@@ -470,7 +484,7 @@ final class EmailViewModel: ObservableObject {
     func openRecordDetail(_ item: EmailBodyItem) {
         detailRecord = item
         detailRecipients = []
-        detailPage = PageState(page: 0, size: 10)
+        detailPage = PageState(page: 0, size: 20)
         formError = nil
         activeSheet = .recordDetail(item)
         Task { await loadDetailRecipients() }

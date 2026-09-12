@@ -774,7 +774,7 @@ struct InstanceConsoleView: View {
                             if model.needsWebsockifyInstall {
                                 Text("Mac 本机未安装 websockify，画面无法显示")
                                     .font(.system(size: 12))
-                                    .foregroundColor(Color(hex: "f85149").opacity(0.9))
+                                    .foregroundColor(AppTheme.danger.opacity(0.9))
                                 AppButton(
                                     title: model.isInstallingWebsockify ? "正在安装…" : "一键安装 websockify",
                                     systemImage: "arrow.down.circle",
@@ -840,7 +840,7 @@ struct InstanceConsoleView: View {
                     .font(.system(size: 11))
                     .foregroundColor(
                         model.statusText.contains("已连接")
-                            ? Color(hex: "3fb950")
+                            ? AppTheme.sidebarActive
                             : AppTheme.sidebarText(dark)
                     )
             }
@@ -920,7 +920,7 @@ struct InstanceConsoleView: View {
                     if let err = model.errorText, !err.isEmpty {
                         Text(err)
                             .font(.system(size: 11))
-                            .foregroundColor(Color(hex: "f85149"))
+                            .foregroundColor(AppTheme.danger)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     ForEach(Array(model.logLines.enumerated()), id: \.offset) { _, line in

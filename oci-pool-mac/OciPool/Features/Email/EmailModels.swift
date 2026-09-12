@@ -130,6 +130,12 @@ struct EmailBodyItem: Identifiable, Equatable {
     var createTime: String = ""
 
     var subjectText: String { title.isEmpty ? "（无主题）" : title }
+    /// Web 状态徽章：failed/sent/pending 由收发结果派生
+    var statusText: String {
+        if receiveFailTotal > 0 && receiveSuccessTotal == 0 { return "发送失败" }
+        if receiveSuccessTotal > 0 { return "已发送" }
+        return "待发送"
+    }
     var tenantText: String {
         if !tenantName.isEmpty { return tenantName }
         if !senderEmail.isEmpty { return senderEmail }

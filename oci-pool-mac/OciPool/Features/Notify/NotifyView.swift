@@ -9,50 +9,73 @@ struct NotifyView: View {
 
     private var dark: Bool { appearance.isDarkEffective }
 
-    /// 通道卡片统一高度
-    private let channelMinHeight: CGFloat = 400
-    /// 定时任务全宽卡（内容横向展开，高度可略低）
-    private let taskMinHeight: CGFloat = 340
+    // MARK: - 校验属性（落实第五章表单按钮禁用规范）
+
+    private var isTaskReady: Bool {
+        model.task.enableAccountCheck || model.task.enableBootLog || model.task.enableCostCheck
+    }
+    private var isTgReady: Bool {
+        !model.telegram.botToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !model.telegram.chatId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    private var isProxyReady: Bool {
+        !model.proxy.host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && model.proxy.port > 0
+    }
+    private var isBarkReady: Bool {
+        !model.bark.url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !model.bark.deviceKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    private var isDdReady: Bool {
+        !model.dingTalk.webhook.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    private var isFsReady: Bool {
+        !model.feishu.webhook.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Telegram / 代理 通道卡片统一高度
+    private let tgMinHeight: CGFloat = 345
+    /// Webhook 类精简卡片统一高度（Bark / 钉钉 / 飞书）
+    private let webhookMinHeight: CGFloat = 260
+    /// 定时任务全宽卡
+    private let taskMinHeight: CGFloat = 300
 
     var body: some View {
         PageScaffold(
             title: "通知管理",
-            subtitle: "定时任务 · Telegram · Bark · 钉钉 · 飞书",
+            subtitle: "通知设置",
             systemImage: "bell",
+            iconColor: AppTheme.orange,
             toolbar: { toolbar },
             content: {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
                         if let err = model.errorText, !err.isEmpty {
                             errorBanner(err)
+                                .padding(.bottom, 12)
                         }
 
                         // 1) 定时任务：全宽独立区（与 Web 一致，避免与通道表单混排）
                         taskCard
 
-                        // 2) 通知通道：相关卡片成对
-                        EqualHeightCardRow(minHeight: channelMinHeight) {
+                        // 2) Telegram 联动组（双列等高）
+                        EqualHeightCardRow(minHeight: tgMinHeight) {
                             telegramCard
                         } second: {
                             proxyCard
                         }
-                        EqualHeightCardRow(minHeight: channelMinHeight) {
+
+                        // 3) Webhook 推送组：Bark / 钉钉 / 飞书（三列等高紧凑并排）
+                        EqualHeightCardRow3(minHeight: webhookMinHeight) {
                             barkCard
                         } second: {
                             dingTalkCard
-                        }
-                        // 飞书与 Bark / 钉钉同尺寸：半宽 + 同 minHeight
-                        EqualHeightCardRow(minHeight: channelMinHeight) {
+                        } third: {
                             feishuCard
-                        } second: {
-                            Color.clear
                         }
                     }
-                    .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .appLoading(model.isLoading)
             }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
@@ -78,10 +101,10 @@ struct NotifyView: View {
 
     private var taskCard: some View {
         ModuleSettingsCard(
-            title: "定时任务",
+            title: "通知任务",
             subtitle: "每天固定时刻执行所选检测任务",
             systemImage: "clock",
-            accent: Color(hex: "4a9eff"),
+            accent: AppTheme.info,
             enabled: $model.task.enabled,
             minHeight: taskMinHeight
         ) {
@@ -112,31 +135,41 @@ struct NotifyView: View {
                         title: "账号测活",
                         subtitle: "检测租户账号可用性",
                         systemImage: "person.2",
-                        accent: Color(hex: "3fb950"),
+                        accent: AppTheme.sidebarActive,
                         isOn: $model.task.enableAccountCheck
                     )
                     taskOptionTile(
-                        title: "开机日志统计",
+                        title: "抢机日志",
                         subtitle: "汇总抢机/开机日志",
                         systemImage: "doc.text",
-                        accent: Color(hex: "4a9eff"),
+                        accent: AppTheme.info,
                         isOn: $model.task.enableBootLog
                     )
                     taskOptionTile(
-                        title: "OCI 费用检查",
+                        title: "OCI 花费 (Payg)",
                         subtitle: "检查账单与费用异常",
                         systemImage: "creditcard",
-                        accent: Color(hex: "f0881a"),
+                        accent: AppTheme.orange,
                         isOn: $model.task.enableCostCheck
                     )
                 }
+            }
+
+            FormFieldRow(label: "通知密钥") {
+                AppTextField(
+                    text: $model.task.notificationSecret,
+                    placeholder: "用于验证通知来源",
+                    secure: true,
+                    leadingSystemImage: "key"
+                )
             }
         } footer: {
             AppButton(
                 title: "保存配置",
                 systemImage: "square.and.arrow.down",
                 kind: .primary,
-                isLoading: model.savingKey == "task"
+                isLoading: model.savingKey == "task",
+                enabled: isTaskReady
             ) {
                 model.saveTask()
             }
@@ -163,7 +196,7 @@ struct NotifyView: View {
                 }
                 Spacer(minLength: 4)
                 Toggle("", isOn: isOn)
-                    .toggleStyle(SwitchToggleStyle())
+                    .toggleStyle(SwitchToggleStyle(tint: AppTheme.sidebarActive))
                     .labelsHidden()
             }
 
@@ -208,12 +241,12 @@ struct NotifyView: View {
             systemImage: "paperplane",
             accent: Color(hex: "2aabee"),
             enabled: $model.telegram.enabled,
-            minHeight: channelMinHeight
+            minHeight: tgMinHeight
         ) {
-            FormFieldRow(label: "Bot Token") {
+            FormFieldRow(label: "Bot Token *") {
                 AppTextField(text: $model.telegram.botToken, placeholder: "从 @BotFather 获取")
             }
-            FormFieldRow(label: "Chat ID") {
+            FormFieldRow(label: "Chat ID *") {
                 AppTextField(
                     text: $model.telegram.chatId,
                     placeholder: "会话 ID",
@@ -233,15 +266,27 @@ struct NotifyView: View {
                     title: "测试",
                     systemImage: "paperplane",
                     kind: .secondary,
-                    isLoading: model.savingKey == "telegramTest"
+                    isLoading: model.savingKey == "telegramTest",
+                    enabled: isTgReady
                 ) {
                     model.testTelegram()
                 }
                 AppButton(
-                    title: "保存",
+                    title: "注册机器人",
+                    systemImage: "arrow.clockwise",
+                    kind: .secondary,
+                    isLoading: model.savingKey == "regBot",
+                    enabled: !model.telegram.botToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ) {
+                    model.registerTgBot()
+                }
+                Spacer()
+                AppButton(
+                    title: "保存配置",
                     systemImage: "square.and.arrow.down",
                     kind: .primary,
-                    isLoading: model.savingKey == "telegram"
+                    isLoading: model.savingKey == "telegram",
+                    enabled: isTgReady
                 ) {
                     model.saveTelegram()
                 }
@@ -256,29 +301,34 @@ struct NotifyView: View {
             systemImage: "globe",
             accent: Color(hex: "9b59b6"),
             enabled: $model.proxy.enabled,
-            minHeight: channelMinHeight
+            minHeight: tgMinHeight
         ) {
             FormFieldRow(label: "代理类型") {
-                SelectMenu(
-                    options: model.proxyTypeOptions,
-                    selection: Binding(
-                        get: { model.proxy.type },
-                        set: { model.proxy.type = $0 ?? "HTTP" }
-                    ),
-                    placeholder: "类型",
-                    width: 140,
-                    allowClear: false,
-                    searchable: false
-                )
+                HStack(spacing: 6) {
+                    ForEach(["HTTP", "HTTPS", "SOCKS5"], id: \.self) { t in
+                        Button(action: { model.proxy.type = t }) {
+                            Text(t)
+                                .font(.system(size: 11.5, weight: model.proxy.type == t ? .semibold : .regular, design: .monospaced))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 5)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(model.proxy.type == t ? AppTheme.sidebarActive : AppTheme.sidebarHover(dark))
+                                )
+                                .foregroundColor(model.proxy.type == t ? .white : AppTheme.sidebarText(dark))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
             }
-            FormFieldRow(label: "地址") {
+            FormFieldRow(label: "地址 *") {
                 AppTextField(
                     text: $model.proxy.host,
                     placeholder: "127.0.0.1",
                     leadingSystemImage: "server.rack"
                 )
             }
-            FormFieldRow(label: "端口") {
+            FormFieldRow(label: "端口 *") {
                 AppTextField(
                     text: Binding(
                         get: { model.proxy.port == 0 ? "" : "\(model.proxy.port)" },
@@ -302,15 +352,18 @@ struct NotifyView: View {
                     title: "测试",
                     systemImage: "network",
                     kind: .secondary,
-                    isLoading: model.savingKey == "proxyTest"
+                    isLoading: model.savingKey == "proxyTest",
+                    enabled: isProxyReady
                 ) {
                     model.testProxy()
                 }
+                Spacer()
                 AppButton(
-                    title: "保存",
+                    title: "保存配置",
                     systemImage: "square.and.arrow.down",
                     kind: .primary,
-                    isLoading: model.savingKey == "proxy"
+                    isLoading: model.savingKey == "proxy",
+                    enabled: isProxyReady
                 ) {
                     model.saveProxy()
                 }
@@ -320,22 +373,23 @@ struct NotifyView: View {
 
     private var barkCard: some View {
         ModuleSettingsCard(
-            title: "Bark",
+            title: "Bark 通知",
             subtitle: "iOS 推送通知",
             systemImage: "bell.badge",
-            accent: Color(hex: "f0881a"),
+            accent: AppTheme.orange,
             enabled: $model.bark.enabled,
-            minHeight: channelMinHeight
+            minHeight: webhookMinHeight
         ) {
-            FormFieldRow(label: "服务 URL") {
+            FormFieldRow(label: "服务 URL *") {
                 AppTextField(text: $model.bark.url, placeholder: "https://api.day.app")
             }
-            FormFieldRow(label: "Device Key") {
+            FormFieldRow(label: "Device Key *") {
                 AppTextField(text: $model.bark.deviceKey, placeholder: "设备密钥", leadingSystemImage: "key")
             }
             Text("用于 iOS Bark App 接收推送；服务 URL 可自建。")
                 .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .foregroundColor(AppTheme.textTertiary(dark))
+                .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
         } footer: {
             HStack(spacing: 8) {
@@ -343,15 +397,18 @@ struct NotifyView: View {
                     title: "测试",
                     systemImage: "paperplane",
                     kind: .secondary,
-                    isLoading: model.savingKey == "barkTest"
+                    isLoading: model.savingKey == "barkTest",
+                    enabled: isBarkReady
                 ) {
                     model.testBark()
                 }
+                Spacer()
                 AppButton(
-                    title: "保存",
+                    title: "保存配置",
                     systemImage: "square.and.arrow.down",
                     kind: .primary,
-                    isLoading: model.savingKey == "bark"
+                    isLoading: model.savingKey == "bark",
+                    enabled: isBarkReady
                 ) {
                     model.saveBark()
                 }
@@ -361,22 +418,23 @@ struct NotifyView: View {
 
     private var dingTalkCard: some View {
         ModuleSettingsCard(
-            title: "钉钉",
+            title: "钉钉机器人",
             subtitle: "群机器人 Webhook",
             systemImage: "message",
             accent: Color(hex: "0089ff"),
             enabled: $model.dingTalk.enabled,
-            minHeight: channelMinHeight
+            minHeight: webhookMinHeight
         ) {
-            FormFieldRow(label: "Webhook") {
+            FormFieldRow(label: "Webhook *") {
                 AppTextField(text: $model.dingTalk.webhook, placeholder: "https://oapi.dingtalk.com/...")
             }
-            FormFieldRow(label: "加签密钥") {
+            FormFieldRow(label: "签名密钥") {
                 AppTextField(text: $model.dingTalk.secret, placeholder: "可选 Secret", secure: true)
             }
             Text("在钉钉群「智能群助手」中添加自定义机器人获取 Webhook。")
                 .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .foregroundColor(AppTheme.textTertiary(dark))
+                .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
         } footer: {
             HStack(spacing: 8) {
@@ -384,15 +442,18 @@ struct NotifyView: View {
                     title: "测试",
                     systemImage: "paperplane",
                     kind: .secondary,
-                    isLoading: model.savingKey == "dingTalkTest"
+                    isLoading: model.savingKey == "dingTalkTest",
+                    enabled: isDdReady
                 ) {
                     model.testDingTalk()
                 }
+                Spacer()
                 AppButton(
-                    title: "保存",
+                    title: "保存配置",
                     systemImage: "square.and.arrow.down",
                     kind: .primary,
-                    isLoading: model.savingKey == "dingTalk"
+                    isLoading: model.savingKey == "dingTalk",
+                    enabled: isDdReady
                 ) {
                     model.saveDingTalk()
                 }
@@ -402,15 +463,15 @@ struct NotifyView: View {
 
     private var feishuCard: some View {
         ModuleSettingsCard(
-            title: "飞书",
+            title: "飞书机器人",
             subtitle: "群机器人 Webhook",
             systemImage: "bubble.left.and.bubble.right",
-            accent: Color(hex: "00d6b9"),
+            accent: AppTheme.cyan,
             enabled: $model.feishu.enabled,
-            minHeight: channelMinHeight
+            minHeight: webhookMinHeight
         ) {
             // 与 Bark / 钉钉同结构：单列 Webhook + 签名密钥
-            FormFieldRow(label: "Webhook") {
+            FormFieldRow(label: "Webhook *") {
                 AppTextField(text: $model.feishu.webhook, placeholder: "https://open.feishu.cn/...")
             }
             FormFieldRow(label: "签名密钥") {
@@ -418,7 +479,8 @@ struct NotifyView: View {
             }
             Text("在飞书群「设置 → 群机器人」中添加自定义机器人。")
                 .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .foregroundColor(AppTheme.textTertiary(dark))
+                .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
         } footer: {
             HStack(spacing: 8) {
@@ -426,15 +488,18 @@ struct NotifyView: View {
                     title: "测试",
                     systemImage: "paperplane",
                     kind: .secondary,
-                    isLoading: model.savingKey == "feishuTest"
+                    isLoading: model.savingKey == "feishuTest",
+                    enabled: isFsReady
                 ) {
                     model.testFeishu()
                 }
+                Spacer()
                 AppButton(
-                    title: "保存",
+                    title: "保存配置",
                     systemImage: "square.and.arrow.down",
                     kind: .primary,
-                    isLoading: model.savingKey == "feishu"
+                    isLoading: model.savingKey == "feishu",
+                    enabled: isFsReady
                 ) {
                     model.saveFeishu()
                 }
@@ -445,15 +510,15 @@ struct NotifyView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
+                .foregroundColor(AppTheme.danger)
             Text(text).font(.system(size: 12))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(8)
     }
 }

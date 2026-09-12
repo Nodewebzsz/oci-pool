@@ -148,6 +148,23 @@ location ~ ^/websockify/(\d+)$ {
 }
 ```
 
+#### FAQ: Boot Logs stuck on "Connecting..." in Remote mode
+
+* **Cause**: Boot logs stream through SSE (Server-Sent Events). Reverse proxies (Nginx / NPM) enable **proxy buffering** by default, buffering live event data in memory and delaying HTTP response headers.
+* **Quick Fix**:
+  * **Nginx Proxy Manager (NPM)**:
+    1. Proxy Host Details: **Turn OFF "Cache Assets"**, keep "Websockets Support" enabled.
+    2. Advanced Tab ⚙️ (Custom Nginx Configuration): Paste these 5 lines:
+       ```nginx
+       proxy_buffering off;
+       proxy_cache off;
+       chunked_transfer_encoding on;
+       proxy_read_timeout 86400s;
+       proxy_send_timeout 86400s;
+       ```
+       *(Note: Websockets Support already injects `proxy_http_version 1.1`. Do not duplicate it here to avoid syntax conflict)*.
+  * **Standard Nginx**: Add the above 5 `proxy_buffering off;` directives into `location /` or `location /system/streamLogs`.
+
 > When upgrading from older versions, remove the `security` block entirely. All other configuration entries can be kept as-is.
 
 ---

@@ -6,8 +6,9 @@ import Combine
 final class ProxyConfigViewModel: ObservableObject {
 
     @Published private(set) var items: [VpnProxyItem] = []
-    @Published var pageState = PageState(page: 0, size: 10)
+    @Published var pageState = PageState(page: 0, size: 20)
     @Published private(set) var isLoading = false
+    @Published private(set) var hasLoadedOnce = false
     @Published private(set) var isSaving = false
     @Published private(set) var isTestingAll = false
     @Published private(set) var errorText: String?
@@ -25,12 +26,13 @@ final class ProxyConfigViewModel: ObservableObject {
 
     let typeOptions = [
         SelectOption(id: "HTTP", title: "HTTP"),
-        SelectOption(id: "HTTPS", title: "HTTPS")
+        SelectOption(id: "HTTPS", title: "HTTPS"),
+        SelectOption(id: "SOCKS5", title: "SOCKS5")
     ]
 
     let statusOptions = [
-        SelectOption(id: "1", title: "启用"),
-        SelectOption(id: "0", title: "停用")
+        SelectOption(id: "1", title: "可用"),
+        SelectOption(id: "0", title: "不可用")
     ]
 
     let forceOptions = [
@@ -53,7 +55,10 @@ final class ProxyConfigViewModel: ObservableObject {
     func reload() async {
         isLoading = true
         errorText = nil
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoadedOnce = true
+        }
         do {
             let pageNum = pageState.page + 1
             let result = try await service.pageList(pageNum: pageNum, pageSize: pageState.size)
@@ -62,6 +67,10 @@ final class ProxyConfigViewModel: ObservableObject {
         } catch {
             errorText = (error as? APIError)?.errorDescription ?? error.localizedDescription
         }
+    }
+
+    func clearError() {
+        errorText = nil
     }
 
     private func loadTenants() async {

@@ -6,7 +6,7 @@ import AppKit
 @MainActor
 final class SystemLogsViewModel: ObservableObject {
 
-    static let maxLines = 1000
+    static let maxLines = 300
 
     @Published private(set) var entries: [OpenLogEntry] = []
     @Published private(set) var connection: OpenLogsConnectionState = .disconnected

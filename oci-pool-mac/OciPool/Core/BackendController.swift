@@ -60,6 +60,22 @@ final class BackendController: ObservableObject {
         let dbFile = dataDir.appendingPathComponent("vps_db").path
         let dbURL = "jdbc:h2:file:\(dbFile);DB_CLOSE_ON_EXIT=FALSE;MODE=MySQL"
 
+        // 强力兜底清理：清理占用 9856 端口或独占持有数据库文件的孤儿 Java 进程
+        killOrphanBackendsOnPort(defaultPort)
+        killOrphanProcessesHoldingFile(dataDir.appendingPathComponent("vps_db.mv.db").path)
+
+        // 清理残留锁文件
+        let lockFiles = [
+            dataDir.appendingPathComponent("vps_db.lock.db"),
+            dataDir.appendingPathComponent("vps_db.mv.db.lock")
+        ]
+        for lock in lockFiles {
+            if FileManager.default.fileExists(atPath: lock.path) {
+                try? FileManager.default.removeItem(at: lock)
+                appendBackendLog("removed orphan H2 lock file: \(lock.lastPathComponent)")
+            }
+        }
+
         let logFile = dataDir.appendingPathComponent("backend.log")
         if !FileManager.default.fileExists(atPath: logFile.path) {
             FileManager.default.createFile(atPath: logFile.path, contents: nil)
@@ -186,6 +202,44 @@ final class BackendController: ObservableObject {
             return upgraded
         }
         return Bundle.main.url(forResource: "server", withExtension: "jar")
+    }
+
+    /// Kill java processes locking a file (e.g. vps_db.mv.db) if cmdline looks like our server.jar.
+    private func killOrphanProcessesHoldingFile(_ filePath: String) {
+        let pids = fileHolderPIDs(filePath)
+        guard !pids.isEmpty else { return }
+        for pid in pids {
+            let cmd = processCommandLine(pid: pid)
+            let isOurs = cmd.contains("server.jar") || cmd.contains("OciPool")
+            guard isOurs else { continue }
+            appendBackendLog("file-holder pid=\(pid) holding=\(filePath) → terminating")
+            kill(pid, SIGTERM)
+            Thread.sleep(forTimeInterval: 0.3)
+            if kill(pid, 0) == 0 {
+                kill(pid, SIGKILL)
+                appendBackendLog("SIGKILL file-holder pid=\(pid)")
+            }
+        }
+    }
+
+    private func fileHolderPIDs(_ path: String) -> [pid_t] {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
+        task.arguments = ["-t", path]
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = Pipe()
+        do {
+            try task.run()
+            task.waitUntilExit()
+        } catch {
+            return []
+        }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let text = String(data: data, encoding: .utf8) ?? ""
+        return text
+            .split(whereSeparator: { $0.isNewline || $0.isWhitespace })
+            .compactMap { Int32($0) }
     }
 
     /// Kill java processes listening on `port` if cmdline looks like our server.jar.

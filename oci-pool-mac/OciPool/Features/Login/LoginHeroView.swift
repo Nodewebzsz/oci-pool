@@ -2,612 +2,377 @@ import SwiftUI
 import AppKit
 import Combine
 
-/// Left hero panel — web `#heroSvg` + `heroNetCanvas` parity:
-/// node net animation, eye tracking, shy password look-down, cry tears.
+/// Left hero panel — replicates the web AuthHeroArt:
+/// Globe core, 45 orbiting region dots, concentric rings, shield mark, data-flow lines.
+/// Adds the web brand hero copy (mini logo bar on top, earth art in the middle,
+/// headline + subtitle + three-column stats at the bottom) and adapts to the
+/// client window height (compresses the art; scrolls on very short windows).
+/// macOS 11 compatible (no Canvas / TimelineView / GraphicsContext / .overlay(alignment:)).
 struct LoginHeroView: View {
     var dark: Bool
     var crying: Bool = false
-    /// When true (password field focused), pupils look down (web shyMode).
     var shyMode: Bool = false
+    var locale: AppLocale = .zhCN
 
-    @State private var tick: CGFloat = 0
-    @State private var nodes: [HeroNetNode] = []
-    @State private var panelSize: CGSize = .zero
-    @State private var tearPhase: CGFloat = 0
-    /// Mouse in local hero coords (top-left).
-    @State private var localPointer: CGPoint? = nil
+    @State private var t: TimeInterval = 0
+    private let viewBox: CGFloat = 600
 
-    private let viewBox: CGFloat = 520
+    private var accent: Color { Color(hex: "34d399") }
+    private var cyanAccent: Color { Color(hex: "22d3ee") }
+    private var orangeAccent: Color { AppTheme.orange }
+    private var coreFill: Color { Color(hex: dark ? "272c34" : "f2f4f7") }
+    private var grid: Color { Color(hex: dark ? "7c848f" : "c8ced6").opacity(0.10) }
+
+    private var zh: Bool { locale == .zhCN || locale == .zhTW }
+
+    private var brandTagline: String { zh ? "多租户池化管理" : "Multi-tenant management" }
+    private var heroTitle: String { zh ? "现代化的 OCI 池化管理" : "Modern OCI pool management" }
+    private var heroSubtitle: String {
+        zh
+            ? "14+ 项租户操作 · 45 个 Oracle 商业区域 · 深色主题 · 双语支持 · 现代化 UI 重做，自主优化升级。"
+            : "14+ tenant operations · 45 Oracle commercial regions · dark theme · bilingual · a modernised UI with enhanced features."
+    }
+    private var statTenants: String { zh ? "内置租户" : "Tenants" }
+    private var statRegions: String { zh ? "全球区域" : "Regions" }
+    private var statUptime: String { zh ? "在线时间" : "Uptime" }
 
     var body: some View {
         ZStack {
-            // hero-panel background (web)
-            LoginPalette.panel(dark)
-            RadialGradient(
-                gradient: Gradient(colors: [
-                    Color(hex: dark ? "4d9eff" : "6366f1").opacity(dark ? 0.14 : 0.12),
-                    Color.clear
-                ]),
-                center: UnitPoint(x: 0.3, y: 0.2),
-                startRadius: 10,
-                endRadius: 260
-            )
-            RadialGradient(
-                gradient: Gradient(colors: [
-                    Color(hex: dark ? "8b5cf6" : "0ea5e9").opacity(0.10),
-                    Color.clear
-                ]),
-                center: UnitPoint(x: 0.8, y: 0.8),
-                startRadius: 10,
-                endRadius: 240
+            // Web hero 背景：linear-gradient(135deg, var(--bg-1), var(--bg-0))
+            LinearGradient(
+                gradient: Gradient(colors: dark
+                    ? [Color(hex: "0d1216"), Color(hex: "060a0d")]
+                    : [Color(hex: "ffffff"), Color(hex: "f8fafd")]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
             )
 
-            // Animated node network (web heroNetCanvas)
-            HeroNetCanvas(nodes: nodes, dark: dark)
-                .opacity(0.95)
+            RadialGradient(
+                gradient: Gradient(colors: [accent.opacity(dark ? 0.14 : 0.12), Color.clear]),
+                center: UnitPoint(x: 0.3, y: 0.2), startRadius: 10, endRadius: 260
+            )
+            RadialGradient(
+                gradient: Gradient(colors: [cyanAccent.opacity(0.10), Color.clear]),
+                center: UnitPoint(x: 0.8, y: 0.8), startRadius: 10, endRadius: 240
+            )
 
-            // Characters: web viewBox 520, shared bottom baseline y=410
             GeometryReader { geo in
-                let s = min(geo.size.width, geo.size.height) / viewBox
-                let ox = (geo.size.width - viewBox * s) / 2
-                let oy = (geo.size.height - viewBox * s) / 2
-                let scale = s
-                // Web SVG: all characters rest on y=410 — centerY = baseline - height/2
-                let baseline: CGFloat = 410
-                let look = lookOffsets(panelSize: geo.size)
+                let compact = geo.size.height < 640
+                let artH = min(max(geo.size.height - 320, 160), 280)
 
-                ZStack(alignment: .topLeading) {
-                    // back → front; bottoms on one line
-                    mainCharacter(scale: scale, look: look, tearY: tearPhase)
-                        .position(
-                            x: ox + 278 * scale,
-                            y: oy + (baseline - 149) * scale
-                        )
-                    rackCharacter(scale: scale, look: look, tearY: tearPhase)
-                        .position(
-                            x: ox + 385 * scale,
-                            y: oy + (baseline - 116) * scale
-                        )
-                    satCharacter(scale: scale, look: look, tearY: tearPhase)
-                        .position(
-                            x: ox + 462 * scale,
-                            y: oy + (baseline - 52) * scale
-                        )
-                    cloudCharacter(scale: scale, look: look, tearY: tearPhase)
-                        .position(
-                            x: ox + 209 * scale,
-                            y: oy + (baseline - 85) * scale
-                        )
-                    buddyCharacter(scale: scale, look: look, tearY: tearPhase)
-                        .position(
-                            x: ox + 72 * scale,
-                            y: oy + (baseline - 27) * scale
-                        )
-                }
-                .frame(width: geo.size.width, height: geo.size.height)
-                .background(HeroMouseTracker(localPoint: $localPointer))
-                .onAppear {
-                    panelSize = geo.size
-                    seedNodes(for: geo.size)
-                }
-                .onChange(of: geo.size) { newSize in
-                    panelSize = newSize
-                    seedNodes(for: newSize)
+                Group {
+                    if compact {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 0) {
+                                brandHeader
+                                    .padding(.top, 24)
+                                    .padding(.horizontal, 40)
+                                heroArt
+                                    .frame(height: artH)
+                                    .padding(.vertical, 12)
+                                bottomCopy
+                                    .padding(.horizontal, 40)
+                                    .padding(.bottom, 24)
+                            }
+                            .frame(width: geo.size.width)
+                        }
+                    } else {
+                        VStack(alignment: .leading, spacing: 0) {
+                            brandHeader
+                                .padding(.top, 26)
+                                .padding(.horizontal, 40)
+                            heroArt
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 12)
+                            bottomCopy
+                                .padding(.horizontal, 40)
+                                .padding(.bottom, 30)
+                        }
+                        .frame(width: geo.size.width, height: geo.size.height)
+                    }
                 }
             }
-            .padding(28)
-            .shadow(color: Color.black.opacity(dark ? 0.35 : 0.12), radius: 18, y: 10)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
         .onReceive(Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()) { _ in
-            stepNetwork()
-            if crying {
-                tearPhase = tearPhase + 0.08
-                if tearPhase > 1 { tearPhase = 0 }
-            } else {
-                tearPhase = 0
-            }
-            tick += 1
-        }
-        .modifier(CryShakeModifier(active: crying))
-    }
-
-    // MARK: - Look direction (web pupil track)
-
-    private func lookOffsets(panelSize: CGSize) -> (CGFloat, CGFloat) {
-        if crying {
-            return (0, 1)
-        }
-        guard let ptr = localPointer else {
-            if shyMode { return (0, 0.85) }
-            return (0, 0)
-        }
-        let cx = panelSize.width / 2
-        let cy = panelSize.height / 2
-        var dx = (ptr.x - cx) / max(panelSize.width * 0.5, 1)
-        var dy = (ptr.y - cy) / max(panelSize.height * 0.5, 1)
-        if shyMode {
-            dy = max(dy, 0.55)
-        }
-        let len = max(0.0001, sqrt(dx * dx + dy * dy))
-        dx /= len
-        dy /= len
-        return (dx * 0.85, dy * 0.85)
-    }
-
-    private func pupilOffset(look: (CGFloat, CGFloat), max: CGFloat, scale: CGFloat) -> CGSize {
-        CGSize(width: look.0 * max * scale, height: look.1 * max * scale)
-    }
-
-    // MARK: - Characters
-
-    private func rackCharacter(scale: CGFloat, look: (CGFloat, CGFloat), tearY: CGFloat) -> some View {
-        let w: CGFloat = 74 * scale
-        let h: CGFloat = 232 * scale
-        let eyeR: CGFloat = 11.5 * scale
-        let pr: CGFloat = 4.4 * scale
-        let po = pupilOffset(look: look, max: 5, scale: scale)
-        return ZStack {
-            RoundedRectangle(cornerRadius: 20 * scale)
-                .fill(LinearGradient(
-                    gradient: Gradient(colors: [Color(hex: "2A3344"), Color(hex: "151B26")]),
-                    startPoint: .top, endPoint: .bottom
-                ))
-            glassOverlay(radius: 20 * scale)
-            // status LED
-            Circle().fill(Color(hex: "34D399"))
-                .frame(width: 7.6 * scale, height: 7.6 * scale)
-                .offset(x: 0, y: -h * 0.38)
-            faceEyes(eyeR: eyeR, pupilR: pr, spacing: 34 * scale, pupilOff: po)
-                .offset(y: -h * 0.12)
-            mouth(happy: !crying, width: 26 * scale, stroke: Color(hex: "E2E8F0"), line: 3.8 * scale)
-                .offset(y: h * 0.02)
-            if crying {
-                tears(pairSpacing: 50 * scale, phase: tearY, scale: scale * 0.85)
-                    .offset(y: -h * 0.02)
-            }
-            VStack(spacing: 8 * scale) {
-                Capsule().fill(Color(hex: "38BDF8").opacity(0.5)).frame(width: 40 * scale, height: 5 * scale)
-                Capsule().fill(Color(hex: "64748B").opacity(0.45)).frame(width: 40 * scale, height: 5 * scale)
-                Capsule().fill(Color(hex: "64748B").opacity(0.35)).frame(width: 26 * scale, height: 5 * scale)
-            }
-            .offset(y: h * 0.28)
-        }
-        .frame(width: w, height: h)
-        .shadow(color: Color.black.opacity(0.18), radius: 12, y: 8)
-    }
-
-    private func mainCharacter(scale: CGFloat, look: (CGFloat, CGFloat), tearY: CGFloat) -> some View {
-        let w: CGFloat = 156 * scale
-        let h: CGFloat = 298 * scale
-        let eyeR: CGFloat = 16 * scale
-        let pr: CGFloat = 6.2 * scale
-        let po = pupilOffset(look: look, max: 6.5, scale: scale)
-        return ZStack {
-            RoundedRectangle(cornerRadius: 36 * scale)
-                .fill(LinearGradient(
-                    gradient: Gradient(colors: [Color(hex: "6D8CFF"), Color(hex: "4D6BFF"), Color(hex: "3B5BDB")]),
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                ))
-            glassOverlay(radius: 36 * scale)
-            // antenna
-            VStack(spacing: 0) {
-                Circle().fill(Color(hex: "E0E7FF")).frame(width: 11 * scale, height: 11 * scale)
-                Rectangle().fill(Color(hex: "C7D2FE")).frame(width: 3 * scale, height: 12 * scale)
-                Capsule()
-                    .stroke(Color(hex: "C7D2FE").opacity(0.8), lineWidth: 3)
-                    .frame(width: 52 * scale, height: 17 * scale)
-            }
-            .offset(y: -h * 0.48)
-            // LEDs
-            HStack(spacing: 4 * scale) {
-                RoundedRectangle(cornerRadius: 2.5 * scale).fill(Color(hex: "67E8F9")).frame(width: 10 * scale, height: 10 * scale)
-                RoundedRectangle(cornerRadius: 2.5 * scale).fill(Color(hex: "A5B4FC").opacity(0.9)).frame(width: 10 * scale, height: 10 * scale)
-                RoundedRectangle(cornerRadius: 2.5 * scale).fill(Color.white.opacity(0.3)).frame(width: 10 * scale, height: 10 * scale)
-            }
-            .offset(x: -w * 0.22, y: -h * 0.32)
-            faceEyes(eyeR: eyeR, pupilR: pr, spacing: 60 * scale, pupilOff: po)
-                .offset(y: -h * 0.12)
-            mouth(happy: !crying, width: 46 * scale, stroke: Color(hex: "0F172A"), line: 7.5 * scale, smileDeep: true)
-                .offset(y: h * 0.02)
-            if crying {
-                tears(pairSpacing: 84 * scale, phase: tearY, scale: scale)
-                    .offset(y: -h * 0.02)
-            }
-            VStack(spacing: 8 * scale) {
-                Capsule().fill(Color.white.opacity(0.18)).frame(width: 80 * scale, height: 7 * scale)
-                Capsule().fill(Color.white.opacity(0.12)).frame(width: 52 * scale, height: 6 * scale)
-            }
-            .offset(y: h * 0.32)
-        }
-        .frame(width: w, height: h)
-        .shadow(color: Color.black.opacity(0.18), radius: 14, y: 10)
-    }
-
-    private func satCharacter(scale: CGFloat, look: (CGFloat, CGFloat), tearY: CGFloat) -> some View {
-        let r: CGFloat = 52 * scale
-        let po = pupilOffset(look: look, max: 4.5, scale: scale)
-        return ZStack {
-            Circle()
-                .fill(LinearGradient(
-                    gradient: Gradient(colors: [Color(hex: "67E8F9"), Color(hex: "38BDF8")]),
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                ))
-            Circle()
-                .fill(LinearGradient(
-                    gradient: Gradient(colors: [Color.white.opacity(0.2), Color.clear]),
-                    startPoint: .top, endPoint: .bottom
-                ))
-            // ring
-            Ellipse()
-                .stroke(Color(hex: "E0F2FE").opacity(0.5), lineWidth: 2.2 * scale)
-                .frame(width: 116 * scale, height: 28 * scale)
-                .rotationEffect(.degrees(-14))
-            faceEyes(eyeR: 11 * scale, pupilR: 4.2 * scale, spacing: 38 * scale, pupilOff: po)
-                .offset(y: -10 * scale)
-            mouth(happy: !crying, width: 28 * scale, stroke: Color(hex: "0F172A"), line: 5 * scale, flatHappy: true)
-                .offset(y: 16 * scale)
-            if crying {
-                tears(pairSpacing: 54 * scale, phase: tearY, scale: scale * 0.9)
-                    .offset(y: 4 * scale)
-            }
-        }
-        .frame(width: r * 2, height: r * 2)
-        .shadow(color: Color.black.opacity(0.15), radius: 10, y: 6)
-    }
-
-    private func cloudCharacter(scale: CGFloat, look: (CGFloat, CGFloat), tearY: CGFloat) -> some View {
-        // Web cloud path roughly bbox ~48..370 x 240..410 → center ~209, 325, size ~322x170
-        let po = pupilOffset(look: look, max: 6, scale: scale)
-        return ZStack {
-            CloudShape()
-                .fill(LinearGradient(
-                    gradient: Gradient(colors: [Color(hex: "A78BFA"), Color(hex: "7C5CFC")]),
-                    startPoint: .top, endPoint: .bottom
-                ))
-                .frame(width: 322 * scale, height: 170 * scale)
-            CloudShape()
-                .fill(LinearGradient(
-                    gradient: Gradient(colors: [Color.white.opacity(0.18), Color.clear]),
-                    startPoint: .top, endPoint: .bottom
-                ))
-                .frame(width: 322 * scale, height: 170 * scale)
-            faceEyes(eyeR: 15 * scale, pupilR: 5.8 * scale, spacing: 52 * scale, pupilOff: po)
-                .offset(x: -35 * scale, y: -5 * scale)
-            mouth(happy: !crying, width: 44 * scale, stroke: Color(hex: "0F172A"), line: 7.5 * scale, smileDeep: true)
-                .offset(x: -35 * scale, y: 28 * scale)
-            if crying {
-                tears(pairSpacing: 76 * scale, phase: tearY, scale: scale)
-                    .offset(x: -35 * scale, y: 12 * scale)
-            }
-        }
-        .frame(width: 322 * scale, height: 170 * scale)
-        .shadow(color: Color.black.opacity(0.14), radius: 12, y: 6)
-    }
-
-    private func buddyCharacter(scale: CGFloat, look: (CGFloat, CGFloat), tearY: CGFloat) -> some View {
-        let w: CGFloat = 120 * scale
-        let h: CGFloat = 54 * scale
-        let po = pupilOffset(look: look, max: 4.2, scale: scale)
-        return ZStack {
-            RoundedRectangle(cornerRadius: 18 * scale)
-                .fill(Color(hex: "0F172A").opacity(0.95))
-            glassOverlay(radius: 18 * scale)
-            Circle().fill(Color(hex: "34D399"))
-                .frame(width: 5.6 * scale, height: 5.6 * scale)
-                .offset(x: -w * 0.38, y: -h * 0.28)
-            faceEyes(eyeR: 10 * scale, pupilR: 4.2 * scale, spacing: 30 * scale, pupilOff: po)
-                .offset(x: -w * 0.12, y: -2 * scale)
-            mouth(happy: !crying, width: 14 * scale, stroke: Color(hex: "E2E8F0"), line: 2.6 * scale)
-                .offset(x: -w * 0.12, y: 12 * scale)
-            if crying {
-                tears(pairSpacing: 46 * scale, phase: tearY, scale: scale * 0.7)
-                    .offset(x: -w * 0.12, y: 6 * scale)
-            }
-            VStack(spacing: 0) {
-                Text("oci")
-                    .font(.system(size: 11 * scale, weight: .heavy))
-                    .foregroundColor(Color(hex: "93C5FD"))
-                Text("start")
-                    .font(.system(size: 11 * scale, weight: .heavy))
-                    .foregroundColor(Color(hex: "E2E8F0"))
-            }
-            .offset(x: w * 0.28, y: 0)
-        }
-        .frame(width: w, height: h)
-        .shadow(color: Color.black.opacity(0.16), radius: 10, y: 6)
-    }
-
-    // MARK: - Face pieces
-
-    private func faceEyes(eyeR: CGFloat, pupilR: CGFloat, spacing: CGFloat, pupilOff: CGSize) -> some View {
-        HStack(spacing: spacing - eyeR * 2) {
-            eye(eyeR, pupilR, pupilOff)
-            eye(eyeR, pupilR, pupilOff)
+            t += 1.0 / 30.0
         }
     }
 
-    private func eye(_ r: CGFloat, _ pr: CGFloat, _ off: CGSize) -> some View {
-        ZStack {
-            Circle().fill(Color.white).frame(width: r * 2, height: r * 2)
-            Circle().fill(Color(hex: "0F172A"))
-                .frame(width: pr * 2, height: pr * 2)
-                .offset(x: off.width, y: off.height)
-        }
-        .frame(width: r * 2, height: r * 2)
-        .clipShape(Circle())
-    }
+    // MARK: - Brand header (top)
 
-    private func mouth(
-        happy: Bool,
-        width: CGFloat,
-        stroke: Color,
-        line: CGFloat,
-        smileDeep: Bool = false,
-        flatHappy: Bool = false
-    ) -> some View {
-        Group {
-            if flatHappy && happy {
-                // satellite happy = flat line
-                Capsule()
-                    .fill(stroke)
-                    .frame(width: width, height: line)
-            } else {
-                SmileShape(sad: !happy, deep: smileDeep)
-                    .stroke(stroke, style: StrokeStyle(lineWidth: line, lineCap: .round))
-                    .frame(width: width, height: width * (smileDeep ? 0.42 : 0.38))
+    private var brandHeader: some View {
+        HStack(spacing: 12) {
+            LoginBrandBadge(size: 38, accent: accent, cyan: cyanAccent)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("OCI-POOL")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(LoginPalette.text(dark))
+                    .tracking(-0.2)
+                Text(brandTagline)
+                    .font(.system(size: 11))
+                    .foregroundColor(LoginPalette.muted(dark))
+                    .tracking(0.4)
             }
         }
     }
 
-    private func tears(pairSpacing: CGFloat, phase: CGFloat, scale: CGFloat) -> some View {
-        let drop = (phase * 14 * scale)
-        let op = Double(1 - phase)
-        return HStack(spacing: pairSpacing) {
-            Ellipse()
-                .fill(Color(hex: "7DD3FC"))
-                .frame(width: 5 * scale, height: 8 * scale)
-                .offset(y: drop)
-                .opacity(op)
-            Ellipse()
-                .fill(Color(hex: "7DD3FC"))
-                .frame(width: 5 * scale, height: 8 * scale)
-                .offset(y: drop)
-                .opacity(op)
+    // MARK: - Earth art (middle, fills available space)
+
+    private var heroArt: some View {
+        GeometryReader { geo in
+            let scale = min(geo.size.width, geo.size.height) / viewBox
+            let cx = geo.size.width / 2
+            let cy = geo.size.height / 2
+
+            ZStack {
+                // ambient glow
+                Circle()
+                    .fill(RadialGradient(gradient: Gradient(colors: [accent.opacity(0.32), cyanAccent.opacity(0.12), Color.clear]),
+                                         center: .center, startRadius: 0, endRadius: 280 * scale))
+                    .frame(width: 560 * scale, height: 560 * scale)
+                    .position(x: cx, y: cy)
+                    .blur(radius: 12)
+
+                // grid
+                LoginGridShape()
+                    .stroke(grid, lineWidth: 1)
+                    .frame(width: viewBox * scale, height: viewBox * scale)
+                    .position(x: cx, y: cy)
+
+                // concentric rings; middle dashed and rotating
+                ForEach(0..<3, id: \.self) { i in
+                    let rad: CGFloat = i == 0 ? 210 : (i == 1 ? 160 : 110)
+                    let op = 0.15 + Double(i) * 0.08
+                    Circle()
+                        .stroke(LinearGradient(gradient: Gradient(colors: [accent.opacity(op), cyanAccent.opacity(op * 0.6)]),
+                                               startPoint: .topLeading, endPoint: .bottomTrailing),
+                                style: StrokeStyle(lineWidth: 1.2,
+                                                   dash: i == 1 ? [3, 6] : [],
+                                                   dashPhase: i == 1 ? CGFloat(t * 20) : 0))
+                        .frame(width: rad * 2 * scale, height: rad * 2 * scale)
+                        .position(x: cx, y: cy)
+                }
+
+                // data flow lines
+                LoginFlowShape()
+                    .stroke(accent.opacity(0.16),
+                            style: StrokeStyle(lineWidth: 0.8, dash: [2, 3], dashPhase: CGFloat(-t * 20)))
+                    .frame(width: viewBox * scale, height: viewBox * scale)
+                    .position(x: cx, y: cy)
+
+                // central core
+                Circle().fill(coreFill)
+                    .frame(width: 116 * scale, height: 116 * scale)
+                    .position(x: cx, y: cy)
+                Circle().stroke(accent, lineWidth: 2.2)
+                    .frame(width: 116 * scale, height: 116 * scale)
+                    .position(x: cx, y: cy)
+                Circle().stroke(accent.opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [2, 4]))
+                    .frame(width: 96 * scale, height: 96 * scale)
+                    .position(x: cx, y: cy)
+
+                // 核心品牌云池图标（与 Web PoolBrandMark 1:1 坐标比例）
+                PoolBrandGlyphStroke()
+                    .stroke(accent, style: StrokeStyle(lineWidth: 2 * scale, lineCap: .round, lineJoin: .round))
+                    .frame(width: 54 * scale, height: 54 * scale)
+                    .position(x: cx, y: cy)
+                PoolBrandGlyphDots()
+                    .fill(accent)
+                    .frame(width: 54 * scale, height: 54 * scale)
+                    .position(x: cx, y: cy)
+
+                // 45 region dots
+                ForEach(0..<45, id: \.self) { i in
+                    let ang = CGFloat(i) / 45.0 * .pi * 2
+                    let x = cx + cos(ang) * 210 * scale
+                    let y = cy + sin(ang) * 210 * scale
+                    let hot = i % 5 == 2
+                    let base: Double = hot ? 0.9 : 0.55
+                    let pulse: Double = hot ? (0.9 + 0.35 * sin(t * (2.0 + Double(i % 3)) * 2.0)) : 1.0
+                    let col = hot ? orangeAccent : cyanAccent
+                    let rad = hot ? 4 * scale : 2 * scale
+                    Circle()
+                        .fill(col.opacity(min(1, max(0.3, base * pulse))))
+                        .frame(width: rad * 2, height: rad * 2)
+                        .position(x: x, y: y)
+                }
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
         }
     }
 
-    private func glassOverlay(radius: CGFloat) -> some View {
-        RoundedRectangle(cornerRadius: radius)
-            .fill(LinearGradient(
-                gradient: Gradient(colors: [Color.white.opacity(0.18), Color.white.opacity(0)]),
-                startPoint: .top, endPoint: .bottom
-            ))
-    }
+    // MARK: - Bottom copy
 
-    // MARK: - Network
+    private var bottomCopy: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(heroTitle)
+                .font(.system(size: 30, weight: .heavy))
+                .foregroundColor(LoginPalette.text(dark))
+                .tracking(-0.8)
+                .lineSpacing(2)
 
-    private func seedNodes(for size: CGSize) {
-        let area = max(1, size.width * size.height)
-        let count = max(18, min(36, Int(area / 14000)))
-        nodes = (0..<count).map { _ in
-            HeroNetNode(
-                x: CGFloat.random(in: 0...max(1, size.width)),
-                y: CGFloat.random(in: 0...max(1, size.height)),
-                vx: CGFloat.random(in: -0.28...0.28),
-                vy: CGFloat.random(in: -0.28...0.28),
-                r: CGFloat.random(in: 1.2...3.0)
-            )
+            Text(heroSubtitle)
+                .font(.system(size: 13.5))
+                .foregroundColor(LoginPalette.muted(dark))
+                .lineSpacing(4)
+                .padding(.top, 10)
+                .frame(maxWidth: 460, alignment: .leading)
+
+            HStack(alignment: .top, spacing: 32) {
+                statItem("14+", statTenants)
+                statItem("45", statRegions)
+                statItem("24/7", statUptime)
+            }
+            .padding(.top, 20)
         }
     }
 
-    private func stepNetwork() {
-        guard panelSize.width > 1, !nodes.isEmpty else { return }
-        let w = panelSize.width
-        let h = panelSize.height
-        for i in nodes.indices {
-            nodes[i].x += nodes[i].vx
-            nodes[i].y += nodes[i].vy
-            if nodes[i].x < -8 { nodes[i].x = w + 8 }
-            if nodes[i].x > w + 8 { nodes[i].x = -8 }
-            if nodes[i].y < -8 { nodes[i].y = h + 8 }
-            if nodes[i].y > h + 8 { nodes[i].y = -8 }
+    private func statItem(_ num: String, _ label: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(num)
+                .font(.system(size: 22, weight: .bold))
+                .foregroundColor(accent)
+                .tracking(-0.4)
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundColor(LoginPalette.muted(dark))
+                .tracking(0.3)
         }
     }
 }
 
-// MARK: - Net canvas
-
-private struct HeroNetNode: Identifiable {
-    let id = UUID()
-    var x: CGFloat
-    var y: CGFloat
-    var vx: CGFloat
-    var vy: CGFloat
-    var r: CGFloat
-}
-
-private struct HeroNetCanvas: View {
-    var nodes: [HeroNetNode]
-    var dark: Bool
+// Mini brand badge (top-left logo) — 与 Web 端 PoolBrandMark 1:1 精确对齐
+private struct LoginBrandBadge: View {
+    var size: CGFloat = 38
+    var accent: Color
+    var cyan: Color
 
     var body: some View {
-        GeometryReader { geo in
-            let maxDist = min(140, max(90, geo.size.width * 0.22))
-            let lineColor = dark ? Color(hex: "4d9eff") : Color(hex: "6366f1")
-            let nodeColor = dark ? Color(hex: "7dd3fc").opacity(0.85) : Color(hex: "4f46e5").opacity(0.75)
-            ZStack {
-                // lines (cap pairs for type-checker / perf)
-                Path { path in
-                    let limit = min(nodes.count, 36)
-                    for i in 0..<limit {
-                        for j in (i + 1)..<limit {
-                            let dx = nodes[i].x - nodes[j].x
-                            let dy = nodes[i].y - nodes[j].y
-                            let dist = sqrt(dx * dx + dy * dy)
-                            if dist > maxDist { continue }
-                            path.move(to: CGPoint(x: nodes[i].x, y: nodes[i].y))
-                            path.addLine(to: CGPoint(x: nodes[j].x, y: nodes[j].y))
-                        }
-                    }
-                }
-                .stroke(lineColor.opacity(dark ? 0.22 : 0.16), lineWidth: 1)
-
-                ForEach(nodes) { n in
-                    Circle()
-                        .fill(lineColor.opacity(dark ? 0.12 : 0.10))
-                        .frame(width: n.r * 6.4, height: n.r * 6.4)
-                        .position(x: n.x, y: n.y)
-                    Circle()
-                        .fill(nodeColor)
-                        .frame(width: n.r * 2, height: n.r * 2)
-                        .position(x: n.x, y: n.y)
-                }
-            }
+        ZStack {
+            RoundedRectangle(cornerRadius: size * (10.0 / 34.0))
+                .fill(LinearGradient(gradient: Gradient(colors: [accent, cyan]),
+                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+                .frame(width: size, height: size)
+            PoolBrandGlyphStroke()
+                .stroke(Color(hex: "0e2a22"),
+                        style: StrokeStyle(lineWidth: size * (2.0 / 36.0), lineCap: .round, lineJoin: .round))
+                .frame(width: size, height: size)
+            PoolBrandGlyphDots()
+                .fill(Color(hex: "0e2a22"))
+                .frame(width: size, height: size)
         }
+        .frame(width: size, height: size)
     }
 }
 
-// MARK: - Cloud path (web GCP-style cloud)
-
-private struct CloudShape: Shape {
+// 严格对齐 Web 端 PoolBrandMark SVG（viewBox="0 0 36 36"）
+// <path d="M10 20.4a4.2 4.2 0 0 1 2.6-7.5 6.1 6.1 0 0 1 11.6 1.2 3.7 3.7 0 0 1 .7 7.3H11.2" stroke-width="2" stroke-linecap="round"/>
+// <path d="M13 23.9v-2.5 M18 23.9v-2.5 M23 23.9v-2.5" stroke-width="1.4"/>
+private struct PoolBrandGlyphStroke: Shape {
     func path(in rect: CGRect) -> Path {
-        // Normalized from web path M86,410 ... within bbox (48,240)-(370,410)
-        // ViewBox path coords mapped into rect
-        let minX: CGFloat = 48, maxX: CGFloat = 370
-        let minY: CGFloat = 240, maxY: CGFloat = 410
-        func sx(_ x: CGFloat) -> CGFloat { (x - minX) / (maxX - minX) * rect.width + rect.minX }
-        func sy(_ y: CGFloat) -> CGFloat { (y - minY) / (maxY - minY) * rect.height + rect.minY }
+        let sx = rect.width / 36.0
+        let sy = rect.height / 36.0
+        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: rect.minX + x * sx, y: rect.minY + y * sy)
+        }
+        var path = Path()
+        // 1. 云朵外轮廓（Web SVG 精确三段贝塞尔弧）
+        path.move(to: p(10, 20.4))
+        path.addCurve(to: p(12.6, 12.9), control1: p(10, 16.6), control2: p(10.6, 14.5))
+        path.addCurve(to: p(24.2, 14.1), control1: p(14.4, 7.4), control2: p(22.5, 8.2))
+        path.addCurve(to: p(24.9, 21.4), control1: p(28.6, 14.3), control2: p(29.1, 20.5))
+        path.addLine(to: p(11.2, 21.4))
+        // 2. 底部三根连接虚线立柱 (M13 23.9v-2.5 ...)
+        for x: CGFloat in [13.0, 18.0, 23.0] {
+            path.move(to: p(x, 23.9))
+            path.addLine(to: p(x, 21.4))
+        }
+        return path
+    }
+}
 
+// 底部三个云池节点圆点（Web SVG cx="13/18/23", cy="25.5", r="1.6"）
+private struct PoolBrandGlyphDots: Shape {
+    func path(in rect: CGRect) -> Path {
+        let sx = rect.width / 36.0
+        let sy = rect.height / 36.0
+        var path = Path()
+        let r: CGFloat = 1.6 * min(sx, sy)
+        for x: CGFloat in [13.0, 18.0, 23.0] {
+            let cx = rect.minX + x * sx
+            let cy = rect.minY + 25.5 * sy
+            path.addEllipse(in: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
+        }
+        return path
+    }
+}
+
+// Grid helper lines (web coords 0..600)
+private struct LoginGridShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let s = min(rect.width, rect.height) / 600
+        func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: rect.minX + x * s, y: rect.minY + y * s) }
         var p = Path()
-        p.move(to: CGPoint(x: sx(86), y: sy(410)))
-        p.addCurve(to: CGPoint(x: sx(48), y: sy(372)),
-                   control1: CGPoint(x: sx(64), y: sy(410)),
-                   control2: CGPoint(x: sx(48), y: sy(394)))
-        p.addCurve(to: CGPoint(x: sx(82), y: sy(332)),
-                   control1: CGPoint(x: sx(48), y: sy(352)),
-                   control2: CGPoint(x: sx(62), y: sy(336)))
-        p.addCurve(to: CGPoint(x: sx(140), y: sy(284)),
-                   control1: CGPoint(x: sx(86), y: sy(304)),
-                   control2: CGPoint(x: sx(110), y: sy(284)))
-        p.addCurve(to: CGPoint(x: sx(216), y: sy(256)),
-                   control1: CGPoint(x: sx(156), y: sy(260)),
-                   control2: CGPoint(x: sx(186), y: sy(248)))
-        p.addCurve(to: CGPoint(x: sx(282), y: sy(266)),
-                   control1: CGPoint(x: sx(236), y: sy(240)),
-                   control2: CGPoint(x: sx(266), y: sy(244)))
-        p.addCurve(to: CGPoint(x: sx(330), y: sy(322)),
-                   control1: CGPoint(x: sx(310), y: sy(270)),
-                   control2: CGPoint(x: sx(330), y: sy(294)))
-        p.addCurve(to: CGPoint(x: sx(370), y: sy(376)),
-                   control1: CGPoint(x: sx(354), y: sy(328)),
-                   control2: CGPoint(x: sx(370), y: sy(350)))
-        p.addCurve(to: CGPoint(x: sx(328), y: sy(410)),
-                   control1: CGPoint(x: sx(370), y: sy(398)),
-                   control2: CGPoint(x: sx(352), y: sy(410)))
+        for i in 0..<5 {
+            p.move(to: pt(120, 200 + CGFloat(i) * 25))
+            p.addLine(to: pt(480, 200 + CGFloat(i) * 25))
+        }
+        for i in 0..<5 {
+            p.move(to: pt(220 + CGFloat(i) * 40, 180))
+            p.addLine(to: pt(220 + CGFloat(i) * 40, 420))
+        }
+        return p
+    }
+}
+
+// 5 data-flow diagonals from outer edge to core (web coords)
+private struct LoginFlowShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let s = min(rect.width, rect.height) / 600
+        let cx = rect.minX + 300 * s
+        let cy = rect.minY + 300 * s
+        func edge(_ i: Int) -> CGPoint {
+            let ang = CGFloat(i) / 45.0 * .pi * 2
+            return CGPoint(x: cx + cos(ang) * 210 * s, y: cy + sin(ang) * 210 * s)
+        }
+        var p = Path()
+        for i in [0, 9, 18, 27, 36] {
+            p.move(to: edge(i))
+            p.addLine(to: CGPoint(x: cx, y: cy))
+        }
+        return p
+    }
+}
+
+// Shield outline centered in the shape frame
+private struct LoginShieldShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let s = min(rect.width, rect.height) / 30.0
+        let cx = rect.midX
+        let cy = rect.midY
+        var p = Path()
+        p.move(to: CGPoint(x: cx, y: cy - 10 * s))
+        p.addLine(to: CGPoint(x: cx - 8 * s, y: cy - 6 * s))
+        p.addLine(to: CGPoint(x: cx - 8 * s, y: cy))
+        p.addQuadCurve(to: CGPoint(x: cx, y: cy + 10 * s), control: CGPoint(x: cx - 8 * s, y: cy + 8 * s))
+        p.addQuadCurve(to: CGPoint(x: cx + 8 * s, y: cy), control: CGPoint(x: cx + 8 * s, y: cy + 8 * s))
+        p.addLine(to: CGPoint(x: cx + 8 * s, y: cy - 6 * s))
         p.closeSubpath()
         return p
     }
 }
 
-private struct SmileShape: Shape {
-    var sad: Bool
-    var deep: Bool = false
+private struct LoginCheckShape: Shape {
     func path(in rect: CGRect) -> Path {
+        let s = min(rect.width, rect.height) / 30.0
+        let cx = rect.midX
+        let cy = rect.midY
         var p = Path()
-        if sad {
-            p.move(to: CGPoint(x: rect.minX, y: rect.midY + rect.height * 0.2))
-            p.addQuadCurve(
-                to: CGPoint(x: rect.maxX, y: rect.midY + rect.height * 0.2),
-                control: CGPoint(x: rect.midX, y: rect.minY + (deep ? 0 : rect.height * 0.1))
-            )
-        } else {
-            p.move(to: CGPoint(x: rect.minX, y: rect.midY - rect.height * 0.15))
-            p.addQuadCurve(
-                to: CGPoint(x: rect.maxX, y: rect.midY - rect.height * 0.15),
-                control: CGPoint(x: rect.midX, y: rect.maxY - (deep ? 0 : rect.height * 0.05))
-            )
-        }
+        p.move(to: CGPoint(x: cx - 4 * s, y: cy))
+        p.addLine(to: CGPoint(x: cx - 1.5 * s, y: cy + 2.5 * s))
+        p.addLine(to: CGPoint(x: cx + 4.5 * s, y: cy - 2.5 * s))
         return p
-    }
-}
-
-private struct CryShakeModifier: ViewModifier {
-    var active: Bool
-    @State private var x: CGFloat = 0
-
-    func body(content: Content) -> some View {
-        content
-            .offset(x: x)
-            .onChange(of: active) { on in
-                if on { runShake() } else { x = 0 }
-            }
-    }
-
-    private func runShake() {
-        let steps: [CGFloat] = [0, -3, 3, -3, 3, 0]
-        for (i, v) in steps.enumerated() {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.06 * Double(i)) {
-                withAnimation(.easeInOut(duration: 0.06)) { x = v }
-            }
-        }
-    }
-}
-
-// MARK: - Local mouse tracker (eye follow)
-
-private struct HeroMouseTracker: NSViewRepresentable {
-    @Binding var localPoint: CGPoint?
-
-    final class TrackView: NSView {
-        var onMove: ((CGPoint?) -> Void)?
-        private var tracking: NSTrackingArea?
-
-        override func updateTrackingAreas() {
-            super.updateTrackingAreas()
-            if let tracking = tracking {
-                removeTrackingArea(tracking)
-            }
-            let opts: NSTrackingArea.Options = [
-                .activeInKeyWindow, .mouseMoved, .inVisibleRect, .mouseEnteredAndExited
-            ]
-            let area = NSTrackingArea(rect: bounds, options: opts, owner: self, userInfo: nil)
-            addTrackingArea(area)
-            tracking = area
-        }
-
-        override func mouseMoved(with event: NSEvent) {
-            // Convert to top-left SwiftUI coords inside this view
-            let p = convert(event.locationInWindow, from: nil)
-            let y = bounds.height - p.y
-            onMove?(CGPoint(x: p.x, y: y))
-        }
-
-        override func mouseEntered(with event: NSEvent) {
-            mouseMoved(with: event)
-        }
-
-        override func mouseExited(with event: NSEvent) {
-            onMove?(nil)
-        }
-
-        override var isOpaque: Bool { false }
-        override func hitTest(_ point: NSPoint) -> NSView? { nil } // never steal clicks
-    }
-
-    func makeNSView(context: Context) -> TrackView {
-        let v = TrackView()
-        v.wantsLayer = true
-        v.onMove = { pt in
-            DispatchQueue.main.async { self.localPoint = pt }
-        }
-        return v
-    }
-
-    func updateNSView(_ nsView: TrackView, context: Context) {
-        nsView.onMove = { pt in
-            DispatchQueue.main.async { self.localPoint = pt }
-        }
     }
 }

@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - API envelope (matches com.doubledimple.ocicommon.param.ApiResponse)
+// MARK: - API envelope (matches com.nodewebzsz.ocicommon.param.ApiResponse)
 
 struct APIEnvelope<T: Decodable>: Decodable {
     let success: Bool
@@ -195,6 +195,10 @@ enum DashboardFormat {
         let days = Int(seconds / 86400)
         return "\(days)天"
     }
+
+    static func uptimeDaysNumber(_ seconds: Double) -> Double {
+        Double(Int(seconds / 86400))
+    }
 }
 
 struct NetworkSample: Identifiable, Equatable {
@@ -202,4 +206,44 @@ struct NetworkSample: Identifiable, Equatable {
     let timeLabel: String
     let upload: Double
     let download: Double
+}
+
+// MARK: - /system/openLogs/json → activity feed
+
+/// Parsed line shown in the monitor activity feed (mirrors web `parseLogLine`).
+struct ActivityLog: Identifiable, Equatable {
+    let id: Int
+    let time: String
+    let level: String
+    let msg: String
+    let tenant: String
+    let region: String
+
+    static func parse(_ line: String, id: Int) -> ActivityLog {
+        let s = String(line)
+        let time = self.matchTime(s)
+        let lvl = (s.range(of: #"\b(INFO|WARN|ERROR|DEBUG|SUCCESS)\b"#, options: .regularExpression).map { String(s[$0]) }) ?? "INFO"
+        var msg = s
+        if !time.isEmpty { msg = msg.replacingOccurrences(of: time, with: " ") }
+        msg = msg.replacingOccurrences(of: #"\[[^\]]*\]"#, with: " ", options: .regularExpression)
+        msg = msg.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if msg.isEmpty { msg = s }
+        return ActivityLog(id: id, time: time, level: lvl, msg: msg, tenant: "", region: "")
+    }
+
+    private static func matchTime(_ s: String) -> String {
+        let patterns = [#"(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})"#, #"(\d{2}:\d{2}:\d{2})"#]
+        for p in patterns {
+            if let r = s.range(of: p, options: .regularExpression) {
+                return String(s[r])
+            }
+        }
+        return ""
+    }
+}
+
+/// `{ lines: [...] }` envelope returned by `/system/openLogs/json`.
+struct OpenLogLinesEnvelope: Decodable {
+    let lines: [String]?
 }

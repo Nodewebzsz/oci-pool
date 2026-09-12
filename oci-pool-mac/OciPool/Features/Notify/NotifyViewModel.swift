@@ -53,6 +53,18 @@ final class NotifyViewModel: ObservableObject {
     func saveTask() { Task { await perform("task") { try await service.updateTask(task) } } }
     func saveTelegram() { Task { await perform("telegram") { try await service.updateTelegram(telegram) } } }
     func testTelegram() { Task { await perform("telegramTest") { try await service.testTelegram() } } }
+    func registerTgBot() {
+        Task {
+            guard AppAlert.confirm(
+                title: "注册 Telegram 机器人",
+                message: "将向 Telegram 官方注销并重新注册当前 Bot 实例。"
+            ) else { return }
+            await perform("regBot") {
+                try await service.startTgRobot()
+                ToastCenter.shared.success("Telegram 机器人已重新注册并启动")
+            }
+        }
+    }
     func saveBark() { Task { await perform("bark") { try await service.updateBark(bark) } } }
     func testBark() { Task { await perform("barkTest") { try await service.testBark() } } }
     func saveDingTalk() { Task { await perform("dingTalk") { try await service.updateDingTalk(dingTalk) } } }

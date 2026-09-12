@@ -74,45 +74,37 @@ function MonitorPage({ density }) {
   const timeLabels = ['24h', '18h', '12h', '6h', '3h', 'now'];
 
   return (
-    <div>
-      <PageHeader
-        title={tr('monitor.title')}
-        icon="activity"
-        actions={
-          <>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', background: 'var(--bg-2)', borderRadius: 6, fontSize: 11.5, color: 'var(--fg-2)' }}>
-              <StatusDot status="running" size={6} pulse />
-              <span className="mono" style={{ color: 'var(--fg-1)' }}>{s.timestamp}</span>
-            </span>
-            <Button variant="outline" size="md" icon="refresh-cw" onClick={loadMonitor}>{tr('common.refresh')}</Button>
-          </>
-        }
-      />
+    <div className="monitor-page">
+      <div className="monitor-header">
+        <PageHeader
+          title={tr('monitor.title')}
+          icon="activity"
+          actions={
+            <>
+              <span className="monitor-timestamp" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', background: 'var(--bg-2)', borderRadius: 6, fontSize: 11.5, color: 'var(--fg-2)' }}>
+                <StatusDot status="running" size={6} pulse />
+                <span className="mono" style={{ color: 'var(--fg-1)' }}>{s.timestamp}</span>
+              </span>
+              <Button variant="outline" size="md" icon="refresh-cw" onClick={loadMonitor}>{tr('common.refresh')}</Button>
+            </>
+          }
+        />
+      </div>
 
       {loadError && <div role="alert" style={{ marginBottom: 12, color: 'var(--danger)' }}>{loadError}</div>}
 
       {/* Top KPI strip */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(5, 1fr)',
-        gap: 12,
-        marginBottom: 14,
-      }}>
+      <div className="monitor-kpi-grid">
         {kpis.map((k, i) => (
           <KPICard key={i} label={k.label} value={k.value} icon={k.icon} iconColor={k.color} />
         ))}
       </div>
 
       {/* Four gauges row · CPU / 内存 / 磁盘 / 系统信息 */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: 14,
-        marginBottom: 14,
-      }}>
+      <div className="monitor-resource-grid">
         {/* CPU · SystemMetrics {cpuUsage, cpuPhysicalCount, cpuLogicalCount, cpuTemperature, cpuFrequency, cpuModel} */}
-        <Card title={tr('monitor.cpu.title')} subtitle={s.cpu.cpuModel || tr('monitor.cpu.sub')} headerIcon="cpu" headerIconColor="var(--accent)">
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4px 0 8px' }}>
+        <Card className="monitor-resource-card" title={tr('monitor.cpu.title')} subtitle={s.cpu.cpuModel || tr('monitor.cpu.sub')} headerIcon="cpu" headerIconColor="var(--accent)">
+          <div className="monitor-gauge" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4px 0 8px' }}>
             <CircularGauge value={s.cpu.cpuUsage} max={100} color="var(--accent)" size={180} thickness={14} />
           </div>
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -124,8 +116,8 @@ function MonitorPage({ density }) {
         </Card>
 
         {/* Memory · SystemMetrics {memoryUsage %, totalMemory MB, usedMemory MB, availableMemory MB, swap*} */}
-        <Card title={tr('monitor.mem.title')} subtitle={`${tr('monitor.mem.totalLabel')}${s._display.memTotalGB}`} headerIcon="database" headerIconColor="var(--orange)">
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4px 0 8px' }}>
+        <Card className="monitor-resource-card" title={tr('monitor.mem.title')} subtitle={`${tr('monitor.mem.totalLabel')}${s._display.memTotalGB}`} headerIcon="database" headerIconColor="var(--orange)">
+          <div className="monitor-gauge" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4px 0 8px' }}>
             <CircularGauge value={s.memory.memoryUsage} max={100} color="var(--orange)" size={180} thickness={14} />
           </div>
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -137,8 +129,8 @@ function MonitorPage({ density }) {
         </Card>
 
         {/* Disk · SystemMetrics {diskUsage %, diskTotal / diskUsed / diskFree in Bytes} */}
-        <Card title={tr('monitor.disk.title')} subtitle={tr('monitor.disk.sub')} headerIcon="hard-drive" headerIconColor="var(--danger)">
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4px 0 8px' }}>
+        <Card className="monitor-resource-card" title={tr('monitor.disk.title')} subtitle={tr('monitor.disk.sub')} headerIcon="hard-drive" headerIconColor="var(--danger)">
+          <div className="monitor-gauge" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4px 0 8px' }}>
             <CircularGauge value={s.disk.diskUsage} max={100} color="var(--danger)" size={180} thickness={14} />
           </div>
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -150,8 +142,8 @@ function MonitorPage({ density }) {
         </Card>
 
         {/* System · SystemMetrics {totalProcesses, threadCount, systemUptime, osName, osArch, hostname} */}
-        <Card title={tr('monitor.sys.title')} subtitle={<span className="mono" style={{ fontSize: 10 }}>{s.system.hostname}</span>} headerIcon="server" headerIconColor="var(--accent)">
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4px 0 8px' }}>
+        <Card className="monitor-resource-card" title={tr('monitor.sys.title')} subtitle={<span className="mono" style={{ fontSize: 10 }}>{s.system.hostname}</span>} headerIcon="server" headerIconColor="var(--accent)">
+          <div className="monitor-gauge" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4px 0 8px' }}>
             <CircularGauge
               value={s._display.uptimeDays}
               max={90}
@@ -172,11 +164,7 @@ function MonitorPage({ density }) {
       </div>
 
       {/* Bottom charts row: Grab trend + activity feed */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1.6fr 1fr',
-        gap: 14,
-      }}>
+      <div className="monitor-bottom-grid">
         <Card
           title={tr('monitor.chart.grabRate')}
           subtitle={tr('monitor.chart.subtitle')}
@@ -209,8 +197,8 @@ function MonitorPage({ density }) {
 
         <Card title={tr('monitor.chart.activity')} headerIcon="radio" headerIconColor="var(--accent)" padding={0}>
           <div style={{ maxHeight: 320, overflowY: 'auto' }}>
-            {activityLogs.map((l, i) => (
-              <div key={i} style={{
+            {activityLogs.length ? activityLogs.map((l, i) => (
+              <div key={i} className="monitor-activity-row" style={{
                 padding: '10px 16px',
                 borderBottom: i < 9 ? '1px solid var(--border)' : 'none',
                 display: 'flex', alignItems: 'flex-start', gap: 10,
@@ -233,7 +221,11 @@ function MonitorPage({ density }) {
                   </div>
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="monitor-activity-empty">
+                {tr('monitor.chart.activityEmpty')}
+              </div>
+            )}
           </div>
         </Card>
       </div>
@@ -243,9 +235,9 @@ function MonitorPage({ density }) {
 
 function SysRow({ label, value }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-      <span style={{ fontSize: 11.5, color: 'var(--fg-3)' }}>{label}</span>
-      <span style={{ fontSize: 12, color: 'var(--fg-0)', fontWeight: 500, textAlign: 'right' }}>{value}</span>
+    <div className="monitor-system-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+      <span style={{ fontSize: 11.5, color: 'var(--fg-3)', flexShrink: 0 }}>{label}</span>
+      <span style={{ fontSize: 12, color: 'var(--fg-0)', fontWeight: 500, textAlign: 'right', minWidth: 0, overflowWrap: 'anywhere' }}>{value}</span>
     </div>
   );
 }

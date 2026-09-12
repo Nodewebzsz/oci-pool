@@ -35,9 +35,10 @@ function RegionsPage({ density }) {
   const [statusFilter, setStatusFilter] = useStateR('all');
   const [search, setSearch] = useStateR('');
   const [page, setPage] = useStateR(1);
-  const [perPage, setPerPage] = useStateR(10);
+  const [perPage, setPerPage] = useStateR(20);
   const [regions, setRegions] = useStateR([]);
   const [loading, setLoading] = useStateR(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useStateR(false);
   const [loadError, setLoadError] = useStateR('');
 
   // 对齐 mobile/arm_regions.ftl：区域目录、放货记录和“我的区域”均来自原后端。
@@ -46,6 +47,7 @@ function RegionsPage({ density }) {
     (async () => {
       try {
         setLoading(true);
+        setRegions([]); // 刷新与加载时第一时间清空旧数据，杜绝旧数据与 loading 共存！
         setLoadError('');
         const [armResponse, mineResponse] = await Promise.all([
           window.ociApi.request('/resource/arm-data'),
@@ -90,7 +92,10 @@ function RegionsPage({ density }) {
           setLoadError(error.message || tr('regions.err.load'));
         }
       } finally {
-        if (alive) setLoading(false);
+        if (alive) {
+          setLoading(false);
+          setHasLoadedOnce(true);
+        }
       }
     })();
     return () => { alive = false; };
@@ -158,11 +163,11 @@ function RegionsPage({ density }) {
       ),
     },
     {
-      key: 'code', label: tr('regions.col.code'),
+      key: 'code', label: tr('regions.col.code'), width: 140,
       render: r => <span className="mono" style={{ color: 'var(--accent)', fontSize: 11.5 }}>{r.code}</span>,
     },
     {
-      key: 'name', label: tr('regions.col.name'),
+      key: 'name', label: tr('regions.col.name'), width: 190,
       render: r => (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 14 }}>{r.flag}</span>
@@ -178,7 +183,7 @@ function RegionsPage({ density }) {
       ),
     },
     {
-      key: 'arch', label: tr('regions.col.arch'),
+      key: 'arch', label: tr('regions.col.arch'), width: 80,
       render: r => (
         r.arch !== '—'
           ? <span style={{
@@ -190,11 +195,11 @@ function RegionsPage({ density }) {
       ),
     },
     {
-      key: 'firstAt', label: tr('regions.col.firstAt'),
+      key: 'firstAt', label: tr('regions.col.firstAt'), width: 150,
       render: r => <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>{r.firstAt}</span>,
     },
     {
-      key: 'totalGrabs', label: tr('regions.col.totalGrabs'), align: 'right',
+      key: 'totalGrabs', label: tr('regions.col.totalGrabs'), align: 'right', width: 90,
       render: r => (
         <span className="num" style={{
           fontWeight: 600,
@@ -203,7 +208,7 @@ function RegionsPage({ density }) {
       ),
     },
     {
-      key: 'monthlyOpenCount', label: tr('regions.col.monthly'), align: 'right',
+      key: 'monthlyOpenCount', label: tr('regions.col.monthly'), align: 'right', width: 90,
       render: r => (
         r.monthlyOpenCount > 0
           ? <span className="num" style={{ color: 'var(--orange)', fontWeight: 700 }}>{r.monthlyOpenCount}</span>
@@ -211,7 +216,7 @@ function RegionsPage({ density }) {
       ),
     },
     {
-      key: 'lastAt', label: tr('regions.col.lastAt'),
+      key: 'lastAt', label: tr('regions.col.lastAt'), width: 150,
       render: r => (
         r.lastAt === '—'
           ? <span style={{ color: 'var(--fg-3)' }}>—</span>
@@ -245,7 +250,18 @@ function RegionsPage({ density }) {
       />
 
       {loadError && (
-        <div role="alert" style={{ marginBottom: 12, color: 'var(--danger)' }}>{loadError}</div>
+        <div style={{ marginBottom: 12, padding: '10px 14px', border: '1px solid var(--danger)', borderRadius: 6, background: 'var(--danger-soft)', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Icon name="alert-circle" size={15} />
+          <span style={{ flex: 1 }}>{loadError}</span>
+          <button
+            type="button"
+            onClick={() => setLoadError('')}
+            style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', display: 'inline-flex', padding: 2 }}
+            title={tr('common.close')}
+          >
+            <Icon name="x" size={14} />
+          </button>
+        </div>
       )}
 
       {/* 3 KPI cards */}
@@ -388,7 +404,20 @@ function RegionsPage({ density }) {
               minHeight: 0,
               overflow: 'auto',
             }}>
-              <Table columns={columns} rows={loading ? [] : paged} density={density} onRowClick={showRegionDetail} />
+              <Table
+                columns={columns}
+                rows={paged}
+                loading={!hasLoadedOnce || loading}
+                empty={
+                  <EmptyState
+                    icon="globe"
+                    title="没有找到匹配的区域"
+                    subtitle="试试调整大洲或状态筛选条件"
+                  />
+                }
+                density={density}
+                onRowClick={showRegionDetail}
+              />
             </div>
 
             {/* 分页 — 固定底部 */}

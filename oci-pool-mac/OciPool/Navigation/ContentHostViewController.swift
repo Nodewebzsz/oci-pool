@@ -71,8 +71,19 @@ final class ContentHostViewController: NSViewController {
         child.view.translatesAutoresizingMaskIntoConstraints = true
         child.view.autoresizingMask = [.width, .height]
         child.view.frame = view.bounds
+        child.view.wantsLayer = true
+        child.view.layer?.opacity = 0
+        child.view.layer?.setAffineTransform(CGAffineTransform(translationX: 0, y: 6))
         view.addSubview(child.view)
         currentChild = child
+
+        // Web `page-in`: 透明 0→1 + 上移 6px → 0
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.22
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            child.view.layer?.opacity = 1
+            child.view.layer?.setAffineTransform(.identity)
+        }
 
         view.window?.title = "OCI-POOL — \(NavigationCatalog.item(for: nav)?.title ?? nav.rawValue)"
     }

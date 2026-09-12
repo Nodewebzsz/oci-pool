@@ -10,7 +10,11 @@ struct AppNSTextField: NSViewRepresentable {
     var enabled: Bool = true
     var fontSize: CGFloat = AppInputStyle.fontSize
     @Binding var isFocused: Bool
+    var alignCenter: Bool = false
     var onCommit: (() -> Void)? = nil
+    var onEscape: (() -> Void)? = nil
+    var onMoveUp: (() -> Void)? = nil
+    var onMoveDown: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -30,6 +34,7 @@ struct AppNSTextField: NSViewRepresentable {
             field.centerYAnchor.constraint(equalTo: container.centerYAnchor)
         ])
         applyStyle(field)
+        if alignCenter { field.alignment = .center }
         field.stringValue = text
         return container
     }
@@ -56,10 +61,16 @@ struct AppNSTextField: NSViewRepresentable {
 
         guard let field = coord.field else { return }
         applyStyle(field)
+        if alignCenter { field.alignment = .center }
         field.isEditable = enabled
         field.isSelectable = enabled
-        if field.stringValue != text, field.currentEditor() == nil {
-            field.stringValue = text
+        if field.stringValue != text {
+            // 聚焦中也同步（如 ESC 清空搜索词）：写入 field editor 才能立即反映到屏幕
+            if let editor = field.currentEditor() {
+                editor.string = text
+            } else {
+                field.stringValue = text
+            }
         }
         field.placeholderAttributedString = placeholderAttr()
     }
@@ -147,6 +158,19 @@ struct AppNSTextField: NSViewRepresentable {
         func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
             if commandSelector == #selector(NSResponder.insertNewline(_:)) {
                 parent.onCommit?()
+                return true
+            }
+            // ESC：交由调用方决定（搜索框=清空关闭，表单=失焦）
+            if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
+                parent.onEscape?()
+                return true
+            }
+            if commandSelector == #selector(NSResponder.moveUp(_:)) {
+                parent.onMoveUp?()
+                return true
+            }
+            if commandSelector == #selector(NSResponder.moveDown(_:)) {
+                parent.onMoveDown?()
                 return true
             }
             return false

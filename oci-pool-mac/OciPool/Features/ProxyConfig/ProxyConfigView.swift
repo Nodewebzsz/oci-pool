@@ -12,25 +12,30 @@ struct ProxyConfigView: View {
 
     var body: some View {
         PageScaffold(
-            title: "代理配置",
-            subtitle: "HTTP/HTTPS 代理池 · 强制代理 · 按租户绑定或全局共享",
-            systemImage: "arrow.left.arrow.right",
+            title: "代理管理",
+            subtitle: "出站代理池，用于绕过 OCI 区域限制和速率限制",
+            systemImage: "shuffle",
+            iconColor: AppTheme.cyan,
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
                     if let err = model.errorText, !err.isEmpty {
                         errorBanner(err)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
+                            .padding(.bottom, 12)
                     }
-                    listBody
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-                .appLoading(model.isLoading && model.items.isEmpty)
-            },
-            footer: {
-                PaginationBar(state: $model.pageState) {
-                    model.onPageChange()
+                    VStack(spacing: 0) {
+                        listBody
+                        PaginationBar(state: $model.pageState) {
+                            model.onPageChange()
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(AppTheme.sidebarBg(dark))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(AppTheme.border(dark), lineWidth: 1)
+                    )
+                    .cornerRadius(8)
                 }
             }
         )
@@ -72,8 +77,29 @@ struct ProxyConfigView: View {
     }
 
     private var listBody: some View {
-        Group {
-            if model.items.isEmpty && !model.isLoading {
+        DataList {
+            DataListColumnHeader(title: "名称", width: 100)
+            DataListColumnHeader(title: "类型", width: 64)
+            DataListColumnHeader(title: "地址", width: nil)
+            DataListColumnHeader(title: "端口", width: 56)
+            DataListColumnHeader(title: "用户名", width: 88)
+            DataListColumnHeader(title: "密码", width: 80)
+            DataListColumnHeader(title: "租户", width: 110)
+            DataListColumnHeader(title: "强制", width: 72)
+            DataListColumnHeader(title: "连通状态", width: 80)
+            DataListColumnHeader(title: "操作", width: 170, alignment: .center)
+        } content: {
+            if (!model.hasLoadedOnce || model.isLoading) && model.items.isEmpty {
+                VStack(spacing: 10) {
+                    Spacer()
+                    ProgressView()
+                    Text("加载代理列表中…")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.sidebarText(dark))
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, minHeight: 260)
+            } else if model.items.isEmpty {
                 EmptyStateView(
                     icon: "arrow.left.arrow.right.circle",
                     title: "暂无代理",
@@ -81,28 +107,14 @@ struct ProxyConfigView: View {
                     actionTitle: "新增代理",
                     action: { model.openAdd() }
                 )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, minHeight: 260)
             } else {
-                DataList {
-                    DataListColumnHeader(title: "名称", width: 100)
-                    DataListColumnHeader(title: "类型", width: 64)
-                    DataListColumnHeader(title: "地址", width: nil)
-                    DataListColumnHeader(title: "端口", width: 56)
-                    DataListColumnHeader(title: "用户名", width: 88)
-                    DataListColumnHeader(title: "密码", width: 80)
-                    DataListColumnHeader(title: "租户", width: 110)
-                    DataListColumnHeader(title: "强制", width: 72)
-                    DataListColumnHeader(title: "连通状态", width: 80)
-                    DataListColumnHeader(title: "操作", width: 170, alignment: .trailing)
-                } content: {
-                    ForEach(model.items) { item in
-                        DataListRow {
-                            row(item)
-                        }
+                ForEach(model.items) { item in
+                    DataListRow {
+                        row(item)
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.top, 8)
+                .opacity(model.isLoading ? 0.6 : 1.0)
             }
         }
     }
@@ -119,7 +131,7 @@ struct ProxyConfigView: View {
             // 强制列可点切换（橙=强制 / 绿=非强制）
             forceShieldCell(item)
             StatusBadge(text: item.statusLabel, tone: item.statusTone)
-                .frame(width: 80, alignment: .leading)
+                .frame(width: 80, alignment: .center)
             HStack(spacing: 6) {
                 Spacer(minLength: 0)
                 Button(action: { model.testConnection(item) }) {
@@ -139,14 +151,14 @@ struct ProxyConfigView: View {
                     Image(systemName: "shield.fill")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(item.isForce
-                                         ? Color(hex: "e67e22")
-                                         : Color(hex: "1abc9c"))
+                                         ? AppTheme.orange
+                                         : AppTheme.sidebarActive)
                         .frame(width: 28, height: 28)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
                                 .fill((item.isForce
-                                       ? Color(hex: "e67e22")
-                                       : Color(hex: "1abc9c")).opacity(0.12))
+                                       ? AppTheme.orange
+                                       : AppTheme.sidebarActive).opacity(0.12))
                         )
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -166,11 +178,11 @@ struct ProxyConfigView: View {
                 Button(action: { model.delete(item) }) {
                     Image(systemName: "trash")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(Color(hex: "f85149"))
+                        .foregroundColor(AppTheme.danger)
                         .frame(width: 28, height: 28)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
-                                .fill(Color(hex: "f85149").opacity(0.12))
+                                .fill(AppTheme.danger.opacity(0.12))
                         )
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -188,12 +200,12 @@ struct ProxyConfigView: View {
                     .font(.system(size: 12))
                     .foregroundColor(item.isForce
                                      ? Color(hex: dark ? "e67e22" : "d35400")
-                                     : Color(hex: dark ? "1abc9c" : "16a085"))
+                                     : AppTheme.sidebarActive)
                 Text(item.forceLabel)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(item.isForce
                                      ? Color(hex: dark ? "e67e22" : "d35400")
-                                     : Color(hex: dark ? "1abc9c" : "16a085"))
+                                     : AppTheme.sidebarActive)
                     .lineLimit(1)
             }
             .padding(.horizontal, 6)
@@ -201,10 +213,10 @@ struct ProxyConfigView: View {
             .background(
                 RoundedRectangle(cornerRadius: 6)
                     .fill((item.isForce
-                           ? Color(hex: "e67e22")
-                           : Color(hex: "1abc9c")).opacity(0.12))
+                           ? AppTheme.orange
+                           : AppTheme.sidebarActive).opacity(0.12))
             )
-            .frame(width: 72, alignment: .leading)
+            .frame(width: 72, alignment: .center)
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
@@ -235,7 +247,7 @@ struct ProxyConfigView: View {
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(AppTheme.sidebarText(dark))
                 }
-                .frame(width: 80, alignment: .leading)
+                .frame(width: 80, alignment: .center)
             }
             .buttonStyle(PlainButtonStyle())
             .help(revealed ? "隐藏密码" : "显示密码")
@@ -247,22 +259,33 @@ struct ProxyConfigView: View {
             .font(.system(size: 12, weight: weight))
             .foregroundColor(dark ? Color.white.opacity(0.88) : Color(hex: "1e2f42"))
             .lineLimit(1)
-            .frame(width: width, alignment: .leading)
+            .truncationMode(.tail)
+            .frame(width: width, alignment: .center)
             .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
+            .clipped()
+            .help(text)
     }
 
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
+                .foregroundColor(AppTheme.danger)
             Text(text).font(.system(size: 12))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
+            Button(action: { model.clearError() }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(AppTheme.danger.opacity(0.8))
+                    .padding(4)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .help("关闭提示")
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(8)
     }
 }

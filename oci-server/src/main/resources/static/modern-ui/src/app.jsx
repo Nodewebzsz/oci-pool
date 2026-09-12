@@ -31,6 +31,25 @@ function resolveTheme(theme) {
   return 'dark';
 }
 
+function useTabletLayout() {
+  const query = '(min-width: 768px) and (max-width: 1199px)';
+  const [matches, setMatches] = useStateA(() => window.matchMedia(query).matches);
+
+  useEffectA(() => {
+    const media = window.matchMedia(query);
+    const update = () => setMatches(media.matches);
+    update();
+    if (media.addEventListener) media.addEventListener('change', update);
+    else media.addListener(update);
+    return () => {
+      if (media.removeEventListener) media.removeEventListener('change', update);
+      else media.removeListener(update);
+    };
+  }, []);
+
+  return matches;
+}
+
 // 品牌加载页 · authState === 'checking'(刷新后等待 /api/userInfo 返回)时出现,
 // 复用品牌云标 + 强调色渐变,替代原先的纯文本占位,让每次刷新都能看到完整品牌首屏。
 function BrandLoading() {
@@ -160,6 +179,8 @@ function AppInner() {
   const { lang, setLang, t: tr } = useT();
   const tk = useTweaks(window.OCI_TWEAK_DEFAULTS);
   const [tweaks, setTweak] = [tk[0], tk[1]];
+  const isTabletLayout = useTabletLayout();
+  const [tabletSidebarOpen, setTabletSidebarOpen] = useStateA(false);
 
   // 后端 sa-token 会话是唯一登录依据；本地存储只保留纯 UI 偏好。
   const [authState, setAuthState] = useStateA('checking');
@@ -229,6 +250,19 @@ function AppInner() {
     return un;
   }, []);
 
+  useEffectA(() => {
+    setTabletSidebarOpen(false);
+  }, [isTabletLayout, route.page]);
+
+  useEffectA(() => {
+    if (!isTabletLayout || !tabletSidebarOpen) return;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setTabletSidebarOpen(false);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [isTabletLayout, tabletSidebarOpen]);
+
   // 未登录时访问非 auth 路由 → 记录目标页并回到登录页;登录成功后回到该页
   // 已登录时访问 auth 路由 → 直接去监控面板
   React.useEffect(() => {
@@ -243,8 +277,8 @@ function AppInner() {
   }, [authState, route]);
 
   const page = route.page;
-  // 子页面上下文(tenant-detail/grab/resources):从路由参数/查询还原
-  const CHILD_PAGE_IDS = ['tenant-detail', 'tenant-grab', 'tenant-resources'];
+  // 子页面上下文(tenant-detail/grab/resources/traffic/audit/cost/quota):从路由参数/查询还原
+  const CHILD_PAGE_IDS = ['tenant-detail', 'tenant-grab', 'tenant-resources', 'tenant-traffic', 'tenant-audit', 'tenant-cost', 'tenant-quota'];
   const detailCtx = CHILD_PAGE_IDS.includes(page)
     ? {
         tenantId: route.params.tenantDbId,
@@ -325,6 +359,10 @@ function AppInner() {
     'tenant-detail': TenantDetailPage,
     'tenant-grab': TenantGrabPage,
     'tenant-resources': TenantResourcesPage,
+    'tenant-traffic': TenantTrafficPage,
+    'tenant-audit': TenantAuditPage,
+    'tenant-cost': TenantCostPage,
+    'tenant-quota': TenantQuotaPage,
     instances: InstancesPage,
     grab: GrabPage,
     regions: RegionsPage,
@@ -340,6 +378,8 @@ function AppInner() {
     memPage:    MemPage,
     migPage:    MigPage,
     mfaBackup:  MfaBackupPage,
+    // AI 对话 · 全屏沉浸式工作台（对齐 macOS 客户端 AiChatView）
+    aiChat:     AiChatPage,
     mail: MailPage,
     object: ObjectPage,
     ai: AIPage,
@@ -359,6 +399,10 @@ function AppInner() {
     'tenant-detail': 'tenants',
     'tenant-grab': 'tenants',      // 从租户菜单进的"查看开机"归属"租户管理"
     'tenant-resources': 'tenants', // 资源列表也是租户的下钻
+    'tenant-traffic': 'tenants',   // 实例流量监控归属"租户管理"
+    'tenant-audit': 'tenants',     // 审计日志归属"租户管理"
+    'tenant-cost': 'tenants',      // 费用统计归属"租户管理"
+    'tenant-quota': 'tenants',     // 账号配额归属"租户管理"
   };
   // 若上次停在依赖 ctx 的子页但 ctx 丢了,回退到 tenants 列表。
   // 租户是否仍存在由详情页对应的后端请求判定，不能依赖本地模拟列表。
@@ -372,6 +416,14 @@ function AppInner() {
   const pageProps = (effectivePage in CHILD_PAGES)
     ? { ...commonProps, ctx: detailCtx, navigate, updateDetailCtx }
     : commonProps;
+  const sidebarCollapsed = isTabletLayout ? !tabletSidebarOpen : tweaks.sidebarCollapsed;
+  const toggleSidebar = () => {
+    if (isTabletLayout) {
+      setTabletSidebarOpen((open) => !open);
+      return;
+    }
+    setTweak('sidebarCollapsed', !tweaks.sidebarCollapsed);
+  };
 
   // Not signed in → render the auth SPA and skip the whole app shell.
   // The auth page still respects theme/accent/lang because those are set on
@@ -388,10 +440,27 @@ function AppInner() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-0)' }}>
-      <Sidebar
-        activePage={activeNavId}
-        onNavigate={navigate}
-        collapsed={tweaks.sidebarCollapsed} />
+      {isTabletLayout && tabletSidebarOpen &&
+        <button
+          type="button"
+          className="tablet-sidebar-backdrop"
+          aria-label={tr('common.close')}
+          onClick={() => setTabletSidebarOpen(false)} />
+      }
+      {isTabletLayout
+        ? <div className="tablet-sidebar-slot">
+            <Sidebar
+              activePage={activeNavId}
+              onNavigate={navigate}
+              collapsed={sidebarCollapsed}
+              tabletOverlay={tabletSidebarOpen}
+              onNavigateComplete={() => setTabletSidebarOpen(false)} />
+          </div>
+        : <Sidebar
+            activePage={activeNavId}
+            onNavigate={navigate}
+            collapsed={sidebarCollapsed} />
+      }
       
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <Topbar
@@ -399,8 +468,8 @@ function AppInner() {
           onChangeTheme={(v) => setTweak('theme', v)}
           lang={lang}
           onToggleLang={() => setLang(lang === 'zh' ? 'en' : 'zh')}
-          collapsed={tweaks.sidebarCollapsed}
-          onToggleCollapse={() => setTweak('sidebarCollapsed', !tweaks.sidebarCollapsed)}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={toggleSidebar}
           accent={
             typeof tweaks.accent === 'string' && ACCENT_PRESETS[tweaks.accent] ? tweaks.accent :
             (tweaks.accent && (tweaks.accent.value || tweaks.accent.key)) || 'green'
@@ -518,6 +587,9 @@ function labelFor(page) {
     'tenant-detail': tr('app.6046be'),
     'tenant-grab': tr('app.2f047d'),
     'tenant-resources': tr('app.73d1f1'),
+    'tenant-traffic': '实例流量监控',
+    'tenant-audit': '审计日志',
+    'tenant-cost': '费用统计',
     instances: tr('app.cd50e3'),
     grab: tr('app.8c19ed'), regions: tr('app.d3d0e3'), logs: tr('app.61eb6d'),
     proxyKeyConfig: tr('app.215666'), cfManage: tr('app.ed4f87'), eoManage: tr('app.4c89a3'),
@@ -526,6 +598,7 @@ function labelFor(page) {
     sysSetting: tr('app.b6225b'), sysVpnProxy: tr('app.a57f7d'),
     notifyMgmt: tr('app.4dda7a'), memPage: tr('app.84aae6'),
     migPage: tr('app.2a0005'), mfaBackup: tr('app.0c7c83'),
+    aiChat: tr('nav.aiChat'),
     keyConfig: tr('app.a10eb8'),
   };
   return map[page] || page;

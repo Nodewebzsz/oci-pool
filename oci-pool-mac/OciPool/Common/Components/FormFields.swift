@@ -2,12 +2,12 @@ import SwiftUI
 
 // MARK: - Shared input chrome (aligned with login page filled fields)
 
-/// Global input tokens — match login filled box (soft fill, radius 12, focus glow).
-/// Toolbar/filter height is slightly denser than login form (40 vs 48).
+/// Global input tokens — 对齐 Web ui.jsx：SearchInput/Select/TextInput 统一 md 高度 30。
+/// 登录页输入框为 Web 特例（高 40 / 圆角 6），由 LoginField 自行定义。
 enum AppInputStyle {
-    static let height: CGFloat = 40
-    static let radius: CGFloat = 12
-    static let fontSize: CGFloat = 13
+    static let height: CGFloat = 30
+    static let radius: CGFloat = 5
+    static let fontSize: CGFloat = 12
     static let iconSize: CGFloat = 12
     static let hPad: CGFloat = 12
 
@@ -20,10 +20,10 @@ enum AppInputStyle {
 
     static func border(_ dark: Bool, focused: Bool = false, hovering: Bool = false) -> Color {
         if focused {
-            return dark ? Color(hex: "4d9eff") : Color(hex: "42b983")
+            return dark ? AppTheme.info : AppTheme.sidebarActive
         }
         if hovering {
-            return dark ? Color(hex: "4d9eff").opacity(0.45) : Color(hex: "42b983").opacity(0.45)
+            return dark ? AppTheme.info.opacity(0.45) : AppTheme.sidebarActive.opacity(0.45)
         }
         return dark ? Color(hex: "31363d") : Color(hex: "e4e7ed")
     }
@@ -31,8 +31,8 @@ enum AppInputStyle {
     static func glow(_ dark: Bool, focused: Bool) -> Color {
         guard focused else { return .clear }
         return dark
-            ? Color(hex: "4d9eff").opacity(0.18)
-            : Color(hex: "42b983").opacity(0.14)
+            ? AppTheme.info.opacity(0.18)
+            : AppTheme.sidebarActive.opacity(0.14)
     }
 
     static func text(_ dark: Bool) -> Color {
@@ -53,6 +53,8 @@ struct AppInputChrome<Content: View>: View {
     var dark: Bool
     var focused: Bool = false
     var height: CGFloat = AppInputStyle.height
+    var radius: CGFloat = AppInputStyle.radius
+    var hPad: CGFloat = AppInputStyle.hPad
     var leading: AnyView? = nil
     var trailing: AnyView? = nil
     @ViewBuilder var content: () -> Content
@@ -69,14 +71,14 @@ struct AppInputChrome<Content: View>: View {
                 trailing
             }
         }
-        .padding(.horizontal, AppInputStyle.hPad)
+        .padding(.horizontal, hPad)
         .frame(height: height)
         .background(
-            RoundedRectangle(cornerRadius: AppInputStyle.radius)
+            RoundedRectangle(cornerRadius: radius)
                 .fill(AppInputStyle.fill(dark, focused: focused))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: AppInputStyle.radius)
+            RoundedRectangle(cornerRadius: radius)
                 .stroke(
                     AppInputStyle.border(dark, focused: focused, hovering: hovering),
                     lineWidth: focused ? 1.5 : 1
@@ -104,16 +106,28 @@ struct FormFieldRow<Content: View>: View {
     @Environment(\.colorScheme) private var colorScheme
     private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
 
+    private var cleanLabel: String {
+        var s = label.trimmingCharacters(in: .whitespaces)
+        if s.hasSuffix("*") {
+            s = String(s.dropLast(1)).trimmingCharacters(in: .whitespaces)
+        }
+        return s
+    }
+
+    private var isRequiredEffective: Bool {
+        required || label.trimmingCharacters(in: .whitespaces).hasSuffix("*")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 2) {
-                Text(label)
+                Text(cleanLabel)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(AppTheme.sidebarText(dark))
-                if required {
+                if isRequiredEffective {
                     Text("*")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(Color(hex: "f85149"))
+                        .foregroundColor(AppTheme.danger)
                 }
             }
             content()
@@ -136,6 +150,7 @@ struct AppTextField: View {
     private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
 
     @State private var focused = false
+    @State private var isRevealed = false
 
     var body: some View {
         AppInputChrome(
@@ -149,19 +164,31 @@ struct AppTextField: View {
                         .foregroundColor(AppInputStyle.icon(dark))
                 )
             },
-            trailing: text.isEmpty ? nil : AnyView(
-                Button(action: { text = "" }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: AppInputStyle.iconSize))
-                        .foregroundColor(AppInputStyle.icon(dark).opacity(0.85))
+            trailing: AnyView(
+                HStack(spacing: 6) {
+                    if !text.isEmpty {
+                        Button(action: { text = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: AppInputStyle.iconSize))
+                                .foregroundColor(AppInputStyle.icon(dark).opacity(0.85))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                    if secure {
+                        Button(action: { isRevealed.toggle() }) {
+                            Image(systemName: isRevealed ? "eye.slash" : "eye")
+                                .font(.system(size: AppInputStyle.iconSize))
+                                .foregroundColor(isRevealed ? AppTheme.sidebarActive : AppInputStyle.icon(dark).opacity(0.85))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
                 }
-                .buttonStyle(PlainButtonStyle())
             )
         ) {
             AppNSTextField(
                 text: $text,
                 placeholder: placeholder,
-                secure: secure,
+                secure: secure && !isRevealed,
                 dark: dark,
                 enabled: true,
                 fontSize: AppInputStyle.fontSize,
@@ -181,6 +208,7 @@ struct AppCompactField: View {
     var placeholder: String = ""
     var width: CGFloat = 56
     var height: CGFloat = 32
+    var alignCenter: Bool = false
     var onCommit: (() -> Void)? = nil
 
     @EnvironmentObject private var appearance: AppearanceController
@@ -199,6 +227,7 @@ struct AppCompactField: View {
                 enabled: true,
                 fontSize: 12,
                 isFocused: $focused,
+                alignCenter: alignCenter,
                 onCommit: onCommit
             )
             .frame(maxWidth: .infinity)

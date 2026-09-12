@@ -92,6 +92,22 @@ enum FeatureRouter {
                     .environmentObject(AppearanceController.shared)
                     .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
             )
+        case .tenantGrab:
+            root = AnyView(
+                BootView(tenantSubPage: true)
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+        case .tenantResources:
+            root = AnyView(
+                InstancesView(tenantSubPage: true)
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
         case .boot:
             root = AnyView(
                 BootView()

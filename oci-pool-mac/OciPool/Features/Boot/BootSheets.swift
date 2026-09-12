@@ -111,13 +111,30 @@ struct BootSheetHost: View {
                 HStack(spacing: 8) {
                     Image(systemName: "person.2")
                         .foregroundColor(AppTheme.sidebarActive)
-                    Text(item.displayTenant)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(primaryText)
-                    if !item.regionName.isEmpty {
-                        Text("· \(item.regionName)")
-                            .font(.system(size: 12))
-                            .foregroundColor(mutedText)
+                    if item.tenantId == 0 {
+                        // 工具栏「预开」：表单内选择租户（对齐 Web addBoot(null) 租户下拉）
+                        SelectMenu(
+                            options: model.parentTenants.map {
+                                SelectOption(id: $0.id, title: model.tenantLabel($0))
+                            },
+                            selection: Binding(
+                                get: { model.createTenantId > 0 ? String(model.createTenantId) : nil },
+                                set: { v in model.createTenantId = Int64(v ?? "0") ?? 0 }
+                            ),
+                            placeholder: "请选择租户",
+                            width: 300,
+                            allowClear: false,
+                            searchable: true
+                        )
+                    } else {
+                        Text(item.displayTenant)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(primaryText)
+                        if !item.regionName.isEmpty {
+                            Text("· \(item.regionName)")
+                                .font(.system(size: 12))
+                                .foregroundColor(mutedText)
+                        }
                     }
                     Spacer()
                 }

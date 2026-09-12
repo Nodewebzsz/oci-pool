@@ -33,6 +33,7 @@ final class StorageViewModel: ObservableObject {
     // MARK: - UI state
 
     @Published private(set) var isLoading = false
+    @Published private(set) var hasLoadedOnce = false
     @Published private(set) var errorText: String?
     @Published var activeSheet: StorageSheet?
 
@@ -44,6 +45,10 @@ final class StorageViewModel: ObservableObject {
 
     // Presigned
     @Published var presignedURLText = ""
+    @Published var presignedHoursText: String = "24"
+    var presignedHours: Int { min(max(Int(presignedHoursText) ?? 24, 1), 168) }
+    @Published var presignedLoading = false
+    @Published var presignedItem: StorageObjectItem?
 
     // Upload
     @Published var uploadTasks: [StorageUploadTask] = []
@@ -78,10 +83,12 @@ final class StorageViewModel: ObservableObject {
     // MARK: - Lifecycle
 
     func start() {
+        isLoading = true
         Task { await loadTenants() }
     }
 
     func reloadAll() async {
+        errorText = nil
         await loadTenants()
         if !selectedTenantId.isEmpty {
             await loadBuckets(reset: true)
@@ -96,12 +103,15 @@ final class StorageViewModel: ObservableObject {
     func loadTenants() async {
         isLoading = true
         errorText = nil
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoadedOnce = true
+        }
         do {
             var list = try await service.listParentTenants()
             list.sort {
-                let a = $0.userName.isEmpty ? $0.tenancyName : $0.userName
-                let b = $1.userName.isEmpty ? $1.tenancyName : $1.userName
+                let a = $0.tenancyName.isEmpty ? $0.userName : $0.tenancyName
+                let b = $1.tenancyName.isEmpty ? $1.userName : $1.tenancyName
                 return a.localizedCaseInsensitiveCompare(b) == .orderedAscending
             }
             parentTenants = list
@@ -117,15 +127,15 @@ final class StorageViewModel: ObservableObject {
         buckets = []
         bucketNextToken = nil
         bucketSearch = ""
+        errorText = nil
         clearObjectPanel()
         guard !selectedTenantId.isEmpty else { return }
+        bucketsLoading = true
         Task { await loadBuckets(reset: true) }
     }
 
     func tenantLabel(_ t: TenantRegionOption) -> String {
-        if !t.userName.isEmpty { return t.userName }
-        if !t.tenancyName.isEmpty { return t.tenancyName }
-        return t.id
+        t.label
     }
 
     // MARK: - Buckets
@@ -135,6 +145,7 @@ final class StorageViewModel: ObservableObject {
         if reset {
             bucketsLoading = true
             bucketNextToken = nil
+            errorText = nil
         }
         defer { bucketsLoading = false }
         do {
@@ -143,6 +154,7 @@ final class StorageViewModel: ObservableObject {
                 limit: 20,
                 pageToken: reset ? nil : bucketNextToken
             )
+            errorText = nil
             if reset {
                 buckets = page.items
             } else {
@@ -158,6 +170,11 @@ final class StorageViewModel: ObservableObject {
             if namespace.isEmpty, let ns = buckets.first?.namespace, !ns.isEmpty {
                 namespace = ns
             }
+            if namespace.isEmpty {
+                if let ns = try? await service.getNamespace(tenantId: tenantId), !ns.isEmpty {
+                    namespace = ns
+                }
+            }
         } catch {
             if reset { buckets = [] }
             handleError(error)
@@ -169,6 +186,7 @@ final class StorageViewModel: ObservableObject {
             ToastCenter.shared.error("请先选择租户")
             return
         }
+        errorText = nil
         Task { await loadBuckets(reset: true) }
     }
 
@@ -182,6 +200,7 @@ final class StorageViewModel: ObservableObject {
         if !item.namespace.isEmpty {
             namespace = item.namespace
         }
+        objectsLoading = true
         Task { await loadObjects(reset: true) }
     }
 
@@ -226,25 +245,27 @@ final class StorageViewModel: ObservableObject {
     }
 
     func deleteBucket(_ item: StorageBucketItem) {
-        guard let tenantId = tenantIdValue else { return }
-        guard AppAlert.confirm(
-            title: "删除存储桶",
-            message: "确定删除「\(item.name)」？桶必须为空才能删除。"
-        ) else { return }
+        // Web：requireText = 桶名 +「永久删除」
+        guard let input = AppAlert.confirmRequireText(
+            title: "删除存储桶 \(item.name)?",
+            message: "该操作不可撤销。",
+            requiredText: item.name,
+            placeholder: "输入桶名以确认",
+            confirmTitle: "永久删除"
+        ), input == item.name else { return }
         Task {
             LoadingHUD.shared.begin()
             do {
                 try await service.deleteBucket(
-                    tenantId: tenantId,
+                    tenantId: tenantIdValue ?? 0,
                     namespace: item.namespace,
                     bucketName: item.name
                 )
-                if selectedBucket?.name == item.name {
-                    clearObjectPanel()
-                }
-                await loadBuckets(reset: true)
+                if selectedBucket?.name == item.name { clearObjectPanel() }
+                refreshBuckets()
+                ToastCenter.shared.warn("✓ 已删除存储桶 \(item.name)")
             } catch {
-                ToastCenter.shared.error(error.localizedDescription)
+                ToastCenter.shared.error("删除失败: \(error.localizedDescription)")
             }
             LoadingHUD.shared.end()
         }
@@ -281,6 +302,7 @@ final class StorageViewModel: ObservableObject {
         if reset {
             objectTokens = [nil]
             objectPageIndex = 0
+            errorText = nil
         }
         objectsLoading = true
         defer { objectsLoading = false }
@@ -294,6 +316,7 @@ final class StorageViewModel: ObservableObject {
                 limit: objectPageLimit,
                 startToken: token
             )
+            errorText = nil
             objects = page.items
             if let next = page.nextStartWith, !next.isEmpty {
                 if objectTokens.count <= objectPageIndex + 1 {
@@ -357,27 +380,38 @@ final class StorageViewModel: ObservableObject {
     }
 
     func openPresigned(_ item: StorageObjectItem) {
-        guard let tenantId = tenantIdValue, let bucket = selectedBucket else { return }
-        let ns = bucket.namespace.isEmpty ? namespace : bucket.namespace
+        presignedItem = item
         presignedURLText = ""
+        presignedHoursText = "24"
         activeSheet = .presigned(item)
+        generatePresigned()
+    }
+
+    /// Web：POST validitySeconds（小时 × 3600，默认 24h，可选 1-168h）
+    func generatePresigned() {
+        guard let item = presignedItem,
+              let tenantId = tenantIdValue,
+              let bucket = selectedBucket else { return }
+        let ns = bucket.namespace.isEmpty ? namespace : bucket.namespace
+        let hours = presignedHours
+        presignedURLText = ""
+        presignedLoading = true
         Task {
-            LoadingHUD.shared.begin()
             do {
                 let url = try await service.presignedURL(
                     tenantId: tenantId,
                     namespace: ns,
                     bucketName: bucket.name,
-                    objectName: item.name
+                    objectName: item.name,
+                    validitySeconds: Int64(hours) * 3600
                 )
                 presignedURLText = url
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(url, forType: .string)
             } catch {
-                ToastCenter.shared.error(error.localizedDescription)
-                activeSheet = nil
+                ToastCenter.shared.error("获取预签名链接失败: \(error.localizedDescription)")
             }
-            LoadingHUD.shared.end()
+            presignedLoading = false
         }
     }
 
@@ -646,6 +680,10 @@ final class StorageViewModel: ObservableObject {
         case "zip": return "application/zip"
         default: return nil
         }
+    }
+
+    func clearError() {
+        errorText = nil
     }
 
     // MARK: - Helpers

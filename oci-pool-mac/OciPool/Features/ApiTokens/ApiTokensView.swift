@@ -8,38 +8,39 @@ struct ApiTokensView: View {
     @StateObject private var model = ApiTokensViewModel()
 
     private var dark: Bool { appearance.isDarkEffective }
-    private let cardMinHeight: CGFloat = 360
+    private let row1MinHeight: CGFloat = 240
+    private let row2MinHeight: CGFloat = 180
 
     var body: some View {
         PageScaffold(
             title: "Token 配置",
-            subtitle: "Open API 访问令牌 · 生成 / 撤销 / 使用说明",
-            systemImage: "key.fill",
+            subtitle: "平台 REST API 的 Bearer Token 管理",
+            systemImage: "key",
+            iconColor: AppTheme.sidebarActive,
             toolbar: { toolbar },
             content: {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
                         if let err = model.errorText, !err.isEmpty {
                             errorBanner(err)
+                                .padding(.bottom, 12)
                         }
                         VStack(spacing: 14) {
-                            EqualHeightCardRow(minHeight: cardMinHeight) {
+                            EqualHeightCardRow(minHeight: row1MinHeight) {
                                 statusCard
                             } second: {
                                 configCard
                             }
-                            EqualHeightCardRow(minHeight: cardMinHeight) {
+                            EqualHeightCardRow(minHeight: row2MinHeight) {
                                 docsCard
                             } second: {
                                 usageCard
                             }
                         }
                     }
-                    .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .appLoading(model.isLoading)
             }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
@@ -68,9 +69,9 @@ struct ApiTokensView: View {
             title: "Token 状态",
             subtitle: model.status.enabled ? "已启用" : "未启用 / 已撤销",
             systemImage: "info.circle",
-            accent: model.status.enabled ? Color(hex: "3fb950") : Color(hex: "adbac7"),
+            accent: model.status.enabled ? AppTheme.sidebarActive : AppTheme.sidebarText(dark),
             enabled: nil,
-            minHeight: cardMinHeight
+            minHeight: row1MinHeight
         ) {
             infoRow("名称", model.status.tokenName.isEmpty ? "—" : model.status.tokenName)
             infoRow("状态", model.status.hasToken ? (model.status.enabled ? "已生成 · 有效" : "已生成 · 已停用") : "未生成")
@@ -112,9 +113,9 @@ struct ApiTokensView: View {
             title: "Token 配置",
             subtitle: "生成或撤销 API 访问令牌",
             systemImage: "gearshape",
-            accent: Color(hex: "4a9eff"),
+            accent: AppTheme.info,
             enabled: nil,
-            minHeight: cardMinHeight
+            minHeight: row1MinHeight
         ) {
             FormFieldRow(label: "Token 名称", required: true) {
                 AppTextField(
@@ -171,12 +172,12 @@ struct ApiTokensView: View {
 
     private var docsCard: some View {
         ModuleSettingsCard(
-            title: "API 文档",
+            title: "API 文档访问",
             subtitle: "Swagger / OpenAPI",
             systemImage: "book",
-            accent: Color(hex: "9b59b6"),
+            accent: Color(hex: "b484e8"),
             enabled: nil,
-            minHeight: cardMinHeight
+            minHeight: row2MinHeight
         ) {
             Text("使用 Bearer Token 调用 Open API。可在浏览器打开 Swagger 或下载 OpenAPI JSON。")
                 .font(.system(size: 12))
@@ -199,14 +200,14 @@ struct ApiTokensView: View {
 
     private var usageCard: some View {
         ModuleSettingsCard(
-            title: "使用说明",
+            title: "API 使用说明",
             subtitle: "请求头携带 Authorization",
             systemImage: "terminal",
-            accent: Color(hex: "f0881a"),
+            accent: AppTheme.orange,
             enabled: nil,
-            minHeight: cardMinHeight
+            minHeight: row2MinHeight
         ) {
-            Text("在 HTTP 请求头中加入：")
+            Text("所有 API 请求需在请求头中携带 Bearer Token 完成鉴权。示例：")
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.sidebarText(dark))
 
@@ -243,7 +244,7 @@ struct ApiTokensView: View {
         Button(action: { model.openURL(path) }) {
             HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .foregroundColor(Color(hex: "9b59b6"))
+                    .foregroundColor(Color(hex: "b484e8"))
                     .frame(width: 18)
                 Text(title)
                     .font(.system(size: 13, weight: .medium))
@@ -279,7 +280,7 @@ struct ApiTokensView: View {
                 .font(.system(size: 12, weight: warn ? .semibold : .regular))
                 .foregroundColor(
                     warn
-                        ? Color(hex: "f0881a")
+                        ? AppTheme.orange
                         : (dark ? Color.white.opacity(0.9) : Color.primary)
                 )
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -289,15 +290,15 @@ struct ApiTokensView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
+                .foregroundColor(AppTheme.danger)
             Text(text).font(.system(size: 12))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(8)
     }
 }

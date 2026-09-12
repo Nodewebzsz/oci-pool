@@ -11,6 +11,8 @@ struct AiChatView: View {
     @State private var inputFocused = false
     /// 租户列默认隐藏，给聊天区最大宽度；点顶栏按钮展开
     @State private var showTenantRail = false
+    /// 输入框动态行高（单行 24px，随多行自适应增长，上限 96px）
+    @State private var inputEditorHeight: CGFloat = 24
 
     private var dark: Bool { appearance.isDarkEffective }
 
@@ -416,10 +418,10 @@ struct AiChatView: View {
             } else if model.selectedTenantId != nil {
                 Text("暂无可用模型")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(Color(hex: "f59e0b"))
+                    .foregroundColor(AppTheme.orange)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(Capsule().fill(Color(hex: "f59e0b").opacity(0.12)))
+                    .background(Capsule().fill(AppTheme.orange.opacity(0.12)))
             }
 
             // Context toggle chip
@@ -459,9 +461,9 @@ struct AiChatView: View {
     }
 
     private var statusColor: Color {
-        if model.isConnected { return Color(hex: "10b981") }
+        if model.isConnected { return AppTheme.sidebarActive }
         if model.isLoadingModels || model.statusText.contains("连接") || model.statusText.contains("加载") {
-            return Color(hex: "f59e0b")
+            return AppTheme.orange
         }
         return Color(hex: "94a3b8")
     }
@@ -632,12 +634,15 @@ struct AiChatView: View {
         .opacity(model.isConnected && !model.selectedModelId.isEmpty ? 1 : 0.45)
     }
 
+    /// Web 抽屉消息行：30 圆形头像（user=info-soft+person / AI=violet-soft+cpu）+ 气泡
     private func messageRow(_ msg: AiChatMessage) -> some View {
         HStack(alignment: .top, spacing: 10) {
             if msg.role == .user {
-                Spacer(minLength: 80)
+                Spacer(minLength: 40)
                 userBubble(msg)
+                chatAvatar(isUser: true)
             } else {
+                chatAvatar(isUser: false)
                 assistantBlock(msg)
                 Spacer(minLength: 40)
             }
@@ -647,22 +652,41 @@ struct AiChatView: View {
         .animation(.easeOut(duration: 0.16), value: msg.text)
     }
 
-    /// 用户：右侧浅底气泡（短句像 pill，多行自动圆角矩形）
+    private func chatAvatar(isUser: Bool) -> some View {
+        let color = isUser ? AppTheme.info : Color(hex: "b484e8")
+        return ZStack {
+            Circle()
+                .fill(isUser
+                      ? AppTheme.infoSoft(dark)
+                      : (dark ? Color(hex: "3b1959") : Color(hex: "f6e0ff")))
+                .frame(width: 30, height: 30)
+            Image(systemName: isUser ? "person.fill" : "cpu")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(color)
+        }
+    }
+
+    /// 用户：右侧 info-soft 气泡 + info 边框（Web 抽屉样式）
     private func userBubble(_ msg: AiChatMessage) -> some View {
         VStack(alignment: .trailing, spacing: 4) {
             Text(msg.text)
-                .font(.system(size: 13.5))
-                .foregroundColor(dark ? Color.white.opacity(0.95) : Color.primary)
+                .font(.system(size: 12.5))
+                .foregroundColor(AppTheme.navIcon(dark))
                 .lineSpacing(3)
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 9)
+                .frame(maxWidth: .infinity, alignment: .trailing)
                 .background(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(dark ? Color.white.opacity(0.12) : Color(hex: "f3f4f6"))
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(AppTheme.infoSoft(dark))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(AppTheme.info, lineWidth: 1)
                 )
             Text(timeString(msg.createdAt))
                 .font(.system(size: 10))
-                .foregroundColor(muted.opacity(0.75))
+                .foregroundColor(AppTheme.textTertiary(dark))
         }
         .frame(maxWidth: 480, alignment: .trailing)
     }
@@ -684,39 +708,51 @@ struct AiChatView: View {
                 .padding(.vertical, 10)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color(hex: "f59e0b").opacity(0.12))
+                        .fill(AppTheme.orange.opacity(0.12))
                 )
             } else {
-                Text(msg.text)
-                    .font(.system(size: 14))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
-                    .lineSpacing(4)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            HStack(spacing: 10) {
-                Text(timeString(msg.createdAt))
-                    .font(.system(size: 10))
-                    .foregroundColor(muted.opacity(0.75))
-                if msg.isStreaming {
-                    Text("生成中")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(accent)
-                }
-                if msg.role == .assistant, !msg.isStreaming {
-                    Button {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(msg.text, forType: .string)
-                        ToastCenter.shared.success("已复制")
-                    } label: {
-                        Image(systemName: "doc.on.doc")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(muted.opacity(0.7))
+                // Web 抽屉 AI 气泡：bg-2 底 + border · 文本与时间都在气泡内
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(msg.text)
+                        .font(.system(size: 12.5))
+                        .foregroundColor(AppTheme.navIcon(dark))
+                        .lineSpacing(4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 10) {
+                        Text(timeString(msg.createdAt))
+                            .font(.system(size: 10))
+                            .foregroundColor(AppTheme.textTertiary(dark))
+                        if msg.isStreaming {
+                            Text("生成中")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(accent)
+                        }
+                        if !msg.isStreaming {
+                            Button {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(msg.text, forType: .string)
+                                ToastCenter.shared.success("已复制")
+                            } label: {
+                                Image(systemName: "doc.on.doc")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(AppTheme.textTertiary(dark))
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .help("复制本条")
+                        }
+                        Spacer(minLength: 0)
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    .help("复制本条")
                 }
-                Spacer(minLength: 0)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(AppTheme.sidebarHover(dark))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(AppTheme.border(dark), lineWidth: 1)
+                )
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -741,26 +777,30 @@ struct AiChatView: View {
             if let err = model.errorText, !err.isEmpty {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundColor(Color(hex: "f85149"))
+                        .foregroundColor(AppTheme.danger)
                     Text(err)
                         .font(.system(size: 11))
-                        .foregroundColor(Color(hex: "f85149"))
+                        .foregroundColor(AppTheme.danger)
                     Spacer()
                 }
                 .padding(.horizontal, 4)
             }
 
             HStack(alignment: .center, spacing: 10) {
-                ZStack(alignment: .leading) {
+                ZStack(alignment: .topLeading) {
                     if model.input.isEmpty {
                         Text("畅所欲问…")
                             .font(.system(size: 14))
                             .foregroundColor(muted.opacity(0.55))
-                            .padding(.leading, 4)
+                            .padding(.top, 2)
                             .allowsHitTesting(false)
                     }
-                    MacChatTextEditor(text: $model.input, onSubmit: { model.send() })
-                        .frame(minHeight: 24, maxHeight: 88)
+                    MacChatTextEditor(
+                        text: $model.input,
+                        calculatedHeight: $inputEditorHeight,
+                        onSubmit: { model.send() }
+                    )
+                    .frame(height: inputEditorHeight)
                 }
                 .frame(maxWidth: .infinity)
 
@@ -787,9 +827,9 @@ struct AiChatView: View {
                 .buttonStyle(PlainButtonStyle())
                 .disabled(!canSend)
             }
-            .padding(.leading, 16)
+            .padding(.leading, 20)
             .padding(.trailing, 8)
-            .padding(.vertical, 8)
+            .padding(.vertical, 7)
             .background(
                 Capsule(style: .continuous)
                     .fill(dark ? Color.white.opacity(0.08) : Color(hex: "f4f4f5"))
@@ -845,13 +885,15 @@ struct AiChatView: View {
 
 private struct MacChatTextEditor: NSViewRepresentable {
     @Binding var text: String
+    @Binding var calculatedHeight: CGFloat
     var onSubmit: () -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView()
-        scroll.hasVerticalScroller = true
+        scroll.hasVerticalScroller = false
+        scroll.hasHorizontalScroller = false
         scroll.borderType = .noBorder
         scroll.drawsBackground = false
         scroll.scrollerStyle = .overlay
@@ -861,7 +903,8 @@ private struct MacChatTextEditor: NSViewRepresentable {
         tv.isRichText = false
         tv.allowsUndo = true
         tv.font = NSFont.systemFont(ofSize: 14)
-        tv.textContainerInset = NSSize(width: 2, height: 4)
+        tv.textContainer?.lineFragmentPadding = 0
+        tv.textContainerInset = NSSize(width: 0, height: 2)
         tv.isHorizontallyResizable = false
         tv.isVerticallyResizable = true
         tv.autoresizingMask = [.width]
@@ -870,8 +913,12 @@ private struct MacChatTextEditor: NSViewRepresentable {
         tv.drawsBackground = false
         tv.string = text
         context.coordinator.textView = tv
+        context.coordinator.scrollView = scroll
 
         scroll.documentView = tv
+        DispatchQueue.main.async {
+            context.coordinator.updateHeight()
+        }
         return scroll
     }
 
@@ -879,6 +926,7 @@ private struct MacChatTextEditor: NSViewRepresentable {
         guard let tv = nsView.documentView as? NSTextView else { return }
         if tv.string != text {
             tv.string = text
+            context.coordinator.updateHeight()
         }
         let dark = AppearanceController.shared.isDarkEffective
         tv.textColor = dark ? NSColor.white.withAlphaComponent(0.92) : NSColor.labelColor
@@ -888,12 +936,29 @@ private struct MacChatTextEditor: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: MacChatTextEditor
         weak var textView: NSTextView?
+        weak var scrollView: NSScrollView?
 
         init(_ parent: MacChatTextEditor) { self.parent = parent }
 
         func textDidChange(_ notification: Notification) {
             guard let tv = notification.object as? NSTextView else { return }
             parent.text = tv.string
+            updateHeight()
+        }
+
+        func updateHeight() {
+            guard let tv = textView, let layoutManager = tv.layoutManager, let textContainer = tv.textContainer else { return }
+            layoutManager.glyphRange(for: textContainer)
+            let usedRect = layoutManager.usedRect(for: textContainer)
+            let baseHeight: CGFloat = 22
+            let contentHeight = max(baseHeight, ceil(usedRect.height))
+            let targetHeight = min(max(22, contentHeight + 2), 96)
+            if parent.calculatedHeight != targetHeight {
+                DispatchQueue.main.async {
+                    self.parent.calculatedHeight = targetHeight
+                    self.scrollView?.hasVerticalScroller = targetHeight >= 96
+                }
+            }
         }
 
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {

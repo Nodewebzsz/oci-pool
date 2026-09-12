@@ -99,7 +99,7 @@ function ToastStack({ toasts }) {
 }
 
 // ─── Modal ───────────────────────────────────────────────────────
-function ModalShell({ title, subtitle, icon, iconColor = 'var(--accent)', size = 'md', body, footer, onClose }) {
+function ModalShell({ title, subtitle, icon, iconColor = 'var(--accent)', size = 'md', height, body, footer, onClose }) {
   React.useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -122,6 +122,7 @@ function ModalShell({ title, subtitle, icon, iconColor = 'var(--accent)', size =
         top: '50%', left: '50%',
         transform: 'translate(-50%, -50%)',
         width: w, maxWidth: '92vw',
+        height: height || undefined,
         maxHeight: '90vh',
         background: 'var(--bg-1)',
         border: '1px solid var(--border-strong)',
@@ -158,7 +159,11 @@ function ModalShell({ title, subtitle, icon, iconColor = 'var(--accent)', size =
             <IconButton icon="x" onClick={onClose} size={28} style={{ border: '1px solid var(--border)' }} />
           </div>
         )}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div style={{
+          flex: 1, minHeight: 0,
+          overflowY: height ? 'hidden' : 'auto',
+          display: 'flex', flexDirection: 'column',
+        }}>
           {body}
         </div>
         {footer && (
@@ -640,36 +645,73 @@ function FormRow({ label, hint, required, children, style = {} }) {
   );
 }
 
-// ─── 通用密码输入框(带眼睛) ─────────────
+// ─── 通用密码输入框(带眼睛 + 一键清空) ─────────────
 // 用于替换项目中裸的 <input type="password"> · 保持外层容器/表单布局不变
-function PasswordInput({ value, onChange, placeholder, style = {}, mono = true, ...rest }) {
+function PasswordInput({ value, onChange, placeholder, style = {}, mono = true, disabled = false, readOnly = false, allowClear = true, ...rest }) {
   const [reveal, setReveal] = React.useState(false);
+  const hasVal = Boolean(value !== undefined && value !== null && String(value).length > 0 && !disabled && !readOnly && typeof onChange === 'function' && allowClear);
+
   return (
-    <div style={{ position: 'relative', width: '100%' }}>
+    <div style={{
+      position: 'relative',
+      width: style.width || '100%',
+      flex: style.flex,
+      minWidth: style.minWidth,
+      maxWidth: style.maxWidth,
+      display: style.display || (style.width && style.width !== '100%' ? 'inline-block' : 'block'),
+    }}>
       <input
         type={reveal ? 'text' : 'password'}
         value={value ?? ''}
         onChange={e => onChange && onChange(e.target.value)}
         placeholder={placeholder}
         autoComplete="off"
+        disabled={disabled}
+        readOnly={readOnly}
         style={{
           width: '100%',
-          padding: '7px 36px 7px 10px',
-          background: 'var(--bg-2)', color: 'var(--fg-0)',
-          border: '1px solid var(--border)', borderRadius: 4,
-          fontSize: 12, fontFamily: mono ? 'var(--font-mono)' : 'inherit',
+          padding: allowClear ? '7px 54px 7px 10px' : '7px 32px 7px 10px',
+          background: disabled || readOnly ? 'var(--bg-3)' : 'var(--bg-2)',
+          color: disabled ? 'var(--fg-3)' : 'var(--fg-0)',
+          border: '1px solid var(--border)',
+          borderRadius: 4,
+          fontSize: 12,
+          fontFamily: mono ? 'var(--font-mono)' : 'inherit',
           outline: 'none',
+          boxSizing: 'border-box',
           ...style,
         }}
         {...rest}
       />
+      {hasVal && (
+        <button
+          type="button"
+          onMouseDown={e => e.preventDefault()}
+          onClick={() => onChange && onChange('')}
+          tabIndex={-1}
+          title={typeof tr === 'function' ? (tr('logs.action.clear') || 'Clear') : 'Clear'}
+          style={{
+            position: 'absolute', right: 28, top: '50%', transform: 'translateY(-50%)',
+            width: 22, height: 22, padding: 0,
+            background: 'transparent', color: 'var(--fg-3)',
+            border: 'none', cursor: 'pointer', borderRadius: '50%',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            opacity: 0.65,
+            transition: 'opacity 120ms, color 120ms',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--fg-1)'; }}
+          onMouseLeave={e => { e.currentTarget.style.opacity = '0.65'; e.currentTarget.style.color = 'var(--fg-3)'; }}
+        >
+          <Icon name="x-circle" size={13} />
+        </button>
+      )}
       <button type="button"
         onClick={() => setReveal(!reveal)}
         tabIndex={-1}
-        title={reveal ? tr('shell.dce537') : tr('shell.4d775d')}
+        title={reveal ? (typeof tr === 'function' ? tr('shell.dce537') : 'Hide') : (typeof tr === 'function' ? tr('shell.4d775d') : 'Show')}
         style={{
           position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)',
-          width: 26, height: 26, padding: 0,
+          width: 24, height: 24, padding: 0,
           background: 'transparent', color: 'var(--fg-2)',
           border: 'none', cursor: 'pointer', borderRadius: 3,
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -681,59 +723,111 @@ function PasswordInput({ value, onChange, placeholder, style = {}, mono = true, 
   );
 }
 
-function TextInput({ value, onChange, placeholder, mono, type = 'text', style = {}, autoComplete, maxLength }) {
+function TextInput({
+  value,
+  onChange,
+  placeholder,
+  mono,
+  type = 'text',
+  style = {},
+  autoComplete,
+  maxLength,
+  disabled = false,
+  readOnly = false,
+  allowClear = true,
+  ...rest
+}) {
   const [reveal, setReveal] = React.useState(false);
   const isPass = type === 'password';
   const effType = isPass && reveal ? 'text' : type;
-  const inputStyle = {
-    width: '100%',
-    padding: isPass ? '7px 36px 7px 10px' : '7px 10px',
-    background: 'var(--bg-2)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-sm)',
-    color: 'var(--fg-0)',
-    fontFamily: mono || isPass ? 'var(--font-mono)' : 'inherit',
-    fontSize: 12, outline: 'none',
-    ...style,
-  };
-  if (!isPass) {
-    return (
-      <input
-        type={effType}
-        value={value || ''}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        autoComplete={autoComplete}
-        maxLength={maxLength}
-        style={inputStyle}
-      />
-    );
-  }
-  // 密码输入框:内嵌眼睛按钮
+  const hasVal = Boolean(value !== undefined && value !== null && String(value).length > 0 && !disabled && !readOnly && typeof onChange === 'function' && allowClear);
+
+  const padRight = isPass
+    ? (allowClear ? '54px' : '32px')
+    : (allowClear ? '30px' : '10px');
+
   return (
-    <div style={{ position: 'relative', width: '100%' }}>
+    <div style={{
+      position: 'relative',
+      width: style.width || '100%',
+      flex: style.flex,
+      minWidth: style.minWidth,
+      maxWidth: style.maxWidth,
+      display: style.display || (style.width && style.width !== '100%' ? 'inline-block' : 'block'),
+    }}>
       <input
         type={effType}
-        value={value || ''}
-        onChange={e => onChange(e.target.value)}
+        value={value ?? ''}
+        onChange={e => onChange && onChange(e.target.value)}
         placeholder={placeholder}
-        autoComplete={autoComplete || 'off'}
+        autoComplete={autoComplete || (isPass ? 'off' : undefined)}
         maxLength={maxLength}
-        style={inputStyle}
-      />
-      <button type="button"
-        onClick={() => setReveal(!reveal)}
-        tabIndex={-1}
-        title={reveal ? tr('shell.dce537') : tr('shell.4d775d')}
+        disabled={disabled}
+        readOnly={readOnly}
         style={{
-          position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)',
-          width: 26, height: 26, padding: 0,
-          background: 'transparent', color: 'var(--fg-2)',
-          border: 'none', cursor: 'pointer', borderRadius: 3,
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          width: '100%',
+          padding: `7px ${padRight} 7px 10px`,
+          background: disabled || readOnly ? 'var(--bg-3)' : 'var(--bg-2)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-sm)',
+          color: disabled ? 'var(--fg-3)' : 'var(--fg-0)',
+          fontFamily: mono || isPass ? 'var(--font-mono)' : 'inherit',
+          fontSize: 12,
+          outline: 'none',
+          boxSizing: 'border-box',
+          ...style,
         }}
-      >
-        <Icon name={reveal ? 'eye-off' : 'eye'} size={13} />
-      </button>
+        {...rest}
+      />
+      {hasVal && (
+        <button
+          type="button"
+          onMouseDown={e => e.preventDefault()}
+          onClick={() => onChange && onChange('')}
+          tabIndex={-1}
+          title={typeof tr === 'function' ? (tr('logs.action.clear') || 'Clear') : 'Clear'}
+          style={{
+            position: 'absolute',
+            right: isPass ? 28 : 5,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: 22,
+            height: 22,
+            padding: 0,
+            background: 'transparent',
+            color: 'var(--fg-3)',
+            border: 'none',
+            cursor: 'pointer',
+            borderRadius: '50%',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: 0.65,
+            transition: 'opacity 120ms, color 120ms',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--fg-1)'; }}
+          onMouseLeave={e => { e.currentTarget.style.opacity = '0.65'; e.currentTarget.style.color = 'var(--fg-3)'; }}
+        >
+          <Icon name="x-circle" size={13} />
+        </button>
+      )}
+      {isPass && (
+        <button
+          type="button"
+          onClick={() => setReveal(!reveal)}
+          tabIndex={-1}
+          title={reveal ? (typeof tr === 'function' ? tr('shell.dce537') : 'Hide') : (typeof tr === 'function' ? tr('shell.4d775d') : 'Show')}
+          style={{
+            position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)',
+            width: 24, height: 24, padding: 0,
+            background: 'transparent', color: 'var(--fg-2)',
+            border: 'none', cursor: 'pointer', borderRadius: 3,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <Icon name={reveal ? 'eye-off' : 'eye'} size={13} />
+        </button>
+      )}
     </div>
   );
 }
@@ -963,5 +1057,5 @@ Object.assign(window, {
   DropdownMenu, RowActionMenu,
   KVList, SectionLabel, Stepper,
   FormRow, TextInput, PasswordInput, TextArea, NumberInput,
-  ToggleSwitch, RadioGroup, CheckboxGroup,
+  ToggleSwitch, Switch: ToggleSwitch, RadioGroup, CheckboxGroup,
 });

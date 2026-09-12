@@ -28,8 +28,8 @@ struct StorageBucketItem: Identifiable, Equatable {
 
     var accessLabel: String {
         switch publicAccess {
-        case "ObjectRead": return "公共读"
-        case "ObjectReadWithoutList": return "公共读(无列表)"
+        case "ObjectRead": return "公开读"
+        case "ObjectReadWithoutList": return "公开读(无列表)"
         default: return "私有"
         }
     }

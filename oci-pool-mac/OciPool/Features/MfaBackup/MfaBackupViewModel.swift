@@ -7,7 +7,9 @@ final class MfaBackupViewModel: ObservableObject {
     @Published var items: [MfaKeyItem] = []
     @Published var searchText = ""
     @Published var addForm: MfaAddForm?
+    @Published var qrPreviewItem: MfaKeyItem?
     @Published var countdown = 30
+    @Published private(set) var hasLoadedOnce = false
     @Published private(set) var isLoading = false
     @Published private(set) var isSaving = false
     @Published private(set) var errorText: String?
@@ -40,9 +42,13 @@ final class MfaBackupViewModel: ObservableObject {
     }
 
     func reload() async {
+        items = [] // 切换/刷新时清空旧数据，杜绝原有数据与 loading 同时存在！
         isLoading = true
         errorText = nil
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoadedOnce = true
+        }
         do {
             items = try await service.listKeys()
             await refreshOtps()
@@ -56,29 +62,51 @@ final class MfaBackupViewModel: ObservableObject {
         addForm = MfaAddForm()
     }
 
-    func saveAdd() {
-        Task { await performSaveAdd() }
+    func smartParse(urlText: String) -> (name: String, issuer: String, secret: String)? {
+        let trimmed = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.lowercased().hasPrefix("otpauth://") else { return nil }
+        guard let components = URLComponents(string: trimmed) else { return nil }
+        var secret = ""
+        var issuer = ""
+        for item in components.queryItems ?? [] {
+            if item.name.lowercased() == "secret" {
+                secret = item.value ?? ""
+            } else if item.name.lowercased() == "issuer" {
+                issuer = item.value ?? ""
+            }
+        }
+        var name = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if name.contains(":") {
+            let parts = name.split(separator: ":", maxSplits: 1).map(String.init)
+            if issuer.isEmpty { issuer = parts[0] }
+            name = parts[1]
+        }
+        return (name, issuer, secret)
     }
 
-    private func performSaveAdd() async {
-        guard let form = addForm else { return }
-        let name = form.keyName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let secret = form.secretKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !secret.isEmpty else {
-            ToastCenter.shared.error("请填写密钥")
+    func saveAdd(name: String, secret: String, issuer: String = "") {
+        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanSecret = secret.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: " ", with: "").uppercased()
+        let cleanIssuer = issuer.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanSecret.isEmpty else {
+            ToastCenter.shared.warn("请填写密钥")
             return
         }
-        let keyName = name.isEmpty ? "\(Int(Date().timeIntervalSince1970))" : name
-        isSaving = true
-        defer { isSaving = false }
-        do {
-            try await LoadingHUD.shared.during {
-                try await service.saveSecret(keyName: keyName, secretKey: secret)
+        let keyName = cleanName.isEmpty ? "\(Int(Date().timeIntervalSince1970))" : cleanName
+        Task {
+            isSaving = true
+            defer { isSaving = false }
+            do {
+                let finalIssuer = cleanIssuer.isEmpty ? "mfa-oci-pool" : cleanIssuer
+                try await LoadingHUD.shared.during {
+                    try await service.saveSecret(keyName: keyName, secretKey: cleanSecret, issuer: finalIssuer)
+                }
+                addForm = nil
+                await reload()
+                ToastCenter.shared.success("MFA 密钥已保存")
+            } catch {
+                ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
             }
-            addForm = nil
-            await reload()
-        } catch {
-            ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
         }
     }
 

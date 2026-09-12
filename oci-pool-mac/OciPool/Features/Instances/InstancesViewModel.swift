@@ -8,7 +8,9 @@ final class InstancesViewModel: ObservableObject {
     @Published private(set) var rows: [InstanceItem] = []
     @Published private(set) var isLoading = false
     @Published private(set) var errorText: String?
-    @Published var pageState = PageState(page: 0, size: 10)
+    /// 首次加载完成哨兵标记：首屏未加载完成前为 false，杜绝空状态闪烁
+    @Published private(set) var hasLoadedOnce = false
+    @Published var pageState = PageState(page: 0, size: 20)
 
     // Filters（租户 → 区域级联；查询参数 tenantId = 区域子租户 id）
     @Published var parentTenants: [TenantRegionOption] = []
@@ -51,12 +53,16 @@ final class InstancesViewModel: ObservableObject {
     var runningCount: Int { rows.filter(\.isRunning).count }
     var stoppedCount: Int { rows.filter(\.isStopped).count }
     var otherStateCount: Int { rows.count - runningCount - stoppedCount }
+    /// Web KPI：ARM 架构实例数 / 覆盖区域数（按当前加载实例去重）
+    var armCount: Int { rows.filter { $0.architecture.uppercased().contains("ARM") || $0.shape.uppercased().contains("ARM") }.count }
+    var regionsCount: Int { Set(rows.map(\.regionCode).filter { !$0.isEmpty }).count }
 
     init(session: AppSession = .shared) {
         self.session = session
     }
 
     func start() {
+        isLoading = true
         Task {
             await loadParentTenants()
             if let pending = NavigationState.shared.takePendingInstancesFilter() {
@@ -90,7 +96,10 @@ final class InstancesViewModel: ObservableObject {
     func reload() async {
         isLoading = true
         errorText = nil
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoadedOnce = true
+        }
         do {
             let resp = try await service.list(
                 page: pageState.page,
@@ -121,9 +130,11 @@ final class InstancesViewModel: ObservableObject {
 
     func loadParentTenants() async {
         do {
-            // 对齐 Web：按 userName 排序
+            // 对齐 Web 方案 B：按真实租户名 tenancyName A~Z 字母排序
             parentTenants = try await service.listParentTenants().sorted {
-                $0.userName.localizedCaseInsensitiveCompare($1.userName) == .orderedAscending
+                let a = $0.tenancyName.isEmpty ? $0.userName : $0.tenancyName
+                let b = $1.tenancyName.isEmpty ? $1.userName : $1.tenancyName
+                return a.localizedCaseInsensitiveCompare(b) == .orderedAscending
             }
         } catch {
             parentTenants = []
@@ -135,20 +146,35 @@ final class InstancesViewModel: ObservableObject {
         selectedRegionId = ""
         regions = []
         if selectedParentId.isEmpty {
+            filterTenantId = nil
+            pageState.page = 0
+            rows = []
+            isLoading = true
+            Task { await reload() }
             return
         }
+        // 切换租户时立即清空旧数据并同步置为 loading，拉取区域期间绝不进入空态！
+        rows = []
+        pageState.page = 0
+        isLoading = true
         Task {
             do {
                 let list = try await service.listRegions(parentId: selectedParentId)
-                // 对齐 Web：按 region 排序；仅一个区域时自动选中
+                // 对齐 Web：按 region 排序；仅一个区域时自动选中并联动触发筛选
                 regions = list.sorted {
                     $0.region.localizedCaseInsensitiveCompare($1.region) == .orderedAscending
                 }
                 if regions.count == 1 {
                     selectedRegionId = regions[0].id
+                    filterTenantId = regions[0].id
+                    await reload()
+                } else {
+                    // 多区域租户：待用户在下拉中选择具体区域
+                    isLoading = false
                 }
             } catch {
                 regions = []
+                isLoading = false
                 ToastCenter.shared.error(error.localizedDescription)
             }
         }
@@ -156,6 +182,9 @@ final class InstancesViewModel: ObservableObject {
 
     func onRegionChanged(_ regionId: String?) {
         selectedRegionId = regionId ?? ""
+        if !selectedRegionId.isEmpty {
+            applyFilter()
+        }
     }
 
     /// 对齐 Web `goToInstances`：用区域（子租户）id 过滤
@@ -166,6 +195,8 @@ final class InstancesViewModel: ObservableObject {
         }
         filterTenantId = selectedRegionId
         pageState.page = 0
+        rows = []
+        isLoading = true
         Task { await reload() }
     }
 
@@ -175,6 +206,8 @@ final class InstancesViewModel: ObservableObject {
         regions = []
         filterTenantId = nil
         pageState.page = 0
+        rows = []
+        isLoading = true
         Task { await reload() }
     }
 
@@ -183,7 +216,7 @@ final class InstancesViewModel: ObservableObject {
     }
 
     var hasActiveFilter: Bool {
-        filterTenantId != nil && !(filterTenantId?.isEmpty ?? true)
+        !selectedParentId.isEmpty || !selectedRegionId.isEmpty || (filterTenantId != nil && !(filterTenantId?.isEmpty ?? true))
     }
 
     // MARK: - Export

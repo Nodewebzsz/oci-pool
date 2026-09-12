@@ -20,6 +20,32 @@ enum AppAlert {
         return alert.runModal() == .alertFirstButtonReturn
     }
 
+    /// 对齐 Web openConfirm danger+requireText：需输入指定文本（如 RESET / 桶名 / 租户名）才能确认。
+    /// 返回 nil = 用户取消；返回 "" 或输入不匹配 = 校验失败；否则返回输入内容。
+    @discardableResult
+    static func confirmRequireText(
+        title: String,
+        message: String,
+        requiredText: String,
+        placeholder: String = "",
+        confirmTitle: String = "确认"
+    ) -> String? {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .critical
+        alert.addButton(withTitle: confirmTitle)
+        alert.addButton(withTitle: "取消")
+
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
+        input.placeholderString = placeholder
+        input.identifier = NSUserInterfaceItemIdentifier("requireText")
+        alert.accessoryView = input
+
+        if alert.runModal() != .alertFirstButtonReturn { return nil }
+        return input.stringValue
+    }
+
     static func info(title: String, message: String) {
         let alert = NSAlert()
         alert.messageText = title

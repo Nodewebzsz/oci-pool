@@ -18,6 +18,7 @@ final class SecuritySettingsViewModel: ObservableObject {
     @Published var mfa = MfaForm()
     @Published var turnstile = TurnstileForm()
     @Published var channelNotifyEnabled = false
+    @Published var isMfaSheetPresented = false
 
     @Published private(set) var isLoading = false
     @Published private(set) var savingKey: String?
@@ -259,6 +260,26 @@ final class SecuritySettingsViewModel: ObservableObject {
         }
     }
 
+    func openMfaWizard() {
+        if mfa.secretKey.isEmpty {
+            Task {
+                savingKey = "mfaRegen"
+                defer { savingKey = nil }
+                do {
+                    try await LoadingHUD.shared.during {
+                        try await service.regenerateMfaSecret()
+                    }
+                    await reload()
+                    isMfaSheetPresented = true
+                } catch {
+                    ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
+                }
+            }
+        } else {
+            isMfaSheetPresented = true
+        }
+    }
+
     func regenerateMfa() {
         Task { await performRegenerateMfa() }
     }
@@ -320,11 +341,16 @@ final class SecuritySettingsViewModel: ObservableObject {
         savingKey = "mfaVerify"
         defer { savingKey = nil }
         do {
-            let msg = try await LoadingHUD.shared.during {
-                try await service.verifyMfaCode(code)
+            try await LoadingHUD.shared.during {
+                _ = try await service.verifyMfaCode(code)
+                // 第三步验证通过，正式激活保存启用
+                mfa.enabled = true
+                try await service.updateMfa(enabled: true, issuer: mfa.issuer)
             }
             mfa.verifyCode = ""
-            AppAlert.info(title: "验证成功", message: msg)
+            isMfaSheetPresented = false
+            await reload()
+            ToastCenter.shared.success("MFA 验证通过并已激活启用")
         } catch {
             mfa.verifyCode = ""
             ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)

@@ -12,6 +12,17 @@ final class MigrationViewModel: ObservableObject {
     @Published private(set) var isImporting = false
     @Published private(set) var statusText: String?
 
+    var selectedFileSizeText: String? {
+        guard let url = selectedFileURL,
+              let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = attrs[.size] as? Int64 else { return nil }
+        let kb = Double(size) / 1024.0
+        if kb > 1024 {
+            return String(format: "%.2f MB", kb / 1024.0)
+        }
+        return String(format: "%.1f KB", kb)
+    }
+
     private let session: AppSession
     private var service: MigrationService { MigrationService(baseURL: session.serverURL) }
 
@@ -27,6 +38,12 @@ final class MigrationViewModel: ObservableObject {
         panel.allowedFileTypes = ["enc", "sql"]
         panel.message = "选择备份文件（.enc 加密备份）"
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        selectedFileURL = url
+        selectedFileName = url.lastPathComponent
+        statusText = nil
+    }
+
+    func setImportFile(url: URL) {
         selectedFileURL = url
         selectedFileName = url.lastPathComponent
         statusText = nil

@@ -32,6 +32,23 @@ final class APIClient {
         try await data(for: request, using: session)
     }
 
+    /// Like `data(for:)` but does NOT rewrite HTTP 401 into `.unauthorized`.
+    /// Auth endpoints need the raw 401 body so `/perform_login` can surface the
+    /// server's "需要验证码 / MFA" message and route into the verify step.
+    private func rawData(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        do {
+            let (data, response) = try await session.compatData(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw APIError.invalidResponse
+            }
+            return (data, http)
+        } catch let error as APIError {
+            throw error
+        } catch {
+            throw APIError.network(error)
+        }
+    }
+
     private func data(for request: URLRequest, using session: URLSession) async throws -> (Data, HTTPURLResponse) {
         do {
             let (data, response) = try await session.compatData(for: request)
@@ -201,7 +218,7 @@ final class APIClient {
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
         req.httpBody = formBody(fields)
-        return try await data(for: req)
+        return try await rawData(for: req)
     }
 
     /// JSON POST body (empty `{}` when body is nil).

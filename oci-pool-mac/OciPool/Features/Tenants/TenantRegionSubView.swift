@@ -23,6 +23,7 @@ struct TenantRegionSubView: View {
             content: {
                 VStack(spacing: 0) {
                     summaryBar
+                    infoBanner
                     tabBar
                     tabContent
                 }
@@ -99,6 +100,38 @@ struct TenantRegionSubView: View {
         .cornerRadius(6)
     }
 
+    // MARK: - Info Banner
+
+    private var infoBanner: some View {
+        let homeName = tenant.map { t in
+            let cn = t.regionNameText
+            return cn.isEmpty ? (t.region.isEmpty ? "—" : t.region) : cn
+        } ?? "—"
+
+        return HStack(spacing: 8) {
+            Image(systemName: "info.circle.fill")
+                .foregroundColor(AppTheme.cyan)
+                .font(.system(size: 13))
+            (Text("主区域为 ")
+                .foregroundColor(mutedText)
+            + Text(homeName)
+                .fontWeight(.semibold)
+                .foregroundColor(primaryText)
+            + Text("，不可退订。订阅新区域后可在该区域创建实例。")
+                .foregroundColor(mutedText))
+                .font(.system(size: 11.5))
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(AppTheme.cyan.opacity(dark ? 0.12 : 0.08))
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(AppTheme.cyan.opacity(0.35), lineWidth: 1))
+        .cornerRadius(6)
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+        .padding(.bottom, 4)
+    }
+
     // MARK: - Tab bar
 
     private var tabBar: some View {
@@ -159,11 +192,13 @@ struct TenantRegionSubView: View {
                 GeometryReader { geo in
                     let wHome: CGFloat = 80
                     let wStatus: CGFloat = 96
-                    let wKey: CGFloat = 180
                     let hPad: CGFloat = 16
-                    let fixed = wHome + wStatus + wKey + hPad * 2
-                    let totalW = max(geo.size.width, fixed + 160)
-                    let wName = max(160, totalW - fixed)
+                    // 多列均匀分配：区域名称/区域标识弹性，主区域/状态固定
+                    let fixed = wHome + wStatus + hPad * 2
+                    let totalW = max(geo.size.width, fixed + 320)
+                    let flex = max(0, totalW - fixed)
+                    let wName = 160 + flex * 0.50
+                    let wKey = 180 + flex * 0.50
 
                     VStack(spacing: 0) {
                         subscribedHeader(wName: wName, wKey: wKey, wHome: wHome, wStatus: wStatus, width: totalW, hPad: hPad)
@@ -202,19 +237,19 @@ struct TenantRegionSubView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(primaryText)
                 .lineLimit(1)
-                .frame(width: wName, alignment: .leading)
+                .frame(width: wName, alignment: .center)
             Text(r.regionKey)
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.sidebarActive)
                 .lineLimit(1)
-                .frame(width: wKey, alignment: .leading)
+                .frame(width: wKey, alignment: .center)
             homeBadge(r.isHomeRegion)
-                .frame(width: wHome, alignment: .leading)
+                .frame(width: wHome, alignment: .center)
             statusBadge(r.status)
-                .frame(width: wStatus, alignment: .leading)
+                .frame(width: wStatus, alignment: .center)
         }
         .padding(.horizontal, hPad)
-        .padding(.vertical, 9)
+        .padding(.vertical, appearance.density.rowPadding)
         .frame(width: width, alignment: .leading)
         .background(index % 2 == 1 ? AppTheme.sidebarHover(dark).opacity(0.18) : Color.clear)
         .overlay(Rectangle().frame(height: 1).foregroundColor(border.opacity(0.3)), alignment: .bottom)
@@ -321,7 +356,7 @@ struct TenantRegionSubView: View {
                 Spacer()
             }
             .padding(.horizontal, hPad)
-            .padding(.vertical, 10)
+            .padding(.vertical, appearance.density.rowPadding)
             .frame(width: width, alignment: .leading)
             .background(selected ? AppTheme.sidebarActive.opacity(0.07) : (index % 2 == 1 ? AppTheme.sidebarHover(dark).opacity(0.18) : Color.clear))
             .overlay(Rectangle().frame(height: 1).foregroundColor(border.opacity(0.3)), alignment: .bottom)
@@ -346,7 +381,7 @@ struct TenantRegionSubView: View {
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(mutedText)
         if let w = w {
-            return AnyView(view.frame(width: w, alignment: .leading))
+            return AnyView(view.frame(width: w, alignment: .center))
         }
         return AnyView(view)
     }

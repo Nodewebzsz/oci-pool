@@ -35,11 +35,11 @@ enum AppSheetSurface {
     static func cardBg(_ dark: Bool) -> Color { surface(dark) }
 
     static func accentBlue(_ dark: Bool) -> Color {
-        dark ? Color(hex: "4d9eff") : Color(hex: "2563eb")
+        dark ? AppTheme.info : Color(hex: "2563eb")
     }
 
     static func accentGreen(_ dark: Bool) -> Color {
-        dark ? Color(hex: "3fb950") : Color(hex: "16a34a")
+        dark ? AppTheme.sidebarActive : AppTheme.sidebarActive
     }
 
     static func accentRed(_ dark: Bool) -> Color {
@@ -57,10 +57,13 @@ enum AppSheetSurface {
 /// `background: var(--surface); padding: 24px; border-radius: 16px; border: 1px solid var(--card-border)`.
 struct AppSheetChrome<Content: View, Footer: View>: View {
     let title: String
+    var subtitle: String? = nil
     var systemImage: String? = nil
+    var iconColor: Color? = nil
     var width: CGFloat = 520
     var height: CGFloat = 480
     var fixedSize: Bool = false
+    var scrollableContent: Bool = true
     var showClose: Bool = true
     var onClose: (() -> Void)? = nil
     let footer: Footer
@@ -74,20 +77,26 @@ struct AppSheetChrome<Content: View, Footer: View>: View {
 
     init(
         title: String,
+        subtitle: String? = nil,
         systemImage: String? = nil,
+        iconColor: Color? = nil,
         width: CGFloat = 520,
         height: CGFloat = 480,
         fixedSize: Bool = false,
+        scrollableContent: Bool = true,
         showClose: Bool = true,
         onClose: (() -> Void)? = nil,
         @ViewBuilder footer: () -> Footer,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
+        self.subtitle = subtitle
         self.systemImage = systemImage
+        self.iconColor = iconColor
         self.width = width
         self.height = height
         self.fixedSize = fixedSize
+        self.scrollableContent = scrollableContent
         self.showClose = showClose
         self.onClose = onClose
         self.footer = footer()
@@ -97,13 +106,20 @@ struct AppSheetChrome<Content: View, Footer: View>: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            ScrollView {
+            if scrollableContent {
+                ScrollView {
+                    content
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
                 content
                     .padding(.horizontal, 24)
                     .padding(.vertical, 16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
             footerBar
         }
         .frame(
@@ -119,32 +135,50 @@ struct AppSheetChrome<Content: View, Footer: View>: View {
     }
 
     private var header: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             if let systemImage = systemImage {
-                Image(systemName: systemImage)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(AppTheme.sidebarActive)
+                let color = iconColor ?? AppTheme.sidebarActive
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(color.opacity(0.18))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: systemImage)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(color)
+                }
             }
-            Text(title)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(AppSheetSurface.primaryText(dark))
-                .lineLimit(2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(AppSheetSurface.primaryText(dark))
+                    .lineLimit(1)
+                if let sub = subtitle, !sub.isEmpty {
+                    Text(sub)
+                        .font(.system(size: 12))
+                        .foregroundColor(AppSheetSurface.mutedText(dark))
+                        .lineLimit(1)
+                }
+            }
             Spacer(minLength: 8)
             if showClose {
                 Button(action: close) {
-                    Text("×")
-                        .font(.system(size: 22, weight: .regular))
-                        .foregroundColor(AppSheetSurface.mutedText(dark))
-                        .frame(width: 28, height: 28)
-                        .contentShape(Rectangle())
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(AppTheme.border(dark).opacity(0.8), lineWidth: 1)
+                            .frame(width: 28, height: 28)
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(AppSheetSurface.mutedText(dark))
+                    }
                 }
                 .buttonStyle(PlainButtonStyle())
                 .help("关闭")
             }
         }
         .padding(.horizontal, 24)
-        .padding(.top, 20)
+        .padding(.top, 16)
         .padding(.bottom, 14)
+        .background(AppSheetSurface.surface(dark))
         .overlay(
             Rectangle()
                 .fill(AppSheetSurface.border(dark))
@@ -231,13 +265,23 @@ struct AppSheetTableHeader: View {
     var body: some View {
         HStack(spacing: 0) {
             ForEach(Array(columns.enumerated()), id: \.offset) { _, col in
-                Text(col.title.uppercased())
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppSheetSurface.mutedText(dark))
-                    .lineLimit(1)
-                    .frame(width: col.width, alignment: .leading)
-                    .frame(maxWidth: col.width == nil ? .infinity : nil, alignment: .leading)
-                    .padding(.horizontal, 10)
+                Group {
+                    if let w = col.width {
+                        Text(col.title.uppercased())
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(AppSheetSurface.mutedText(dark))
+                            .lineLimit(1)
+                            .frame(width: w, alignment: .center)
+                    } else {
+                        Text(col.title.uppercased())
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(AppSheetSurface.mutedText(dark))
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.horizontal, 10)
+                    }
+                }
             }
         }
         .padding(.vertical, 10)
@@ -285,6 +329,80 @@ struct AppSheetTableBox<Content: View>: View {
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppSheetSurface.surface(dark))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppSheetSurface.border(dark), lineWidth: 1)
+        )
+        .cornerRadius(8)
+    }
+}
+
+/// 固定表头表格盒：表头常驻 + 数据区独立加载/空态 + 超阈值滚动。
+/// 对齐磁盘/数据库/安全规则弹窗的表格模式（模式A），供其它表格弹窗复用。
+struct AppSheetFixedTable<Header: View, Rows: View>: View {
+    let isLoading: Bool
+    let isEmpty: Bool
+    var emptyText: String = "暂无数据"
+    var emptyIcon: String = "tray"
+    var rowCount: Int
+    var rowHeight: CGFloat = 44
+    var maxBodyHeight: CGFloat = 360
+    var emptyBodyHeight: CGFloat = 160
+    @ViewBuilder var header: () -> Header
+    @ViewBuilder var rows: () -> Rows
+
+    @EnvironmentObject private var appearance: AppearanceController
+    @Environment(\.colorScheme) private var colorScheme
+    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 固定表头（不随数据滚动）
+            header()
+
+            // 数据区：加载 / 空态 / 滚动行
+            if isLoading {
+                VStack(spacing: 8) {
+                    Spacer()
+                    ProgressView().scaleEffect(0.8)
+                    Text("加载中…")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppSheetSurface.mutedText(dark))
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: emptyBodyHeight)
+            } else if isEmpty {
+                VStack(spacing: 8) {
+                    Spacer()
+                    Image(systemName: emptyIcon)
+                        .font(.system(size: 30))
+                        .foregroundColor(AppSheetSurface.mutedText(dark).opacity(0.6))
+                    Text(emptyText)
+                        .font(.system(size: 13))
+                        .foregroundColor(AppSheetSurface.primaryText(dark))
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: emptyBodyHeight)
+            } else {
+                let totalRowsH = CGFloat(rowCount) * rowHeight
+                if totalRowsH > maxBodyHeight {
+                    ScrollView([.vertical], showsIndicators: true) {
+                        LazyVStack(spacing: 0) {
+                            rows()
+                        }
+                    }
+                    .frame(height: maxBodyHeight)
+                } else {
+                    VStack(spacing: 0) {
+                        rows()
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
         .background(AppSheetSurface.surface(dark))
         .overlay(
             RoundedRectangle(cornerRadius: 8)

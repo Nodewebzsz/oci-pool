@@ -60,11 +60,19 @@ struct EoAccelDomain: Identifiable, Equatable {
         }
     }
 
+    var statusLabel: String {
+        switch status.lowercased() {
+        case "online", "active", "process": return "在线"
+        case "offline", "forbidden", "deleted": return "离线"
+        case "pending", "init", "stopped": return "审核中"
+        default: return status.isEmpty ? "—" : status
+        }
+    }
+
     var statusTone: StatusTone {
         switch status.lowercased() {
         case "online", "active", "process": return .success
-        case "offline", "forbidden", "deleted": return .danger
-        case "pending", "init", "stopped": return .warning
+        case "pending", "init", "stopped": return .info
         default: return .neutral
         }
     }

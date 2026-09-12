@@ -15,34 +15,25 @@ struct IpQualityView: View {
 
     var body: some View {
         PageScaffold(
-            title: "质量管理",
-            subtitle: "IP 质量检测开关 · 三网 VPS SSH 探测节点",
+            title: "IP 质量管理",
+            subtitle: "IP 质量检测与运营商链路配置 · 保障新分配 IP 的可用性",
             systemImage: "shield",
+            iconColor: AppTheme.info,
             toolbar: { toolbar },
             content: {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
                         if let err = model.errorText, !err.isEmpty {
                             errorBanner(err)
+                                .padding(.bottom, 4)
                         }
-                        VStack(spacing: 14) {
-                            EqualHeightCardRow(minHeight: cardMinHeight) {
-                                ipCheckCard
-                            } second: {
-                                vpsCard(.telecom)
-                            }
-                            EqualHeightCardRow(minHeight: cardMinHeight) {
-                                vpsCard(.unicom)
-                            } second: {
-                                vpsCard(.mobile)
-                            }
-                        }
+                        // 1 + 3 优雅排版：顶部通栏策略配置 + 底部三大运营商探针并排
+                        ipCheckCard
+                        carriersRow
                     }
-                    .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .appLoading(model.isLoading)
             }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
@@ -66,53 +57,139 @@ struct IpQualityView: View {
         }
     }
 
-    // MARK: - IP check card
+    // MARK: - IP check card (通栏全局策略配置)
 
     private var ipCheckCard: some View {
-        ModuleSettingsCard(
-            title: "IP 质量检测",
-            subtitle: "定时检测实例公网 IP 质量",
-            systemImage: "network",
-            accent: Color(hex: "4a9eff"),
-            enabled: $model.ipCheckEnabled,
-            minHeight: cardMinHeight
-        ) {
-            FormFieldRow(label: "检测间隔") {
-                SelectMenu(
-                    options: model.intervalOptions,
-                    selection: Binding(
-                        get: { "\(model.checkInterval)" },
-                        set: { model.checkInterval = Int($0 ?? "1") ?? 1 }
-                    ),
-                    placeholder: "选择间隔",
-                    width: 160,
-                    allowClear: false,
-                    searchable: false
-                )
+        VStack(alignment: .leading, spacing: 12) {
+            // 头部：图标 + 标题 + 状态胶囊 + 开关
+            HStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(AppTheme.info.opacity(0.14))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: "shield.checkerboard")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(AppTheme.info)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 8) {
+                        Text("IP 质量检测全局配置")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(dark ? Color.white.opacity(0.95) : Color.primary)
+                        Text(model.ipCheckEnabled ? "已启用" : "未启用")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(model.ipCheckEnabled ? AppTheme.sidebarActive : AppTheme.textTertiary(dark))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(model.ipCheckEnabled ? AppTheme.sidebarActive.opacity(0.15) : AppTheme.bg3(dark))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(model.ipCheckEnabled ? AppTheme.sidebarActive.opacity(0.35) : AppTheme.border(dark).opacity(0.8), lineWidth: 1)
+                            )
+                    }
+                    Text("定期检测所有实例的公网 IP 质量，确保链路通畅可用")
+                        .font(.system(size: 11))
+                        .foregroundColor(AppTheme.textTertiary(dark))
+                }
+
+                Spacer()
+
+                Toggle("", isOn: $model.ipCheckEnabled)
+                    .labelsHidden()
+                    .toggleStyle(SwitchToggleStyle(tint: AppTheme.sidebarActive))
             }
-            Text("按设定小时周期执行 IP 质量检测任务")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
-        } footer: {
-            AppButton(
-                title: "保存配置",
-                systemImage: "square.and.arrow.down",
-                kind: .primary,
-                isLoading: model.savingKey == "ipCheck"
-            ) {
-                model.saveIpCheck()
+
+            Divider()
+                .background(AppTheme.border(dark).opacity(0.6))
+
+            // 核心参数：检测周期 + 业务提示 + 保存按钮
+            HStack(alignment: .center, spacing: 16) {
+                HStack(spacing: 8) {
+                    Text("检测周期:")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(dark ? Color.white.opacity(0.85) : Color.primary)
+
+                    SelectMenu(
+                        options: model.intervalOptions,
+                        selection: Binding(
+                            get: { "\(model.checkInterval)" },
+                            set: { model.checkInterval = Int($0 ?? "6") ?? 6 }
+                        ),
+                        placeholder: "选择周期",
+                        width: 130,
+                        allowClear: false,
+                        searchable: false
+                    )
+                }
+
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 11))
+                        .foregroundColor(AppTheme.textTertiary(dark))
+                    Text("按设定小时周期自动执行检测；当所有启用的运营商探针均检测不可达时，系统将自动分配更换新公网 IP。")
+                        .font(.system(size: 11))
+                        .foregroundColor(AppTheme.textTertiary(dark))
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: 12)
+
+                AppButton(
+                    title: "保存全局配置",
+                    systemImage: "square.and.arrow.down",
+                    kind: .primary,
+                    isLoading: model.savingKey == "ipCheck"
+                ) {
+                    model.saveIpCheck()
+                }
             }
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.sidebarBg(dark))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(AppTheme.border(dark).opacity(0.8), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Carriers row (三大运营商并排)
+
+    private var carriersRow: some View {
+        HStack(alignment: .top, spacing: 12) {
+            vpsCard(.telecom)
+            vpsCard(.unicom)
+            vpsCard(.mobile)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - VPS card
 
     private func vpsCard(_ carrier: IpCarrier) -> some View {
-        ModuleSettingsCard(
+        let binding = model.binding(for: carrier)
+        let hasHost = !binding.serverIp.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasUser = !binding.username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let canSubmit = hasHost && hasUser
+
+        let accent: Color = {
+            switch carrier {
+            case .telecom: return AppTheme.sidebarActive // 绿色
+            case .unicom: return AppTheme.orange        // 橙色
+            case .mobile: return AppTheme.danger        // 红色
+            }
+        }()
+
+        return ModuleSettingsCard(
             title: carrier.title,
             subtitle: carrier.subtitle,
             systemImage: carrier.systemImage,
-            accent: AppTheme.sidebarActive,
+            accent: accent,
             enabled: Binding(
                 get: { model.binding(for: carrier).enabled },
                 set: { newVal in
@@ -121,9 +198,9 @@ struct IpQualityView: View {
                     model.update(carrier, v)
                 }
             ),
-            minHeight: cardMinHeight
+            minHeight: 330
         ) {
-            FormFieldRow(label: "服务器地址") {
+            FormFieldRow(label: "服务器地址 *") {
                 AppTextField(
                     text: Binding(
                         get: { model.binding(for: carrier).serverIp },
@@ -138,7 +215,7 @@ struct IpQualityView: View {
                 )
             }
             HStack(spacing: 10) {
-                FormFieldRow(label: "用户名") {
+                FormFieldRow(label: "用户名 *") {
                     AppTextField(
                         text: Binding(
                             get: { model.binding(for: carrier).username },
@@ -180,7 +257,7 @@ struct IpQualityView: View {
                             model.update(carrier, v)
                         }
                     ),
-                    placeholder: "SSH 密码",
+                    placeholder: "留空使用密钥认证",
                     secure: true,
                     leadingSystemImage: "key"
                 )
@@ -189,17 +266,19 @@ struct IpQualityView: View {
             HStack(spacing: 8) {
                 AppButton(
                     title: "测试连接",
-                    systemImage: "bolt.horizontal.circle",
+                    systemImage: "zap",
                     kind: .secondary,
-                    isLoading: model.savingKey == "test-\(carrier.rawValue)"
+                    isLoading: model.savingKey == "test-\(carrier.rawValue)",
+                    enabled: canSubmit
                 ) {
                     model.testVPS(carrier)
                 }
                 AppButton(
-                    title: "保存",
+                    title: "保存配置",
                     systemImage: "square.and.arrow.down",
                     kind: .primary,
-                    isLoading: model.savingKey == carrier.rawValue
+                    isLoading: model.savingKey == carrier.rawValue,
+                    enabled: canSubmit
                 ) {
                     model.saveVPS(carrier)
                 }
@@ -210,15 +289,15 @@ struct IpQualityView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
+                .foregroundColor(AppTheme.danger)
             Text(text).font(.system(size: 12))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(8)
     }
 }

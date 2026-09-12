@@ -16,12 +16,13 @@ services:
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: "6379"
       MODERN_UI_ENABLED: "${MODERN_UI_ENABLED:-true}"
+      MODERN_UI_MOCK_DATA: "${MODERN_UI_MOCK_DATA:-false}"
       DB_PASSWORD: "${DB_PASSWORD:-}"
     volumes:
       - ./data:/oci-pool/data
       - ./logs:/oci-pool/logs
     healthcheck: { test: ["CMD", "curl", "-sf", "http://127.0.0.1:9856/actuator/health"], interval: 30s, timeout: 5s, retries: 5, start_period: 60s }
-  # 统一入口反代:UI + /ws/console + /websockify/{port}(VNC 动态端口)
+  # 统一入口反代:UI + /ws/console + /ws/aiChat + /websockify/{port}(VNC 动态端口)
   # 配置打进镜像(COPY nginx.conf),避免宿主 bind-mount;上下文为本目录(含 Dockerfile.web + nginx.conf)。
   web:
     build: { context: ., dockerfile: Dockerfile.web }

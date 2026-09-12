@@ -89,7 +89,12 @@ function TenantGrabPage({ density, ctx, navigate, updateDetailCtx }) {
   };
 
   if (loading && !tenant) {
-    return <div role="status" style={{ padding: 24, color: 'var(--fg-2)' }}>{tr('tg.loading')}</div>;
+    return (
+      <div role="status" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 280, gap: 12, color: 'var(--fg-3)' }}>
+        <Icon name="loader-2" size={20} className="spin" style={{ opacity: 0.6 }} />
+        <span style={{ fontSize: 13 }}>{tr('tg.loading') || '正在加载开机管理…'}</span>
+      </div>
+    );
   }
   if (!tenant) {
     return (
@@ -447,7 +452,8 @@ function TenantGrabPage({ density, ctx, navigate, updateDetailCtx }) {
                   <td style={{ padding: '11px 12px', borderBottom: '1px solid var(--border)' }}>
                     <span style={{
                       padding: '1px 6px',
-                      background: 'var(--info-soft)', color: 'var(--info)',
+                      background: getInstanceArch(r) === 'ARM' ? 'var(--info-soft)' : 'var(--violet-soft)',
+                      color: getInstanceArch(r) === 'ARM' ? 'var(--info)' : 'var(--violet)',
                       borderRadius: 3, fontSize: 10, fontWeight: 600,
                       fontFamily: 'var(--font-mono)',
                     }}>{getInstanceArch(r)}</span>

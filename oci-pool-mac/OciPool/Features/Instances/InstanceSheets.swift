@@ -315,7 +315,7 @@ struct InstanceSheetHost: View {
                 if let result = model.changeIpResult {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(Color(hex: "3fb950"))
+                            .foregroundColor(AppTheme.sidebarActive)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("IP 切换成功")
                                 .font(.system(size: 12, weight: .semibold))
@@ -327,7 +327,7 @@ struct InstanceSheetHost: View {
                         Spacer(minLength: 0)
                     }
                     .padding(10)
-                    .background(Color(hex: "3fb950").opacity(0.12))
+                    .background(AppTheme.sidebarActive.opacity(0.12))
                     .cornerRadius(10)
                 }
 

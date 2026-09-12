@@ -1,2 +1,2 @@
 org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-com.doubledimple.ocicommon.cache.CommonCacheAutoConfiguration
+com.nodewebzsz.ocicommon.cache.CommonCacheAutoConfiguration

@@ -13,18 +13,19 @@ struct OpenLogsView: View {
     var body: some View {
         PageScaffold(
             title: "开机日志",
-            subtitle: "OCI 抢机实时日志 · 历史 + SSE 尾随",
-            systemImage: "doc.text",
+            subtitle: "实时抢机日志流",
+            systemImage: "terminal",
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
                     if let err = model.errorText, !err.isEmpty {
                         errorBanner(err)
+                            .padding(.bottom, 10)
                     }
+                    filterBar
                     terminalCard
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(12)
             }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
@@ -40,19 +41,20 @@ struct OpenLogsView: View {
     private var toolbar: some View {
         HStack(spacing: 8) {
             connectionBadge
+            // Web logs.action.pause/resume：暂停时断开 SSE 并切徽章
+            AppButton(
+                title: model.paused ? "恢复滚动" : "暂停滚动",
+                systemImage: model.paused ? "play" : "pause",
+                kind: .secondary
+            ) {
+                model.paused.toggle()
+            }
+            // Web logs.action.download：导出日志文件
+            AppButton(title: "下载日志", systemImage: "arrow.down", kind: .secondary) {
+                model.exportLogs()
+            }
             AppButton(title: "清空", systemImage: "trash", kind: .secondary) {
                 model.clearLogs()
-            }
-            AppButton(title: "重连", systemImage: "bolt.horizontal.circle", kind: .secondary) {
-                model.reconnectNow()
-            }
-            AppButton(
-                title: "刷新",
-                systemImage: "arrow.clockwise",
-                kind: .secondary,
-                isLoading: model.isLoadingHistory
-            ) {
-                model.reloadHistory()
             }
         }
     }
@@ -76,10 +78,102 @@ struct OpenLogsView: View {
 
     private var connectionColor: Color {
         switch model.connection {
-        case .connected: return Color(hex: "1abc9c")
-        case .connecting: return Color(hex: "f39c12")
-        case .disconnected: return Color(hex: "ff6b6b")
+        case .connected: return AppTheme.sidebarActive
+        case .connecting: return AccentPreset.orange.color
+        case .disconnected: return Color(hex: "f05653")
         }
+    }
+
+    // MARK: - Filter bar
+
+    private var filterBar: some View {
+        HStack(spacing: 10) {
+            // 级别切换胶囊（全部、INFO、WARN、ERROR、SUCCESS）
+            HStack(spacing: 4) {
+                ForEach(OpenLogFilterLevel.allCases) { lvl in
+                    filterLevelButton(lvl)
+                }
+            }
+
+            // 关键字搜索框
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 11))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                TextField("关键字过滤", text: $model.keyword)
+                    .textFieldStyle(PlainTextFieldStyle())
+                    .font(.system(size: 11.5))
+                if !model.keyword.isEmpty {
+                    Button(action: { model.keyword = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(AppTheme.sidebarText(dark))
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .frame(width: 180)
+            .background(dark ? Color(hex: "181c20") : Color(hex: "edf2f7"))
+            .cornerRadius(6)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(AppTheme.border(dark).opacity(0.8), lineWidth: 1)
+            )
+
+            Spacer()
+
+            // 过滤条数统计：共 M / N 条
+            HStack(spacing: 2) {
+                Text("共")
+                    .font(.system(size: 11))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                Text("\(model.filteredEntries.count)")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundColor(AppTheme.sidebarActive)
+                Text(" / \(model.entries.count) 条")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(AppTheme.sidebarBg(dark))
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark).opacity(0.7), lineWidth: 1)
+        )
+        .padding(.bottom, 10)
+    }
+
+    private func filterLevelButton(_ lvl: OpenLogFilterLevel) -> some View {
+        let isSelected = model.filterLevel == lvl
+        let count = model.count(for: lvl)
+        let color = lvl.activeColor
+
+        return Button(action: { model.filterLevel = lvl }) {
+            HStack(spacing: 4) {
+                Text(lvl.rawValue)
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .medium))
+                Text("\(count)")
+                    .font(.system(size: 9.5, weight: .regular, design: .monospaced))
+                    .opacity(isSelected ? 0.9 : 0.6)
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(isSelected ? color.opacity(dark ? 0.22 : 0.12) : Color.clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(isSelected ? color.opacity(0.8) : AppTheme.border(dark).opacity(0.6), lineWidth: 1)
+            )
+            .foregroundColor(isSelected ? color : AppTheme.sidebarText(dark))
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 
     // MARK: - Terminal
@@ -94,24 +188,24 @@ struct OpenLogsView: View {
         .background(Color.black)
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(Color(hex: "00ff00").opacity(0.45), lineWidth: 1)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
         )
         .cornerRadius(6)
-        .shadow(color: Color(hex: "00ff00").opacity(0.12), radius: 8, x: 0, y: 2)
+        .shadow(color: Color.black.opacity(dark ? 0.35 : 0.12), radius: 8, x: 0, y: 2)
     }
 
     private var terminalHeader: some View {
         HStack(spacing: 10) {
             Image(systemName: "desktopcomputer")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Color(hex: "33ff66"))
+                .foregroundColor(AppTheme.sidebarActive)
             Text("OCI 开机日志")
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                .foregroundColor(Color(hex: "33ff66"))
+                .foregroundColor(AppTheme.sidebarActive)
             // Blinking cursor affordance
             Text("▌")
                 .font(.system(size: 12, design: .monospaced))
-                .foregroundColor(Color(hex: "33ff66").opacity(0.7))
+                .foregroundColor(AppTheme.sidebarActive.opacity(0.7))
             Spacer()
             HStack(spacing: 6) {
                 Circle()
@@ -128,7 +222,7 @@ struct OpenLogsView: View {
         .overlay(
             Rectangle()
                 .frame(height: 1)
-                .foregroundColor(Color(hex: "00ff00").opacity(0.25)),
+                .foregroundColor(AppTheme.border(dark).opacity(0.5)),
             alignment: .bottom
         )
     }
@@ -143,8 +237,14 @@ struct OpenLogsView: View {
                             .foregroundColor(Color.white.opacity(0.35))
                             .padding(.vertical, 8)
                             .id("empty")
+                    } else if model.filteredEntries.isEmpty {
+                        Text("没有匹配的日志")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundColor(Color.white.opacity(0.35))
+                            .padding(.vertical, 8)
+                            .id("no-match")
                     }
-                    ForEach(model.entries) { entry in
+                    ForEach(model.filteredEntries) { entry in
                         Text(entry.text)
                             .font(.system(size: 12, design: .monospaced))
                             .foregroundColor(entry.level.color)
@@ -186,8 +286,13 @@ struct OpenLogsView: View {
             HStack(spacing: 6) {
                 Image(systemName: "list.bullet")
                     .font(.system(size: 10))
-                Text("\(model.entries.count) log entries")
-                    .font(.system(size: 11, design: .monospaced))
+                if model.filteredEntries.count == model.entries.count {
+                    Text("共 \(model.entries.count) 条")
+                        .font(.system(size: 11, design: .monospaced))
+                } else {
+                    Text("显示 \(model.filteredEntries.count) / 共 \(model.entries.count) 条")
+                        .font(.system(size: 11, design: .monospaced))
+                }
             }
             .foregroundColor(Color.white.opacity(0.55))
 
@@ -201,7 +306,7 @@ struct OpenLogsView: View {
             .toggleStyle(CheckboxToggleStyle())
             .foregroundColor(Color.white.opacity(0.7))
 
-            Text(model.connection == .connected ? "实时更新中" : "等待连接")
+            Text(model.paused ? "已暂停接收" : "实时接收中")
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(Color.white.opacity(0.45))
         }
@@ -211,7 +316,7 @@ struct OpenLogsView: View {
         .overlay(
             Rectangle()
                 .frame(height: 1)
-                .foregroundColor(Color(hex: "00ff00").opacity(0.2)),
+                .foregroundColor(AppTheme.sidebarActive.opacity(0.15)),
             alignment: .top
         )
     }
@@ -221,7 +326,7 @@ struct OpenLogsView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f39c12"))
+                .foregroundColor(AppTheme.orange)
             Text(text)
                 .font(.system(size: 12))
                 .foregroundColor(dark ? Color.white.opacity(0.85) : Color(hex: "1e2f42"))
@@ -236,7 +341,7 @@ struct OpenLogsView: View {
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color(hex: "f39c12").opacity(0.12))
+                .fill(AppTheme.orange.opacity(0.12))
         )
         .padding(.bottom, 8)
     }
@@ -250,7 +355,7 @@ private struct CheckboxToggleStyle: ToggleStyle {
             HStack(spacing: 6) {
                 Image(systemName: configuration.isOn ? "checkmark.square.fill" : "square")
                     .font(.system(size: 12))
-                    .foregroundColor(configuration.isOn ? Color(hex: "33ff66") : Color.white.opacity(0.45))
+                    .foregroundColor(configuration.isOn ? AppTheme.sidebarActive : Color.white.opacity(0.45))
                 configuration.label
             }
         }

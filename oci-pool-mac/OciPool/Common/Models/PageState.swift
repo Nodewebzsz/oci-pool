@@ -7,17 +7,16 @@ struct PageState: Equatable {
     var totalElements: Int64 = 0
     var totalPages: Int = 0
 
-    static let sizeOptions: [Int] = [10, 20, 30, 50]
+    static let sizeOptions: [Int] = [10, 20, 50, 100]
 
     var isFirst: Bool { page <= 0 }
     var isLast: Bool { totalPages <= 0 || page >= totalPages - 1 }
     var displayPage: Int { page + 1 } // 1-based for UI
 
     var rangeText: String {
-        guard totalElements > 0 else { return "共 0 条" }
-        let start = page * size + 1
-        let end = min(Int64(page * size + size), totalElements)
-        return "第 \(start)–\(end) 条 / 共 \(totalElements) 条"
+        // 对齐 Web 分页：「共 n 条」+「page/totalPages」
+        guard totalElements > 0 else { return "共 0 条 0/0" }
+        return "共 \(totalElements) 条 \(displayPage)/\(totalPages)"
     }
 
     mutating func apply(totalElements: Int64, totalPages: Int? = nil) {

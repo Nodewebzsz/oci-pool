@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="b1WsMER02g6QqB3QlAw0tB">
+<head data-page-node-id="z2P9ndIrCMjCNEYPYgJ2YO">
+<meta charset="UTF-8" data-page-node-id="B3iBsGHWm4zC0r7HWCmJsZ">
+<meta name="viewport" content="width=device-width, initial-scale=1" data-page-node-id="HAB4O9VIZnvLAq5PcyfaEJ">
+<title>审计日志 · 改造后页面状态全集</title>
+<style>
+:root{
+  --page-bg:#f8fafd; --surface:#ffffff; --zebra:#f4f7f9; --hover:#eef4f7;
+  --border:#d9dfe3; --border-soft:#e6ebee;
+  --text:#2d3439; --text-2:#5d646a; --text-3:#81878c;
+  --accent:#35c177; --accent-soft:#c9f4d7; --accent-ink:#0f6e56;
+  --danger:#f05653; --danger-soft:#ffdcd7; --danger-ink:#791f1f;
+  --orange:#ef852e; --orange-soft:#ffe6d1; --orange-ink:#8a4a12;
+  --cyan:#00b6be;
+  --info:#6898e8; --info-soft:#d4edff; --info-ink:#185fa5;
+  --violet:#8b7bd8; --violet-soft:#eae6fb; --violet-ink:#534ab7;
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Helvetica Neue",sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --grid:36px 132px minmax(0,1.25fr) minmax(0,1fr) 96px 142px 118px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:var(--sans); background:#eef1f4; color:var(--text);
+  font-size:13px; line-height:1.6; padding:24px; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px; margin:0 auto; display:flex; flex-direction:column; gap:18px}
+
+.doc-head{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px 18px}
+.doc-title{font-size:16px; font-weight:600; line-height:1.4}
+.doc-sub{font-size:12px; color:var(--text-2); margin-top:4px}
+.doc-meta{font-size:11px; color:var(--text-3); margin-top:8px; font-family:var(--mono)}
+
+.filter{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:11px 12px;
+}
+.chips{display:flex; gap:6px}
+.chip{
+  height:26px; padding:0 11px; border-radius:13px; border:1px solid var(--border);
+  background:var(--surface); color:var(--text-2); font-size:12px; font-family:var(--sans);
+  display:inline-flex; align-items:center;
+}
+.chip.on{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:500}
+.f-label{font-size:12px; color:var(--text-3)}
+.date{
+  height:28px; padding:0 9px; border:1px solid var(--border); border-radius:5px;
+  background:#fbfcfd; color:var(--text); font-family:var(--mono); font-size:12px;
+  display:inline-flex; align-items:center;
+}
+.hint{font-size:11px; color:var(--text-3)}
+.filter-right{margin-left:auto; display:flex; gap:8px; align-items:center}
+
+.state{background:transparent; display:flex; flex-direction:column; gap:8px}
+.state-head{display:flex; align-items:center; gap:9px; padding:0 2px}
+.state-no{
+  width:20px; height:20px; flex:0 0 20px; border-radius:5px; background:var(--text);
+  color:#fff; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center;
+}
+.state-head h2{font-size:13px; font-weight:600}
+.state-tag{
+  font-size:10px; font-weight:500; padding:1px 7px; border-radius:3px;
+  background:var(--border-soft); color:var(--text-2);
+}
+.state-note{font-size:11px; color:var(--text-3); margin-left:auto; text-align:right}
+
+.tablecard{
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:8px; overflow:hidden; display:flex; flex-direction:column;
+}
+.row{
+  display:grid; gap:10px; align-items:center; padding:0 12px;
+  grid-template-columns:var(--grid);
+}
+.row.head{
+  height:32px; font-size:11px; font-weight:500; color:var(--text-3);
+  background:var(--zebra); border-bottom:1px solid var(--border);
+}
+.row.head > div{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.row.data{height:36px; font-size:12px; border-bottom:1px solid var(--border-soft)}
+.row.data:last-child{border-bottom:none}
+.row.data.alt{background:var(--zebra)}
+.c{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.c-idx{text-align:center; color:var(--text-3); font-family:var(--mono); font-size:11px}
+.c-user{color:var(--text)}
+.c-ip{color:var(--text-2); font-family:var(--mono); font-size:11px}
+.c-event{font-weight:500; color:var(--text)}
+.c-time{color:var(--text-2); font-family:var(--mono); font-size:11px}
+.badge{
+  display:inline-flex; align-items:center; gap:5px; height:20px; padding:0 8px;
+  border-radius:4px; font-size:11px; font-weight:500; white-space:nowrap;
+}
+.b-console{background:var(--info-soft); color:var(--info-ink)}
+.b-api{background:var(--violet-soft); color:var(--violet-ink)}
+.b-ok{background:var(--accent-soft); color:var(--accent-ink)}
+.b-fail{background:var(--danger-soft); color:var(--danger-ink)}
+.b-warn{background:var(--orange-soft); color:var(--orange-ink)}
+.cell-resp{display:flex; align-items:center; gap:7px; overflow:hidden}
+.code{font-family:var(--mono); font-size:11px; color:var(--text-2)}
+.code.bad{color:var(--danger)}
+
+.foot{
+  display:flex; align-items:center; gap:12px;
+  padding:11px 14px; background:var(--surface); border-top:1px solid var(--border);
+}
+.foot-text{font-size:12px; color:var(--text-2)}
+.foot-text b{font-weight:500; color:var(--text)}
+.foot-right{margin-left:auto; display:flex; align-items:center; gap:8px}
+
+.btn{
+  height:30px; padding:0 12px; border:1px solid var(--border); border-radius:6px;
+  background:var(--surface); color:var(--text); font-size:12px; font-family:var(--sans);
+  display:inline-flex; align-items:center; gap:6px;
+}
+.btn-primary{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:500}
+.btn[disabled]{color:var(--text-3); background:var(--zebra); cursor:not-allowed}
+
+/* 骨架屏 */
+.skel{
+  height:10px; border-radius:3px;
+  background:linear-gradient(90deg,var(--border-soft) 25%,#f0f3f5 37%,var(--border-soft) 63%);
+  background-size:400% 100%; animation:shim 1.4s ease-in-out infinite;
+}
+.skel.w40{width:40%} .skel.w55{width:55%} .skel.w70{width:70%} .skel.w85{width:85%}
+.skel.pill{height:20px; width:64px; border-radius:4px}
+@keyframes shim{0%{background-position:100% 0}100%{background-position:0 0}}
+
+/* 空态 / 错误态 / 上限态 居中块 */
+.center{
+  padding:44px 20px; display:flex; flex-direction:column; align-items:center; gap:9px; text-align:center;
+}
+.center-icon{
+  width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+}
+.center-title{font-size:13px; font-weight:500}
+.center-desc{font-size:12px; color:var(--text-2); max-width:420px}
+.center-actions{display:flex; gap:8px; margin-top:4px}
+
+/* 错误横幅 */
+.banner{
+  display:flex; align-items:flex-start; gap:9px; padding:10px 12px;
+  border-bottom:1px solid var(--border); font-size:12px;
+}
+.banner.err{background:var(--danger-soft); color:var(--danger-ink)}
+.banner.mock{background:var(--orange-soft); color:var(--orange-ink)}
+.banner-ic{width:15px; height:15px; flex:0 0 15px; margin-top:2px}
+.banner-body{flex:1; min-width:0}
+.banner-title{font-weight:600}
+.banner-desc{font-size:11px; opacity:.9; margin-top:1px; font-family:var(--mono)}
+.banner-act{margin-left:auto; display:flex; gap:7px; flex:0 0 auto}
+.banner-btn{
+  height:24px; padding:0 9px; border-radius:5px; font-size:11px; font-family:var(--sans);
+  border:1px solid currentColor; background:transparent; color:inherit; font-weight:500;
+}
+
+.spin{
+  width:12px; height:12px; border-radius:50%; flex:0 0 12px;
+  border:1.6px solid rgba(255,255,255,.45); border-top-color:#fff;
+  animation:rot .7s linear infinite;
+}
+.spin.dark{border-color:var(--border); border-top-color:var(--text-2)}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+.legend{
+  background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 16px;
+}
+.legend h3{font-size:12px; font-weight:600; margin-bottom:9px}
+.legend table{border-collapse:collapse; width:100%; font-size:11.5px}
+.legend th,.legend td{text-align:left; padding:6px 8px; border-bottom:1px solid var(--border-soft); vertical-align:top}
+.legend th{color:var(--text-3); font-weight:500}
+.legend tr:last-child td{border-bottom:none}
+.legend code{font-family:var(--mono); font-size:10.5px; color:var(--text-2)}
+</style>
+</head>
+<body data-page-node-id="GUySOI2H8fkceq2KrakASC">
+
+<div class="wrap" data-page-node-id="ANNKqlnCxILMytsF6FGtjx">
+
+  <div class="doc-head" data-page-node-id="p4yt1a8C3gaqNKytywsKVA">
+    <div class="doc-title" data-page-node-id="XXZpwa0zIwG3yNIRqCArBZ">审计日志 · 改造后页面状态全集</div>
+    <div class="doc-sub" data-page-node-id="0C7jeenFAK86FKpWe0YuAM">逐项验收对照文件。每格为一个独立可见状态，验收时按编号逐条核对。</div>
+    <div class="doc-meta" data-page-node-id="k577ZHKl3BSaMx6ehKK9Rw">基准：UI_STANDARD.md 第四章 · 配套：docs/audit-log-remediation-plan.md</div>
+  </div>
+
+  <!-- 共享筛选栏 -->
+  <div class="filter" data-page-node-id="m3FX9rpKxlxyN7P4bDEvZi">
+    <div class="chips" data-page-node-id="PWMpjA5DIyM3T9SjqcMehI">
+      <span class="chip on" data-page-node-id="Z3uqc2ZaDsoOF5hZli75Kk">近1天</span>
+      <span class="chip" data-page-node-id="f4MHCPqiFdHLH7TvQN3uZ0">近3天</span>
+      <span class="chip" data-page-node-id="rXuWS3OIgJd9HUQUZiyJAo">近7天</span>
+      <span class="chip" data-page-node-id="EIrL0EDqvexjiggn5c1f7j">近30天</span>
+      <span class="chip" data-page-node-id="pJ8llgyqRhQ5Lmz4jswj9p">自定义</span>
+    </div>
+    <span class="f-label" data-page-node-id="6E8X4f9w6DREuUf8LrGHLG">开始</span>
+    <span class="date" data-page-node-id="zRRwg5tezNIlbN6Z4vzyAW">2026-09-11</span>
+    <span class="f-label" data-page-node-id="I0wbi9mZhtWaC2Xx7XdA5C">结束</span>
+    <span class="date" data-page-node-id="bqeNC9tPSLm9GXZFHLm7F0">2026-09-11</span>
+    <span class="hint" data-page-node-id="TwOw04xgLQUIwQnpPGWBCL">最多查询近 90 天</span>
+    <div class="filter-right" data-page-node-id="4trujtd07GIDPK0R4doP3e">
+      <span class="btn btn-primary" data-page-node-id="Bh8tnRxJ5GO8D8fS3ObCvp">查询</span>
+    </div>
+  </div>
+
+  <!-- 1 正常态 -->
+  <section class="state" data-page-node-id="YAEegZvAikanuNYBiqkSB7">
+    <div class="state-head" data-page-node-id="Xlw6acM6rzNjFgFnpWS197">
+      <span class="state-no" data-page-node-id="HstUHucVbTyZyFyN39WMMp">1</span>
+      <h2 data-page-node-id="y4Ed8uC80whDvOgd5eMiI0">正常态</h2>
+      <span class="state-tag" data-page-node-id="HoPXZ1W2Z4Ea5SFEdqRseO">默认</span>
+      <span class="state-note" data-page-node-id="VMlMiJ17FyOqqOcSpUvhGF">游标分页：无页码条 / 无跳页框 / 无「共 N 条」</span>
+    </div>
+    <div class="tablecard" data-page-node-id="iKwYI7ymijqWZoeioDzYoi">
+      <div class="row head" data-page-node-id="C97T5NiGiGPV01lpWC7A2B">
+        <div style="text-align:center" data-page-node-id="poVYbxhMlVa2fBOeiBQI6h">序号</div>
+        <div data-page-node-id="yISaBOwkn04Hzfk71ZZQpf">用户名</div>
+        <div data-page-node-id="j9cgDXdf6422lexfSfjVef">源 IP</div>
+        <div data-page-node-id="2ydg6wrZEpqSFcCzxvWDBw">事件</div>
+        <div data-page-node-id="WRMENhGal8hGKSvwAS1ftV">环境</div>
+        <div data-page-node-id="iF8N3RNfnt8DkeD25vds2a">事件时间</div>
+        <div data-page-node-id="9XwEZm8tVCvPFqPSbu0l3z">响应</div>
+      </div>
+      <div class="row data" data-page-node-id="YYkBoRpSPTBo16a23pcd15">
+        <div class="c c-idx" data-page-node-id="Tcp9yrAKRfK85zcqCDQr2K">1</div>
+        <div class="c c-user" data-page-node-id="501SoPOq2x8ar6HUfVDWr1">nodewebzsz@gmail.com</div>
+        <div class="c c-ip" title="10.0.2.9(内网地址)，252.49.125.199(中国广东省深圳市)" data-page-node-id="IOGXl5TjDpHDox8ifsGu3P">10.0.2.9(内网地址)，252.49.125.199(中国广东省深圳市)</div>
+        <div class="c c-event" data-page-node-id="xgqiAHr04qtfbOixse19mt">LaunchInstance</div>
+        <div class="c" data-page-node-id="xG8pGC8aZp5WQavEy0Lt98"><span class="badge b-console" data-page-node-id="fub1xAcHtlDSeTEiwXw3jy">控制台</span></div>
+        <div class="c c-time" data-page-node-id="Bw2HUCewZm9XIBoYbD9bZX">2026-09-11 12:04:11</div>
+        <div class="c cell-resp" data-page-node-id="1ur0TnuEpd2NXC9q4NQdC9"><span class="badge b-ok" data-page-node-id="69Xwfrgdh40WawCVDJHTYG">成功</span><span class="code" data-page-node-id="iKV3Go0tGPJbmzPlTk5LnC">200</span></div>
+      </div>
+      <div class="row data alt" data-page-node-id="SGbz5O0hx8wCL6VGp1Kb9M">
+        <div class="c c-idx" data-page-node-id="40a6V8jceRw2KXEA7DX9zH">2</div>
+        <div class="c c-user" data-page-node-id="sOgS51A4KQ2FPv6k0uCDKe">terraform-svc@example.com</div>
+        <div class="c c-ip" title="203.0.113.47(中国广东省深圳市)" data-page-node-id="IaI8ZrFC1RzUioYoFfVVA5">203.0.113.47(中国广东省深圳市)</div>
+        <div class="c c-event" data-page-node-id="tGu7BMH1cUbKEk32LAIRve">CreateVcn</div>
+        <div class="c" data-page-node-id="HzWErWKDcPMU2y3kTI0pM1"><span class="badge b-api" data-page-node-id="lEy4q1gYxNzhTZR1KBqScn">API</span></div>
+        <div class="c c-time" data-page-node-id="VoccQFhg9UAKi9ye67fAuL">2026-09-11 11:58:02</div>
+        <div class="c cell-resp" data-page-node-id="pCdQwTtzEwMA8bImz38D3I"><span class="badge b-ok" data-page-node-id="QgrrTQvCMm4FfppNnyHBAw">成功</span><span class="code" data-page-node-id="Y35gFuWJWno7OzwZdAYZ5j">200</span></div>
+      </div>
+      <div class="row data" data-page-node-id="3oWzpxdhAFIQApPi152tBC">
+        <div class="c c-idx" data-page-node-id="WZPaEXKLOadqBudfS74tOR">3</div>
+        <div class="c c-user" data-page-node-id="7UHc7KrE2b1DFjrpG8iAEq">ci-runner@example.com</div>
+        <div class="c c-ip" title="198.51.100.9(中国香港)" data-page-node-id="28SuD1raZKsWhdCoY7pL07">198.51.100.9(中国香港)</div>
+        <div class="c c-event" data-page-node-id="YIa8JBPvWx21HJdBWoX84g">UpdateBootVolume</div>
+        <div class="c" data-page-node-id="TQWwZZjhabpeQuW9fhkKj0"><span class="badge b-api" data-page-node-id="4gfpEWXE3hoaCS2erY4SZ8">API</span></div>
+        <div class="c c-time" data-page-node-id="HZ2JismqSLx0MV4ffo85n2">2026-09-11 11:47:33</div>
+        <div class="c cell-resp" data-page-node-id="BPhaITmJZ53DG9HsiQyEIK"><span class="badge b-ok" data-page-node-id="W5e4hVJsQLujqgMFLTGxcw">成功</span><span class="code" data-page-node-id="csDJbJO01SB0kcPT6rYAK4">201</span></div>
+      </div>
+      <div class="row data alt" data-page-node-id="QeJLPEGWtNEFQfXsLHILb8">
+        <div class="c c-idx" data-page-node-id="ulkLcXbkSFDmJ6sm2IGcxW">4</div>
+        <div class="c c-user" data-page-node-id="wjyR0n9mTLpYh8rmFG2J6c">ops@example.com</div>
+        <div class="c c-ip" title="172.16.0.5(内网地址)" data-page-node-id="c6H8xB7zco4bcHn2nZBKOi">172.16.0.5(内网地址)</div>
+        <div class="c c-event" data-page-node-id="Nl6cxGsHvSsic1umIA3V1N">StopInstance</div>
+        <div class="c" data-page-node-id="bP4tyjyu9uiXgLXipSpMgx"><span class="badge b-console" data-page-node-id="AC3cEdGSPu27b6EDbHrgAS">控制台</span></div>
+        <div class="c c-time" data-page-node-id="DIK0rIbSB1HpijsA3lLSVe">2026-09-11 11:32:18</div>
+        <div class="c cell-resp" data-page-node-id="HQkSXMgRH5R9RtwuegZObF"><span class="badge b-ok" data-page-node-id="7Cq35JUKMoVc3NaPy2pbAg">成功</span><span class="code" data-page-node-id="YSENy2yKDGDJeqCZBTxB1b">204</span></div>
+      </div>
+      <div class="row data" data-page-node-id="1qgL4zBgkoFmgzXqss79bD">
+        <div class="c c-idx" data-page-node-id="ajyDqu7bMrhkcoMlurQ4mA">5</div>
+        <div class="c c-user" data-page-node-id="EhjHsVuyn4JYM65QWDQ0A2">ci-runner@example.com</div>
+        <div class="c c-ip" title="198.51.100.9(中国香港)" data-page-node-id="O4IEg1iwSxNU74NclxeIWW">198.51.100.9(中国香港)</div>
+        <div class="c c-event" data-page-node-id="s7xg3Du1DviFC0YHMKUutt">TerminateInstance</div>
+        <div class="c" data-page-node-id="gq3NZQDHC99pCBJX3h6e0a"><span class="badge b-api" data-page-node-id="2qXkLZCJmEdMWZGDtaCIfh">API</span></div>
+        <div class="c c-time" data-page-node-id="XBn46kb0Fo3xOf7wWwvmQK">2026-09-11 11:20:56</div>
+        <div class="c cell-resp" data-page-node-id="r7ntO4a1sD21dCAEZZJA6l"><span class="badge b-fail" data-page-node-id="6eNcXiuUq1LLAMcDJY4Ya4">失败</span><span class="code bad" data-page-node-id="EXTGGHADUtb0iF8V7sjs3t">404</span></div>
+      </div>
+      <div class="row data alt" data-page-node-id="cfl0Ee90iQbaPSSGPhEvi2">
+        <div class="c c-idx" data-page-node-id="kkgPQnauzCewM8WhuKZAVn">6</div>
+        <div class="c c-user" data-page-node-id="maCW2MiIVamcxF5G4H2cu5">admin@example.com</div>
+        <div class="c c-ip" title="203.0.113.88(日本东京都)" data-page-node-id="sIiDzEzFIeFOSUF55toIXT">203.0.113.88(日本东京都)</div>
+        <div class="c c-event" data-page-node-id="4c1eQXL1FbYI49f7hywxDK">GetInstance</div>
+        <div class="c" data-page-node-id="lVq8PXV5DDbfhwYvspwf5x"><span class="badge b-console" data-page-node-id="yLfziNk4QNz3XTAG1zJjtq">控制台</span></div>
+        <div class="c c-time" data-page-node-id="PJZg12gL3RBt0dYM7oyA3f">2026-09-11 10:59:04</div>
+        <div class="c cell-resp" data-page-node-id="m1LDYVFNZJmQrjPoFsdwMW"><span class="badge b-warn" data-page-node-id="ufGGMVVd5TqvZpiZjjKU8n">未知</span><span class="code" data-page-node-id="WY5pW0qMUQaoV5Nb4SCWxk">-</span></div>
+      </div>
+      <div class="foot" data-page-node-id="Ee80R660KZI8hO4yjki1eK">
+        <span class="foot-text" data-page-node-id="B39R3Kz3wPkTPX7toNoBir">已加载 <b data-page-node-id="vqeZQw9Ep3CAjvm3ifYoXi">6</b> 条 · 还有更多</span>
+        <div class="foot-right" data-page-node-id="hNBi84nZyyyk5XZsTxshcP">
+          <span class="btn" data-page-node-id="KvTaIGmza2vabEWX4y6WPS">加载更多</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 首屏加载中 -->
+  <section class="state" data-page-node-id="5wsmHOClCU02gAFGzcGCMC">
+    <div class="state-head" data-page-node-id="gj3UjnnFB4x2rOpe6XYTQV">
+      <span class="state-no" data-page-node-id="rEyqsUdH52x9X9YelxKfn1">2</span>
+      <h2 data-page-node-id="m7Wv5AqYGuhpPJ55zg8M68">首屏加载中</h2>
+      <span class="state-tag" data-page-node-id="dVTaNQNovEkbbtALsoNEs9">loading</span>
+      <span class="state-note" data-page-node-id="GqwuM9BlaG5aFMboP4sqGc">骨架屏占位，筛选栏与查询按钮进入禁用态</span>
+    </div>
+    <div class="tablecard" data-page-node-id="aWoP7ocEo9KpnHN7ovlZo1">
+      <div class="row head" data-page-node-id="wxArTke4kAxzJbe0kCQ0vk">
+        <div style="text-align:center" data-page-node-id="DGJ1vFsQXqGEbOk3ZlwVBY">序号</div>
+        <div data-page-node-id="hB8BOv1I3IBUiaNsNYV2O9">用户名</div>
+        <div data-page-node-id="aCKA0R7Hc3uTRQPU3QI4OU">源 IP</div>
+        <div data-page-node-id="yqEUG8KQPKEt7SsFwHSFod">事件</div>
+        <div data-page-node-id="i8swbIAZeJ5aWkyddzDCmg">环境</div>
+        <div data-page-node-id="t9ST9goTfA6JrGZRu1EWhA">事件时间</div>
+        <div data-page-node-id="KojHOGt4J1WdducGS9J0UX">响应</div>
+      </div>
+      <div class="row data" data-page-node-id="XjRpCwGTu5SnrdaH2kHjM5">
+        <div class="c c-idx" data-page-node-id="ZTk2EPxnZr8iUmPPAWxUu2"><span class="skel w55" data-page-node-id="qD30SNGBOwt7TlW74AdR6m"></span></div>
+        <div class="c" data-page-node-id="HxoXDaoR90oChqMoZn0ezg"><span class="skel w85" data-page-node-id="vH5p9cx7H0YhZ2lMOIf1zE"></span></div>
+        <div class="c" data-page-node-id="NKTkq1m22JM4GHiZWGwdpY"><span class="skel w70" data-page-node-id="e07BuUQxzZIk81UjL82lPP"></span></div>
+        <div class="c" data-page-node-id="9xAFDdeZVciHCrgGDovq25"><span class="skel w55" data-page-node-id="JD0oo6Om2Od3zSGE88up0i"></span></div>
+        <div class="c" data-page-node-id="EvXcti98CHRGqMimYKPqGS"><span class="skel pill" data-page-node-id="0GjEEtaHkMkZ4B2CRv1kp0"></span></div>
+        <div class="c" data-page-node-id="HlGvoGuasUMYEzQzuHdR2U"><span class="skel w70" data-page-node-id="awLPwaGDqkY5HkAHJs5NsT"></span></div>
+        <div class="c" data-page-node-id="ZGmMJV3477mv0ioxbZ2NNR"><span class="skel pill" data-page-node-id="WmAMblQwhBcoft62aFiuDv"></span></div>
+      </div>
+      <div class="row data alt" data-page-node-id="aLgRx3SxHvMGyX26qfMbTz">
+        <div class="c c-idx" data-page-node-id="MhCjxE4ffQx2D8LsYzMizj"><span class="skel w55" data-page-node-id="nElIUHJMCH5gxxUNUOGPMa"></span></div>
+        <div class="c" data-page-node-id="9W8fKOMMiHaDo3AZBMMUwp"><span class="skel w55" data-page-node-id="mis0rpydkq48qGB7S6gnXb"></span></div>
+        <div class="c" data-page-node-id="w634eb0dJKT3rKxCk62ksj"><span class="skel w40" data-page-node-id="GJum86u1HpT05OeExV9DEI"></span></div>
+        <div class="c" data-page-node-id="jxM3eWQqw67DrjdYrvAmQy"><span class="skel w70" data-page-node-id="WMvfnnZRvwZ9B0hcEC1p0G"></span></div>
+        <div class="c" data-page-node-id="OMrCYUhFNMrbeeBYIE8mMb"><span class="skel pill" data-page-node-id="FxhrobCvtDh3uB4Ad2HrRN"></span></div>
+        <div class="c" data-page-node-id="lqE25sqIzSVJpY4Nl41ldD"><span class="skel w70" data-page-node-id="mlR5Cgu81CsStA0qIzZr41"></span></div>
+        <div class="c" data-page-node-id="pyeYRU7VXc8qAtoeEDXWDF"><span class="skel pill" data-page-node-id="7n1TuBovtnoSpdiC1JYA8i"></span></div>
+      </div>
+      <div class="row data" data-page-node-id="jc7GCpUtA14BWV5TDQ1DO4">
+        <div class="c c-idx" data-page-node-id="VkzvXF1NhAU7jmbXfqxEaL"><span class="skel w55" data-page-node-id="3FPBPuhEPrKBYZFDi46Lm2"></span></div>
+        <div class="c" data-page-node-id="N5jrZCXdOSmUDYyGxgz0c7"><span class="skel w85" data-page-node-id="RmAxcNxwipd8zdcTK9uS5m"></span></div>
+        <div class="c" data-page-node-id="1MZuDlTmI8EfDBNVUtxc5V"><span class="skel w70" data-page-node-id="PZANHxzvrSFVOyZQZrzXvB"></span></div>
+        <div class="c" data-page-node-id="2ifYALjFD2YJkHvxFBpxZO"><span class="skel w55" data-page-node-id="a2OyXSg27xNefv2aOL70g0"></span></div>
+        <div class="c" data-page-node-id="kesq8mwnkRc8adj9DXJQxL"><span class="skel pill" data-page-node-id="NhplVHHzmJSmzmRSDNOssu"></span></div>
+        <div class="c" data-page-node-id="DVsctKqiPXBngdiF2cB4HD"><span class="skel w70" data-page-node-id="Ys7zyiBaQ7WMaPlHl5sLqD"></span></div>
+        <div class="c" data-page-node-id="Iw3j4PsfA9HsAUIv5SCq3b"><span class="skel pill" data-page-node-id="70ieyHKZSisedyBaxXlvN9"></span></div>
+      </div>
+      <div class="row data alt" data-page-node-id="FqMifxLqzzwnvOm1rarUlR">
+        <div class="c c-idx" data-page-node-id="kKIZ4ycig3nDxKKdGxDwXb"><span class="skel w55" data-page-node-id="c81YtMJpKN6jWeEwyOOukQ"></span></div>
+        <div class="c" data-page-node-id="aFiiIEm5iVNuXnXKZ0ibBI"><span class="skel w55" data-page-node-id="56LxrJM2fMY5WJErl6tGqS"></span></div>
+        <div class="c" data-page-node-id="TAHhnOG3Emo6xmO0NA9ML6"><span class="skel w40" data-page-node-id="xdFGJcnFV58HWO9DIc2E0c"></span></div>
+        <div class="c" data-page-node-id="VxY5Vjs5Wv7u6kXlsS7QAQ"><span class="skel w70" data-page-node-id="i6OnJAxsS2aSek7G8SKL0z"></span></div>
+        <div class="c" data-page-node-id="RavsVlK3baEEaLvrcvW5kL"><span class="skel pill" data-page-node-id="RvT8w2DIAM4M3aNfbEBwci"></span></div>
+        <div class="c" data-page-node-id="Kijt2YdIi5BQMvRbZffCzV"><span class="skel w70" data-page-node-id="In9R17THOGfHdgGmquB8I3"></span></div>
+        <div class="c" data-page-node-id="v7IREc0nAz4iqKreVARzEu"><span class="skel pill" data-page-node-id="yDJvWcLHLZYBN0E0G0UQuF"></span></div>
+      </div>
+      <div class="foot" data-page-node-id="x5NaU7RsRZ4DltyD9H9rV2">
+        <span class="foot-text" data-page-node-id="UcwxElfx4QjlCmae080B4M">正在查询…</span>
+        <div class="foot-right" data-page-node-id="KmT5nEJRjZFcSirVB35kBF">
+          <span class="btn" disabled data-page-node-id="CYKNGOLA32nOJYSq5m4MZc">加载更多</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 加载更多中 -->
+  <section class="state" data-page-node-id="PD4QUBDBEsOIDKn035JBQn">
+    <div class="state-head" data-page-node-id="xed24Und91EKrILSkkWYrZ">
+      <span class="state-no" data-page-node-id="hQD6q7DEXs2aDV2AOmCcK3">3</span>
+      <h2 data-page-node-id="EDuFiGN9Yd9eZOqyY9qXUP">加载更多中</h2>
+      <span class="state-tag" data-page-node-id="7a530vA2nDJJu7S7regsjg">appending</span>
+      <span class="state-note" data-page-node-id="nEujkT6IIGs536Nq0CRV4R">已有行保留不消失，仅尾部追加骨架行；按钮变「加载中…」</span>
+    </div>
+    <div class="tablecard" data-page-node-id="7ceDPqUFQqNGj2Fqd14U0B">
+      <div class="row head" data-page-node-id="o6wiynAsxWXDvlqHhmldmY">
+        <div style="text-align:center" data-page-node-id="cq1XAFILd3CMAjA4G3BmDi">序号</div>
+        <div data-page-node-id="xI01fBo7VNlXYfQJ9hXPWX">用户名</div>
+        <div data-page-node-id="lKwoXdECShtAU4oCBbhhge">源 IP</div>
+        <div data-page-node-id="rlW3wZPovSpH2tgQuyqXGs">事件</div>
+        <div data-page-node-id="fHxZzhIVRebPgxlCg722Db">环境</div>
+        <div data-page-node-id="pzVHlUkMSFAgGD4WPADk9O">事件时间</div>
+        <div data-page-node-id="GVYjp6TanAG2xVkB9iLHqd">响应</div>
+      </div>
+      <div class="row data" data-page-node-id="O1oHpa4cCVriAhH5yyPyvs">
+        <div class="c c-idx" data-page-node-id="0XTH6xW1ZCgsd5bXQRAVJo">17</div>
+        <div class="c c-user" data-page-node-id="5LX3EP7FbBoeDD3YVHAZRp">nodewebzsz@gmail.com</div>
+        <div class="c c-ip" title="10.0.2.9(内网地址)" data-page-node-id="U19NcKd9bsm9equG9gRt3k">10.0.2.9(内网地址)</div>
+        <div class="c c-event" data-page-node-id="sZGbiepMVAyBJ8UJmtDISz">ListInstances</div>
+        <div class="c" data-page-node-id="x20aU1ZUm4sFyhJ7e2JAuV"><span class="badge b-console" data-page-node-id="YARhvB5plz4Ea5z2mxDFCs">控制台</span></div>
+        <div class="c c-time" data-page-node-id="PgBfuS0IWWIflfYnuiEKzy">2026-09-11 09:41:27</div>
+        <div class="c cell-resp" data-page-node-id="YAQZgmNDwwPqu70XH2VuBb"><span class="badge b-ok" data-page-node-id="n4E23fBtVrGGx0ms81WuA6">成功</span><span class="code" data-page-node-id="xurz5D3UcvZCre661wypOU">200</span></div>
+      </div>
+      <div class="row data alt" data-page-node-id="hKPhB7ulLRRe6xUkmdhhmF">
+        <div class="c c-idx" data-page-node-id="MAPzEPsFXUNIhGmRWybG7A">18</div>
+        <div class="c c-user" data-page-node-id="2IO9SMQgPvy3zrREmHhPHH">ci-runner@example.com</div>
+        <div class="c c-ip" title="198.51.100.9(中国香港)" data-page-node-id="70ISnYzFbTRHDmTU3WsRjx">198.51.100.9(中国香港)</div>
+        <div class="c c-event" data-page-node-id="IzZamUBA8i7xHPh7FPg0DO">LaunchInstance</div>
+        <div class="c" data-page-node-id="4qycrAOm1PlrrtgLepeHaq"><span class="badge b-api" data-page-node-id="smZ054DymbEv5ZsEl0dUkG">API</span></div>
+        <div class="c c-time" data-page-node-id="ysoY4yC1HcCEqLpUv0NNDe">2026-09-11 09:33:12</div>
+        <div class="c cell-resp" data-page-node-id="8fm63MOnQCoEDa7HFTRQnV"><span class="badge b-ok" data-page-node-id="y2SfaLHIPjqo7YJmyP7irP">成功</span><span class="code" data-page-node-id="1Glu9aGncG4SrQyDkW8Wdy">200</span></div>
+      </div>
+      <div class="row data" data-page-node-id="6Gs6jbKvejcvIpod7TfrDl">
+        <div class="c c-idx" data-page-node-id="S03KaorhRdn5xKRzcMAcAd"><span class="skel w55" data-page-node-id="UfLKDaPAkRj3LwVQOx9Lci"></span></div>
+        <div class="c" data-page-node-id="KG7qC6PtWqK9BSjQHt8Vgh"><span class="skel w70" data-page-node-id="GcFGKhLiC0kC7BkGhrwQQt"></span></div>
+        <div class="c" data-page-node-id="kLilVh8QoRn8fwwxcH5YEr"><span class="skel w40" data-page-node-id="6udLUENrU0aQW9fXm68P4E"></span></div>
+        <div class="c" data-page-node-id="M8qHrgNlbyXTdRNfyPbK44"><span class="skel w55" data-page-node-id="OzWbPsh3RS0AVUmDsEKhcu"></span></div>
+        <div class="c" data-page-node-id="4o2SewZtkPipWFW9nVSCQt"><span class="skel pill" data-page-node-id="OfkA8WWaWyYcF5Dc7CO1tV"></span></div>
+        <div class="c" data-page-node-id="3eZCFTHH25E0n6hmjsKdmi"><span class="skel w70" data-page-node-id="J3yiQXF0ix3RDYLEJDa7Sy"></span></div>
+        <div class="c" data-page-node-id="NBaIFtVN70vU986xOQcENh"><span class="skel pill" data-page-node-id="DCW4y3pjoCtZYZQXriQ8GV"></span></div>
+      </div>
+      <div class="foot" data-page-node-id="htZDW8NL2YS33AOQF0H32r">
+        <span class="foot-text" data-page-node-id="YJ8nRcDsYo3EefzOdIeHTh">已加载 <b data-page-node-id="HBjv0cZ4lGaSBi3MYGtf4O">18</b> 条 · 还有更多</span>
+        <div class="foot-right" data-page-node-id="mif1DnvrWn8Hv0YQM5l9dF">
+          <span class="btn" disabled data-page-node-id="6CvuNztD2YCToqAELvvwhl"><span class="spin dark" data-page-node-id="MRlicE6FwDiUG3I2FtFHDZ"></span>加载中…</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 空态 -->
+  <section class="state" data-page-node-id="NmLerJDoBN3LKjWLT1ZLD7">
+    <div class="state-head" data-page-node-id="SUW9WAj3u7BKSoOU0uuBMU">
+      <span class="state-no" data-page-node-id="Kbld8LoWpINAWhOc2TDYBa">4</span>
+      <h2 data-page-node-id="sH8fEI5RroTa8HV0Epa5kv">空态</h2>
+      <span class="state-tag" data-page-node-id="m3PBSnAssJazrWpGrnYWey">empty</span>
+      <span class="state-note" data-page-node-id="3OhdReMuNgh8O6SyhKA1ug">A2 验收点：真实空结果必须显示空态，不得被 mock 顶替成 6 条假数据</span>
+    </div>
+    <div class="tablecard" data-page-node-id="yTi6PAt43CbLRjFY1omdHS">
+      <div class="row head" data-page-node-id="bNzoy2qvPFhbFKY8BGPCyk">
+        <div style="text-align:center" data-page-node-id="16PaNrSaaQB2zAZdzSy0ri">序号</div>
+        <div data-page-node-id="eejbGYo2KQcaK5BOwze0CM">用户名</div>
+        <div data-page-node-id="cyAz10SZbey9IFZIKrRALS">源 IP</div>
+        <div data-page-node-id="LbpB7Q39NJfD7ahI8KEB1O">事件</div>
+        <div data-page-node-id="G5gMW4PQVKYZdmwBJv4veP">环境</div>
+        <div data-page-node-id="XmPtzCNsJX77CMPRbHKQ21">事件时间</div>
+        <div data-page-node-id="olTbUnjL9EbI2ErqLEwgcD">响应</div>
+      </div>
+      <div class="center" data-page-node-id="KvulUCg7rTQtcDfmeWpkPO">
+        <div class="center-icon" style="background:var(--border-soft)" data-page-node-id="zjlWD5xsgm6PiQhpRFMCh4">
+          <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="#81878c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="tps56hyJpP72xQQfZXqMZQ">
+            <path d="M9 1.5H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L9 1.5Z" data-page-node-id="CLrsoLCIfLB6jLYeEB92Vs"/>
+            <path d="M9 1.5v4h4" data-page-node-id="BWsGrbSgZFn2rPopuScMQc"/>
+            <path d="M6 9h4" data-page-node-id="Ds8b1rie4v0GCu90lMGDrm"/>
+          </svg>
+        </div>
+        <div class="center-title" data-page-node-id="44A3AdsaDvOOkHBAYM6W2h">该时间范围内没有审计事件</div>
+        <div class="center-desc" data-page-node-id="AOcCr7RS23ZtskXE8gx8lQ">当前查询区间为 2026-09-11 00:00 ~ 2026-09-11 23:59。可尝试放宽时间范围，或确认该租户在此区间内确实没有操作记录。</div>
+        <div class="center-actions" data-page-node-id="64kdWGhgo7Ngx7qaFlpuQc">
+          <span class="btn" data-page-node-id="BlaXu3bMBC0XyNV2ZrPdx0">放宽到近 7 天</span>
+        </div>
+      </div>
+      <div class="foot" data-page-node-id="B5uI4nFPRj9lAHzHuXBCEj">
+        <span class="foot-text" data-page-node-id="LMGs84B4Q44GRfPaJaRX7m">已加载 <b data-page-node-id="RpAGgZOHFRUr3vK8IA2VJu">0</b> 条</span>
+        <div class="foot-right" data-page-node-id="KetBpVBr0rmkEbHCDo3M6D"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 错误态 -->
+  <section class="state" data-page-node-id="8zPL7F90Dji96JyhYY9Smw">
+    <div class="state-head" data-page-node-id="ZvhBnukGe3rQICx2oZbOF9">
+      <span class="state-no" data-page-node-id="MFxHglALKk5CAM8QV6DCRY">5</span>
+      <h2 data-page-node-id="m9N4CHEq2DrNVR3ZTAA03k">错误态</h2>
+      <span class="state-tag" data-page-node-id="aBPDVZwyHWwnpKrQfExQkD">error</span>
+      <span class="state-note" data-page-node-id="Ds9IRG0LXdMcaMX2qU6tYs">A1 / A4 验收点：查询失败必须报错，不得静默显示空列表或假数据</span>
+    </div>
+    <div class="tablecard" data-page-node-id="QemOtI3YWEL1CCGwSTxYdl">
+      <div class="banner err" data-page-node-id="QvWBYeHVVWPdOSokSmAywh">
+        <svg class="banner-ic" viewBox="0 0 16 16" fill="none" stroke="#791f1f" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="pNhvJkOw5HWc0qnCi2qLvh">
+          <circle cx="8" cy="8" r="6.2" data-page-node-id="04VdKqHtPZIoWhb5OAvhZQ"/>
+          <path d="M8 5v3.6M8 10.8v.2" data-page-node-id="F2zSY7Imus6vReGB8P16li"/>
+        </svg>
+        <div class="banner-body" data-page-node-id="4beAY8TU2qt7Zfd2ni6fyh">
+          <div class="banner-title" data-page-node-id="SVkvgDhTAxv3b7zikbBrFO">查询审计日志失败</div>
+          <div class="banner-desc" data-page-node-id="mzAVsTlFbWn1BBHAdPcT4J">日期范围不能超过 90 天（当前 366 天）</div>
+        </div>
+        <div class="banner-act" data-page-node-id="jr5CwTQkr7o3RSGh9Irj5Q">
+          <button class="banner-btn" data-page-node-id="oX1dMnuRblZKJudFiZLIZi">重试</button>
+        </div>
+      </div>
+      <div class="row head" data-page-node-id="Wn3lsgRc9J9YIEr3EgTfLB">
+        <div style="text-align:center" data-page-node-id="ZQe0IasGys9FIZridHoFky">序号</div>
+        <div data-page-node-id="4p5LXjAFlSBm7nxjqcCGbU">用户名</div>
+        <div data-page-node-id="h6Ab8FvXCyjg95j1ac9ZiL">源 IP</div>
+        <div data-page-node-id="OIgYEGhQiYwh1EE2ODMT7c">事件</div>
+        <div data-page-node-id="I3AjD16aJSYEnyVuMb9WWM">环境</div>
+        <div data-page-node-id="jvELYvZi4SEA7Is80SD5gx">事件时间</div>
+        <div data-page-node-id="xYuHWr92MJmCzacouxuJZQ">响应</div>
+      </div>
+      <div class="center" data-page-node-id="0UE4Yrd7L1LaiayG9z1AQk">
+        <div class="center-icon" style="background:var(--danger-soft)" data-page-node-id="Spx1uJBwmgDPq17HsoCXAm">
+          <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="#f05653" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="rAcFidkHVgyiyWL0XHczT7">
+            <path d="M8 2.2 14.4 13.4H1.6L8 2.2Z" data-page-node-id="nKaMNJqNQoXDPI2G865XA5"/>
+            <path d="M8 6.4v3.2M8 11.4v.2" data-page-node-id="sdIeODfVPEuDfwgfdBqNIj"/>
+          </svg>
+        </div>
+        <div class="center-title" data-page-node-id="6l9rETz40F6pRzChgCmtO6">未能获取数据</div>
+        <div class="center-desc" data-page-node-id="p2CyiBEgruohggL7R4DO6H">请修正查询条件后重试。若条件无误仍失败，可能是租户凭据或网络代理异常。</div>
+      </div>
+      <div class="foot" data-page-node-id="fdIAog0TFDVuPclaPTk5GK">
+        <span class="foot-text" data-page-node-id="N5YX18zfJ40O6Fh159l3i3">—</span>
+        <div class="foot-right" data-page-node-id="ODWZ4ndTAofCWo59fy22wi"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 已达上限 -->
+  <section class="state" data-page-node-id="FDA3ZDAZUZH6LDbNic9EVq">
+    <div class="state-head" data-page-node-id="6Dj9k0lNwDT9K7oGCirgXI">
+      <span class="state-no" data-page-node-id="ZqV1kQ1r3ks7DgGoTkbGbE">6</span>
+      <h2 data-page-node-id="IlBzL9mvoBCABNh59EPdBl">已达加载上限</h2>
+      <span class="state-tag" data-page-node-id="craEcmn6Bya92HrBVtdNcM">capped</span>
+      <span class="state-note" data-page-node-id="NnbeM3ASRnjPH6vhIuqmZP">B4 验收点：上限 2000 条，按钮隐藏，文案提示缩小范围</span>
+    </div>
+    <div class="tablecard" data-page-node-id="p3RG5jQ3DsXs0kvgFKu8C5">
+      <div class="row head" data-page-node-id="L5vbiGKXS0jldbqPP1lYaG">
+        <div style="text-align:center" data-page-node-id="6cmPpUWQhBBPTbPytxFDd4">序号</div>
+        <div data-page-node-id="D0VGswzbpSlHCvo4BNaDmz">用户名</div>
+        <div data-page-node-id="NKhxZnbYoFWb29UjM6vcnd">源 IP</div>
+        <div data-page-node-id="IQuiG6m6D7rRfwhKphqxzk">事件</div>
+        <div data-page-node-id="kK18zBpjJGAR5dxSwtVRZz">环境</div>
+        <div data-page-node-id="FqpMdhQZD5mQbbT2pa0j9g">事件时间</div>
+        <div data-page-node-id="UM5x3XjHwpD1vo25u0i9wv">响应</div>
+      </div>
+      <div class="row data" data-page-node-id="2G7zoYQY9luGJRB0rXqVi8">
+        <div class="c c-idx" data-page-node-id="TmHhjr6mLIMJxxLXs9nM9C">1999</div>
+        <div class="c c-user" data-page-node-id="lf9N7c1esOLV71Um5K5p89">ops@example.com</div>
+        <div class="c c-ip" title="172.16.0.5(内网地址)" data-page-node-id="hPXy9NgkqlaCKjKkMjMsLJ">172.16.0.5(内网地址)</div>
+        <div class="c c-event" data-page-node-id="gDp2cElkFoUoSS1dSyAqGE">StopInstance</div>
+        <div class="c" data-page-node-id="xFwvYga8sQmEmrdp9Fi2E2"><span class="badge b-console" data-page-node-id="Ct91rlmWigM32y1GbIsire">控制台</span></div>
+        <div class="c c-time" data-page-node-id="plZOEiv1p4GH2Rh8HphnFZ">2026-09-01 08:12:44</div>
+        <div class="c cell-resp" data-page-node-id="SzgkXQn090Wpw7EH3Ag6eU"><span class="badge b-ok" data-page-node-id="HLoO9PS1gfOlSrC54qlPVI">成功</span><span class="code" data-page-node-id="GvvJNczEBeZ0GEhOuRvdwi">200</span></div>
+      </div>
+      <div class="row data alt" data-page-node-id="BKeEDTqg2lyOe2TKA7MHAA">
+        <div class="c c-idx" data-page-node-id="qVASDDYIICx3Zyd9kjTngD">2000</div>
+        <div class="c c-user" data-page-node-id="9w2GpSy5e19YOEAsSaqAZP">terraform-svc@example.com</div>
+        <div class="c c-ip" title="203.0.113.47(中国广东省深圳市)" data-page-node-id="HvZWdjlXcgybG2cHXUMNoJ">203.0.113.47(中国广东省深圳市)</div>
+        <div class="c c-event" data-page-node-id="W9CeFpi0ZYTBC1lKF8xciD">CreateVcn</div>
+        <div class="c" data-page-node-id="TKougiA44mcY1sC5Znw7po"><span class="badge b-api" data-page-node-id="xQvm0vQKDNSCtqDIhDYCd3">API</span></div>
+        <div class="c c-time" data-page-node-id="nQHDBj0LVC2krelZisMybO">2026-09-01 08:11:02</div>
+        <div class="c cell-resp" data-page-node-id="bFhUjGaWrP6rZxWc0I2rMc"><span class="badge b-ok" data-page-node-id="IK782pJFWCqRsUbBCF4Zvy">成功</span><span class="code" data-page-node-id="9naE0ms3iB2FSpWMFxwart">200</span></div>
+      </div>
+      <div class="foot" data-page-node-id="hMV8WAsEgfM8XCan6E1sVs">
+        <span class="foot-text" data-page-node-id="EuIUns8jAkSsBXme7E6Cop">已加载 <b data-page-node-id="DO5CbjxXo6oFfuvdogbZEW">2000</b> 条 · <span style="color:var(--orange-ink)" data-page-node-id="ijLzO7qOaIzHcR8pmkjttB">已达上限，请缩小时间范围</span></span>
+        <div class="foot-right" data-page-node-id="u04cjxPCYxvN0YUu7vwD78"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 演示数据提示 -->
+  <section class="state" data-page-node-id="aRrtn3hCgaYmfcriVtT2ot">
+    <div class="state-head" data-page-node-id="c2IjKcLOtiKdUPeeGSm2RO">
+      <span class="state-no" data-page-node-id="HfTaPTjLUCjLhC42voemIq">7</span>
+      <h2 data-page-node-id="uwttaNopQq5s9LNvORW2Z4">演示数据提示</h2>
+      <span class="state-tag" data-page-node-id="eHTyRmTDjBnsFSW1xQKjlD">mock</span>
+      <span class="state-note" data-page-node-id="qlrkZNG35SaH7yZRA5Zkra">A2 备选方案：若保留 mock 兜底，必须显式标记，前端置顶横幅提示</span>
+    </div>
+    <div class="tablecard" data-page-node-id="eJ1iWCZKND632urhWhhFBR">
+      <div class="banner mock" data-page-node-id="dEzDVYpH6Uiw18zDN4qBum">
+        <svg class="banner-ic" viewBox="0 0 16 16" fill="none" stroke="#8a4a12" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="AvPZ4OV3myT6d2G5ljPGRt">
+          <circle cx="8" cy="8" r="6.2" data-page-node-id="eolZGHizW47VSdTkjXE4Z3"/>
+          <path d="M8 7.4v3.6M8 5v.2" data-page-node-id="AoEvfxxeikzBX7SxiiXGJt"/>
+        </svg>
+        <div class="banner-body" data-page-node-id="7dQ1unzgwV5pD52pgryy1Q">
+          <div class="banner-title" data-page-node-id="7rhqusKlrsbJzCpmWSgZzS">当前显示的是演示数据</div>
+          <div class="banner-desc" data-page-node-id="BLhODstfqEpfKa1h0ae3in">MODERN_UI_MOCK_DATA=true · 非真实审计记录，请勿据此判断租户状态</div>
+        </div>
+        <div class="banner-act" data-page-node-id="3csDDSbR6xDb6vXthCXDyT">
+          <button class="banner-btn" data-page-node-id="94ggZ7lZDA5WDpniZWWhlq">了解如何关闭</button>
+        </div>
+      </div>
+      <div class="row head" data-page-node-id="aXWOM5j0erU185GDEpGHfN">
+        <div style="text-align:center" data-page-node-id="0qPoETliwHuERUmviOKzA6">序号</div>
+        <div data-page-node-id="aNmmNN21SPBR6pH2V5zjSR">用户名</div>
+        <div data-page-node-id="5RYWOQgpA0i5VHpxkdNqBF">源 IP</div>
+        <div data-page-node-id="08FTOb66RTmRacDJpqBtlV">事件</div>
+        <div data-page-node-id="ihw5MGIYRRm23ZRzNaT2EV">环境</div>
+        <div data-page-node-id="qAOAK4PcfKsHw71HG2VkMH">事件时间</div>
+        <div data-page-node-id="49f6k68H4glBDuOWlj99Xf">响应</div>
+      </div>
+      <div class="row data" data-page-node-id="OZyO2sYAT3aKsKH5RbrJaZ">
+        <div class="c c-idx" data-page-node-id="POKzxBmlHCb5C8cYBznGkV">1</div>
+        <div class="c c-user" data-page-node-id="LqUsEsyiaXnGMD1NGTfS0M">nodewebzsz@gmail.com</div>
+        <div class="c c-ip" title="10.0.2.9(内网地址)" data-page-node-id="MBCKXc2IRBulZagqwp8zx0">10.0.2.9(内网地址)</div>
+        <div class="c c-event" data-page-node-id="alRGt9ir6HzxITFzU5D0dg">LaunchInstance</div>
+        <div class="c" data-page-node-id="qNtpGH74W7GSB0PDISpV8M"><span class="badge b-console" data-page-node-id="K6Fxyt4z2RcWIpep3cHlfI">控制台</span></div>
+        <div class="c c-time" data-page-node-id="h0jbUcsr9DLPaREDZBrXeC">2026-09-11 12:04:11</div>
+        <div class="c cell-resp" data-page-node-id="WiFHiWUlkXHziV4agNjUWV"><span class="badge b-ok" data-page-node-id="JQzOwL1WCB1BJJ3iPOGVlq">成功</span><span class="code" data-page-node-id="eLdY4MIEGIMjAVByL1UJ0N">200</span></div>
+      </div>
+      <div class="row data alt" data-page-node-id="HpI0612xssVUwoz2REste4">
+        <div class="c c-idx" data-page-node-id="tV0JI5vHBDU1EHZtTg6IfY">2</div>
+        <div class="c c-user" data-page-node-id="gG3irn7vKc0CzlxRCajMr3">terraform-svc@example.com</div>
+        <div class="c c-ip" title="203.0.113.47(中国广东省深圳市)" data-page-node-id="GhdBBycQz9DFCvaTY2a7Fp">203.0.113.47(中国广东省深圳市)</div>
+        <div class="c c-event" data-page-node-id="iqql37vdtW63pyUzEIE9TT">CreateVcn</div>
+        <div class="c" data-page-node-id="VjPDwHHFmgFBfP4GxASg2k"><span class="badge b-api" data-page-node-id="AyjaNtlDRFlTkxvus9Pgi2">API</span></div>
+        <div class="c c-time" data-page-node-id="gDtTm8hoe6lg4UvTAP3fUI">2026-09-11 11:58:02</div>
+        <div class="c cell-resp" data-page-node-id="uNK6xCSJFtEXCoCsVA0mCW"><span class="badge b-ok" data-page-node-id="mS4nNDiAvGqGe0vVjh6w84">成功</span><span class="code" data-page-node-id="BLMwijfRltKRKUV0RuHYl0">200</span></div>
+      </div>
+      <div class="foot" data-page-node-id="CQ0SzaOCTbcRZB6F15ZYu0">
+        <span class="foot-text" data-page-node-id="YWmRNonMvQDCnO7Dvwuv9o">已加载 <b data-page-node-id="JZGhGvwkxLTFdePgKCTrid">2</b> 条 · 演示数据</span>
+        <div class="foot-right" data-page-node-id="e869hJCCYIPaLf1uXIqfut"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 状态与验收项对照 -->
+  <div class="legend" data-page-node-id="6be17oe62q2LHiECsUi7Jq">
+    <h3 data-page-node-id="qNp7g2nKPWON0vJcu3twH4">状态 ↔ 验收项对照</h3>
+    <table data-page-node-id="M2dGedcb4rzUmpPKZEke8K">
+      <thead data-page-node-id="doLW5yC2Phgf2cVijqMg1X">
+        <tr data-page-node-id="B771Uwbsg3eIF7Fg1UjrBP"><th style="width:120px" data-page-node-id="Nn0P7UZTGbEsb7JGJE6eCL">状态</th><th style="width:110px" data-page-node-id="yD9TH8DsfYtpcXP3SxVQtD">关联项</th><th data-page-node-id="2eWb6sd8jYK4aySR8qpCES">验收要点</th></tr>
+      </thead>
+      <tbody data-page-node-id="JzUr35uWXYRZHv4lqxBlwh">
+        <tr data-page-node-id="r5tsh3rvg2SYCqvBSUDBLT">
+          <td data-page-node-id="ufFBI4bG9aB6kg4hLBkb5u">1 正常态</td>
+          <td data-page-node-id="u90xmxqnvzV14eCuTYb73h"><code data-page-node-id="6Rz5kBVgxed32Qqy5fOeVV">A3 / B1 / B2 / B3 / B4 / C1 / C2</code></td>
+          <td data-page-node-id="x8BKSFegLb3BHRl6rPAXep">环境列显示「控制台 / API」徽章；事件列为短名；响应列为「语义徽章 + 原始码」；201 / 204 判为成功；<code data-page-node-id="Tga8CMBGnUPKbuJCNfQELJ">-</code> 判为「未知」不染红；底部只有「已加载 N 条 · 还有更多」+「加载更多」，无页码条 / 跳页框 / 共 N 条；序号列 36px；源 IP 列 120px + 省略号 + hover 看全。</td>
+        </tr>
+        <tr data-page-node-id="8Tqn4w7A4mMTIGmk15zUFr">
+          <td data-page-node-id="APUXtgBagpOFn0OsVVcQDU">2 首屏加载中</td>
+          <td data-page-node-id="On1mI39ZRYSiD8nIImbEnc"><code data-page-node-id="VqFIu4zkKTiHHJUQNdUFQW">—</code></td>
+          <td data-page-node-id="RR8ILgHTAOZvW6Dw7Y6YqI">骨架屏占位，不显示任何旧数据；「加载更多」禁用；筛选栏查询按钮禁用。</td>
+        </tr>
+        <tr data-page-node-id="ttC8xMRUBG0FrcIu1XKCRk">
+          <td data-page-node-id="nDU5yqvuOnlMuKI0J6YTwB">3 加载更多中</td>
+          <td data-page-node-id="F37dRbh8UatGw62cDli6sC"><code data-page-node-id="cWclL1BRre7DFpkndOaAdk">B4</code></td>
+          <td data-page-node-id="8DIPmblzTX7cIaX0ujSk4A">已有行不消失、不重排；仅尾部追加；按钮变「加载中…」且不可重复点击。</td>
+        </tr>
+        <tr data-page-node-id="NyrndiGzHalYGOEH2BkHfr">
+          <td data-page-node-id="wBaQ8RiMsAYNt9groXeow4">4 空态</td>
+          <td data-page-node-id="PoASDeI0nkvr0ZU1KAfAHm"><code data-page-node-id="J479biUtstxut5SELUGFR1">A2</code></td>
+          <td data-page-node-id="0ythoBSCg5QeKTQzrQYNpc">真实空结果显示空态并给出放宽范围的操作；<strong data-page-node-id="4mucGXWTcRmCn5RJptrBpd">不得</strong>出现任何事件行。</td>
+        </tr>
+        <tr data-page-node-id="p6pUym0WrfMzLbO1iQaJ9N">
+          <td data-page-node-id="ZYpW9j5XsZ5lgRSO4TwMGk">5 错误态</td>
+          <td data-page-node-id="zTKvH8oXZ70Eg63XK2IFgA"><code data-page-node-id="9Xv5s81SFWyr3wn1xGfYGE">A1 / A4</code></td>
+          <td data-page-node-id="IAJygsC4B9G3WBDCxGtq3I">超过 90 天、格式非法、OCI 查询失败三种情况都必须报错；错误文案要说明具体原因（图示为「日期范围不能超过 90 天」）；提供重试。</td>
+        </tr>
+        <tr data-page-node-id="TY7XxaG35higZTs0I54Mq5">
+          <td data-page-node-id="lTaQTTQ3Y0tgXkAjRcRniI">6 已达加载上限</td>
+          <td data-page-node-id="79TFAwNiJ6DLhYNE4oEzaI"><code data-page-node-id="llXHSmviJpqhZrd9zYbcCd">B4</code></td>
+          <td data-page-node-id="iaBjBEdZw2hoKCWrL9KYpF">达到 2000 条后停止追加，文案提示「已达上限，请缩小时间范围」，按钮隐藏。</td>
+        </tr>
+        <tr data-page-node-id="elhjO6UlwUeDuqNPitDzzR">
+          <td data-page-node-id="xv6VkNZr7IwxilDNBR9k9B">7 演示数据提示</td>
+          <td data-page-node-id="yFfCQUh89ToBQ9iX4GWGtx"><code data-page-node-id="Q81AaCXus8I5yY3T4NEyex">A2</code></td>
+          <td data-page-node-id="lvDKyDY519vGxiOa1BYSrp">仅当保留 mock 兜底时适用：响应需带 <code data-page-node-id="Xrgd6gaolTRvJ0tVB5jxrW">mock: true</code>，前端置顶横幅明确标记为演示数据。</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+</body>
+</html>

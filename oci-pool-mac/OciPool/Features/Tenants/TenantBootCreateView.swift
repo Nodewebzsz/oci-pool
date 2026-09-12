@@ -43,7 +43,7 @@ struct TenantBootCreateView: View {
     private let topMinHeight: CGFloat = 320
 
     private var accent: Color { AppTheme.sidebarActive }
-    private var freeTag: Color { Color(hex: "3fb950") }
+    private var freeTag: Color { AppTheme.sidebarActive }
     private var paidTag: Color { Color(hex: "f78166") }
 
     @State private var selectedTemplateId: String = "arm-base"
@@ -91,11 +91,11 @@ struct TenantBootCreateView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 14))
-                .foregroundColor(Color(hex: "f85149"))
+                .foregroundColor(AppTheme.danger)
             VStack(alignment: .leading, spacing: 4) {
                 Text("API 开机风控警告")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(Color(hex: "f85149"))
+                    .foregroundColor(AppTheme.danger)
                 Text("Oracle 已加强对 API 开机的风控。通过 API 创建实例极大概率触发风控，可能导致账号受限。保存任务前会再次弹框确认。")
                     .font(.system(size: 12))
                     .foregroundColor(dark ? Color.white.opacity(0.85) : Color.primary)
@@ -107,11 +107,11 @@ struct TenantBootCreateView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color(hex: "f85149").opacity(dark ? 0.14 : 0.08))
+                .fill(AppTheme.danger.opacity(dark ? 0.14 : 0.08))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(hex: "f85149").opacity(0.45), lineWidth: 1)
+                .stroke(AppTheme.danger.opacity(0.45), lineWidth: 1)
         )
     }
 
@@ -136,7 +136,7 @@ struct TenantBootCreateView: View {
             title: "架构与区域",
             subtitle: "选择 CPU 架构与部署区域",
             systemImage: "cpu",
-            accent: Color(hex: "4a9eff"),
+            accent: AppTheme.info,
             enabled: nil,
             minHeight: topMinHeight
         ) {
@@ -330,7 +330,7 @@ struct TenantBootCreateView: View {
             title: "部署配置",
             subtitle: "计算规格 · 循环间隔 · 数量与时段",
             systemImage: "slider.horizontal.3",
-            accent: Color(hex: "4a9eff"),
+            accent: AppTheme.info,
             enabled: nil,
             minHeight: pairMinHeight
         ) {
@@ -401,7 +401,7 @@ struct TenantBootCreateView: View {
             title: "镜像与访问",
             subtitle: "Root 密码 · 操作系统 · Image ID",
             systemImage: "desktopcomputer",
-            accent: Color(hex: "00d6b9"),
+            accent: AppTheme.cyan,
             enabled: nil,
             minHeight: pairMinHeight
         ) {

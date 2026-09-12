@@ -135,15 +135,15 @@ function Card({ children, style = {}, className = '', title, subtitle, action, p
 // Button
 function Button({ children, variant = 'ghost', size = 'md', onClick, style = {}, icon, iconRight, disabled, loading = false }) {
   const variants = {
-    primary: { background: 'var(--accent)', color: 'var(--accent-fg)', border: '1px solid var(--accent)' },
+    primary: { background: 'var(--accent)', color: '#ffffff', border: '1px solid var(--accent)' },
     secondary: { background: 'var(--bg-2)', color: 'var(--fg-0)', border: '1px solid var(--border-strong)' },
     ghost: { background: 'transparent', color: 'var(--fg-1)', border: '1px solid transparent' },
     outline: { background: 'transparent', color: 'var(--fg-1)', border: '1px solid var(--border-strong)' },
-    danger: { background: 'var(--danger)', color: 'white', border: '1px solid var(--danger)' },
+    danger: { background: 'var(--danger)', color: '#ffffff', border: '1px solid var(--danger)' },
     danger_soft: { background: 'var(--danger-soft)', color: 'var(--danger)', border: '1px solid transparent' },
-    orange: { background: 'var(--orange)', color: 'oklch(0.16 0.02 55)', border: '1px solid var(--orange)' },
-    cyan: { background: 'var(--cyan)', color: 'oklch(0.14 0.02 200)', border: '1px solid var(--cyan)' },
-    info: { background: 'var(--info)', color: 'white', border: '1px solid var(--info)' }
+    orange: { background: 'var(--orange)', color: '#ffffff', border: '1px solid var(--orange)' },
+    cyan: { background: 'var(--cyan)', color: '#ffffff', border: '1px solid var(--cyan)' },
+    info: { background: 'var(--info)', color: '#ffffff', border: '1px solid var(--info)' }
   };
   const sizes = {
     xs: { padding: '2px 8px', fontSize: 11, height: 22, gap: 4 },
@@ -236,9 +236,30 @@ function Sparkline({ data, color = 'var(--accent)', width = 80, height = 24, fil
 
 }
 
+// EmptyState — 标准空状态组件，100% 对齐客户端 EmptyStateView.swift
+// 图标（36px, 浅色半透明） + 标题（15px, semibold） + 描述（12px, 居中） + 主操作按钮
+function EmptyState({ icon = 'inbox', title = '暂无数据', subtitle, actionLabel, onAction }) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      padding: '44px 32px', textAlign: 'center', gap: 10,
+    }}>
+      <Icon name={icon} size={36} style={{ color: 'var(--fg-3)', opacity: 0.5, strokeWidth: 1.5, marginBottom: 2 }} />
+      <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--fg-0)' }}>{title}</div>
+      {subtitle && <div style={{ fontSize: 12, color: 'var(--fg-2)', maxWidth: 420, lineHeight: 1.5 }}>{subtitle}</div>}
+      {actionLabel && onAction && (
+        <Button variant="primary" size="sm" onClick={onAction} style={{ marginTop: 6 }}>
+          {actionLabel}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 // Table — dense, tool-style, hoverable rows
-function Table({ columns, rows, onRowClick, density = 'compact', empty, striped = true }) {
+function Table({ columns, rows = [], onRowClick, density = 'compact', empty, loading = false, striped = true }) {
   const py = density === 'comfortable' ? 12 : density === 'compact' ? 9 : 6;
+  const safeRows = Array.isArray(rows) ? rows : [];
   return (
     <table style={{
       width: '100%',
@@ -263,16 +284,36 @@ function Table({ columns, rows, onRowClick, density = 'compact', empty, striped 
               position: 'sticky', top: 0,
               whiteSpace: 'nowrap',
               width: c.width,
+              minWidth: c.minWidth || c.width,
               zIndex: 1
             }}>{c.label}</th>
             )}
           </tr>
         </thead>
-        <tbody>
-          {rows.length === 0 && empty &&
-          <tr><td colSpan={columns.length} style={{ padding: 40, textAlign: 'center', color: 'var(--fg-3)' }}>{empty}</td></tr>
-          }
-          {rows.map((r, i) =>
+        <tbody style={{ opacity: (loading && safeRows.length > 0) ? 0.6 : 1, transition: 'opacity 120ms' }}>
+          {loading && safeRows.length === 0 ? (
+            <tr>
+              <td colSpan={columns.length} style={{ padding: 48, textAlign: 'center', color: 'var(--fg-3)' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+                  <Icon name="loader-2" size={18} className="spin" style={{ opacity: 0.6 }} />
+                  <span style={{ fontSize: 13 }}>加载中…</span>
+                </div>
+              </td>
+            </tr>
+          ) : safeRows.length === 0 ? (
+            <tr>
+              <td colSpan={columns.length} style={{ padding: 0, textAlign: 'center' }}>
+                {React.isValidElement(empty) ? (
+                  empty
+                ) : typeof empty === 'string' && empty.trim() && !empty.includes('.') ? (
+                  <EmptyState title={empty} />
+                ) : (
+                  <EmptyState />
+                )}
+              </td>
+            </tr>
+          ) : null}
+          {safeRows.map((r, i) =>
           <tr
             key={r.id || r.seq || i}
             onClick={onRowClick ? () => onRowClick(r) : undefined}
@@ -286,12 +327,19 @@ function Table({ columns, rows, onRowClick, density = 'compact', empty, striped 
             onMouseLeave={(e) => e.currentTarget.style.background = striped && i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 40%, transparent)' : 'transparent'}>
             
               {columns.map((c, ci) =>
-            <td key={c.key || ci} style={{
+            <td key={c.key || ci}
+                title={((c.tooltip && c.tooltip(r)) || (c.render === undefined ? String(r[c.key] ?? '') : '')) || undefined}
+                style={{
               padding: `${py}px 12px`,
               textAlign: c.align || 'left',
               color: 'var(--fg-1)',
               verticalAlign: 'middle',
-              whiteSpace: c.wrap ? 'normal' : 'nowrap'
+              whiteSpace: c.wrap ? 'normal' : 'nowrap',
+              ...(c.ellipsis === false ? {} : {
+                maxWidth: c.maxWidth || c.width || 240,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              })
             }}>
                   {c.render ? c.render(r, i) : r[c.key]}
                 </td>
@@ -319,7 +367,7 @@ function Pagination({ total, page = 1, perPage = 10, onPageChange, onPerPageChan
           value={perPage}
           onChange={v => onPerPageChange && onPerPageChange(+v)}
           options={[10, 20, 50, 100].map(n => ({ value: n, label: String(n) }))}
-          width={64}
+          width={72}
           height={26}
         />
       </div>
@@ -400,19 +448,26 @@ function SearchInput({ placeholder = 'Search...', value, onChange, width = 260, 
     if (controlled) onChange(v);
     else setInternal(v);
   };
+  const handleClear = () => {
+    if (controlled) onChange('');
+    else setInternal('');
+  };
+  const hasVal = Boolean(curValue && String(curValue).length > 0);
+
   return (
     <div style={{
       display: 'inline-flex',
       alignItems: 'center',
       gap: 8,
-      padding: '0 12px',
+      padding: hasVal ? '0 6px 0 12px' : '0 12px',
       height: heights[size] || 30,
       width,
       background: 'var(--bg-2)',
       border: '1px solid var(--border)',
-      borderRadius: 'var(--radius-sm)'
+      borderRadius: 'var(--radius-sm)',
+      boxSizing: 'border-box',
     }}>
-      <Icon name="search" size={13} style={{ color: 'var(--fg-3)' }} />
+      <Icon name="search" size={13} style={{ color: 'var(--fg-3)', flexShrink: 0 }} />
       <input
         value={curValue || ''}
         onChange={handleChange}
@@ -426,9 +481,36 @@ function SearchInput({ placeholder = 'Search...', value, onChange, width = 260, 
           fontSize: 12.5,
           color: 'var(--fg-0)'
         }} />
-      
+      {hasVal && (
+        <button
+          type="button"
+          onMouseDown={e => e.preventDefault()}
+          onClick={handleClear}
+          tabIndex={-1}
+          title={typeof tr === 'function' ? (tr('logs.action.clear') || 'Clear') : 'Clear'}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            color: 'var(--fg-3)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 18,
+            height: 18,
+            borderRadius: '50%',
+            opacity: 0.65,
+            transition: 'opacity 120ms, color 120ms',
+            flexShrink: 0,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--fg-1)'; }}
+          onMouseLeave={e => { e.currentTarget.style.opacity = '0.65'; e.currentTarget.style.color = 'var(--fg-3)'; }}
+        >
+          <Icon name="x-circle" size={13} />
+        </button>
+      )}
     </div>);
-
 }
 
 // Select
@@ -481,11 +563,14 @@ function CustomDropdown({
     const opts = kids.filter(c => c.type === 'option').map(o => ({
       value: o.props.value,
       label: React.Children.toArray(o.props.children).join(''),
+      disabled: !!o.props.disabled,
     }));
-    // placeholder option(空 value)不进 options,而是作为 placeholder 显示
-    const phOpt = opts.find(o => o.value === '' || o.value == null);
-    const cleanOpts = opts.filter(o => o !== phOpt);
-    return { options: cleanOpts, ph: phOpt?.label };
+    // 只有明确 disabled 的空 option（如 <option value="" disabled>请选择</option>）才作为纯 placeholder 且不进入可选列表
+    // 未 disabled 的空 option（如 <option value="">全部</option>）是合法的可选项，必须进入可选列表供随时点击切换
+    const phDisabledOpt = opts.find(o => (o.value === '' || o.value == null) && o.disabled);
+    const cleanOpts = opts.filter(o => o !== phDisabledOpt);
+    const ph = phDisabledOpt?.label;
+    return { options: cleanOpts, ph };
   }, [children]);
   if (derived) {
     if (derived.groups) groups = groups || derived.groups;
@@ -631,7 +716,7 @@ function CustomDropdown({
           background: 'var(--bg-2)',
           border: '1px solid ' + (open ? 'var(--accent)' : 'var(--border)'),
           borderRadius: 'var(--radius-sm)',
-          color: value ? 'var(--fg-0)' : 'var(--fg-3)',
+          color: (value || selectedLabel) ? 'var(--fg-0)' : 'var(--fg-3)',
           fontFamily: 'inherit', fontSize: 12.5,
           textAlign: 'left',
           cursor: disabled ? 'not-allowed' : 'pointer',
@@ -689,7 +774,7 @@ function CustomDropdown({
               </div>
             </div>
           )}
-          {placeholder && value === '' && (
+          {!flatItems.some(it => it.type === 'item' && (it.value === '' || it.value == null)) && placeholder && (value === '' || value == null) && (
             <div style={{ padding: '6px 10px', fontSize: 11.5, color: 'var(--fg-3)', fontStyle: 'italic' }}>
               {placeholder}
             </div>
@@ -938,6 +1023,6 @@ function Overlay({ onClose, children }) {
 
 Object.assign(window, {
   Icon, StatusDot, StatusPill, Card, Button, KPICard, Sparkline,
-  Table, Pagination, SearchInput, Select, CustomDropdown, IconButton, ActionButton,
+  Table, EmptyState, Pagination, SearchInput, Select, CustomDropdown, IconButton, ActionButton,
   PageHeader, RegionBadge, Tabs, ProgressBar, Overlay
 });

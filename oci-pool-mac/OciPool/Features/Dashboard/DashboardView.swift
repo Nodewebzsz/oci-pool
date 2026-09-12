@@ -1,27 +1,31 @@
 import SwiftUI
 
-/// Web-parity 系统监控 page (`dashboard.ftl` + `dashboard.css` + `dashboard.js`).
+/// Web-parity 系统监控 page (`page-monitor.jsx`):
+/// PageHeader 卡 + 5 KPI 网格 + 4 仪表卡 + 底部 抢机趋势(1.6fr)/实时活动(1fr)。
+/// 颜色全部走 AppTheme 全局 token（Web CSS 变量），深浅色统一换肤。
 struct DashboardView: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appearance: AppearanceController
     @StateObject private var model = DashboardViewModel()
 
     private var dark: Bool { appearance.isDarkEffective }
+    private let timeLabels = ["24h", "18h", "12h", "6h", "3h", "now"]
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 14) {
                 pageHeader
                 if let err = model.errorText, !err.isEmpty {
                     errorBanner(err)
                 }
-                statsGrid
-                monitorGrid
+                kpiGrid
+                resourceGrid
+                bottomGrid
             }
-            .padding(24)
+            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(DashboardTheme.bg(dark).ignoresSafeArea())
+        .background(AppTheme.pageBg(dark).ignoresSafeArea())
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         .onAppear { model.start() }
         .onDisappear { model.stop() }
@@ -30,503 +34,566 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Header
+    // MARK: - PageHeader（Web ui.jsx PageHeader：bg-1 卡 / radius 8 / padding 14px 20px / marginBottom 14）
 
     private var pageHeader: some View {
-        HStack(alignment: .center) {
+        HStack(alignment: .center, spacing: 16) {
             HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 11)
-                        .fill(Color(hex: "3b82f6").opacity(0.14))
-                        .frame(width: 40, height: 40)
-                    Image(systemName: "gauge")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(DashboardTheme.blue(dark))
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(AppTheme.sidebarActive.opacity(0.18))
+                        .frame(width: 32, height: 32)
+                    // Web 页头图标为 Lucide activity 描边（SF Symbol 在部分系统上不渲染）
+                    MenuGlyph(name: "activity", size: 17, color: AppTheme.sidebarActive)
                 }
                 Text("系统监控")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(DashboardTheme.text(dark))
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(AppTheme.navIcon(dark))
+                    
             }
             Spacer()
-            HStack(spacing: 7) {
-                Circle()
-                    .fill(DashboardTheme.green(dark))
-                    .frame(width: 7, height: 7)
-                Text(model.lastUpdateText)
-                    .font(.system(size: 12))
-                    .foregroundColor(DashboardTheme.muted(dark))
+            HStack(spacing: 8) {
+                // 时间戳徽章：bg-2 圆角 6，脉冲点 6 + mono 时间 fg-1
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(AppTheme.sidebarActive)
+                        .frame(width: 6, height: 6)
+                        .shadow(color: AppTheme.sidebarActive.opacity(0.5), radius: 3)
+                    Text(model.lastUpdateText)
+                        .font(.system(size: 11.5, design: .monospaced))
+                        .foregroundColor(AppTheme.sidebarText(dark))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(AppTheme.sidebarHover(dark))
+                )
+
+                // outline 按钮：padding 5/12 · radius 5 · border-strong
+                Button(action: { Task { await model.refreshAll() } }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 12, weight: .medium))
+                        Text("刷新")
+                            .font(.system(size: 12.5, weight: .medium))
+                    }
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5)
+                            .stroke(AppTheme.border(dark).opacity(1.6), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(DashboardTheme.surface(dark))
-                    .overlay(Capsule().stroke(DashboardTheme.border(dark), lineWidth: 1))
-            )
         }
-        .padding(.bottom, 4)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .background(AppTheme.sidebarBg(dark))
         .overlay(
-            Rectangle()
-                .fill(DashboardTheme.border(dark))
-                .frame(height: 1),
-            alignment: .bottom
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
         )
-        .padding(.bottom, 8)
+        .cornerRadius(8)
     }
 
     private func errorBanner(_ text: String) -> some View {
-        HStack {
-            Image(systemName: "exclamationmark.triangle.fill")
-            Text(text)
-                .font(.system(size: 12))
-            Spacer()
-            Button("重试") {
-                Task { await model.refreshAll() }
+        Text(text)
+            .font(.system(size: 12))
+            .foregroundColor(AppTheme.danger)
+    }
+
+    // MARK: - KPI（5 列 · gap 12 · marginBottom 14）
+
+    private var kpiGrid: some View {
+        HStack(alignment: .top, spacing: 12) {
+            kpiCard(icon: "list.bullet", iconColor: AppTheme.cyan, title: "总 API 数",
+                    value: "\(model.stats.totalApiCalls)")
+            kpiCard(icon: "server.rack", iconColor: AppTheme.sidebarActive, title: "总 BOOT 实例数",
+                    value: "\(model.stats.totalBootInstances)")
+            kpiCard(icon: "arrow.triangle.2.circlepath", iconColor: AppTheme.info, title: "总抢机次数",
+                    value: "\(model.stats.totalAttempts)")
+            kpiCard(icon: "checkmark.circle", iconColor: AppTheme.sidebarActive, title: "抢机成功次数",
+                    value: "\(model.stats.successfulAttempts)")
+            kpiCard(icon: "xmark.circle", iconColor: AppTheme.danger, title: "抢机失败次数",
+                    value: "\(model.stats.failCounts)")
+        }
+    }
+
+    /// Web KPICard：bg-1 卡 · radius 8 · padding 14px 16px · 图标 36(18% 底) · 标签 11 fg-3 / 数值 22·700 fg-0
+    private func kpiCard(icon: String, iconColor: Color, title: String, value: String) -> some View {
+        HStack(alignment: .center, spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(iconColor.opacity(0.18))
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundColor(iconColor)
             }
-            .buttonStyle(PlainButtonStyle())
-        }
-        .foregroundColor(DashboardTheme.red(dark))
-        .padding(12)
-        .background(DashboardTheme.red(dark).opacity(0.1))
-        .cornerRadius(10)
-    }
-
-    // MARK: - Stats (5 cards)
-
-    private var statsGrid: some View {
-        // 5 equal columns, equal height
-        HStack(alignment: .top, spacing: 14) {
-            statCard(icon: "slider.horizontal.3", iconBg: Color(hex: "3b82f6"), title: "总API数",
-                     value: "\(model.stats.totalApiCalls)", valueColor: nil)
-            statCard(icon: "cpu", iconBg: Color(hex: "22c55e"), title: "总Boot实例数",
-                     value: "\(model.stats.totalBootInstances)", valueColor: nil)
-            statCard(icon: "arrow.triangle.2.circlepath", iconBg: Color(hex: "f97316"), title: "总抢机次数",
-                     value: "\(model.stats.totalAttempts)", valueColor: nil)
-            statCard(icon: "checkmark.circle.fill", iconBg: Color(hex: "06b6d4"), title: "抢机成功次数",
-                     value: "\(model.stats.successfulAttempts)", valueColor: nil)
-            statCard(icon: "xmark.circle.fill", iconBg: Color(hex: "ef4444"), title: "抢机失败次数",
-                     value: "\(model.stats.failCounts)", valueColor: DashboardTheme.red(dark))
-        }
-        .frame(height: 118)
-    }
-
-    private func statCard(icon: String, iconBg: Color, title: String, value: String, valueColor: Color?) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(iconBg.opacity(0.14))
-                        .frame(width: 40, height: 40)
-                    Image(systemName: icon)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(iconBg)
-                }
-                Spacer(minLength: 4)
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(DashboardTheme.muted(dark))
-                    .multilineTextAlignment(.trailing)
-                    .lineLimit(2)
-                    .frame(height: 28, alignment: .topTrailing)
+                    .foregroundColor(AppTheme.textTertiary(dark))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Text(value)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(AppTheme.navIcon(dark))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
             }
             Spacer(minLength: 0)
-            Text(value)
-                .font(.system(size: 28, weight: .bold))
-                .foregroundColor(valueColor ?? DashboardTheme.text(dark))
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(DashboardTheme.surface(dark))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.sidebarBg(dark))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(DashboardTheme.border(dark), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
         )
-        .cornerRadius(12)
+        .cornerRadius(8)
     }
 
-    // MARK: - Monitor grid
+    // MARK: - 资源仪表（4 列 · gap 14）
 
-    private var monitorGrid: some View {
-        // Web layout: 3 columns; network spans 2. Equal height per row.
-        VStack(spacing: 16) {
-            HStack(alignment: .top, spacing: 16) {
-                equalCard { cpuCard }
-                equalCard { memoryCard }
-                equalCard { systemCard }
-            }
-            .frame(minHeight: 420)
-
-            HStack(alignment: .top, spacing: 16) {
-                equalCard { networkCard }
-                    .layoutPriority(2)
-                equalCard { diskCard }
-                    .layoutPriority(1)
-            }
-            .frame(minHeight: 420)
-        }
-    }
-
-    /// Stretch card to fill the row height (same size as siblings).
-    private func equalCard<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        content()
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    }
-
-    // MARK: Cards
-
-    private var cpuCard: some View {
-        monitorCard(
-            icon: "cpu",
-            iconColor: DashboardTheme.blue(dark),
-            title: "CPU信息",
-            subtitle: model.metrics.cpuModel.isEmpty ? "加载中..." : model.metrics.cpuModel,
-            gaugeValue: min(100, model.metrics.cpuUsage),
-            gaugeLabel: "\(Int(min(100, model.metrics.cpuUsage.rounded())))%",
-            details: [
-                ("物理核心", "\(model.metrics.cpuPhysicalCount) C"),
-                ("逻辑核心", "\(model.metrics.cpuLogicalCount) C"),
-                ("CPU温度", model.metrics.cpuTemperature > 0
-                    ? String(format: "%.1f°C", model.metrics.cpuTemperature) : "N/A"),
-                ("主频", String(format: "%.2f GHz", model.metrics.cpuFrequency))
-            ]
-        )
-    }
-
-    private var memoryCard: some View {
-        let totalGB = model.metrics.totalMemory / 1024
-        return monitorCard(
-            icon: "rectangle.stack.fill",
-            iconColor: DashboardTheme.purple(dark),
-            title: "内存使用",
-            subtitle: model.metrics.totalMemory > 0
-                ? String(format: "总内存: %.1f GB", totalGB) : "加载中...",
-            gaugeValue: min(100, model.metrics.memoryUsage),
-            gaugeLabel: "\(Int(model.metrics.memoryUsage.rounded()))%",
-            details: [
-                ("总内存", DashboardFormat.memoryMB(model.metrics.totalMemory)),
-                ("已用内存", DashboardFormat.memoryMB(model.metrics.usedMemory)),
-                ("可用内存", DashboardFormat.memoryMB(model.metrics.availableMemory)),
-                ("交换空间", String(format: "%.0fMB / %.0fMB",
-                                   model.metrics.swapUsed, model.metrics.swapTotal))
-            ]
-        )
-    }
-
-    private var systemCard: some View {
-        // web: uptime gauge vs half of 10 years
-        let maxUptime = 315_360_000.0 / 2
-        let uptimePct = min((model.metrics.systemUptime / maxUptime) * 100, 100)
-        return monitorCard(
-            icon: "desktopcomputer",
-            iconColor: DashboardTheme.green(dark),
-            title: "系统信息",
-            subtitle: model.metrics.hostname.isEmpty ? "加载中..." : model.metrics.hostname,
-            gaugeValue: uptimePct,
-            gaugeLabel: DashboardFormat.uptimeDays(model.metrics.systemUptime),
-            details: [
-                ("操作系统", model.metrics.osName.isEmpty ? "-" : model.metrics.osName),
-                ("系统架构", model.metrics.osArch.isEmpty ? "-" : model.metrics.osArch),
-                ("运行时间", DashboardFormat.uptime(model.metrics.systemUptime)),
-                ("进程数", "\(model.metrics.totalProcesses)"),
-                ("线程数", "\(model.metrics.threadCount)")
-            ]
-        )
-    }
-
-    private var diskCard: some View {
-        monitorCard(
-            icon: "externaldrive.fill",
-            iconColor: DashboardTheme.orange(dark),
-            title: "磁盘使用",
-            subtitle: "存储状态监控",
-            gaugeValue: min(100, model.metrics.diskUsage),
-            gaugeLabel: "\(Int(model.metrics.diskUsage.rounded()))%",
-            details: [
-                ("总容量", DashboardFormat.size(model.metrics.diskTotal)),
-                ("已用空间", DashboardFormat.size(model.metrics.diskUsed)),
-                ("可用空间", DashboardFormat.size(model.metrics.diskFree)),
-                ("读写速度", "-")
-            ]
-        )
-    }
-
-    private var networkCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            cardHeader(
-                icon: "network",
-                iconColor: DashboardTheme.cyan(dark),
-                title: "网络流量",
-                subtitle: "实时流量监控"
+    private var resourceGrid: some View {
+        HStack(alignment: .top, spacing: 14) {
+            monitorCard(
+                icon: "cpu", iconColor: AppTheme.sidebarActive,
+                title: "CPU 信息",
+                subtitle: model.metrics.cpuModel.isEmpty ? "处理器信息" : model.metrics.cpuModel,
+                gauge: { gaugeSpec(color: AppTheme.sidebarActive, value: model.metrics.cpuUsage,
+                                   label: "%", valueSize: 36) },
+                rows: [
+                    ("物理核心", "\(model.metrics.cpuPhysicalCount) C"),
+                    ("逻辑核心", "\(model.metrics.cpuLogicalCount) C"),
+                    ("CPU 温度", model.metrics.cpuTemperature > 0
+                        ? String(format: "%.1f °C", model.metrics.cpuTemperature) : "N/A"),
+                    ("主频", model.metrics.cpuFrequency > 0
+                        ? String(format: "%.2f GHz", model.metrics.cpuFrequency) : "N/A")
+                ]
             )
 
-            NetworkTrafficChart(samples: model.networkHistory, dark: dark)
-                .frame(maxWidth: .infinity)
-                .frame(height: 168)
-                .padding(.bottom, 12)
+            monitorCard(
+                icon: "rectangle.stack", iconColor: AppTheme.orange,
+                title: "内存使用",
+                subtitle: model.metrics.totalMemory > 0
+                    ? String(format: "总内存: %.2f GB", model.metrics.totalMemory / 1024)
+                    : "总内存: ",
+                gauge: { gaugeSpec(color: AppTheme.orange, value: model.metrics.memoryUsage,
+                                   label: "%", valueSize: 36) },
+                rows: [
+                    ("总内存", DashboardFormat.memoryMB(model.metrics.totalMemory)),
+                    ("已用内存", DashboardFormat.memoryMB(model.metrics.usedMemory)),
+                    ("可用内存", DashboardFormat.memoryMB(model.metrics.availableMemory)),
+                    ("交换空间", String(format: "%.0fMB / %.0fMB",
+                                       model.metrics.swapUsed, model.metrics.swapTotal))
+                ]
+            )
 
-            Spacer(minLength: 0)
+            monitorCard(
+                icon: "externaldrive", iconColor: AppTheme.danger,
+                title: "磁盘使用",
+                subtitle: "存储状态监控",
+                gauge: { gaugeSpec(color: AppTheme.danger, value: model.metrics.diskUsage,
+                                   label: "%", valueSize: 36) },
+                rows: [
+                    ("总容量", DashboardFormat.size(model.metrics.diskTotal)),
+                    ("已用空间", DashboardFormat.size(model.metrics.diskUsed)),
+                    ("可用空间", DashboardFormat.size(model.metrics.diskFree)),
+                    ("文件系统", "N/A（后端未提供）")
+                ],
+                mutedRows: [3]
+            )
 
-            detailList([
-                ("上传速度", DashboardFormat.speed(model.metrics.uploadSpeed)),
-                ("下载速度", DashboardFormat.speed(model.metrics.downloadSpeed)),
-                ("总发送", DashboardFormat.size(model.metrics.totalUploadBytes)),
-                ("总接收", DashboardFormat.size(model.metrics.totalDownloadBytes))
-            ], fixedRows: 5)
+            monitorCard(
+                icon: "server.rack", iconColor: AppTheme.sidebarActive,
+                title: "系统信息",
+                subtitle: model.metrics.hostname.isEmpty ? "—" : model.metrics.hostname,
+                gauge: {
+                    var s = gaugeSpec(color: AppTheme.sidebarActive,
+                                      value: DashboardFormat.uptimeDaysNumber(model.metrics.systemUptime),
+                                      label: "天在线", valueSize: 30)
+                    s.maxValue = 90
+                    s.showUnit = false
+                    return s
+                },
+                rows: [
+                    ("操作系统", model.metrics.osName.isEmpty ? "-" : model.metrics.osName),
+                    ("系统架构", model.metrics.osArch.isEmpty ? "-" : model.metrics.osArch),
+                    ("运行时间", DashboardFormat.uptime(model.metrics.systemUptime))
+                ]
+            )
         }
-        .padding(22)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(DashboardTheme.surface(dark))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(DashboardTheme.border(dark), lineWidth: 1)
-        )
-        .cornerRadius(12)
     }
 
+    private func gaugeSpec(color: Color, value: Double, label: String, valueSize: CGFloat) -> GaugeSpec {
+        GaugeSpec(color: color, value: value, unitLabel: label, valueSize: valueSize)
+    }
+
+    /// Web Card（bg-1 / radius 8）+ 头部（inset 10 · padding 12px 16px · 下边框）+ 内容 padding 16
     private func monitorCard(
         icon: String,
         iconColor: Color,
         title: String,
         subtitle: String,
-        gaugeValue: Double,
-        gaugeLabel: String,
-        details: [(String, String)]
+        gauge: () -> GaugeSpec,
+        rows: [(String, String)],
+        mutedRows: Set<Int> = []
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            cardHeader(icon: icon, iconColor: iconColor, title: title, subtitle: subtitle)
-            DashboardGauge(value: gaugeValue, label: gaugeLabel, dark: dark)
-                .frame(width: 148, height: 148)
-                .frame(maxWidth: .infinity)
-                .padding(.bottom, 16)
-            Spacer(minLength: 0)
-            // Always 5 rows so CPU / 内存 / 系统 / 磁盘 cards share identical detail area height
-            detailList(details, fixedRows: 5)
-        }
-        .padding(22)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(DashboardTheme.surface(dark))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(DashboardTheme.border(dark), lineWidth: 1)
-        )
-        .cornerRadius(12)
-    }
-
-    private func cardHeader(icon: String, iconColor: Color, title: String, subtitle: String) -> some View {
-        HStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(iconColor.opacity(0.12))
-                    .frame(width: 44, height: 44)
+            // header（外层 margin 10 对齐 Web Card 头部的 margin:10）
+            HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 15, weight: .medium))
                     .foregroundColor(iconColor)
-            }
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(DashboardTheme.text(dark))
-                    .lineLimit(1)
-                Text(subtitle)
-                    .font(.system(size: 11))
-                    .foregroundColor(DashboardTheme.muted(dark))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            Spacer(minLength: 0)
-        }
-        .frame(height: 52, alignment: .center)
-        .padding(.bottom, 16)
-    }
-
-    /// Fixed-height detail rows so all cards in a row share the same content box size.
-    private func detailList(_ items: [(String, String)], fixedRows: Int = 5) -> some View {
-        let rowH: CGFloat = 34
-        var rows = items
-        while rows.count < fixedRows {
-            rows.append(("", ""))
-        }
-        if rows.count > fixedRows {
-            rows = Array(rows.prefix(fixedRows))
-        }
-
-        return VStack(spacing: 0) {
-            Rectangle()
-                .fill(DashboardTheme.border(dark))
-                .frame(height: 1)
-            ForEach(Array(rows.enumerated()), id: \.offset) { idx, item in
-                HStack(alignment: .center) {
-                    Text(item.0.isEmpty ? " " : item.0)
-                        .font(.system(size: 12))
-                        .foregroundColor(DashboardTheme.muted(dark))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(AppTheme.navIcon(dark))
                         .lineLimit(1)
-                    Spacer(minLength: 8)
-                    Text(item.1.isEmpty ? " " : item.1)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(DashboardTheme.text(dark))
-                        .multilineTextAlignment(.trailing)
+                    Text(subtitle)
+                        .font(.system(size: 10.5, design: .monospaced))
+                        .foregroundColor(AppTheme.textTertiary(dark))
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
-                .frame(height: rowH)
-                .opacity(item.0.isEmpty && item.1.isEmpty ? 0 : 1)
-                if idx < rows.count - 1 {
-                    Rectangle()
-                        .fill(DashboardTheme.border(dark))
-                        .frame(height: 1)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(AppTheme.sidebarBg(dark))
+            .overlay(Rectangle().fill(AppTheme.border(dark)).frame(height: 1), alignment: .bottom)
+            .padding(10)
+
+            // gauge 居中（Web: padding 4px 0 8px，尺寸 clamp 144~180）
+            spec(gauge())
+                .padding(.top, 4)
+                .padding(.bottom, 8)
+                .frame(maxWidth: .infinity)
+
+            // 详情行：上边框 + paddingTop 14 · 行距 10 · 无行分隔线
+            VStack(spacing: 10) {
+                Rectangle().fill(AppTheme.border(dark)).frame(height: 1)
+                ForEach(Array(rows.enumerated()), id: \.offset) { idx, row in
+                    HStack(alignment: .center, spacing: 12) {
+                        Text(row.0)
+                            .font(.system(size: 11.5))
+                            .foregroundColor(AppTheme.textTertiary(dark))
+                            .lineLimit(1)
+                        Spacer(minLength: 8)
+                        Text(row.1)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(mutedRows.contains(idx) ? AppTheme.textTertiary(dark) : AppTheme.navIcon(dark))
+                            .multilineTextAlignment(.trailing)
+                            .lineLimit(2)
+                    }
                 }
             }
+            .padding(.top, 14)
+            .padding(.bottom, 16)
+            .padding(.horizontal, 16)
         }
-        .frame(height: 1 + CGFloat(fixedRows) * rowH + CGFloat(fixedRows - 1) * 1)
+        .frame(maxWidth: .infinity, alignment: .top)
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
+        )
+        .cornerRadius(8)
+    }
+
+    @ViewBuilder
+    private func spec(_ s: GaugeSpec) -> some View {
+        DashboardGauge(
+            value: s.value,
+            maxValue: s.maxValue,
+            color: s.color,
+            unitLabel: s.showUnit ? s.unitLabel : "",
+            belowLabel: s.showUnit ? nil : s.unitLabel,
+            dark: dark,
+            size: 168,
+            thickness: 14,
+            valueSize: s.valueSize
+        )
+    }
+
+    // MARK: - 底部（1.6fr 抢机趋势 + 1fr 实时活动）
+
+    private var bottomGrid: some View {
+        HStack(alignment: .top, spacing: 14) {
+            grabTrendCard
+                .frame(maxWidth: .infinity)
+                .layoutPriority(2)
+            activityCard
+                .frame(minWidth: 280, maxWidth: 400)
+                .layoutPriority(1)
+        }
+    }
+
+    private var grabTrendCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            cardHeader(icon: "chart.bar", iconColor: AppTheme.cyan,
+                       title: "抢机趋势 · 过去 24 小时",
+                       subtitle: "后端当前仅提供累计统计，未提供历史趋势接口") {
+                HStack(spacing: 12) {
+                    legendItem(color: AppTheme.cyan, shape: .square, label: "抢机尝试")
+                    legendItem(color: AppTheme.sidebarActive, shape: .circle, label: "成功")
+                }
+            }
+
+            EmptyBarChart(labels: timeLabels, dark: dark)
+                .frame(height: 200)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+        }
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
+        )
+        .cornerRadius(8)
+    }
+
+    private var activityCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            cardHeader(icon: "dot.radiowaves.left.and.right", iconColor: AppTheme.sidebarActive,
+                       title: "实时活动", subtitle: nil) {
+                EmptyView()
+            }
+
+            ScrollView {
+                VStack(spacing: 0) {
+                    if model.activityLogs.isEmpty {
+                        Text("暂无实时活动")
+                            .font(.system(size: 12))
+                            .foregroundColor(AppTheme.textTertiary(dark))
+                            .frame(maxWidth: .infinity, minHeight: 152)
+                            .padding(20)
+                    } else {
+                        ForEach(Array(model.activityLogs.enumerated()), id: \.element.id) { idx, log in
+                            activityRow(log, showDivider: idx < model.activityLogs.count - 1)
+                        }
+                    }
+                }
+            }
+            .frame(maxHeight: 320)
+        }
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
+        )
+        .cornerRadius(8)
+    }
+
+    /// Web Card 头部：icon 16 + 标题 13/600 + 副标题 11 fg-3，下边框（含 inset 10）
+    private func cardHeader<Action: View>(
+        icon: String, iconColor: Color, title: String, subtitle: String?,
+        @ViewBuilder action: () -> Action
+    ) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(iconColor)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.navIcon(dark))
+                    .lineLimit(1)
+                if let subtitle = subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundColor(AppTheme.textTertiary(dark))
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 12)
+            action()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(Rectangle().fill(AppTheme.border(dark)).frame(height: 1), alignment: .bottom)
+        .padding(10)
+    }
+
+    /// Web 活动行：padding 10px 16px · 时间 mono 10 fg-3 · 级别徽章(mono 9·700 · soft 底) · 消息 + 租户·区域
+    private func activityRow(_ log: ActivityLog, showDivider: Bool) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text(log.time)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor(AppTheme.textTertiary(dark))
+                .frame(width: 56, alignment: .leading)
+                .padding(.top, 2)
+            Text(log.level)
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .foregroundColor(levelColor(log.level).fg)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 1)
+                .background(levelColor(log.level).bg)
+                .cornerRadius(3)
+                .frame(minWidth: 46, alignment: .center)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(log.msg)
+                    .font(.system(size: 11.5))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("\(log.tenant) · \(log.region)")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(AppTheme.textTertiary(dark))
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .overlay(
+            Rectangle().fill(AppTheme.border(dark)).frame(height: 1),
+            alignment: .bottom
+        )
+        .opacity(showDivider ? 1 : 0.95)
+    }
+
+    /// Web logColor：INFO cyan / WARN orange / ERROR danger / SUCCESS accent / DEBUG bg-3（均 soft 底）
+    private func levelColor(_ level: String) -> (bg: Color, fg: Color) {
+        switch level {
+        case "ERROR": return (AppTheme.dangerSoft(dark), AppTheme.danger)
+        case "WARN": return (AppTheme.orangeSoft(dark), AppTheme.orange)
+        case "SUCCESS": return (AppearanceController.shared.accent.accentSoft(dark), AppTheme.sidebarActive)
+        case "DEBUG": return (AppTheme.bg3(dark), AppTheme.textSecondary(dark))
+        default: return (AppTheme.cyanSoft(dark), AppTheme.cyan)
+        }
+    }
+
+    private func legendItem(color: Color, shape: LegendShape, label: String) -> some View {
+        HStack(spacing: 5) {
+            legendDot(color, shape: shape)
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundColor(AppTheme.textSecondary(dark))
+        }
+    }
+
+    @ViewBuilder
+    private func legendDot(_ color: Color, shape: LegendShape) -> some View {
+        switch shape {
+        case .square:
+            RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 8, height: 8)
+        case .circle:
+            Circle().fill(color).frame(width: 8, height: 8)
+        }
+    }
+
+    private enum LegendShape { case square, circle }
+}
+
+private struct GaugeSpec {
+    var color: Color
+    var value: Double
+    var unitLabel: String
+    var valueSize: CGFloat
+    var maxValue: Double = 100
+    var showUnit: Bool = true
+}
+
+// MARK: - Empty bar chart (web BarChart with no data)
+
+struct EmptyBarChart: View {
+    let labels: [String]
+    let dark: Bool
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let left: CGFloat = 40
+            let bottom: CGFloat = 24
+            let top: CGFloat = 16
+            let plotW = max(0, w - left - 12)
+            let plotH = max(0, h - top - bottom)
+            let maxY: Double = 120
+
+            ZStack {
+                // horizontal grid lines + y labels
+                ForEach(0...4, id: \.self) { i in
+                    let y = top + plotH - (plotH * CGFloat(i) / 4)
+                    let tick = maxY / 4 * Double(i)
+                    Path { p in p.move(to: CGPoint(x: left, y: y)); p.addLine(to: CGPoint(x: left + plotW, y: y)) }
+                        .stroke(AppTheme.border(dark), style: StrokeStyle(lineWidth: 1, dash: i == 0 ? [] : [2, 4]))
+                    Text(String(format: "%.0f", tick))
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(AppTheme.textTertiary(dark))
+                        .frame(width: 30, alignment: .trailing)
+                        .position(x: 18, y: y)
+                }
+
+                // x labels
+                ForEach(Array(labels.enumerated()), id: \.offset) { i, label in
+                    let x = left + (CGFloat(i) / CGFloat(max(1, labels.count))) * plotW + (plotW / CGFloat(max(1, labels.count))) / 2
+                    Text(label)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(AppTheme.textTertiary(dark))
+                        .position(x: x, y: h - 8)
+                }
+
+                Text("暂无数据")
+                    .font(.system(size: 11))
+                    .foregroundColor(AppTheme.textTertiary(dark))
+                    .position(x: left + plotW / 2, y: top + plotH / 2)
+            }
+        }
+        .clipped()
     }
 }
 
-// MARK: - Gauge (web conic-gradient style)
+// MARK: - Gauge（Web CircularGauge：轨道 bg-3 · 圆头进度 · 中央数值 + 下方标签，无内圆底）
 
 struct DashboardGauge: View {
     let value: Double
-    let label: String
+    var maxValue: Double = 100
+    var color: Color = AppTheme.sidebarActive
+    var unitLabel: String = "%"
+    var belowLabel: String? = nil
     let dark: Bool
+    var size: CGFloat = 180
+    var thickness: CGFloat = 14
+    var valueSize: CGFloat = 36
 
-    private var clamped: Double { min(100, max(0, value)) }
-
-    private var color: Color {
-        if clamped <= 60 { return Color(hex: "22c55e") }
-        if clamped <= 80 { return Color(hex: "f97316") }
-        return Color(hex: "ef4444")
-    }
+    private var clamped: Double { Swift.min(maxValue, Swift.max(0, value)) }
 
     var body: some View {
         ZStack {
             Circle()
-                .stroke(DashboardTheme.gaugeTrack(dark), lineWidth: 14)
+                .stroke(AppTheme.bg3(dark), lineWidth: thickness)
             Circle()
-                .trim(from: 0, to: CGFloat(clamped / 100))
-                .stroke(color, style: StrokeStyle(lineWidth: 14, lineCap: .round))
+                .trim(from: 0, to: CGFloat(clamped / maxValue))
+                .stroke(color, style: StrokeStyle(lineWidth: thickness, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-            Circle()
-                .fill(DashboardTheme.gaugeCenter(dark))
-                .padding(22)
-                .shadow(color: Color.black.opacity(dark ? 0.4 : 0.08), radius: 6, y: 2)
-            Text(label)
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-                .padding(.horizontal, 28)
-        }
-    }
-}
-
-// MARK: - Network chart
-
-struct NetworkTrafficChart: View {
-    let samples: [NetworkSample]
-    let dark: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 16) {
-                legendDot(Color(hex: "3b82f6"), "上传")
-                legendDot(Color(hex: "22c55e"), "下载")
-                Spacer()
-                Text("KB/s")
-                    .font(.system(size: 11))
-                    .foregroundColor(DashboardTheme.muted(dark))
-            }
-            GeometryReader { geo in
-                let w = geo.size.width
-                let h = geo.size.height
-                let maxY = max(1, samples.map { max($0.upload, $0.download) }.max() ?? 1) * 1.15
-
-                ZStack {
-                    // grid
-                    Path { p in
-                        for i in 0..<4 {
-                            let y = h * CGFloat(i) / 3
-                            p.move(to: CGPoint(x: 0, y: y))
-                            p.addLine(to: CGPoint(x: w, y: y))
-                        }
+            VStack(spacing: 6) {
+                if belowLabel == nil {
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        Text("\(Int(clamped.rounded()))")
+                            .font(.system(size: valueSize, weight: .bold))
+                            .foregroundColor(color)
+                        Text(unitLabel)
+                            .font(.system(size: valueSize * 0.45, weight: .bold))
+                            .foregroundColor(color)
                     }
-                    .stroke(DashboardTheme.border(dark).opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-
-                    if samples.count >= 2 {
-                        areaPath(samples.map(\.upload), maxY: maxY, size: geo.size, color: Color(hex: "3b82f6"))
-                        areaPath(samples.map(\.download), maxY: maxY, size: geo.size, color: Color(hex: "22c55e"))
-                    } else {
-                        Text("等待流量数据…")
-                            .font(.system(size: 12))
-                            .foregroundColor(DashboardTheme.muted(dark))
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
+                                    } else {
+                    Text("\(Int(clamped.rounded()))")
+                        .font(.system(size: valueSize, weight: .bold))
+                        .foregroundColor(color)
+                                            Text(belowLabel ?? "")
+                        .font(.system(size: 11))
+                        .foregroundColor(AppTheme.textTertiary(dark))
                 }
             }
         }
-        .padding(10)
-        .background(DashboardTheme.bg(dark).opacity(0.35))
-        .cornerRadius(10)
+        .frame(width: size, height: size)
     }
-
-    private func legendDot(_ color: Color, _ title: String) -> some View {
-        HStack(spacing: 6) {
-            Circle().fill(color).frame(width: 8, height: 8)
-            Text(title)
-                .font(.system(size: 12))
-                .foregroundColor(DashboardTheme.muted(dark))
-        }
-    }
-
-    private func areaPath(_ values: [Double], maxY: Double, size: CGSize, color: Color) -> some View {
-        let n = values.count
-        guard n > 1 else { return AnyView(EmptyView()) }
-        let w = size.width
-        let h = size.height
-
-        func pt(_ i: Int) -> CGPoint {
-            let x = w * CGFloat(i) / CGFloat(n - 1)
-            let y = h - h * CGFloat(values[i] / maxY)
-            return CGPoint(x: x, y: y)
-        }
-
-        var line = Path()
-        line.move(to: pt(0))
-        for i in 1..<n { line.addLine(to: pt(i)) }
-
-        var fill = Path()
-        fill.move(to: CGPoint(x: pt(0).x, y: h))
-        fill.addLine(to: pt(0))
-        for i in 1..<n { fill.addLine(to: pt(i)) }
-        fill.addLine(to: CGPoint(x: pt(n - 1).x, y: h))
-        fill.closeSubpath()
-
-        return AnyView(
-            ZStack {
-                fill.fill(color.opacity(0.08))
-                line.stroke(color, style: StrokeStyle(lineWidth: 2, lineJoin: .round))
-            }
-        )
-    }
-}
-
-// MARK: - Theme tokens from dashboard.css
-
-enum DashboardTheme {
-    static func bg(_ dark: Bool) -> Color { dark ? Color(hex: "1a1d21") : Color(hex: "f0f4f8") }
-    static func surface(_ dark: Bool) -> Color { dark ? Color(hex: "22262b") : Color.white }
-    static func border(_ dark: Bool) -> Color { dark ? Color(hex: "31363d") : Color(hex: "dde3ec") }
-    static func text(_ dark: Bool) -> Color { dark ? Color(hex: "cdd9e5") : Color(hex: "1a202c") }
-    static func muted(_ dark: Bool) -> Color { dark ? Color(hex: "768390") : Color(hex: "64748b") }
-    static func blue(_ dark: Bool) -> Color { dark ? Color(hex: "4d9eff") : Color(hex: "2563eb") }
-    static func green(_ dark: Bool) -> Color { dark ? Color(hex: "3fb950") : Color(hex: "16a34a") }
-    static func orange(_ dark: Bool) -> Color { dark ? Color(hex: "f78166") : Color(hex: "ea580c") }
-    static func red(_ dark: Bool) -> Color { dark ? Color(hex: "ff6b6b") : Color(hex: "dc2626") }
-    static func purple(_ dark: Bool) -> Color { dark ? Color(hex: "bc8cff") : Color(hex: "7c3aed") }
-    static func cyan(_ dark: Bool) -> Color { dark ? Color(hex: "39c5cf") : Color(hex: "0891b2") }
-    static func gaugeTrack(_ dark: Bool) -> Color { dark ? Color(hex: "252a30") : Color(hex: "e8edf3") }
-    static func gaugeCenter(_ dark: Bool) -> Color { dark ? Color(hex: "22262b") : Color.white }
 }

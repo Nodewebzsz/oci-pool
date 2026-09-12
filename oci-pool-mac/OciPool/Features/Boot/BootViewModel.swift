@@ -9,6 +9,8 @@ final class BootViewModel: ObservableObject {
     @Published private(set) var rows: [BootTaskItem] = []
     @Published private(set) var isLoading = false
     @Published private(set) var errorText: String?
+    /// 首次加载完成哨兵标记：首屏未完成前为 false，杜绝幽灵空态闪现
+    @Published private(set) var hasLoadedOnce = false
     @Published var pageState = PageState(page: 0, size: 20)
 
     // Cascade filter: parent → region (tenantId for list = region id)
@@ -53,7 +55,7 @@ final class BootViewModel: ObservableObject {
     @Published var createSelectedVersion = ""
     @Published var createImageId = ""
     @Published var createLoadingImages = false
-    private var createTenantId: Int64 = 0
+    var createTenantId: Int64 = 0
 
     // Boot log（详情页下方内嵌，web full_machine_list.js openBootLogDrawer）
     @Published private(set) var bootLogLines: [BootLogLine] = []
@@ -76,7 +78,7 @@ final class BootViewModel: ObservableObject {
     private var service: BootService { BootService(baseURL: session.serverURL) }
 
     var hasActiveFilter: Bool {
-        filterTenantId != nil && !(filterTenantId ?? "").isEmpty
+        !selectedParentId.isEmpty || !selectedRegionId.isEmpty || (filterTenantId != nil && !(filterTenantId?.isEmpty ?? true))
     }
 
     var canQuery: Bool { !selectedRegionId.isEmpty || !selectedParentId.isEmpty }
@@ -88,6 +90,7 @@ final class BootViewModel: ObservableObject {
     // MARK: - Lifecycle
 
     func start() {
+        isLoading = true
         Task {
             await loadParentTenants()
             if let pending = NavigationState.shared.takePendingBootFilter() {
@@ -125,7 +128,10 @@ final class BootViewModel: ObservableObject {
     func reload() async {
         isLoading = true
         errorText = nil
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoadedOnce = true
+        }
         do {
             let resp = try await service.list(
                 page: pageState.page,
@@ -153,7 +159,12 @@ final class BootViewModel: ObservableObject {
 
     func loadParentTenants() async {
         do {
-            parentTenants = try await service.listParentTenants()
+            // 对齐 Web 方案 B：按真实租户名 tenancyName A~Z 字母排序
+            parentTenants = try await service.listParentTenants().sorted {
+                let a = $0.tenancyName.isEmpty ? $0.userName : $0.tenancyName
+                let b = $1.tenancyName.isEmpty ? $1.userName : $1.tenancyName
+                return a.localizedCaseInsensitiveCompare(b) == .orderedAscending
+            }
         } catch {
             parentTenants = []
         }
@@ -163,18 +174,44 @@ final class BootViewModel: ObservableObject {
         selectedParentId = parentId ?? ""
         selectedRegionId = ""
         regions = []
-        guard !selectedParentId.isEmpty else { return }
+        if selectedParentId.isEmpty {
+            filterTenantId = nil
+            pageState.page = 0
+            rows = []
+            isLoading = true
+            Task { await reload() }
+            return
+        }
+        // 切换租户时立即清空旧数据并同步置为 loading，拉取区域期间绝不进入空态！
+        rows = []
+        pageState.page = 0
+        isLoading = true
         Task {
             do {
-                regions = try await service.listRegions(parentId: selectedParentId)
+                let list = try await service.listRegions(parentId: selectedParentId)
+                regions = list.sorted {
+                    $0.region.localizedCaseInsensitiveCompare($1.region) == .orderedAscending
+                }
+                if regions.count == 1 {
+                    selectedRegionId = regions[0].id
+                    applyFilter() // 单区域自动联动查询！
+                } else {
+                    // 多区域租户：待用户选择区域
+                    isLoading = false
+                }
             } catch {
                 regions = []
+                isLoading = false
+                ToastCenter.shared.error(error.localizedDescription)
             }
         }
     }
 
     func onRegionChanged(_ regionId: String?) {
         selectedRegionId = regionId ?? ""
+        if !selectedRegionId.isEmpty {
+            applyFilter()
+        }
     }
 
     func applyFilter() {
@@ -186,6 +223,8 @@ final class BootViewModel: ObservableObject {
             filterTenantId = nil
         }
         pageState.page = 0
+        rows = []
+        isLoading = true
         Task { await reload() }
     }
 
@@ -195,6 +234,8 @@ final class BootViewModel: ObservableObject {
         regions = []
         filterTenantId = nil
         pageState.page = 0
+        rows = []
+        isLoading = true
         Task { await reload() }
     }
 
@@ -227,33 +268,40 @@ final class BootViewModel: ObservableObject {
             do {
                 let n = try await service.startingCount()
                 guard AppAlert.confirm(
-                    title: "批量停止",
-                    message: "将停止全部开机中任务（当前约 \(n) 条），确定继续？"
+                    title: "停止全部运行中任务?",
+                    message: "\(n) 个正在运行的任务将被停止，当前正在进行的抢机请求会完成后停止。",
+                    confirmTitle: "全部停止"
                 ) else {
                     LoadingHUD.shared.end()
                     return
                 }
                 try await service.batchStop()
                 await reload()
+                ToastCenter.shared.success("已停止全部运行中任务")
             } catch {
-                ToastCenter.shared.error(error.localizedDescription)
+                ToastCenter.shared.error("停止失败: \(error.localizedDescription)")
             }
             LoadingHUD.shared.end()
         }
     }
 
     func batchResetFail() {
-        guard AppAlert.confirm(
-            title: "重置失败次数",
-            message: "将清空全部任务的失败计数，确定继续？"
-        ) else { return }
+        // Web：重置所有任务统计（次数/失败/成功清零）+ requireText RESET
+        guard let input = AppAlert.confirmRequireText(
+            title: "重置所有任务统计?",
+            message: "所有任务的抢机次数、失败数、成功数将被清零，且无法恢复。",
+            requiredText: "RESET",
+            placeholder: "输入 RESET 以确认",
+            confirmTitle: "重置"
+        ), input == "RESET" else { return }
         Task {
             LoadingHUD.shared.begin()
             do {
                 try await service.batchInitFailCount()
                 await reload()
+                ToastCenter.shared.success("已重置所有任务统计")
             } catch {
-                ToastCenter.shared.error(error.localizedDescription)
+                ToastCenter.shared.error("重置失败: \(error.localizedDescription)")
             }
             LoadingHUD.shared.end()
         }
@@ -268,22 +316,26 @@ final class BootViewModel: ObservableObject {
             do {
                 try await service.startBoot(bootId: item.id)
                 await reload()
+                ToastCenter.shared.success("任务 \(item.displayTenant) 已启动")
             } catch {
-                ToastCenter.shared.error(error.localizedDescription)
+                ToastCenter.shared.error("启动失败: \(error.localizedDescription)")
             }
             LoadingHUD.shared.end()
         }
     }
 
     func confirmStop(_ item: BootTaskItem) {
-        guard AppAlert.confirm(title: "停止任务", message: "停止 \(item.displayTenant) · \(item.archText) 下开机中任务？") else { return }
+        guard AppAlert.confirm(title: "停止任务 \(item.displayTenant)?",
+                               message: "已抢到的实例不会被删除，仅停止后续抢机尝试。",
+                               confirmTitle: "停止") else { return }
         Task {
             LoadingHUD.shared.begin()
             do {
                 try await service.stopBoot(bootId: item.id)
                 await reload()
+                ToastCenter.shared.success("任务 \(item.displayTenant) 已停止")
             } catch {
-                ToastCenter.shared.error(error.localizedDescription)
+                ToastCenter.shared.error("停止失败: \(error.localizedDescription)")
             }
             LoadingHUD.shared.end()
         }
@@ -304,10 +356,14 @@ final class BootViewModel: ObservableObject {
     }
 
     func confirmDelete(_ item: BootTaskItem) {
-        guard AppAlert.confirm(
-            title: "删除开机任务",
-            message: "将删除该租户+架构下全部抢机配置，确定？"
-        ) else { return }
+        // Web：requireText = 租户名 + 确认按钮「永久删除」
+        guard let input = AppAlert.confirmRequireText(
+            title: "删除任务 \(item.displayTenant)?",
+            message: "该任务将从队列中永久移除。已抢到的实例不会被删除。",
+            requiredText: item.displayTenant,
+            placeholder: "输入租户名以确认",
+            confirmTitle: "永久删除"
+        ), input == item.displayTenant else { return }
         Task {
             LoadingHUD.shared.begin()
             do {
@@ -357,6 +413,13 @@ final class BootViewModel: ObservableObject {
             detailItems = []
             ToastCenter.shared.error(error.localizedDescription)
         }
+    }
+
+    /// 工具栏「预开」：空白配置，租户在表单内选择（对齐 Web addBoot(null)）
+    func openCreateBlank() {
+        let blank = BootTaskItem()
+        openAddConfig(blank)
+        createTenantId = 0
     }
 
     func openAddConfig(_ item: BootTaskItem) {
@@ -579,15 +642,11 @@ final class BootViewModel: ObservableObject {
     }
 
     func tenantLabel(_ t: TenantRegionOption) -> String {
-        if !t.userName.isEmpty { return t.userName }
-        if !t.tenancyName.isEmpty { return t.tenancyName }
-        return t.id
+        t.label
     }
 
     func regionLabel(_ r: TenantRegionOption) -> String {
-        var s = r.region.isEmpty ? (r.tenancyName.isEmpty ? r.id : r.tenancyName) : r.region
-        if r.isHomeRegion { s += " · 主" }
-        return s
+        r.regionDropdownLabel
     }
 
     // MARK: - Boot log（详情页下方内嵌面板 + SSE，非弹框）

@@ -63,11 +63,11 @@ const REGION_MAP = REGIONS.reduce((m, r) => (m[r.code] = r, m), {});
 // ═══════════════════════════════════════════════════════════════════════
 // 字段访问器 helpers · Phase 1(数据字段对齐原项目 doubleDimple/oci-start)
 // ─────────────────────────────────────────────────────────────────────
-// 前端 mock 数据现在同时携带两组字段:
-//   · 旧字段(如 cpu / mem / name / status / custom / days / task) — 现有 UI 引用
+// 前端数据访问器适配两组字段:
+//   · 字段(如 cpu / mem / name / status / custom / days / task) — 现有 UI 引用
 //   · 原项目 entity 字段(如 ocpu / memory / remark / statusInt / tenancyName / activeDays / openInsFlag)
 //
-// 后续新代码请优先用这些 helper(以后接后端时只改 helper 一处):
+// 后续新代码请优先用这些 helper:
 // ═══════════════════════════════════════════════════════════════════════
 
 // ── Instance / BootInstance ──────────────────────────────────────────
@@ -98,14 +98,21 @@ window.getTenantDbId      = t => {
   return value == null ? '' : String(value);
 };
 window.getTenantName      = t => {
-  const value = [t?._ui?.name, t?.tenancyName, t?.userName, t?.name, t?.custom]
+  const value = [t?._ui?.name, t?.tenancyName, t?.userName, t?.tenantName, t?.name, t?.custom]
     .find(v => v !== null && v !== undefined && String(v) !== '');
   return value == null ? '' : String(value);
 };
 window.getTenantAlias     = t => {
   const value = [t?._ui?.alias, t?.defName, t?.custom]
     .find(v => v !== null && v !== undefined && String(v) !== '');
-  return value == null ? '' : String(value);
+  if (value == null) return '';
+  const raw = String(value);
+  // 未设置过自定义名称时 defName 会被后端回填为 userName(OCID)/ID；这些仍应按“未设置”显示为空
+  // 仅当 defName 是 OCID/租户ID 这类“未设置回填值”时才判为空；
+  // 不要把 tenancyName(租户名) 判为空——后端会把未设置自定义名的 defName 兜底为租户名，此时应显示租户名。
+  const fallbacks = [t?.userName, t?.idStr, t?.id, t?.tenantId]
+    .filter(v => v !== null && v !== undefined && String(v) !== '').map(String);
+  return fallbacks.includes(raw) ? '' : raw;
 };   // 自定义显示名
 window.getTenantDays      = t => {
   const v = t?._ui?.activeDays ?? t?.activeDays ?? t?.days;
@@ -113,7 +120,33 @@ window.getTenantDays      = t => {
 };
 window.getTenantHasTask   = t => t?._ui?.hasBootTask ?? (t?.openBootFlag === true || t?.openInsFlag === '1' || t?.task === 'running');
 window.getTenantActive    = t => t?._ui?.isActive ?? (typeof t?.isActive === 'boolean' ? t.isActive : t?.status === 'active');
-window.getTenantRegion    = t => t?._ui?.regionCode ?? t?.region ?? t?.mainRegion;
+window.getTenantRegion    = t => t?._ui?.regionCode ?? t?.region ?? t?.regionName ?? t?.mainRegion;
+
+// 租户下拉统一显示（方案 B）：优先真实租户名(tenancyName/name) + 区域。
+// lang: 'en' → 区域用英文名(r.en)，否则中文城市名(simpleName/cn)。
+// 先 normalize（缺 _ui 时自动根据后端原始字段补齐），避免对象存储等页拿到原始分页对象时回落成 OCID。
+window.getTenantLabel    = (t, lang) => {
+  const src = (t && t._ui) ? t : (window.ociTenantRow ? window.ociTenantRow.normalize(t, REGIONS) : (t || {}));
+  const name  = window.getTenantName(src);
+  const alias = window.getTenantAlias(src);
+  const regionCode = window.getTenantRegion(src);
+  let region = '';
+  if (regionCode) {
+    const r = REGION_MAP[regionCode];
+    if (r) region = lang === 'en' ? r.en : (r.simpleName || r.cn || r.name);
+    else region = regionCode;
+  }
+  // 方案 B：100% 优先展示真实租户名
+  const base = name || alias || '';
+  return region ? `${base} · ${region}` : base;
+};
+
+// 租户名脱敏：首字符 + '***' + 末字符（对齐开机任务 z***c）。
+window.maskName = (name) => {
+  const s = String(name || '');
+  if (s.length <= 1) return s;
+  return s.charAt(0) + '***' + s.charAt(s.length - 1);
+};
 
 // 自定义名称显示截断 · 与原项目 tlTruncateName 一致(ASCII 算 1 宽,其它算 2 宽,上限 14)
 window.truncateDisplayName = (str, maxVisualLen = 14) => {
@@ -158,7 +191,7 @@ window.statusStr2Int = s => ({ stopped: 0, pending: 1, running: 2, paused: 4, id
 // 对齐原项目 LoginController.validateAdditionalFactors 的决策逻辑:
 //   messageEnabled = tg.enabled || dd.enabled || bark.enabled
 //   mfaEnabled     = mfaConfig.isEnabled()
-// 目前从 localStorage 读(mock 场景 · 未来接后端时改成 GET /api/config/*-enabled)
+// 目前从 localStorage 读取前端多因子通知与 MFA 开关配置
 //
 // 写入方 · NotifyMgmtPage(page-tools.jsx) 的 saveChannel + SysSettingPage(page-misc.jsx) 的 MFA 保存
 // 读取方 · AuthPage(page-auth.jsx) 决定登录流程,以及登录成功后回主界面

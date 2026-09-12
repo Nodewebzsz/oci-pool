@@ -11,28 +11,38 @@ struct EmailView: View {
 
     var body: some View {
         PageScaffold(
-            title: "邮件管理",
-            subtitle: "OCI Email Delivery · 租户服务 / 收件人 / 发送记录",
+            title: "OCI 邮箱服务",
+            subtitle: emailSubtitle,
             systemImage: "envelope",
+            iconColor: AppTheme.cyan,
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
                     if let err = model.errorText, !err.isEmpty {
                         errorBanner(err)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
+                            .padding(.bottom, 12)
                     }
+                    kpiGrid
+                        .padding(.bottom, 12)
                     mainSectionBar
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
-                        .padding(.bottom, 4)
-                    filterBar
-                    sectionBody
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.bottom, 12)
+
+                    // 统一主卡片：bg-1 · border · radius 8 · 顶部 FilterBar + 内部滚动列表 + 底部钉住分页栏
+                    VStack(spacing: 0) {
+                        filterBar
+                        sectionBody
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        paginationFooter
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(AppTheme.sidebarBg(dark))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(AppTheme.border(dark), lineWidth: 1)
+                    )
+                    .cornerRadius(8)
                 }
-                .appLoading(pageLoading)
-            },
-            footer: { paginationFooter }
+            }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         .onAppear { model.start() }
@@ -62,18 +72,64 @@ struct EmailView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
-            AppButton(title: "发送邮件", systemImage: "square.and.pencil", kind: .primary) {
+            AppButton(title: "写邮件", systemImage: "edit", kind: .primary) {
                 model.openCompose()
             }
-            AppButton(
-                title: "刷新",
-                systemImage: "arrow.clockwise",
-                kind: .secondary,
-                isLoading: model.isLoading || sectionBusy
-            ) {
-                Task { await model.reloadAll() }
-            }
         }
+    }
+
+    /// Web mail.subtitle：Email Delivery Service · N 个租户已启用 · N 位联系人 · N 条发送记录
+    private var emailSubtitle: String {
+        "Email Delivery Service · \(model.enabledTotal) 个租户已启用 · \(model.contactPage.totalElements) 位联系人 · \(model.recordPage.totalElements) 条发送记录"
+    }
+
+    // MARK: - KPI（对齐 Web mail.kpi.* 4 卡与 InstancesView 标准卡片）
+
+    private var kpiGrid: some View {
+        HStack(alignment: .top, spacing: 12) {
+            kpiCard(icon: "checkmark.circle", color: AppTheme.sidebarActive,
+                    label: "已启用邮件服务的租户", value: "\(model.enabledTotal)")
+            kpiCard(icon: "circle", color: AppTheme.sidebarText(dark),
+                    label: "未启用", value: "\(model.disabledTotal)")
+            kpiCard(icon: "person.2", color: AppTheme.info,
+                    label: "联系人总数", value: "\(model.contactPage.totalElements)")
+            kpiCard(icon: "paperplane.fill", color: Color(hex: "00b6be"),
+                    label: "本月已发送", value: "\(model.recordPage.totalElements)")
+        }
+    }
+
+    private func kpiCard(icon: String, color: Color, label: String, value: String) -> some View {
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(color.opacity(0.18))
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundColor(color)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(AppTheme.textTertiary(dark))
+                    .lineLimit(1)
+                Text(value)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(AppTheme.navIcon(dark))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
+        )
+        .cornerRadius(8)
     }
 
     private var sectionBusy: Bool {
@@ -190,7 +246,7 @@ struct EmailView: View {
                         }
                     case .contacts:
                         HStack(spacing: 8) {
-                            AppButton(title: "添加", systemImage: "plus", kind: .primary) {
+                            AppButton(title: "添加联系人", systemImage: "plus", kind: .primary) {
                                 model.openAddContact()
                             }
                             AppButton(
@@ -280,7 +336,7 @@ struct EmailView: View {
 
     private var tenantsBody: some View {
         Group {
-            if model.tenantsLoading && currentTenantEmpty {
+            if (!model.hasLoadedOnce || model.tenantsLoading) && currentTenantEmpty {
                 loadingBox
             } else if currentTenantEmpty {
                 EmptyStateView(
@@ -297,21 +353,19 @@ struct EmailView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if model.tenantTab == .enabled {
                 ScrollView {
-                    LazyVStack(spacing: 12) {
+                    LazyVStack(spacing: 0) {
                         ForEach(model.enabledConfigs) { item in
                             enabledCard(item)
                         }
                     }
-                    .padding(16)
                 }
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 12) {
+                    LazyVStack(spacing: 0) {
                         ForEach(model.disabledTenants) { item in
                             disabledCard(item)
                         }
                     }
-                    .padding(16)
                 }
             }
         }
@@ -320,25 +374,25 @@ struct EmailView: View {
     private func enabledCard(_ item: TenantEmailConfigItem) -> some View {
         HStack(alignment: .center, spacing: 14) {
             ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color(hex: "4a9eff").opacity(0.14))
-                    .frame(width: 40, height: 40)
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(AppTheme.info.opacity(0.14))
+                    .frame(width: 36, height: 36)
                 Image(systemName: "envelope.fill")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(Color(hex: "4a9eff"))
+                    .foregroundColor(AppTheme.info)
             }
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     Text(item.displaySender)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                         .lineLimit(1)
                     StatusBadge(text: "运行中", tone: .success)
                 }
                 if !item.tenantName.isEmpty {
                     Text(item.tenantName)
-                        .font(.system(size: 12))
+                        .font(.system(size: 11.5))
                         .foregroundColor(AppTheme.sidebarText(dark))
                         .lineLimit(1)
                 }
@@ -351,11 +405,16 @@ struct EmailView: View {
                 model.disableConfig(item)
             }
         }
-        .padding(14)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(cardBackground)
-        .overlay(cardStroke(accent: Color(hex: "4a9eff"), active: true))
-        .shadow(color: Color.black.opacity(dark ? 0.18 : 0.05), radius: 8, y: 2)
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(
+            Rectangle()
+                .fill(AppTheme.border(dark).opacity(0.5))
+                .frame(height: 1),
+            alignment: .bottom
+        )
     }
 
     private func usageBar(_ item: TenantEmailConfigItem) -> some View {
@@ -385,9 +444,9 @@ struct EmailView: View {
     private func disabledCard(_ item: DisabledTenantItem) -> some View {
         HStack(alignment: .center, spacing: 14) {
             ZStack {
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: 8)
                     .fill(Color(hex: "9b59b6").opacity(0.14))
-                    .frame(width: 40, height: 40)
+                    .frame(width: 36, height: 36)
                 Image(systemName: "plus.circle")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(Color(hex: "9b59b6"))
@@ -395,11 +454,11 @@ struct EmailView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.name)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                     .lineLimit(1)
                 Text(item.region.isEmpty ? "未开启邮件服务" : item.region)
-                    .font(.system(size: 12))
+                    .font(.system(size: 11.5))
                     .foregroundColor(AppTheme.sidebarText(dark))
                     .lineLimit(1)
             }
@@ -410,18 +469,23 @@ struct EmailView: View {
                 model.openEnableTenant(item)
             }
         }
-        .padding(14)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(cardBackground)
-        .overlay(cardStroke(accent: Color(hex: "9b59b6"), active: false))
-        .shadow(color: Color.black.opacity(dark ? 0.18 : 0.05), radius: 8, y: 2)
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(
+            Rectangle()
+                .fill(AppTheme.border(dark).opacity(0.5))
+                .frame(height: 1),
+            alignment: .bottom
+        )
     }
 
     // MARK: Contacts
 
     private var contactsBody: some View {
         Group {
-            if model.contactsLoading && model.contacts.isEmpty {
+            if (!model.hasLoadedOnce || model.contactsLoading) && model.contacts.isEmpty {
                 loadingBox
             } else if model.contacts.isEmpty {
                 EmptyStateView(
@@ -434,12 +498,11 @@ struct EmailView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 12) {
+                    LazyVStack(spacing: 0) {
                         ForEach(model.contacts) { c in
                             contactCard(c)
                         }
                     }
-                    .padding(16)
                 }
             }
         }
@@ -449,20 +512,20 @@ struct EmailView: View {
         HStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(Color(hex: "3fb950").opacity(0.15))
-                    .frame(width: 40, height: 40)
+                    .fill(AppTheme.sidebarActive.opacity(0.15))
+                    .frame(width: 36, height: 36)
                 Text(avatarLetter(c))
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(Color(hex: "3fb950"))
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(AppTheme.sidebarActive)
             }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(c.name.isEmpty ? "—" : c.name)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                     .lineLimit(1)
                 Text(c.email)
-                    .font(.system(size: 12))
+                    .font(.system(size: 11.5, design: .monospaced))
                     .foregroundColor(AppTheme.sidebarText(dark))
                     .lineLimit(1)
             }
@@ -471,7 +534,7 @@ struct EmailView: View {
 
             if !c.createTime.isEmpty {
                 Text(c.createTime)
-                    .font(.system(size: 11))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(AppTheme.sidebarText(dark).opacity(0.85))
             }
 
@@ -479,11 +542,16 @@ struct EmailView: View {
                 model.deleteContact(c)
             }
         }
-        .padding(14)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(cardBackground)
-        .overlay(cardStroke(accent: Color(hex: "3fb950"), active: false))
-        .shadow(color: Color.black.opacity(dark ? 0.18 : 0.05), radius: 8, y: 2)
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(
+            Rectangle()
+                .fill(AppTheme.border(dark).opacity(0.5))
+                .frame(height: 1),
+            alignment: .bottom
+        )
     }
 
     private func avatarLetter(_ c: EmailContactItem) -> String {
@@ -495,26 +563,21 @@ struct EmailView: View {
 
     private var recordsBody: some View {
         Group {
-            if model.recordsLoading && model.records.isEmpty {
+            if (!model.hasLoadedOnce || model.recordsLoading) && model.records.isEmpty {
                 loadingBox
             } else if model.records.isEmpty {
                 EmptyStateView(
                     icon: "envelope",
-                    title: "暂无发送记录",
-                    subtitle: "发送邮件后将在此显示",
-                    actionTitle: "发送邮件",
-                    action: { model.openCompose() }
+                    title: "暂无发送记录"
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 DataList {
                     DataListColumnHeader(title: "主题", width: nil)
-                    DataListColumnHeader(title: "时间", width: 150)
-                    DataListColumnHeader(title: "租户", width: 120)
-                    DataListColumnHeader(title: "收件", width: 56)
-                    DataListColumnHeader(title: "成功", width: 56)
-                    DataListColumnHeader(title: "失败", width: 56)
-                    DataListColumnHeader(title: "操作", width: 120, alignment: .trailing)
+                    DataListColumnHeader(title: "发件人", width: nil)
+                    DataListColumnHeader(title: "收件数", width: 80, alignment: .center)
+                    DataListColumnHeader(title: "状态", width: 100, alignment: .center)
+                    DataListColumnHeader(title: "发送时间", width: nil)
                 } content: {
                     ForEach(model.records) { r in
                         DataListRow(action: { model.openRecordDetail(r) }) {
@@ -533,92 +596,96 @@ struct EmailView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                     .lineLimit(1)
-                if !r.senderEmail.isEmpty {
-                    Text(r.senderEmail)
-                        .font(.system(size: 11))
-                        .foregroundColor(AppTheme.sidebarText(dark))
-                        .lineLimit(1)
-                }
+                Text(r.tenantText)
+                    .font(.system(size: 11))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Text(r.createTime.isEmpty ? "—" : r.createTime)
-                .font(.system(size: 12))
+            // Web：发件人列（mono）
+            Text(r.senderEmail)
+                .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(AppTheme.sidebarText(dark))
-                .frame(width: 150, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .lineLimit(1)
 
-            Text(r.tenantText)
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarText(dark))
-                .frame(width: 120, alignment: .leading)
-                .lineLimit(1)
-
+            // Web：收件数（居中）
             Text("\(r.receiveTotal)")
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
-                .frame(width: 56, alignment: .leading)
+                .frame(width: 80, alignment: .center)
 
-            Text("\(r.receiveSuccessTotal)")
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                .foregroundColor(StatusTone.success.color(dark: dark))
-                .frame(width: 56, alignment: .leading)
+            // Web：状态徽章 sent=accent / failed=danger / pending=info
+            recordStatusBadge(r)
+                .frame(width: 100, alignment: .center)
 
-            Text("\(r.receiveFailTotal)")
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                .foregroundColor(
-                    r.receiveFailTotal > 0
-                        ? StatusTone.danger.color(dark: dark)
-                        : AppTheme.sidebarText(dark)
-                )
-                .frame(width: 56, alignment: .leading)
+            Text(r.createTime.isEmpty ? "—" : r.createTime)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(AppTheme.sidebarText(dark))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .lineLimit(1)
 
-            HStack(spacing: 6) {
-                AppButton(title: "详情", kind: .secondary) {
-                    model.openRecordDetail(r)
-                }
-                AppButton(title: "删除", systemImage: "trash", kind: .danger) {
-                    model.deleteRecord(r)
-                }
-            }
-            .frame(width: 120, alignment: .trailing)
         }
+    }
+
+    /// Web 状态徽章：sent=accent / failed=danger / pending=info（含图标）
+    @ViewBuilder
+    private func recordStatusBadge(_ r: EmailBodyItem) -> some View {
+        let status = r.statusText
+        let (icon, text, color): (String, String, Color) = {
+            if status.contains("fail") || status.contains("失败") {
+                return ("xmark.circle", "发送失败", AppTheme.danger)
+            }
+            if status.contains("pend") || status.contains("等待") {
+                return ("clock", "待发送", AppTheme.info)
+            }
+            return ("checkmark.circle", "已发送", AppTheme.sidebarActive)
+        }()
+        HStack(spacing: 4) {
+            Image(systemName: icon).font(.system(size: 10))
+            Text(text).font(.system(size: 11, weight: .medium))
+        }
+        .foregroundColor(color)
     }
 
     // MARK: - Pagination
 
     @ViewBuilder
     private var paginationFooter: some View {
-        switch model.mainSection {
-        case .tenants:
-            if model.tenantTab == .enabled {
-                PaginationBar(state: $model.enabledPage) {
-                    model.onEnabledPageChange()
+        Group {
+            switch model.mainSection {
+            case .tenants:
+                if model.tenantTab == .enabled {
+                    PaginationBar(state: $model.enabledPage) {
+                        model.onEnabledPageChange()
+                    }
+                } else {
+                    PaginationBar(state: $model.disabledPage) {
+                        model.onDisabledPageChange()
+                    }
                 }
-            } else {
-                PaginationBar(state: $model.disabledPage) {
-                    model.onDisabledPageChange()
+            case .contacts:
+                PaginationBar(state: $model.contactPage) {
+                    model.onContactPageChange()
                 }
-            }
-        case .contacts:
-            PaginationBar(state: $model.contactPage) {
-                model.onContactPageChange()
-            }
-        case .records:
-            PaginationBar(state: $model.recordPage) {
-                model.onRecordPageChange()
+            case .records:
+                PaginationBar(state: $model.recordPage) {
+                    model.onRecordPageChange()
+                }
             }
         }
+        .cornerRadius(8, corners: [.bottomLeft, .bottomRight])
     }
 
     // MARK: - Shared chrome
 
     private var cardBackground: some View {
-        RoundedRectangle(cornerRadius: 14)
+        RoundedRectangle(cornerRadius: 8)
             .fill(AppTheme.sidebarBg(dark))
     }
 
     private func cardStroke(accent: Color, active: Bool) -> some View {
-        RoundedRectangle(cornerRadius: 14)
+        RoundedRectangle(cornerRadius: 8)
             .stroke(
                 active
                     ? accent.opacity(dark ? 0.35 : 0.28)
@@ -642,15 +709,15 @@ struct EmailView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
+                .foregroundColor(AppTheme.danger)
             Text(text).font(.system(size: 12))
             Spacer()
             Button("重试") { Task { await model.reloadAll() } }
                 .buttonStyle(PlainButtonStyle())
         }
-        .foregroundColor(Color(hex: "f85149"))
+        .foregroundColor(AppTheme.danger)
         .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
+        .background(AppTheme.danger.opacity(0.1))
         .cornerRadius(8)
     }
 }

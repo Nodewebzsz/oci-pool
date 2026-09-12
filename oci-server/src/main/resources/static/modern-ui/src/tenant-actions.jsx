@@ -11,6 +11,11 @@ const CONTINENT_CN = {
   africa:   tr('tenant.ca0760'),
 };
 const tenantLabel = tenant => getTenantName(tenant) || tenant?.userName || '';
+// 区域别名：code → simpleName / cn，未知则回退 code（对齐租户详情页显示）
+const regionSimpleName = (code) => {
+  const r = REGIONS.find(x => x.code === code);
+  return r ? (r.simpleName || r.cn || code) : code;
+};
 function formatRegionLabel(r) {
   if (!r || !getRegionSimpleName(r)) return '';
   const parenMatch = getRegionSimpleName(r).match(/(.+?)[\(（]([^)）]+)[\)）]$/);
@@ -293,14 +298,15 @@ function useAddBootModal() {
                 const suffix = state.mode === 'quick'
                   ? (QUICK_PRESETS.find(p => p.id === state.quickPreset)?.id || 'arm-max')
                   : state.customTemplate;
-                state.remark = `${getTenantName(picked)}-${suffix}`;
+                const nm = window.getTenantAlias(picked) || getTenantName(picked);
+                state.remark = `${nm}-${suffix}`;
               }
               render();
             }} height={32} width="100%">
             <option value="" disabled>{tr('tenant.6c7d53')}</option>
             {state.tenantOptions.filter(t => getTenantActive(t) !== false).map(t => (
               <option key={getTenantDbId(t)} value={getTenantDbId(t)}>
-                {getTenantName(t)} · {getTenantAlias(t) || '-'} · {regionLabel(t)}
+                {getTenantLabel(t, lang)}
               </option>
             ))}
           </CustomDropdown>
@@ -986,72 +992,104 @@ function useApiImportModal() {
       keyMode: 'upload', // 'upload' | 'paste' — how to input private key
     };
 
+    // 重置除 pasteBuffer 外的全部表单字段
+    const resetForm = () => {
+      state.tenancy = '';
+      state.user = '';
+      state.fingerprint = '';
+      state.region = '';
+      state.privateKey = '';
+      state.alias = '';
+      state.lastParsed = null;
+      state.keyFileName = '';
+      state.keyMode = 'upload';
+    };
+
     // Parse OCI config text and merge into state
-    const parseAndFill = () => {
+    const parseAndFill = (silent = false) => {
       const text = state.pasteBuffer;
-      if (!text.trim()) {
-        shell.showToast(tr('tenant.8045df'), { kind: 'warn' });
+      if (!text || !text.trim()) {
+        resetForm();
+        if (!silent) shell.showToast(tr('tenant.8045df'), { kind: 'warn' });
+        render();
         return;
       }
 
       const filled = {};
 
-      // Match key=value pairs (case-insensitive keys)
-      // Handles both  key=value  and  key = value  formats.
-      const parseKV = (key) => {
-        const re = new RegExp(`^\\s*${key}\\s*=\\s*(.+?)\\s*$`, 'im');
-        const m = text.match(re);
-        return m ? m[1].trim() : null;
-      };
+      // 逐行解析 key=value 或 key: value，彻底免疫 \r\n、等号/冒号、引号差异
+      const map = {};
+      const lines = text.split(/\r?\n/);
+      for (const line of lines) {
+        const s = line.trim();
+        if (!s || s.startsWith('#') || s.startsWith(';')) continue;
+        const sepIdx = s.indexOf('=') !== -1 ? s.indexOf('=') : s.indexOf(':');
+        if (sepIdx !== -1) {
+          const k = s.slice(0, sepIdx).trim().toLowerCase().replace(/[\s_-]/g, '');
+          let v = s.slice(sepIdx + 1).trim();
+          v = v.replace(/^["']|["']$/g, '');
+          if (k && v) map[k] = v;
+        }
+      }
 
-      const user = parseKV('user');
-      const fingerprint = parseKV('fingerprint');
-      const tenancy = parseKV('tenancy');
-      const region = parseKV('region');
-      const keyFile = parseKV('key_file'); // just record it
+      const user = map.user || map.username || map.userocid || map.apiuser;
+      const fingerprint = map.fingerprint || map.apifingerprint;
+      const tenancy = map.tenancy || map.tenancyocid || map.rootcompartment;
+      const region = map.region || map.homeregion;
 
-      // Extract profile name (e.g. [DEFAULT] or [TENANCY-XYZ]) → used as alias
-      const profileMatch = text.match(/^\s*\[([^\]]+)\]\s*$/m);
+      // Profile 别名提取 (如 [DEFAULT] 或 [sanjose-free])
+      const profileMatch = text.match(/\[([^\]]+)\]/);
       const profileName = profileMatch ? profileMatch[1].trim() : null;
 
-      if (user) { state.user = user; filled.user = user; }
-      if (fingerprint) { state.fingerprint = fingerprint; filled.fingerprint = fingerprint; }
-      if (tenancy) { state.tenancy = tenancy; filled.tenancy = tenancy; }
+      // OCID 正则智能兜底识别
+      let finalUser = user;
+      let finalTenancy = tenancy;
+      const ocidMatches = text.match(/ocid1\.[a-z0-9]+\.oc1\.[^\s"',}]+/gi) || [];
+      for (const ocid of ocidMatches) {
+        if (ocid.includes('.user.') && !finalUser) finalUser = ocid;
+        if (ocid.includes('.tenancy.') && !finalTenancy) finalTenancy = ocid;
+      }
 
-      // Region matching — warn if unknown
+      // 指纹正则智能兜底识别
+      let finalFp = fingerprint;
+      if (!finalFp) {
+        const fpMatch = text.match(/([0-9a-fA-F]{2}:){15}[0-9a-fA-F]{2}/);
+        if (fpMatch) finalFp = fpMatch[0];
+      }
+
+      if (finalUser) { state.user = finalUser; filled.user = finalUser; }
+      if (finalFp) { state.fingerprint = finalFp; filled.fingerprint = finalFp; }
+      if (finalTenancy) { state.tenancy = finalTenancy; filled.tenancy = finalTenancy; }
+
+      // 区域匹配
       let regionMatched = null;
       if (region) {
-        const known = REGIONS.find(r => r.code === region);
+        const known = REGIONS.find(r => r.code === region || r.code.toLowerCase() === region.toLowerCase());
         if (known) {
           state.region = known.code;
           filled.region = known.code;
           regionMatched = true;
         } else {
-          // Unknown region — warn user but don't overwrite
           regionMatched = false;
         }
       }
 
-      // Extract PEM if present in the paste too
+      // PEM 私钥块提取
       const pemMatch = text.match(/-----BEGIN[^-]+-----[\s\S]+?-----END[^-]+-----/);
       if (pemMatch) {
-        state.privateKey = pemMatch[0];
+        state.privateKey = pemMatch[0].trim();
         state.keyMode = 'paste';
         state.keyFileName = '';
         filled.privateKey = 'PEM block';
       }
 
-      // Auto-fill alias from profile name (matches OCI config convention)
-      // Priority: [profileName] > (fallback) short slug based on tenancy
-      if (!state.alias) {
-        if (profileName) {
-          state.alias = profileName;
-          filled.alias = profileName;
-        } else if (tenancy) {
-          // Fallback only when no [profile] header exists
-          state.alias = `oci-${tenancy.slice(-6)}`;
-          filled.alias = state.alias;
-        }
+      // 自动生成别名
+      if (profileName && !['DEFAULT', 'default'].includes(profileName)) {
+        state.alias = profileName;
+        filled.alias = profileName;
+      } else if (finalTenancy && !state.alias) {
+        state.alias = `oci-${finalTenancy.slice(-6)}`;
+        filled.alias = state.alias;
       }
 
       const count = Object.keys(filled).length;
@@ -1059,13 +1097,12 @@ function useApiImportModal() {
 
       // Report result
       if (count === 0) {
-        shell.showToast(tr('tenant.c34aa7'), { kind: 'error' });
+        if (!silent) shell.showToast(tr('tenant.c34aa7'), { kind: 'error' });
       } else if (regionMatched === false) {
-        // Region provided but not in our list — separate warning toast
         shell.showToast(tr('tenant.572a5f').replace('{0}',region), { kind: 'warn', duration: 5000 });
         shell.showToast(tr('tenant.04c377').replace('{0}',count), { kind: 'success' });
       } else {
-        shell.showToast(tr('tenant.aee103').replace('{0}',count).replace('{1}',Object.keys(filled).join(', ')), { kind: 'success' });
+        if (!silent) shell.showToast(tr('tenant.aee103').replace('{0}',count).replace('{1}',Object.keys(filled).join(', ')), { kind: 'success' });
       }
       render();
     };
@@ -1114,8 +1151,7 @@ function useApiImportModal() {
                       try {
                         const text = await navigator.clipboard.readText();
                         state.pasteBuffer = text;
-                        render();
-                        parseAndFill();
+                        parseAndFill(false);
                       } catch {
                         shell.showToast(tr('tenant.14f8c4'), { kind: 'warn' });
                       }
@@ -1125,7 +1161,7 @@ function useApiImportModal() {
                     size="xs"
                     variant="primary"
                     icon="wand-2"
-                    onClick={parseAndFill}
+                    onClick={() => parseAndFill(false)}
                     disabled={!state.pasteBuffer.trim()}
                   >{tr('tenant.e25aef')}</Button>
                 </div>
@@ -1135,7 +1171,16 @@ function useApiImportModal() {
                 mono
                 rows={6}
                 value={state.pasteBuffer}
-                onChange={v => { state.pasteBuffer = v; render(); }}
+                onChange={v => {
+                  state.pasteBuffer = v;
+                  if (!v || !v.trim()) {
+                    // 当清空配置输入框时，整个弹窗表单彻底重置
+                    resetForm();
+                    render();
+                  } else {
+                    parseAndFill(true);
+                  }
+                }}
                 placeholder={tr('tenant.96e1cb')}
                 style={{
                   background: 'oklch(0.10 0.008 240 / 0.4)',
@@ -1546,7 +1591,7 @@ function useTenantDetailDrawer() {
       { id: 'disk-info',     label: tr('tenant.a74b62'),   icon: 'hard-drive',    color: 'var(--fg-1)' },
       { id: 'security-rules',label: tr('tenant.d77eaa'),   icon: 'shield',        color: 'var(--fg-1)' },
       { id: 'resource-list', label: tr('tenant.6a50dc'),   icon: 'list',          color: 'var(--fg-1)' },
-      { id: 'storage-case',  label: tr('tenant.9ff7a2'),   icon: 'database',      color: 'var(--fg-1)' },
+      { id: 'database-case', label: tr('tenant.9ff7a2'),   icon: 'database',      color: 'var(--fg-1)' },
     ];
 
     const runAction = (actionId, row) => {
@@ -1586,8 +1631,8 @@ function useTenantDetailDrawer() {
         case 'resource-list':
           showResourceModal(shell, tenant, row);
           return;
-        case 'storage-case':
-          showStorageModal(shell, tenant, row);
+        case 'database-case':
+          showMysqlModal(shell, tenant, row);
           return;
       }
     };
@@ -1633,7 +1678,8 @@ function useTenantDetailDrawer() {
               background: 'var(--bg-1)',
               border: '1px solid var(--border)',
               borderRadius: 6,
-              overflow: 'visible',
+              overflow: 'auto',
+              maxHeight: 460,
             }}>
               <table style={{
                 width: '100%',
@@ -1653,6 +1699,7 @@ function useTenantDetailDrawer() {
                         textTransform: 'uppercase', letterSpacing: 0.5,
                         borderBottom: '1px solid var(--border)',
                         whiteSpace: 'nowrap',
+                        position: 'sticky', top: 0, zIndex: 1,
                       }}>{h}</th>
                     ))}
                   </tr>
@@ -1918,6 +1965,7 @@ function showDiskModal(shell, tenant, row) {
   const normDisk = (r) => ({
     id: r.id,
     name: r.displayName || r.instanceName,
+    instanceName: r.instanceName || '',
     size: r.sizeInGBs,
     type: 'Boot',
     vpu: r.vpusPerGB,
@@ -1961,7 +2009,7 @@ function showDiskModal(shell, tenant, row) {
             >
               <input
                 type="range"
-                min={0} max={120} step={5}
+                min={10} max={120} step={10}
                 value={editState.vpu}
                 onChange={e => { editState.vpu = +e.target.value; renderEdit(); }}
                 style={{ width: '100%', accentColor: 'var(--accent)' }}
@@ -1973,7 +2021,7 @@ function showDiskModal(shell, tenant, row) {
               }}>
                 {(() => {
                   const nearest = Math.round(editState.vpu / 10) * 10;
-                  return [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120].map(n => (
+                  return [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120].map(n => (
                     <span key={n} style={{ color: n === nearest ? 'var(--accent)' : undefined, fontWeight: n === nearest ? 600 : undefined }}>{n}</span>
                   ));
                 })()}
@@ -2032,23 +2080,25 @@ function showDiskModal(shell, tenant, row) {
       size: 'lg',
       body: (
         <div style={{ padding: 18 }}>
+          <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflowY: 'auto', maxHeight: 400 }}>
           <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12 }}>
             <thead>
               <tr>
                 {[
-                  { h: tr('tenant.d7ec2d') },
-                  { h: tr('tenant.226b09'), w: 76 },
-                  { h: tr('tenant.fe7d74'), w: 90 },
-                  { h: tr('tenant.3bb6a2'), w: 180 },
-                  { h: 'IOPS', w: 100 },
-                  { h: tr('tenant.3fea7c'), w: 100 },
-                  { h: tr('tenant.2b6bc0'), w: 90, align: 'center' },
+                  { h: '引导卷名称', w: 180 },
+                  { h: '实例名称', w: 130 },
+                  { h: '类型', w: 60 },
+                  { h: '容量', w: 80 },
+                  { h: '性能 (VPU)', w: 120 },
+                  { h: '状态', w: 80 },
+                  { h: '操作', w: 80, align: 'center' },
                 ].map((c, i) =>
                   <th key={i} style={{
                     textAlign: c.align || 'left', padding: '9px 10px', width: c.w,
                     background: 'var(--bg-2)', color: 'var(--fg-3)',
                     fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
                     borderBottom: '1px solid var(--border)',
+                    position: 'sticky', top: 0, zIndex: 1,
                   }}>{c.h}</th>
                 )}
               </tr>
@@ -2069,6 +2119,9 @@ function showDiskModal(shell, tenant, row) {
                   <td style={{ padding: '10px', color: 'var(--fg-0)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
                     <span className="mono" style={{ fontSize: 11.5, whiteSpace: 'nowrap' }}>{d.name}</span>
                   </td>
+                  <td style={{ padding: '10px', color: 'var(--fg-1)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
+                    {d.instanceName ? <span style={{ fontSize: 11.5 }}>{d.instanceName}</span> : <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>未关联实例</span>}
+                  </td>
                   <td style={{ padding: '10px', borderBottom: '1px solid var(--border)' }}>
                     <span style={{
                       padding: '1px 6px',
@@ -2081,15 +2134,26 @@ function showDiskModal(shell, tenant, row) {
                     {d.size} GB
                   </td>
                   <td style={{ padding: '10px', borderBottom: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <div style={{ flex: 1, height: 4, background: 'var(--bg-3)', borderRadius: 2, overflow: 'hidden' }}>
-                        <div style={{ width: `${Math.min(100, (d.vpu / 120) * 100)}%`, height: '100%', background: 'var(--cyan)', transition: 'width 200ms' }} />
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ position: 'relative', width: 28, height: 28 }}>
+                        <svg width={28} height={28} style={{ transform: 'rotate(-90deg)' }}>
+                          <circle cx={14} cy={14} r={11} fill="none" stroke="var(--bg-3)" strokeWidth={3} />
+                          <circle
+                            cx={14} cy={14} r={11} fill="none" stroke="var(--cyan)" strokeWidth={3}
+                            strokeDasharray={2 * Math.PI * 11}
+                            strokeDashoffset={2 * Math.PI * 11 * (1 - Math.min(1, Math.max(0, d.vpu / 120)))}
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                        <div style={{
+                          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 8.5, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--cyan)',
+                        }}>
+                          {d.vpu}
+                        </div>
                       </div>
-                      <span className="num" style={{ fontSize: 10.5, color: 'var(--fg-2)', minWidth: 30 }}>{d.vpu}</span>
+                      <span style={{ fontSize: 10, color: 'var(--fg-3)', fontWeight: 500 }}>VPU</span>
                     </div>
-                  </td>
-                  <td style={{ padding: '10px', color: 'var(--fg-1)', borderBottom: '1px solid var(--border)' }} className="num">
-                    {calcIops(d.size, d.vpu).toLocaleString()}
                   </td>
                   <td style={{ padding: '10px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
                     {d.attached
@@ -2106,9 +2170,15 @@ function showDiskModal(shell, tenant, row) {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       ),
-      footer: <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('tenant.b15d91')}</Button>,
+      footer: (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <Button variant="secondary" size="md" icon="refresh-cw" loading={state.loading} onClick={loadDisks}>刷新</Button>
+          <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('tenant.b15d91')}</Button>
+        </div>
+      ),
     });
   };
   renderList();
@@ -2130,11 +2200,10 @@ function showSecurityModal(shell, tenant, row) {
   //   · 每行 ⋯ 菜单(复用统一的 <RowActionMenu>):编辑/复制/删除
 
   const PROTOCOLS = [
-    { id: 'ALL',    label: tr('tenant.e56f49'), icon: 'shield',    color: 'var(--fg-1)' },
+    { id: 'ALL',    label: '全部',      icon: 'shield',    color: 'var(--fg-1)' },
     { id: 'TCP',    label: 'TCP',      icon: 'arrow-right-left', color: 'var(--info)' },
     { id: 'UDP',    label: 'UDP',      icon: 'zap',       color: 'var(--cyan)' },
     { id: 'ICMP',   label: 'ICMP',     icon: 'radio',     color: 'var(--violet)' },
-    { id: 'ICMPv6', label: 'ICMPv6',   icon: 'radio',     color: 'var(--orange)' },
   ];
 
   // 快选 CIDR
@@ -2234,9 +2303,15 @@ function showSecurityModal(shell, tenant, row) {
     state.loading = false; render();
   };
   const persistRule = async (payload) => {
-    await window.ociApi.request('/tenants/security-rules', {
+    return await window.ociApi.request('/tenants/security-rules', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
     });
+  };
+  // 后端兜底：检测到高危规则时响应带 warning 字段 → 提示用户
+  const warnIfBackendRisk = (resp) => {
+    if (resp && resp.warning) {
+      shell.showToast(tr('tenant.risk.backendWarn') + resp.warning, { kind: 'warn', duration: 6000 });
+    }
   };
   const deleteRule = async (id) => {
     await window.ociApi.request('/tenants/security-rules/' + encodeURIComponent(id), { method: 'DELETE' });
@@ -2258,6 +2333,16 @@ function showSecurityModal(shell, tenant, row) {
     low:      { label: tr('tenant.19ac67'),   color: 'var(--accent)', bg: 'var(--accent-soft)' },
   };
 
+  // 是否为高危规则（开放全地址 + 全协议 / 高危端口），保存前需二次确认
+  const isDangerForm = (proto, addr, ports) => {
+    const openAll = addr === '0.0.0.0/0' || addr === '::/0';
+    const dangerPorts = /(^|,|-|\b)(22|3389|3306|5432|6379|27017)(\b|,|-|$)/;
+    if (!openAll) return false;
+    if (proto === 'ALL') return true;
+    if (ports && dangerPorts.test(ports)) return true;
+    return false;
+  };
+
   // 端口输入转字符串
   const portsToStr = (start, end) => {
     if (!start) return '';
@@ -2270,9 +2355,6 @@ function showSecurityModal(shell, tenant, row) {
     if (m) return { start: m[1], end: m[2] };
     return { start: s, end: '' };
   };
-
-  // 当前打开的行菜单
-  let openMenu = null;   // { rowId, anchorEl } | null
 
   const render = () => {
     const list = state.tab === 'ingress' ? state.ingress : state.egress;
@@ -2288,7 +2370,7 @@ function showSecurityModal(shell, tenant, row) {
 
     shell.openModal({
       title: tr('tenant.a50569'),
-      subtitle: <span><span className="mono">{tenantLabel(tenant)}</span> · Default VCN · <span className="mono">{row.region}</span> · <span style={{ color: 'var(--fg-2)' }}>{currentRules.length} {tr('tenant.6c2cfb')}</span></span>,
+      subtitle: <span><span className="mono">{tenantLabel(tenant)}</span> · <span className="mono">{regionSimpleName(row.region)}</span> · <span style={{ color: 'var(--fg-2)' }}>{currentRules.length} {tr('tenant.6c2cfb')}</span></span>,
       icon: 'shield',
       iconColor: 'var(--accent)',
       size: 'xl',
@@ -2300,28 +2382,31 @@ function showSecurityModal(shell, tenant, row) {
             marginBottom: 14,
           }}>
             <div style={{
-              display: 'inline-flex',
-              padding: 3,
+              display: 'flex',
+              width: '100%',
+              padding: 4,
               background: 'var(--bg-2)',
               border: '1px solid var(--border)',
-              borderRadius: 8,
+              borderRadius: 10,
             }}>
               {['ingress', 'egress'].map(k => {
                 const isActive = state.tab === k;
+                const accent = k === 'ingress' ? 'var(--info)' : 'var(--orange)';
                 return (
                   <button
                     key={k}
                     type="button"
                     onClick={() => { state.tab = k; resetForm(); render(); }}
                     style={{
-                      padding: '7px 20px',
-                      background: isActive ? 'var(--bg-1)' : 'transparent',
-                      border: isActive ? '1px solid var(--border-strong)' : '1px solid transparent',
-                      borderRadius: 6,
-                      color: isActive ? (k === 'ingress' ? 'var(--info)' : 'var(--orange)') : 'var(--fg-2)',
-                      fontFamily: 'inherit', fontSize: 12.5, fontWeight: isActive ? 600 : 500,
+                      flex: 1,
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      padding: '11px 12px',
+                      background: isActive ? accent : 'transparent',
+                      border: isActive ? '1px solid ' + accent : '1px solid transparent',
+                      borderRadius: 8,
+                      color: isActive ? '#fff' : 'var(--fg-2)',
+                      fontFamily: 'inherit', fontSize: 13, fontWeight: isActive ? 600 : 500,
                       cursor: 'pointer',
-                      display: 'inline-flex', alignItems: 'center', gap: 6,
                       transition: 'all 100ms',
                     }}
                   >
@@ -2329,8 +2414,8 @@ function showSecurityModal(shell, tenant, row) {
                     {k === 'ingress' ? tr('tenant.3331c8') : tr('tenant.0d0772')}
                     <span style={{
                       padding: '0 6px', minWidth: 18,
-                      background: isActive ? (k === 'ingress' ? 'var(--info-soft)' : 'var(--orange-soft)') : 'var(--bg-3)',
-                      color: isActive ? (k === 'ingress' ? 'var(--info)' : 'var(--orange)') : 'var(--fg-3)',
+                      background: isActive ? 'rgba(255,255,255,0.2)' : 'var(--bg-3)',
+                      color: isActive ? '#fff' : 'var(--fg-3)',
                       borderRadius: 4, fontSize: 10, fontWeight: 600,
                       fontFamily: 'var(--font-mono)',
                     }}>{(k === 'ingress' ? state.ingress : state.egress).length}</span>
@@ -2338,31 +2423,31 @@ function showSecurityModal(shell, tenant, row) {
                 );
               })}
             </div>
-
-            <div style={{ flex: 1 }} />
-
-            {/* 风险汇总徽章 */}
-            {currentRules.length > 0 && (
-              <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                <span style={{ fontSize: 10.5, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{tr('tenant.92cae8')}</span>
-                {['critical', 'high', 'medium', 'low'].map(lvl => (
-                  riskCount[lvl] > 0 && (
-                    <span key={lvl} style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 3,
-                      padding: '2px 7px',
-                      background: riskCfg[lvl].bg,
-                      color: riskCfg[lvl].color,
-                      borderRadius: 3, fontSize: 10.5, fontWeight: 600,
-                    }}>
-                      {(lvl === 'critical' || lvl === 'high') && <Icon name="alert-triangle" size={10} />}
-                      {riskCfg[lvl].label}
-                      <span className="num" style={{ opacity: 0.85 }}>{riskCount[lvl]}</span>
-                    </span>
-                  )
-                ))}
-              </div>
-            )}
           </div>
+
+          {/* ── 风险汇总徽章（独立行，3 档对齐客户端：高=严重+高合并）─ */}
+          {currentRules.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+              <span style={{ fontSize: 10.5, color: 'var(--fg-3)', fontWeight: 600 }}>风险</span>
+              {[
+                { key: 'high', label: riskCfg['high'].label, color: riskCfg['high'].color, bg: riskCfg['high'].bg, count: riskCount.critical + riskCount.high, alert: true },
+                { key: 'medium', label: riskCfg['medium'].label, color: riskCfg['medium'].color, bg: riskCfg['medium'].bg, count: riskCount.medium, alert: false },
+                { key: 'low', label: riskCfg['low'].label, color: riskCfg['low'].color, bg: riskCfg['low'].bg, count: riskCount.low, alert: false },
+              ].filter(x => x.count > 0).map(x => (
+                <span key={x.key} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 3,
+                  padding: '2px 7px',
+                  background: x.bg,
+                  color: x.color,
+                  borderRadius: 3, fontSize: 10.5, fontWeight: 600,
+                }}>
+                  {x.alert && <Icon name="alert-triangle" size={10} />}
+                  {x.label}
+                  <span className="num" style={{ opacity: 0.85 }}>{x.count}</span>
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* ── 关闭时的操作栏 ─────────────────────────── */}
           {state.formMode === 'closed' && (
@@ -2377,12 +2462,6 @@ function showSecurityModal(shell, tenant, row) {
                 onClick={() => { state.formMode = 'template'; render(); }}
               >{tr('tenant.47a160')}</Button>
               <div style={{ flex: 1 }} />
-              <Button size="sm" variant="ghost" icon="download"
-                onClick={() => shell.showToast(tr('tenant.1aeae9').replace('{0}',currentRules.length), { kind: 'success' })}
-              >{tr('tenant.55405e')}</Button>
-              <Button size="sm" variant="ghost" icon="upload"
-                onClick={() => shell.showToast(tr('tenant.b83b4a'), { kind: 'info' })}
-              >{tr('tenant.8d9a07')}</Button>
             </div>
           )}
 
@@ -2472,7 +2551,7 @@ function showSecurityModal(shell, tenant, row) {
               <div style={{ marginBottom: 12 }}>
                 <div style={{ fontSize: 11.5, color: 'var(--fg-1)', fontWeight: 500, marginBottom: 6 }}>{tr('tenant.faa1ad')}</div>
                 <div style={{
-                  display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4,
+                  display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4,
                   padding: 3,
                   background: 'var(--bg-1)',
                   border: '1px solid var(--border)',
@@ -2519,17 +2598,6 @@ function showSecurityModal(shell, tenant, row) {
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 6 }}>
                   <span style={{ fontSize: 11.5, color: 'var(--fg-1)', fontWeight: 500 }}>{addrLabel}</span>
                   <span style={{ color: 'var(--danger)' }}>*</span>
-                  {(state.form.addr === '0.0.0.0/0' || state.form.addr === '::/0') && (
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 3,
-                      padding: '1px 6px',
-                      background: 'var(--orange-soft)', color: 'var(--orange)',
-                      borderRadius: 3, fontSize: 10, fontWeight: 500,
-                    }}>
-                      <Icon name="alert-triangle" size={9} />
-                      {tr('tenant.808eae')}
-                    </span>
-                  )}
                 </div>
                 {/* CIDR 快选 chips */}
                 <div style={{
@@ -2688,13 +2756,31 @@ function showSecurityModal(shell, tenant, row) {
                     const cidrOk = /^([0-9a-fA-F:.]+)\/\d+$/.test(state.form.addr.trim());
                     if (!cidrOk) { shell.showToast(tr('tenant.c622cf'), { kind: 'warn' }); return; }
                     const ports = portsDisabled ? '' : portsToStr(state.form.portStart, state.form.portEnd);
-                    try {
-                      await persistRule({ tenantId: getTenantDbId(tenant), type: apiType(), protocol: state.form.proto, source: state.form.addr, ports: ports || null });
-                      shell.showToast(tr('tenant.ed2386').replace('{0}',state.tab === 'ingress' ? tr('tenant.ingress') : tr('tenant.egress')), { kind: 'success' });
-                      resetForm();
-                      loadRules();
-                    } catch (e) {
-                      shell.showToast(tr('tenant.40f902') + (e.message || e), { kind: 'error' });
+                    const payload = { tenantId: getTenantDbId(tenant), type: apiType(), protocol: state.form.proto, source: state.form.addr, ports: ports || null };
+                    const doSave = async () => {
+                      try {
+                        const resp = await persistRule(payload);
+                        warnIfBackendRisk(resp);
+                        shell.showToast(tr('tenant.ed2386').replace('{0}',state.tab === 'ingress' ? tr('tenant.ingress') : tr('tenant.egress')), { kind: 'success' });
+                        resetForm();
+                        loadRules();
+                      } catch (e) {
+                        shell.showToast(tr('tenant.40f902') + (e.message || e), { kind: 'error' });
+                      }
+                    };
+                    if (isDangerForm(state.form.proto, state.form.addr, ports)) {
+                      shell.openConfirm({
+                        title: tr('tenant.risk.confirmTitle'),
+                        body: <div style={{ lineHeight: 1.6 }}>
+                          {tr('tenant.risk.confirmBody')}
+                          <b>{PROTOCOLS.find(p => p.id === state.form.proto)?.label || state.form.proto}</b> · {addrLabel}:<span className="mono">{state.form.addr}</span>
+                          {ports && <> {tr('tenant.03cfd0')}<span className="mono">{ports}</span></>}
+                        </div>,
+                        danger: true, confirmLabel: tr('tenant.risk.confirmBtn'),
+                        onConfirm: doSave,
+                      });
+                    } else {
+                      await doSave();
                     }
                   }}
                 >{tr('tenant.be5fbb')}</Button>
@@ -2706,25 +2792,37 @@ function showSecurityModal(shell, tenant, row) {
           <div style={{
             border: '1px solid var(--border)',
             borderRadius: 8,
-            overflow: 'hidden',
+            overflowY: 'auto',
+            maxHeight: 380,
             background: 'var(--bg-1)',
           }}>
-            {currentRules.length === 0 ? (
+            {state.loading ? (
+              <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--fg-3)', fontSize: 12.5 }}>
+                <style>{'@keyframes ociSpin{to{transform:rotate(360deg)}}'}</style>
+                <div style={{ marginBottom: 8 }}>
+                  <span style={{ display: 'inline-block', width: 18, height: 18, border: '2px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'ociSpin 0.8s linear infinite' }} />
+                </div>
+                加载中…
+              </div>
+            ) : currentRules.length === 0 ? (
               /* 空状态 */
               <div style={{
                 padding: '48px 20px',
                 textAlign: 'center',
               }}>
-                <Icon name="shield-off" size={36} style={{ color: 'var(--fg-3)', marginBottom: 10 }} />
+                <Icon name="shield-off" size={36} style={{ color: 'var(--fg-3)', marginBottom: 8 }} />
                 <div style={{ fontSize: 13, color: 'var(--fg-1)', fontWeight: 500, marginBottom: 4 }}>
                   {tr('tenant.f61f4c')}{state.tab === 'ingress' ? tr('tenant.0768a8') : tr('tenant.5148cf')}{tr('tenant.b0fae0')}
                 </div>
-                <div style={{ fontSize: 11.5, color: state.tab === 'ingress' ? 'var(--danger)' : 'var(--fg-3)', marginBottom: 14 }}>
-                  {state.tab === 'ingress'
-                    ? tr('tenant.72dc77')
-                    : tr('tenant.027ade')}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                  fontSize: 11.5, color: state.tab === 'ingress' ? 'var(--danger)' : 'var(--orange)',
+                  marginBottom: 20,
+                }}>
+                  <Icon name="alert-triangle" size={11} />
+                  {state.tab === 'ingress' ? tr('tenant.72dc77') : tr('tenant.027ade')}
                 </div>
-                <div style={{ display: 'inline-flex', gap: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
                   <Button size="sm" variant="primary" icon="plus"
                     onClick={() => { state.formMode = 'add'; render(); }}
                   >{tr('tenant.63edd6')}</Button>
@@ -2746,7 +2844,7 @@ function showSecurityModal(shell, tenant, row) {
                       { h: addrLabel },
                       { h: tr('tenant.75384b'), w: 130 },
                       { h: tr('tenant.57846f'), w: 70, align: 'center' },
-                      { h: tr('tenant.2b6bc0'), w: 60, align: 'center' },
+                      { h: tr('tenant.2b6bc0'), w: 190, align: 'center' },
                     ].map((c, i) => (
                       <th key={i} style={{
                         textAlign: c.align || 'left', padding: '10px 12px', width: c.w,
@@ -2754,6 +2852,7 @@ function showSecurityModal(shell, tenant, row) {
                         fontSize: 10.5, fontWeight: 600,
                         textTransform: 'uppercase', letterSpacing: 0.5,
                         borderBottom: '1px solid var(--border)',
+                        position: 'sticky', top: 0, zIndex: 1,
                       }}>{c.h}</th>
                     ))}
                   </tr>
@@ -2784,22 +2883,19 @@ function showSecurityModal(shell, tenant, row) {
                           </span>
                         </td>
                         <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                            <Icon name={proto.icon} size={11} style={{ color: proto.color }} />
-                            <span className="mono" style={{ fontSize: 11, color: proto.color, fontWeight: 600 }}>{proto.label}</span>
-                          </span>
+                          <span className="mono" style={{ fontSize: 11, color: proto.color, fontWeight: 600 }}>{proto.label}</span>
                         </td>
                         <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
                           <span className="mono" style={{ fontSize: 11, color: 'var(--fg-0)' }}>{r.addr}</span>
                         </td>
-                        <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                           {r.ports
                             ? <span className="mono" style={{
                                 padding: '1px 6px',
                                 background: 'var(--cyan-soft)', color: 'var(--cyan)',
                                 borderRadius: 3, fontSize: 10.5, fontWeight: 500,
                               }}>{r.ports}</span>
-                            : <span style={{ color: 'var(--fg-3)', fontSize: 11, fontStyle: 'italic' }}>{tr('tenant.a30062')}</span>
+                            : <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>全部</span>
                           }
                         </td>
                         <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
@@ -2815,32 +2911,58 @@ function showSecurityModal(shell, tenant, row) {
                             {cfg.label}
                           </span>
                         </td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-                          {(() => {
-                            const isOpen = openMenu?.rowId === r.id;
-                            return (
-                              <button
-                                type="button"
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  if (isOpen) { openMenu = null; render(); return; }
-                                  openMenu = { rowId: r.id, anchorEl: e.currentTarget };
-                                  render();
-                                }}
-                                style={{
-                                  width: 28, height: 28, borderRadius: 4,
-                                  background: isOpen ? 'var(--accent)' : 'var(--bg-2)',
-                                  border: '1px solid ' + (isOpen ? 'var(--accent)' : 'var(--border)'),
-                                  color: isOpen ? 'var(--accent-fg)' : 'var(--fg-1)',
-                                  cursor: 'pointer',
-                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                }}
-                                title={tr('tenant.2b6bc0')}
-                              >
-                                <Icon name="more-horizontal" size={13} />
-                              </button>
-                            );
-                          })()}
+                        <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                            <Button size="sm" variant="secondary" onClick={() => {
+                              const sp = strToPorts(r.ports);
+                              state.form = { proto: r.proto, addr: r.addr, portStart: sp.start, portEnd: sp.end };
+                              state.editingId = r.id;
+                              state.formMode = 'edit';
+                              render();
+                            }}>编辑</Button>
+                            <Button size="sm" variant="secondary" onClick={() => {
+                              const sp = strToPorts(r.ports);
+                              const payload = { tenantId: getTenantDbId(tenant), type: apiType(), protocol: r.proto, source: r.addr, ports: r.ports || null };
+                              const doCopy = () => {
+                                persistRule(payload).then(resp => {
+                                  warnIfBackendRisk(resp);
+                                  shell.showToast(tr('tenant.0f1c3d'), { kind: 'success' });
+                                  loadRules();
+                                }).catch(e => shell.showToast(tr('tenant.abdfe2') + (e.message || e), { kind: 'error' }));
+                              };
+                              if (isDangerForm(r.proto, r.addr, r.ports)) {
+                                shell.openConfirm({
+                                  title: tr('tenant.risk.confirmTitle'),
+                                  body: <div style={{ lineHeight: 1.6 }}>
+                                    {tr('tenant.risk.confirmBody')}
+                                    <b>{PROTOCOLS.find(p => p.id === r.proto)?.label || r.proto}</b> · {addrLabel}:<span className="mono">{r.addr}</span>
+                                    {r.ports && <> {tr('tenant.03cfd0')}<span className="mono">{r.ports}</span></>}
+                                  </div>,
+                                  danger: true, confirmLabel: tr('tenant.risk.confirmBtn'),
+                                  onConfirm: doCopy,
+                                });
+                              } else {
+                                doCopy();
+                              }
+                            }}>复制</Button>
+                            <Button size="sm" variant="danger" onClick={() => {
+                              shell.openConfirm({
+                                title: tr('tenant.0d4c41').replace('{0}',r.id || '?'),
+                                body: <div>{tr('tenant.6217c8')}<b>{PROTOCOLS.find(p => p.id === r.proto)?.label || r.proto}</b> · {addrLabel}:<span className="mono">{r.addr}</span>{r.ports && <> {tr('tenant.03cfd0')}<span className="mono">{r.ports}</span></>}</div>,
+                                danger: true, confirmLabel: tr('tenant.2f4aad'),
+                                onConfirm: async () => {
+                                  if (!r.id) { shell.showToast(tr('tenant.2be61d'), { kind: 'warn' }); return; }
+                                  try {
+                                    await deleteRule(r.id);
+                                    shell.showToast(tr('tenant.d9984b').replace('{0}',r.id), { kind: 'warn' });
+                                    loadRules();
+                                  } catch (e) {
+                                    shell.showToast(tr('tenant.ad23f0') + (e.message || e), { kind: 'error' });
+                                  }
+                                },
+                              });
+                            }}>删除</Button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -2850,55 +2972,6 @@ function showSecurityModal(shell, tenant, row) {
             )}
           </div>
 
-          {/* ── 行操作 · 复用统一的 <RowActionMenu> ─────── */}
-          {openMenu && (() => {
-            const arr = state.tab === 'ingress' ? state.ingress : state.egress;
-            const r = arr.find(x => x.id === openMenu.rowId);
-            if (!r) return null;
-            return (
-              <RowActionMenu
-                anchorEl={openMenu.anchorEl}
-                width={200}
-                columns={1}
-                header={
-                  <>
-                    <Icon name="shield" size={11} style={{ color: 'var(--accent)' }} />
-                    <span style={{ color: 'var(--fg-0)' }}>{tr('tenant.19b0d8')}{r.id}</span>
-                    <span style={{ color: 'var(--fg-3)', flex: 1 }} className="mono">{r.addr}</span>
-                  </>
-                }
-                items={[
-                  { id: 'copy',   label: tr('tenant.7b807e'), icon: 'copy', color: 'var(--info)' },
-                  { id: 'delete', label: tr('tenant.2f4aad'),    icon: 'trash-2', color: 'var(--danger)' },
-                ]}
-                onClose={() => { openMenu = null; render(); }}
-                onAction={(id) => {
-                  if (id === 'copy') {
-                    persistRule({ tenantId: getTenantDbId(tenant), type: apiType(), protocol: r.proto, source: r.addr, ports: r.ports || null }).then(() => {
-                      shell.showToast(tr('tenant.0f1c3d'), { kind: 'success' });
-                      loadRules();
-                    }).catch(e => shell.showToast(tr('tenant.abdfe2') + (e.message || e), { kind: 'error' }));
-                  } else if (id === 'delete') {
-                    shell.openConfirm({
-                      title: tr('tenant.0d4c41').replace('{0}',r.id || '?'),
-                      body: <div>{tr('tenant.6217c8')}<b>{PROTOCOLS.find(p => p.id === r.proto)?.label || r.proto}</b> · {addrLabel}:<span className="mono">{r.addr}</span>{r.ports && <> {tr('tenant.03cfd0')}<span className="mono">{r.ports}</span></>}</div>,
-                      danger: true, confirmLabel: tr('tenant.2f4aad'),
-                      onConfirm: async () => {
-                        if (!r.id) { shell.showToast(tr('tenant.2be61d'), { kind: 'warn' }); return; }
-                        try {
-                          await deleteRule(r.id);
-                          shell.showToast(tr('tenant.d9984b').replace('{0}',r.id), { kind: 'warn' });
-                          loadRules();
-                        } catch (e) {
-                          shell.showToast(tr('tenant.ad23f0') + (e.message || e), { kind: 'error' });
-                        }
-                      },
-                    });
-                  }
-                }}
-              />
-            );
-          })()}
         </div>
       ),
       footer: (
@@ -3010,7 +3083,8 @@ function showResourceModal(shell, tenant, row) {
             background: 'var(--bg-1)',
             border: '1px solid var(--border)',
             borderRadius: 6,
-            overflow: 'hidden',
+            overflowY: 'auto',
+            maxHeight: 420,
           }}>
             <table style={{
               width: '100%', borderCollapse: 'separate', borderSpacing: 0,
@@ -3041,6 +3115,7 @@ function showResourceModal(shell, tenant, row) {
                       textTransform: 'uppercase', letterSpacing: 0.5,
                       borderBottom: '1px solid var(--border)',
                       whiteSpace: 'nowrap',
+                      position: 'sticky', top: 0, zIndex: 1,
                     }}>{c.h}</th>
                   ))}
                 </tr>
@@ -3063,11 +3138,12 @@ function showResourceModal(shell, tenant, row) {
                     <td style={{ padding: '10px 12px', color: 'var(--fg-3)', borderBottom: '1px solid var(--border)' }}>
                       <span className="num">{(state.page - 1) * state.perPage + i + 1}</span>
                     </td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
-                      <span className="mono" style={{
+                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }} title={inst.tenantName || ''}>
+                      <span title={inst.tenantName || ''} className="mono" style={{
                         padding: '2px 6px', background: 'var(--bg-3)',
                         borderRadius: 3, fontSize: 11, color: 'var(--fg-1)',
-                      }}>{state.masked ? inst.tenantName : (inst.tenantName || '').replace(/\*/g, 'a')}</span>
+                        cursor: 'pointer',
+                      }}>{state.masked ? window.maskName(inst.tenantName) : (inst.tenantName || '')}</span>
                     </td>
                     <td style={{ padding: '10px 12px', color: 'var(--fg-0)', borderBottom: '1px solid var(--border)' }}>
                       {regionLabel(inst.region)}
@@ -3213,6 +3289,399 @@ function showResourceModal(shell, tenant, row) {
   };
   render();
   loadInstances();
+}
+function showMysqlModal(shell, tenant, row) {
+  // ═══════════════════════════════════════════════════════════════════════
+  // 数据库管理 (MySQL HeatWave) · 对齐原项目 doubleDimple/oci-start
+  // ═══════════════════════════════════════════════════════════════════════
+  // 布局:单面板表格
+  //   · 顶部: + 创建 MySQL  |  ⟳ 从云同步  → 右侧关闭
+  //   · 表格:名称(点击复制 OCID)/版本/状态/公网·端口/账密(可切换显隐)/规格/存储(GB)/操作(⋯)
+  //   · 行内 ⋯ 菜单(复用 <RowActionMenu>):同步此实例 / 绑定公网IP / 重置账密 / 终止实例(红)
+  //   · 空态:暂无数据;加载态:loader
+
+  const state = {
+    instances: [],
+    loading: true,
+    revealing: null,        // 正在显示密码的行 id
+    openMenu: null,         // { rowId, anchorEl }
+  };
+
+  const unwrap = payload => payload && payload.data !== undefined ? payload.data : payload;
+
+  const load = async () => {
+    state.loading = true; render();
+    try {
+      const r = await window.ociApi.request('/tenants/mysql-info?tenantId=' + encodeURIComponent(getTenantDbId(tenant)));
+      const list = (r && r.success && Array.isArray(r.data)) ? r.data : (Array.isArray(r) ? r : []);
+      state.instances = list;
+      state.revealing = null;
+    } catch (e) {
+      state.instances = [];
+    }
+    state.loading = false; render();
+  };
+
+  const tenantId = getTenantDbId(tenant);
+
+  // 行内操作:同步此实例
+  const syncSingle = async (inst) => {
+    try {
+      await window.ociApi.request('/tenants/sync-single-mysql?id=' + encodeURIComponent(inst.id));
+      shell.showToast(tr('td.mysql.toast.sync'), { kind: 'success' });
+      load();
+    } catch (e) {
+      shell.showToast(tr('td.mysql.toast.err') + (e.message || e), { kind: 'error' });
+    }
+  };
+
+  // 行内操作:绑定公网 IP
+  const bindPublicIp = (inst) => {
+    shell.openConfirm({
+      title: tr('td.mysql.confirm.bindIp'),
+      body: <div>{tr('td.mysql.confirm.bindIpBody').replace('{0}', inst.displayName || inst.dbName || '?')}</div>,
+      confirmLabel: tr('td.mysql.confirm'),
+      onConfirm: async () => {
+        try {
+          await window.ociApi.request('/tenants/bind-public-ip?id=' + encodeURIComponent(inst.id));
+          shell.showToast(tr('td.mysql.toast.bindIp'), { kind: 'success' });
+          load();
+        } catch (e) {
+          shell.showToast(tr('td.mysql.toast.err') + (e.message || e), { kind: 'error' });
+        }
+      },
+    });
+  };
+
+  // 行内操作:重置账密
+  const resetAuth = (inst) => {
+    shell.openConfirm({
+      title: tr('td.mysql.confirm.resetAuth'),
+      body: <div style={{ lineHeight: 1.6 }}>{tr('td.mysql.confirm.resetAuthBody')}<b>{inst.displayName || inst.dbName || '?'}</b></div>,
+      confirmLabel: tr('td.mysql.confirm'),
+      onConfirm: async () => {
+        try {
+          await window.ociApi.request('/tenants/mysql-reset-auth?id=' + encodeURIComponent(inst.id) + '&tenantId=' + encodeURIComponent(tenantId));
+          shell.showToast(tr('td.mysql.toast.resetAuth'), { kind: 'success' });
+          load();
+        } catch (e) {
+          shell.showToast(tr('td.mysql.toast.err') + (e.message || e), { kind: 'error' });
+        }
+      },
+    });
+  };
+
+  // 行内操作:终止实例(删除)
+  const terminate = (inst) => {
+    shell.openConfirm({
+      title: tr('td.mysql.confirm.delete'),
+      body: <div style={{ lineHeight: 1.6 }}>{tr('td.mysql.confirm.deleteBody')}<b>{inst.displayName || inst.dbName || '?'}</b></div>,
+      danger: true,
+      confirmLabel: tr('td.mysql.confirm.delete'),
+      onConfirm: async () => {
+        try {
+          await window.ociApi.request('/tenants/mysql-action', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tenantId, id: String(inst.id), action: 'delete' }),
+          });
+          shell.showToast(tr('td.mysql.toast.delete'), { kind: 'warn' });
+          load();
+        } catch (e) {
+          shell.showToast(tr('td.mysql.toast.err') + (e.message || e), { kind: 'error' });
+        }
+      },
+    });
+  };
+
+  // 创建 MySQL · 对齐原项目:确认 → loading 弹窗 → 成功/失败结果弹窗
+  const doCreate = () => {
+    shell.openConfirm({
+      title: tr('td.mysql.confirm.create'),
+      body: <div style={{ lineHeight: 1.6 }}>{tr('td.mysql.confirm.createBody')}<b>{getTenantName(tenant)}</b></div>,
+      confirmLabel: tr('td.mysql.confirm'),
+      onConfirm: async () => {
+        // step1: 先展示阻塞式 loading 弹窗（旋转 loader）
+        shell.openModal({
+          title: tr('td.mysql.loadingCreate'),
+          icon: 'loader',
+          iconColor: 'var(--accent)',
+          size: 'sm',
+          onClose: () => {},   // 创建过程中不响应关闭；接口结束后会覆盖为结果弹窗
+          body: (
+            <div style={{ padding: '24px 20px', textAlign: 'center' }}>
+              <Icon name="loader" size={28} style={{ color: 'var(--accent)', animation: 'button-spin 800ms linear infinite' }} />
+              <div style={{ marginTop: 12, fontSize: 12, color: 'var(--fg-2)' }}>{tr('td.mysql.loadingCreateBody')}</div>
+            </div>
+          ),
+        });
+        try {
+          const r = await window.ociApi.request('/tenants/mysql-create?tenantId=' + encodeURIComponent(tenantId), { method: 'POST' });
+          const ok = r && (r.success || r.code === 200);
+          const msg = (r && r.message) || tr('td.mysql.toast.create');
+          // step2: 覆盖为成功/失败结果弹窗
+          shell.openModal({
+            title: ok ? tr('td.mysql.result.success') : tr('td.mysql.result.fail'),
+            icon: ok ? 'check-circle' : 'alert-triangle',
+            iconColor: ok ? 'var(--accent)' : 'var(--danger)',
+            size: 'md',
+            body: (
+              <div style={{ padding: '20px 22px 6px', fontSize: 12.5, color: 'var(--fg-1)', lineHeight: 1.7 }}>{ok ? tr('td.mysql.result.createBody') : msg}</div>
+            ),
+            footer: (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <Button variant={ok ? 'primary' : 'danger'} size="md" onClick={shell.closeModal}>{tr('td.mysql.confirm')}</Button>
+              </div>
+            ),
+          });
+          if (ok) load();
+        } catch (e) {
+          const msg = tr('td.mysql.toast.err') + (e.message || e);
+          shell.openModal({
+            title: tr('td.mysql.result.fail'),
+            icon: 'alert-triangle',
+            iconColor: 'var(--danger)',
+            size: 'md',
+            body: (
+              <div style={{ padding: '20px 22px 6px' }}>
+                <div style={{
+                  padding: '12px 14px',
+                  background: 'var(--danger-soft)',
+                  border: '1px solid color-mix(in oklab, var(--danger) 40%, transparent)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: 12.5, color: 'var(--danger)', lineHeight: 1.7,
+                }}>{msg}</div>
+              </div>
+            ),
+            footer: (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <Button variant="danger" size="md" onClick={shell.closeModal}>{tr('td.mysql.confirm')}</Button>
+              </div>
+            ),
+          });
+        }
+      },
+    });
+  };
+
+  // 行内菜单项
+  const menuItemsFor = (inst) => [
+    { id: 'sync',    label: tr('td.mysql.menu.sync'),    icon: 'sync',      color: 'var(--info)' },
+    { id: 'bindIp',  label: tr('td.mysql.menu.bindIp'),  icon: 'globe',     color: 'var(--cyan)' },
+    { id: 'reset',   label: tr('td.mysql.menu.reset'),   icon: 'key-round', color: 'var(--orange)' },
+    { id: 'delete',  label: tr('td.mysql.menu.delete'),  icon: 'trash-2',   color: 'var(--danger)' },
+  ];
+
+  const copyOcid = (inst) => {
+    if (!inst.dbId) return;
+    navigator.clipboard.writeText(inst.dbId).then(() => {
+      shell.showToast(tr('td.mysql.toast.copy'), { kind: 'success' });
+    }).catch(() => shell.showToast(tr('td.mysql.toast.err'), { kind: 'error' }));
+  };
+
+  const render = () => {
+    const cols = [
+      { h: tr('td.mysql.col.name'),    w: 150 },
+      { h: tr('td.mysql.col.version'), w: 80 },
+      { h: tr('td.mysql.col.status'),  w: 90 },
+      { h: tr('td.mysql.col.public'),  w: 150 },
+      { h: tr('td.mysql.col.cred'),    w: 200 },
+      { h: tr('td.mysql.col.shape'),   w: 120 },
+      { h: tr('td.mysql.col.storage'), w: 80, align: 'center' },
+      { h: tr('td.mysql.col.ops'),     w: 56, align: 'center' },
+    ];
+
+    shell.openModal({
+      title: tr('td.mysql.title').replace('{0}', getTenantName(tenant)),
+      subtitle: <span><span className="mono">{getTenantName(tenant)}</span> · {row.region} · <span style={{ color: 'var(--fg-2)' }}>{state.instances.length} {tr('td.mysql.subtitle.count')}</span></span>,
+      icon: 'database',
+      iconColor: 'var(--info)',
+      size: 'xl',
+      body: (
+        <div style={{ padding: 18 }}>
+          {/* ── 顶部操作栏 ─────────────────────────── */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14 }}>
+            <Button size="sm" variant="primary" icon="plus" onClick={doCreate}>{tr('td.mysql.create')}</Button>
+            <Button size="sm" variant="outline" icon="refresh-cw" onClick={async () => {
+              try {
+                const r = await window.ociApi.request('/tenants/sync-mysql?tenantId=' + encodeURIComponent(tenantId), { method: 'POST' });
+                const msg = (r && r.message) || tr('td.mysql.toast.syncAll');
+                shell.showToast(msg, { kind: 'success' });
+                load();
+              } catch (e) {
+                shell.showToast(tr('td.mysql.toast.err') + (e.message || e), { kind: 'error' });
+              }
+            }}>{tr('td.mysql.sync')}</Button>
+            <div style={{ flex: 1 }} />
+            <Button size="sm" variant="ghost" icon="refresh-cw" onClick={load}>{tr('td.mysql.refresh')}</Button>
+          </div>
+
+          {/* ── 表格（表头恒定 + 数据区独立加载/空态）────── */}
+          <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflowY: 'auto', maxHeight: 420 }}>
+            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12 }}>
+              <thead>
+                <tr>
+                  {cols.map((c, i) => (
+                    <th key={i} style={{
+                      textAlign: c.align || 'left', padding: '10px 12px', width: c.w,
+                      background: 'var(--bg-2)', color: 'var(--fg-3)',
+                      fontSize: 10.5, fontWeight: 600,
+                      textTransform: 'uppercase', letterSpacing: 0.5,
+                      borderBottom: '1px solid var(--border)',
+                      whiteSpace: 'nowrap',
+                      position: 'sticky', top: 0, zIndex: 1,
+                    }}>{c.h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {state.loading ? (
+                  <tr>
+                    <td colSpan={cols.length} style={{ padding: 48, textAlign: 'center', color: 'var(--fg-3)', fontSize: 11.5 }}>
+                      <Icon name="loader" size={24} style={{ color: 'var(--info)', marginBottom: 8, animation: 'button-spin 800ms linear infinite' }} />
+                      <div>{tr('td.mysql.loading')}</div>
+                    </td>
+                  </tr>
+                ) : state.instances.length === 0 ? (
+                  <tr>
+                    <td colSpan={cols.length} style={{ padding: 48, textAlign: 'center', color: 'var(--fg-3)', fontSize: 12 }}>
+                      <Icon name="database" size={28} style={{ color: 'var(--bg-3)', marginBottom: 8 }} />
+                      <div>{tr('td.mysql.empty')}</div>
+                    </td>
+                  </tr>
+                ) : state.instances.map((inst, i) => {
+                  const revealed = state.revealing === inst.id;
+                  const name = inst.displayName || inst.dbName || tr('td.mysql.unnamed');
+                  const isOpen = state.openMenu?.rowId === inst.id;
+                  return (
+                    <tr key={inst.id} style={{
+                      background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent',
+                    }}>
+                      {/* 名称 · 点击复制 OCID */}
+                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                        <strong
+                          title={inst.dbId ? tr('td.mysql.copyOcid') : ''}
+                          onClick={() => copyOcid(inst)}
+                          style={{ cursor: inst.dbId ? 'pointer' : 'default', color: 'var(--info)' }}
+                        >{name}</strong>
+                      </td>
+                      {/* 版本 */}
+                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                        <span className="mono" style={{ fontSize: 11, color: 'var(--fg-1)' }}>{inst.dbVersion || '-'}</span>
+                      </td>
+                      {/* 状态 */}
+                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          padding: '1px 8px', borderRadius: 3, fontSize: 10.5, fontWeight: 500,
+                          background: inst.dbStatus === 'ACTIVE' ? 'var(--accent-soft)' : 'var(--bg-3)',
+                          color: inst.dbStatus === 'ACTIVE' ? 'var(--accent)' : 'var(--fg-2)',
+                          whiteSpace: 'nowrap',
+                        }}>{inst.dbStatus || '-'}</span>
+                      </td>
+                      {/* 公网/端口 */}
+                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                        <span className="mono" style={{ fontSize: 11, color: inst.dbPublicUrl ? 'var(--info)' : 'var(--fg-3)' }}>
+                          {inst.dbPublicUrl || tr('td.mysql.noPublic')} : {inst.dbPort || '3306'}
+                        </span>
+                      </td>
+                      {/* 账密 · 可切换显隐 */}
+                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <span className="mono" style={{ fontSize: 11, color: 'var(--fg-1)' }}>{inst.dbName || tr('td.mysql.noUser')}</span>
+                          <span style={{ color: 'var(--fg-3)' }}>/</span>
+                          <span className="mono" style={{ fontSize: 11, color: 'var(--cyan)' }}>
+                            {revealed ? (inst.dbPassword || tr('td.mysql.noPassword')) : '•••••••'}
+                          </span>
+                          {inst.dbPassword && (
+                            <button
+                              type="button"
+                              onClick={() => { state.revealing = revealed ? null : inst.id; render(); }}
+                              style={{ background: 'transparent', border: 'none', color: 'var(--fg-3)', cursor: 'pointer', padding: 0, display: 'inline-flex' }}
+                              title={revealed ? tr('td.mysql.hide') : tr('td.mysql.show')}
+                            >
+                              <Icon name={revealed ? 'eye-off' : 'eye'} size={12} />
+                            </button>
+                          )}
+                        </span>
+                      </td>
+                      {/* 规格 */}
+                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                        <span style={{ color: 'var(--fg-1)' }}>{inst.shapeName || '-'}</span>
+                      </td>
+                      {/* 存储 GB */}
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
+                        <span className="num" style={{ color: 'var(--fg-1)' }}>{inst.dataStorageSizeInGBs != null ? inst.dataStorageSizeInGBs : '-'}</span>
+                      </td>
+                      {/* 操作 ⋯ */}
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation();
+                            if (isOpen) { state.openMenu = null; render(); return; }
+                            state.openMenu = { rowId: inst.id, anchorEl: e.currentTarget };
+                            render();
+                          }}
+                          style={{
+                            width: 28, height: 28, borderRadius: 4,
+                            background: isOpen ? 'var(--accent)' : 'var(--bg-2)',
+                            border: '1px solid ' + (isOpen ? 'var(--accent)' : 'var(--border)'),
+                            color: isOpen ? 'var(--accent-fg)' : 'var(--fg-1)',
+                            cursor: 'pointer',
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          }}
+                          title={tr('td.mysql.col.ops')}
+                        >
+                          <Icon name="more-horizontal" size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ── 行操作 · 复用统一的 <RowActionMenu>(portal 到 body,不被弹窗裁剪) ─────── */}
+          {state.openMenu && (() => {
+            const inst = state.instances.find(x => x.id === state.openMenu.rowId);
+            if (!inst) return null;
+            return (
+              <RowActionMenu
+                anchorEl={state.openMenu.anchorEl}
+                width={220}
+                columns={1}
+                header={
+                  <>
+                    <Icon name="database" size={11} style={{ color: 'var(--info)' }} />
+                    <span style={{ color: 'var(--fg-0)' }}>{inst.displayName || inst.dbName || tr('td.mysql.unnamed')}</span>
+                  </>
+                }
+                items={menuItemsFor(inst)}
+                onClose={() => { state.openMenu = null; render(); }}
+                onAction={(id) => {
+                  const it = inst;
+                  state.openMenu = null;
+                  if (id === 'sync') syncSingle(it);
+                  else if (id === 'bindIp') bindPublicIp(it);
+                  else if (id === 'reset') resetAuth(it);
+                  else if (id === 'delete') terminate(it);
+                }}
+              />
+            );
+          })()}
+        </div>
+      ),
+      footer: (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('tenant.625fb2')}</Button>
+        </div>
+      ),
+    });
+  };
+
+  render();
+  load();
 }
 function showStorageModal(shell, tenant, row) {
   // ═══════════════════════════════════════════════════════════════════════
@@ -3881,1540 +4350,7 @@ function MiniMetric({ label, value, color }) {
   );
 }
 
-function useQuotaDrawer() {
-  // ═══════════════════════════════════════════════════════════════════════
-  // 查看配额 · 严格对齐原项目 doubleDimple/oci-start tenant_list.ftl → quotaModal
-  //   服务类型下拉:两组 optgroup
-  //     - 计算存储:compute / block-storage / object-storage
-  //     - 数据库:  mysql / database / autonomous-database / nosql
-  // ═══════════════════════════════════════════════════════════════════════
-  const shell = useShell();
-  return React.useCallback((tenant) => {
-    const serviceGroups = [
-      {
-        label: tr('tenant.fb176e'),
-        items: [
-          { id: 'compute',        label: tr('tenant.809e35'),           icon: 'cpu' },
-          { id: 'block-storage',  label: tr('tenant.e8e48e'),    icon: 'hard-drive' },
-          { id: 'object-storage', label: tr('tenant.ef75b0'), icon: 'database' },
-        ],
-      },
-      {
-        label: tr('tenant.68051b'),
-        items: [
-          { id: 'mysql',                label: 'MySQL HeatWave',              icon: 'database' },
-          { id: 'database',             label: 'Oracle Database (DBCS)',      icon: 'server' },
-          { id: 'autonomous-database',  label: tr('tenant.c2c790'),            icon: 'zap' },
-          { id: 'nosql',                label: 'NoSQL Database',              icon: 'layers' },
-        ],
-      },
-    ];
-    // 扁平化用于查找
-    const services = serviceGroups.flatMap(g => g.items);
-    // 每个服务下的配额项 · 严格按 OCI Service Limit API 命名
-    const quotaData = {
-      compute: [
-        { name: 'Ampere A1 OCPUs',                used: 4,   quota: 4,     unit: 'OCPU' },
-        { name: 'Ampere A1 Memory',               used: 24,  quota: 24,    unit: 'GB' },
-        { name: 'AMD E2.1.Micro Instances',       used: 2,   quota: 2,     unit: tr('tenant.930882') },
-        { name: 'Standard E2 OCPUs',              used: 1,   quota: 8,     unit: 'OCPU' },
-        { name: 'Standard E2 Memory',             used: 8,   quota: 64,    unit: 'GB' },
-        { name: 'VM Standard Intel OCPUs',        used: 0,   quota: 0,     unit: 'OCPU' },
-      ],
-      'block-storage': [
-        { name: tr('tenant.dca845'),              used: 240, quota: 500,  unit: 'GB' },
-        { name: tr('tenant.597b0b'),              used: 8,   quota: 100,   unit: tr('tenant.930882') },
-        { name: tr('tenant.981f41'),               used: 1,   quota: 20,    unit: tr('tenant.930882') },
-      ],
-      'object-storage': [
-        { name: 'Standard Storage',               used: 32,  quota: 200,   unit: 'GB' },
-        { name: tr('tenant.5e4ca0'),                       used: 4,   quota: 20,    unit: tr('tenant.930882') },
-        { name: 'Archive Storage',                used: 0,   quota: 100,   unit: 'GB' },
-      ],
-      mysql: [
-        { name: 'MySQL DB System · Standalone',   used: 0,   quota: 2,     unit: tr('tenant.930882') },
-        { name: 'MySQL DB System · HA',           used: 0,   quota: 1,     unit: tr('tenant.930882') },
-        { name: tr('tenant.284c47'),          used: 0,   quota: 0,     unit: tr('tenant.930882') },
-      ],
-      database: [
-        { name: 'DB System · VM.Standard2 OCPUs', used: 0,   quota: 6,     unit: 'OCPU' },
-        { name: 'Exadata DB System',              used: 0,   quota: 0,     unit: tr('tenant.930882') },
-      ],
-      'autonomous-database': [
-        { name: 'Always Free ATP',                used: 2,   quota: 2,     unit: tr('tenant.930882') },
-        { name: 'Always Free ADW',                used: 0,   quota: 2,     unit: tr('tenant.930882') },
-        { name: 'Paid ADB OCPUs',                 used: 0,   quota: 8,     unit: 'OCPU' },
-      ],
-      nosql: [
-        { name: tr('tenant.b5a3ab'),                used: 0,   quota: 3,     unit: tr('tenant.930882') },
-        { name: tr('tenant.123c7f'),                 used: 0,   quota: 400,   unit: 'RU' },
-        { name: tr('tenant.2067fd'),                used: 0,   quota: 100,   unit: 'WU' },
-      ],
-    };
-    const state = {
-      service: 'compute',
-      tenantId: getTenantDbId(tenant),
-      tenantOptions: [],
-      tenantLoading: false,
-      rows: [],
-      loading: false,
-      queried: false,
-      region: '',
-    };
-
-    const loadTenants = async () => {
-      state.tenantLoading = true;
-      if (typeof render === 'function') render();
-      try {
-        const j = await window.ociApi.request('/tenants/listRegions?parentId=' + encodeURIComponent(getTenantDbId(tenant)));
-        const list = Array.isArray(j) ? j : [];
-        let opts;
-        if (list.length === 0) {
-          opts = [{ id: getTenantDbId(tenant), label: (getTenantName(tenant) || tenantLabel(tenant) || '') + (getTenantRegion(tenant) ? ' (' + getTenantRegion(tenant) + ')' : '') }];
-        } else {
-          opts = list.map(t => ({
-            id: t.id,
-            label: ((t.tenancyName || t.userName || t.tenantId || t.id) || '') + (t.region ? ' (' + t.region + ')' : ''),
-          }));
-        }
-        state.tenantOptions = opts;
-        if (!opts.some(o => String(o.id) === String(state.tenantId))) {
-          state.tenantId = (opts[0] && opts[0].id) || getTenantDbId(tenant);
-        }
-      } catch (e) {
-        state.tenantOptions = [{ id: getTenantDbId(tenant), label: getTenantName(tenant) || tenantLabel(tenant) || '' }];
-      } finally {
-        state.tenantLoading = false;
-        if (typeof render === 'function') render();
-      }
-    };
-
-    const doQuery = async () => {
-      if (!state.tenantId) { shell.showToast(tr('tenant.6554d5'), { kind: 'warn' }); return; }
-      state.loading = true;
-      state.queried = false;
-      if (typeof render === 'function') render();
-      try {
-        const j = await window.ociApi.request('/tenants/quota?tenantId=' + encodeURIComponent(state.tenantId) + '&serviceName=' + encodeURIComponent(state.service) + '&page=0&pageSize=20');
-        if (j && j.error) throw new Error(j.error);
-        state.rows = (Array.isArray(j.items) ? j.items : []);
-        state.region = j.region || '';
-        state.queried = true;
-      } catch (err) {
-        state.rows = [];
-        state.queried = true;
-        shell.showToast(tr('tenant.7ce137') + (err.message || err), { kind: 'error' });
-      } finally {
-        state.loading = false;
-        if (typeof render === 'function') render();
-      }
-    };
-
-    const render = () => {
-      const rows = state.rows;
-      shell.openModal({
-        title: tr('tenant.de63b2'),
-        subtitle: <span><span className="mono">{tenantLabel(tenant)}</span> · {getTenantName(tenant)} · Service Limits</span>,
-        icon: 'bar-chart-3',
-        iconColor: 'var(--accent)',
-        size: 'lg',
-        body: (
-          <div style={{ padding: 16 }}>
-            {/* 顶部筛选 */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: 12,
-              background: 'var(--bg-2)', border: '1px solid var(--border)',
-              borderRadius: 8, marginBottom: 14,
-            }}>
-              <span style={{ fontSize: 11, color: 'var(--fg-3)', fontWeight: 500 }}>{tr('tenant.4787d6')}</span>
-              <CustomDropdown value={state.tenantId}
-                onChange={e => { state.tenantId = e; render(); }} height={32} width="100%">
-                {state.tenantOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-              </CustomDropdown>
-              <span style={{ fontSize: 11, color: 'var(--fg-3)', fontWeight: 500 }}>{tr('tenant.924f67')}</span>
-              <CustomDropdown value={state.service}
-                onChange={e => { state.service = e; render(); }} height={32} width="100%">
-                {serviceGroups.map(g => (
-                  <optgroup key={g.label} label={g.label}>
-                    {g.items.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-                  </optgroup>
-                ))}
-              </CustomDropdown>
-              <div style={{ flex: 1 }} />
-              <Button size="sm" variant="primary" icon="search"
-                loading={state.loading}
-                onClick={() => doQuery()}
-              >{tr('tenant.bee912')}</Button>
-            </div>
-
-            {/* 配额表格 */}
-            <div style={{
-              border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden',
-              background: 'var(--bg-1)',
-            }}>
-              <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12 }}>
-                <thead>
-                  <tr>
-                    {[
-                      { h: tr('tenant.124904') },
-                      { h: tr('tenant.df8f74'), w: 200, align: 'center' },
-                      { h: tr('tenant.ad6b70'),      w: 120, align: 'center' },
-                      { h: tr('tenant.41d8b2'),    w: 200 },
-                      { h: tr('tenant.3fea7c'),      w: 100, align: 'center' },
-                    ].map((c, i) => (
-                      <th key={i} style={{
-                        textAlign: c.align || 'left', padding: '10px 14px', width: c.w,
-                        background: 'var(--bg-2)', color: 'var(--fg-3)',
-                        fontSize: 10.5, fontWeight: 600,
-                        textTransform: 'uppercase', letterSpacing: 0.5,
-                        borderBottom: '1px solid var(--border)',
-                      }}>{c.h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} style={{ padding: 40, textAlign: 'center', color: 'var(--fg-3)', fontSize: 12 }}>
-                        <Icon name="inbox" size={26} style={{ color: 'var(--fg-3)', marginBottom: 6 }} />
-                        <div>{tr('tenant.ffc6f2')}</div>
-                      </td>
-                    </tr>
-                  ) : rows.map((r, i) => {
-                    const total = Number(r.total || 0);
-                    const used = Number(r.used || 0);
-                    const avail = Number(r.available || 0);
-                    const pct = total > 0 ? Math.round((used / total) * 100) : 0;
-                    const status = avail <= 0 ? 'exceeded' : (total > 0 && avail < total * 0.2) ? 'warning' : 'ok';
-                    const statusCfg = {
-                      ok:       { label: tr('tenant.fd6e80'), color: 'var(--accent)', bg: 'var(--accent-soft)' },
-                      warning:  { label: tr('tenant.a3a249'), color: 'var(--orange)', bg: 'var(--orange-soft)' },
-                      exceeded: { label: tr('tenant.535023'), color: 'var(--danger)', bg: 'var(--danger-soft)' },
-                    }[status];
-                    const barColor = pct >= 100 ? 'var(--danger)' : pct >= 80 ? 'var(--orange)' : 'var(--accent)';
-                    return (
-                      <tr key={i} style={{ background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent' }}>
-                        <td style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', color: 'var(--fg-0)' }}>
-                          <span style={{ fontSize: 12 }}>{r.name}</span>
-                        </td>
-                        <td style={{ padding: '10px 14px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-                          <span className="num mono" style={{ fontSize: 12, color: 'var(--fg-0)', fontWeight: 500 }}>
-                            {used} / {total}
-                          </span>
-                        </td>
-                        <td style={{ padding: '10px 14px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-                          <span className="num mono" style={{ fontSize: 12, color: 'var(--fg-1)', fontWeight: 500 }}>{avail}</span>
-                        </td>
-                        <td style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ flex: 1, height: 8, background: 'var(--bg-3)', borderRadius: 4, overflow: 'hidden' }}>
-                              <div style={{ width: Math.min(100, pct) + '%', height: '100%', background: barColor, transition: 'width 400ms' }} />
-                            </div>
-                            <span className="num mono" style={{ fontSize: 11, color: barColor, fontWeight: 600, width: 38, textAlign: 'right' }}>{pct}%</span>
-                          </div>
-                        </td>
-                        <td style={{ padding: '10px 14px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-                          <span style={{
-                            padding: '2px 8px', borderRadius: 3, fontSize: 10.5, fontWeight: 500,
-                            background: statusCfg.bg, color: statusCfg.color,
-                          }}>{statusCfg.label}</span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* 提示 */}
-            <div style={{
-              padding: '10px 12px', marginTop: 12,
-              background: 'var(--info-soft)', border: '1px solid var(--info)',
-              borderRadius: 6, fontSize: 11, color: 'var(--info)',
-            }}>
-              <Icon name="info" size={11} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-              {tr('tenant.d67864')} <b>Service Limit Increase</b> {tr('tenant.7c1661')}
-            </div>
-          </div>
-        ),
-        footer: <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('tenant.b15d91')}</Button>,
-      });
-    };
-    render();
-    loadTenants();
-  }, [shell]);
-}
-
-function useCostDrawer() {
-  // ═══════════════════════════════════════════════════════════════════════
-  // 账号花费 · 严格对齐原项目 doubleDimple/oci-start oci_cost.ftl
-  //   - 时间筛选:今日 / 本月 / 自定义(展开开始/结束 date)
-  //   - 5 张统计卡:总费用 / 计算 / 存储 / 网络 / 其他 (cost.totalCost / cal / save / net / other)
-  //   - 每日费用趋势图(SVG 平滑曲线,替代原项目 ECharts)
-  //   - 5 列明细表:day / resourceType / skuName / resourceId / cost
-  //   - "只显示正费用"过滤 + 客户端分页
-  // ═══════════════════════════════════════════════════════════════════════
-  const shell = useShell();
-  return React.useCallback((tenant) => {
-
-    // ─── 真实后端 · 费用明细(POST /cost/query → CloudCostItem 列表) ────
-    // 与原项目字段对齐:day / resourceType / skuName / resourceId / cost
-    const CAT_OF = { COMPUTE: 'compute', BLOCK_STORAGE: 'storage', OBJECT_STORAGE: 'storage', NETWORK: 'network', OTHER: 'other' };
-    const today = new Date().toISOString().slice(0, 10);
-    const monthStart = today.slice(0, 8) + '01';
-
-    const state = {
-      preset: 'month',           // today | month | custom
-      startDate: monthStart,
-      endDate: today,
-      positiveOnly: false,       // 只显示正费用(cost > 0)
-      page: 1,
-      pageSize: 10,
-      loading: false,
-      queried: false,
-      rows: [],
-    };
-
-    const loadRows = async (s, e) => {
-      state.loading = true;
-      state.queried = false;
-      if (typeof render === 'function') render();
-      try {
-        const j = await window.ociApi.request('/cost/query', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tenantId: getTenantDbId(tenant), startDate: s, endDate: e }),
-        });
-        const list = (j && Array.isArray(j.data)) ? j.data : [];
-        state.rows = list.map(r => ({
-          day: r.day, resourceType: r.resourceType, skuName: r.skuName,
-          resourceId: r.resourceId, cost: Number(r.cost || 0),
-        }));
-        state.page = 1;
-        state.queried = true;
-      } catch (err) {
-        state.rows = [];
-        state.queried = true;
-        shell.showToast(tr('tenant.1c6c6a') + (err.message || err), { kind: 'error' });
-      } finally {
-        state.loading = false;
-        if (typeof render === 'function') render();
-      }
-    };
-
-    const runQuery = () => {
-      let s, e;
-      if (state.preset === 'today') { s = today; e = today; }
-      else if (state.preset === 'month') { s = monthStart; e = today; }
-      else { s = state.startDate; e = state.endDate; }
-      if (new Date(s) > new Date(e)) {
-        shell.showToast(tr('tenant.f3e0fa'), { kind: 'error' });
-        return;
-      }
-      state.startDate = s;
-      state.endDate = e;
-      loadRows(s, e);
-    };
-
-    // ─── 计算 5 张统计卡数据(总/计算/存储/网络/其他) ─────
-    const compStats = () => {
-      const stats = { total: 0, compute: 0, storage: 0, network: 0, other: 0 };
-      state.rows.forEach(r => {
-        stats.total += r.cost;
-        stats[CAT_OF[r.resourceType] || 'other'] += r.cost;
-      });
-      return stats;
-    };
-    // ─── 生成每日趋势数据 ─────────────────────────────
-    const compTrend = () => {
-      const byDay = new Map();
-      state.rows.forEach(r => { byDay.set(r.day, (byDay.get(r.day) || 0) + r.cost); });
-      return Array.from(byDay.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-    };
-    const exportCost = () => {
-      try {
-        downloadCsv(`cost_${getTenantDbId(tenant)}_${state.startDate}_${state.endDate}.csv`,
-          ['day', 'resourceType', 'skuName', 'resourceId', 'cost'], state.rows);
-        shell.showToast(tr('tenant.d3b40e'), { kind: 'success' });
-      } catch (error) {
-        shell.showToast(error.message, { kind: 'warn' });
-      }
-    };
-
-    const render = () => {
-      const stats = compStats();
-      const trend = compTrend();
-      // 明细过滤 + 分页
-      const filtered = state.positiveOnly ? state.rows.filter(r => r.cost > 0) : state.rows;
-      const total = filtered.length;
-      const totalPages = Math.max(1, Math.ceil(total / state.pageSize));
-      if (state.page > totalPages) state.page = totalPages;
-      const pageRows = filtered.slice((state.page - 1) * state.pageSize, state.page * state.pageSize);
-
-      // 趋势图 SVG
-      const trendW = 700, trendH = 160, padL = 40, padR = 12, padT = 12, padB = 22;
-      const trendMax = Math.max(0.001, ...trend.map(p => p[1]));
-      const trendMin = 0;
-      const xStep = trend.length > 1 ? (trendW - padL - padR) / (trend.length - 1) : 0;
-      const yScale = (v) => padT + (trendH - padT - padB) * (1 - (v - trendMin) / (trendMax - trendMin));
-      const points = trend.map((p, i) => [padL + i * xStep, yScale(p[1])]);
-      // Catmull-Rom → cubic Bezier
-      const smoothPath = (() => {
-        if (points.length < 2) return '';
-        let d = `M ${points[0][0]} ${points[0][1]}`;
-        for (let i = 0; i < points.length - 1; i++) {
-          const p0 = points[Math.max(0, i - 1)];
-          const p1 = points[i];
-          const p2 = points[i + 1];
-          const p3 = points[Math.min(points.length - 1, i + 2)];
-          const cp1x = p1[0] + (p2[0] - p0[0]) / 6;
-          const cp1y = p1[1] + (p2[1] - p0[1]) / 6;
-          const cp2x = p2[0] - (p3[0] - p1[0]) / 6;
-          const cp2y = p2[1] - (p3[1] - p1[1]) / 6;
-          d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2[0]} ${p2[1]}`;
-        }
-        return d;
-      })();
-      const areaPath = smoothPath + (points.length ? ` L ${points[points.length-1][0]} ${trendH - padB} L ${points[0][0]} ${trendH - padB} Z` : '');
-
-      // ─── 统计卡定义(5 张,对齐原项目 totalCost / cal / save / net / other) ───
-      const cards = [
-        { key: 'total',   label: tr('tenant.136f63'), icon: 'coins',          value: stats.total,   color: 'var(--accent)' },
-        { key: 'compute', label: tr('tenant.35b4b4'),   icon: 'server',         value: stats.compute, color: 'var(--info)' },
-        { key: 'storage', label: tr('tenant.a39cf1'),   icon: 'hard-drive',     value: stats.storage, color: 'var(--violet)' },
-        { key: 'network', label: tr('tenant.7ddbe1'),   icon: 'globe',          value: stats.network, color: 'var(--cyan)' },
-        { key: 'other',   label: tr('tenant.0d98c7'),   icon: 'more-horizontal',value: stats.other,   color: 'var(--fg-2)' },
-      ];
-      const resourceTypeColor = {
-        COMPUTE:        'var(--info)',
-        BLOCK_STORAGE:  'var(--violet)',
-        OBJECT_STORAGE: 'var(--violet)',
-        NETWORK:        'var(--cyan)',
-        OTHER:          'var(--fg-2)',
-      };
-
-      shell.openModal({
-        title: tr('tenant.d941b5'),
-        subtitle: <span><span className="mono">{tenantLabel(tenant)}</span> · {getTenantName(tenant)}</span>,
-        icon: 'dollar-sign',
-        iconColor: 'var(--accent)',
-        size: 'xl',
-        body: (
-          <div style={{ padding: 16 }}>
-            {/* ── 筛选栏:时间预设 + 自定义日期 + 查询 ─────────────────── */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              padding: 12,
-              background: 'var(--bg-2)',
-              border: '1px solid var(--border)',
-              borderRadius: 8,
-              marginBottom: 14,
-              flexWrap: 'wrap',
-            }}>
-              <span style={{ fontSize: 11, color: 'var(--fg-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 }}>{tr('tenant.cd649f')}</span>
-              <div style={{ display: 'inline-flex', background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 6, padding: 2 }}>
-                {[
-                  { id: 'today',  label: tr('tenant.296304') },
-                  { id: 'month',  label: tr('tenant.0ec94a') },
-                  { id: 'custom', label: tr('tenant.f1d4ff') },
-                ].map(p => (
-                  <button key={p.id}
-                    onClick={() => { state.preset = p.id; render(); }}
-                    style={{
-                      padding: '5px 14px',
-                      background: state.preset === p.id ? 'var(--accent)' : 'transparent',
-                      color: state.preset === p.id ? 'var(--accent-fg)' : 'var(--fg-1)',
-                      border: 'none', borderRadius: 4, cursor: 'pointer',
-                      fontSize: 12, fontWeight: state.preset === p.id ? 600 : 400,
-                      fontFamily: 'inherit',
-                      transition: 'background 120ms',
-                    }}
-                  >{p.label}</button>
-                ))}
-              </div>
-
-              {state.preset === 'custom' && (
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <input type="date" value={state.startDate}
-                    onChange={e => { state.startDate = e.target.value; render(); }}
-                    style={{
-                      padding: '5px 8px', fontSize: 12,
-                      background: 'var(--bg-1)', color: 'var(--fg-0)',
-                      border: '1px solid var(--border)', borderRadius: 4,
-                      fontFamily: 'inherit', colorScheme: 'dark',
-                    }}
-                  />
-                  <span style={{ color: 'var(--fg-3)', fontSize: 12 }}>{tr('tenant.981cbe')}</span>
-                  <input type="date" value={state.endDate}
-                    onChange={e => { state.endDate = e.target.value; render(); }}
-                    style={{
-                      padding: '5px 8px', fontSize: 12,
-                      background: 'var(--bg-1)', color: 'var(--fg-0)',
-                      border: '1px solid var(--border)', borderRadius: 4,
-                      fontFamily: 'inherit', colorScheme: 'dark',
-                    }}
-                  />
-                </div>
-              )}
-
-              <div style={{ flex: 1 }} />
-              <Button size="sm" variant="primary" icon="search" onClick={runQuery}>{tr('tenant.bee912')}</Button>
-            </div>
-
-            {/* ── 5 张统计卡:总费用 / 计算 / 存储 / 网络 / 其他 ───────── */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(5, 1fr)',
-              gap: 8, marginBottom: 14,
-            }}>
-              {cards.map(c => (
-                <div key={c.key} style={{
-                  padding: 12,
-                  background: 'var(--bg-1)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 8,
-                  position: 'relative', overflow: 'hidden',
-                }}>
-                  <div style={{ position: 'absolute', top: 8, right: 8, opacity: 0.15 }}>
-                    <Icon name={c.icon} size={26} style={{ color: c.color }} />
-                  </div>
-                  <div style={{ fontSize: 10.5, color: 'var(--fg-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>{c.label}</div>
-                  <div className="num" style={{
-                    fontSize: c.key === 'total' ? 20 : 18,
-                    fontWeight: 700, color: c.color,
-                    marginTop: 4, letterSpacing: -0.3,
-                  }}>{'$' + c.value.toFixed(4)}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* ── 每日费用趋势图 ─────────────────────────────────────── */}
-            <div style={{
-              background: 'var(--bg-1)',
-              border: '1px solid var(--border)',
-              borderRadius: 8,
-              padding: '12px 14px 6px',
-              marginBottom: 14,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-0)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Icon name="trending-up" size={13} style={{ color: 'var(--accent)' }} />
-                  {tr('tenant.753ee6')}
-                </div>
-                <div style={{ fontSize: 10.5, color: 'var(--fg-3)' }} className="mono">
-                  {state.startDate} → {state.endDate} · {trend.length} {tr('tenant.249aba')}
-                </div>
-              </div>
-              <div style={{ position: 'relative' }}>
-                <svg viewBox={`0 0 ${trendW} ${trendH}`} preserveAspectRatio="none" style={{ width: '100%', height: 160, display: 'block' }}>
-                  <defs>
-                    <linearGradient id="costTrendFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.35" />
-                      <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                  {/* Y-axis grid */}
-                  {[0, 0.25, 0.5, 0.75, 1].map((t, i) => (
-                    <line key={i}
-                      x1={padL} x2={trendW - padR}
-                      y1={padT + (trendH - padT - padB) * t}
-                      y2={padT + (trendH - padT - padB) * t}
-                      stroke="var(--border)" strokeWidth="1" strokeDasharray={i > 0 && i < 4 ? '2 3' : '0'} />
-                  ))}
-                  {/* Y-axis labels */}
-                  {[0, 0.25, 0.5, 0.75, 1].map((t, i) => (
-                    <text key={i}
-                      x={padL - 6} y={padT + (trendH - padT - padB) * (1 - t) + 3}
-                      textAnchor="end" fontSize="9" fill="var(--fg-3)" className="mono">
-                      {'$' + (trendMax * t).toFixed(2)}
-                    </text>
-                  ))}
-                  {/* Area */}
-                  {points.length > 1 && <path d={areaPath} fill="url(#costTrendFill)" />}
-                  {/* Line */}
-                  {points.length > 1 && <path d={smoothPath} fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />}
-                  {/* Dots */}
-                  {points.map((p, i) => (
-                    <circle key={i} cx={p[0]} cy={p[1]} r="2.2" fill="var(--accent)" />
-                  ))}
-                  {/* X labels(首尾+中间) */}
-                  {trend.length > 0 && [0, Math.floor(trend.length / 2), trend.length - 1].filter((v, i, a) => a.indexOf(v) === i).map((idx, i) => (
-                    <text key={i}
-                      x={padL + idx * xStep}
-                      y={trendH - 6}
-                      textAnchor="middle" fontSize="9" fill="var(--fg-3)" className="mono">
-                      {trend[idx][0].slice(5)}
-                    </text>
-                  ))}
-                </svg>
-              </div>
-            </div>
-
-            {/* ── 费用明细表(5 列:日期/资源类型/SKU/资源ID/费用) ─────────── */}
-            <div style={{
-              background: 'var(--bg-1)',
-              border: '1px solid var(--border)',
-              borderRadius: 8,
-              overflow: 'hidden',
-            }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '10px 14px', borderBottom: '1px solid var(--border)',
-                background: 'var(--bg-2)',
-              }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-0)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Icon name="list" size={13} style={{ color: 'var(--fg-2)' }} />
-                  {tr('tenant.db39f3')} <span className="num" style={{ color: 'var(--fg-3)', fontWeight: 400, marginLeft: 4 }}>({total})</span>
-                </div>
-                <button onClick={() => { state.positiveOnly = !state.positiveOnly; state.page = 1; render(); }}
-                  style={{
-                    padding: '4px 10px',
-                    background: state.positiveOnly ? 'var(--accent-soft)' : 'var(--bg-1)',
-                    color: state.positiveOnly ? 'var(--accent)' : 'var(--fg-1)',
-                    border: '1px solid ' + (state.positiveOnly ? 'var(--accent)' : 'var(--border)'),
-                    borderRadius: 4, cursor: 'pointer',
-                    fontSize: 11, fontWeight: 500, fontFamily: 'inherit',
-                    display: 'inline-flex', alignItems: 'center', gap: 5,
-                  }}>
-                  <Icon name={state.positiveOnly ? 'check-circle' : 'filter'} size={11} />
-                  {state.positiveOnly ? tr('tenant.436e34') : tr('tenant.c6d13c')}
-                </button>
-              </div>
-
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', minWidth: 780, borderCollapse: 'separate', borderSpacing: 0, fontSize: 12 }}>
-                  <thead>
-                    <tr>
-                      {[
-                        { h: tr('tenant.4ff1e7'),       w: 108 },
-                        { h: tr('tenant.14871a'),   w: 130 },
-                        { h: tr('tenant.de2cb8') },
-                        { h: tr('tenant.044449'),    w: 220 },
-                        { h: tr('tenant.01d4e8'), w: 100, align: 'right' },
-                      ].map((c, i) => (
-                        <th key={i} style={{
-                          textAlign: c.align || 'left', padding: '9px 14px', width: c.w,
-                          background: 'var(--bg-2)', color: 'var(--fg-3)',
-                          fontSize: 10.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
-                          borderBottom: '1px solid var(--border)',
-                          position: 'sticky', top: 0,
-                        }}>{c.h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pageRows.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} style={{ padding: 50, textAlign: 'center', color: 'var(--fg-3)', fontSize: 12 }}>
-                          <Icon name="inbox" size={28} style={{ color: 'var(--fg-3)', marginBottom: 6 }} />
-                          <div>{state.queried ? tr('tenant.f0869f') : tr('tenant.ddc4a9')}</div>
-                        </td>
-                      </tr>
-                    ) : pageRows.map((r, i) => (
-                      <tr key={i} style={{ background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent' }}>
-                        <td style={{ padding: '9px 14px', borderBottom: '1px solid var(--border)', color: 'var(--fg-2)' }}>
-                          <span className="mono" style={{ fontSize: 11 }}>{r.day}</span>
-                        </td>
-                        <td style={{ padding: '9px 14px', borderBottom: '1px solid var(--border)' }}>
-                          <span style={{
-                            padding: '2px 8px', borderRadius: 3,
-                            background: 'color-mix(in oklab, ' + (resourceTypeColor[r.resourceType] || 'var(--fg-2)') + ' 18%, transparent)',
-                            color: resourceTypeColor[r.resourceType] || 'var(--fg-2)',
-                            fontSize: 10, fontWeight: 600, letterSpacing: 0.4,
-                          }} className="mono">{r.resourceType}</span>
-                        </td>
-                        <td style={{ padding: '9px 14px', borderBottom: '1px solid var(--border)', color: 'var(--fg-0)' }}>
-                          <span title={r.skuName} style={{ fontSize: 11.5 }}>{r.skuName}</span>
-                        </td>
-                        <td style={{ padding: '9px 14px', borderBottom: '1px solid var(--border)' }}>
-                          <span className="mono" title={r.resourceId} style={{
-                            fontSize: 10.5, color: 'var(--fg-2)',
-                            display: 'inline-block', maxWidth: 200,
-                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                            verticalAlign: 'middle',
-                          }}>{r.resourceId}</span>
-                        </td>
-                        <td style={{ padding: '9px 14px', borderBottom: '1px solid var(--border)', textAlign: 'right' }}>
-                          <span className="num" style={{
-                            fontSize: 12,
-                            fontWeight: r.cost > 0 ? 600 : 400,
-                            color: r.cost > 0 ? 'var(--accent)' : 'var(--fg-3)',
-                          }}>{'$' + r.cost.toFixed(4)}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* 分页 */}
-              {total > state.pageSize && (
-                <div style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '8px 14px', borderTop: '1px solid var(--border)',
-                  background: 'var(--bg-2)',
-                }}>
-                  <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-                    {tr('tenant.fbd2b1')} <span className="num" style={{ color: 'var(--fg-1)', fontWeight: 600 }}>{total}</span> {tr('tenant.b576e1')} <span className="num" style={{ color: 'var(--fg-1)' }}>{state.page}</span> / <span className="num">{totalPages}</span> {tr('tenant.5fccd0')}
-                  </div>
-                  <div style={{ display: 'inline-flex', gap: 4 }}>
-                    <button onClick={() => { if (state.page > 1) { state.page--; render(); } }}
-                      disabled={state.page <= 1}
-                      style={{
-                        padding: '4px 10px', background: 'var(--bg-1)',
-                        color: state.page <= 1 ? 'var(--fg-3)' : 'var(--fg-1)',
-                        border: '1px solid var(--border)', borderRadius: 4,
-                        cursor: state.page <= 1 ? 'not-allowed' : 'pointer',
-                        fontSize: 11, fontFamily: 'inherit',
-                      }}>{tr('tenant.f4f853')}</button>
-                    <button onClick={() => { if (state.page < totalPages) { state.page++; render(); } }}
-                      disabled={state.page >= totalPages}
-                      style={{
-                        padding: '4px 10px', background: 'var(--bg-1)',
-                        color: state.page >= totalPages ? 'var(--fg-3)' : 'var(--fg-1)',
-                        border: '1px solid var(--border)', borderRadius: 4,
-                        cursor: state.page >= totalPages ? 'not-allowed' : 'pointer',
-                        fontSize: 11, fontFamily: 'inherit',
-                      }}>{tr('tenant.b4e1b5')}</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        ),
-        footer: (
-          <>
-            <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('tenant.b15d91')}</Button>
-            <Button variant="outline" size="md" icon="download"
-              onClick={exportCost}
-            >{tr('tenant.1add12')}</Button>
-          </>
-        ),
-      });
-    };
-
-    render();
-    loadRows(monthStart, today);
-  }, [shell]);
-}
-
-function useTrafficDrawer() {
-  // ═══════════════════════════════════════════════════════════════════════
-  // 流量查询 · 严格对齐原项目 doubleDimple/oci-start oci_monitor.ftl
-  //   /monitor/homePage?tenantId=xxx 的整页设计,在这里以 xl modal 呈现
-  // ═══════════════════════════════════════════════════════════════════════
-  // - 区域多选筛选 + 时间预设(今日/本月/自定义)+ 日期范围
-  // - 4 张统计卡:总流量 / 入站流量 / 出站流量 / 预警阈值
-  // - 3 个占比进度环:总流量占比 / 入站占比 / 出站占比
-  // - 2 个趋势图:总体流量趋势(折线) · 实例展示流量趋势(堆叠柱)
-  const shell = useShell();
-  return React.useCallback((tenant) => {
-    // 该租户可选区域
-    const availableRegions = [
-      getTenantRegion(tenant),
-      ...(Array.isArray(tenant.children) ? tenant.children.map(getTenantRegion) : []),
-    ].filter(Boolean).filter((code, index, list) => list.indexOf(code) === index);
-
-    const state = {
-      selectedRegions: [getTenantRegion(tenant)],
-      timePreset: 'month',            // today | month | custom
-      startDate: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().slice(0, 10),
-      endDate: new Date().toISOString().slice(0, 10),
-      regionMenuOpen: false,
-      threshold: 10, // TB (预警阈值)
-      instanceData: [],
-      trendPts: [],
-      loading: false,
-      loaded: false,
-    };
-
-    const dayCount = () => {
-      if (state.timePreset === 'today') return 1;
-      if (state.timePreset === 'month') return 30;
-      const d1 = new Date(state.startDate).getTime();
-      const d2 = new Date(state.endDate).getTime();
-      return Math.max(1, Math.round((d2 - d1) / (24 * 3600 * 1000)) + 1);
-    };
-
-    // 真实后端 · 统计(POST /monitor/api/instances/traffic → InstanceTrafficVO)
-    const computeStats = () => {
-      const rows = state.instanceData;
-      const total = rows.reduce((a, r) => a + r.in + r.out, 0);
-      const inT = rows.reduce((a, r) => a + r.in, 0);
-      const outT = rows.reduce((a, r) => a + r.out, 0);
-      const threshold = state.threshold;
-      return {
-        total: total,
-        in: inT,
-        out: outT,
-        threshold: threshold,
-        totalPct: Math.min(100, (total / threshold) * 100),
-        inPct: total > 0 ? (inT / total) * 100 : 0,
-        outPct: total > 0 ? (outT / total) * 100 : 0,
-      };
-    };
-
-    const fmtTraffic = (v) => v >= 1 ? `${v.toFixed(2)} TB` : `${(v * 1000).toFixed(1)} GB`;
-    const regionShortName = (code) => {
-      const r = REGIONS.find(x => x.code === code);
-      if (!r) return code;
-      const m = getRegionSimpleName(r).match(/\(([^)]+)\)$/);
-      return m ? m[1] : getRegionSimpleName(r);
-    };
-
-    // 折线数据(真实后端趋势,单位 GB)
-    const genTrendData = () => state.trendPts;
-
-    // 实例流量(每实例总量,已换算为 TB)
-    const genInsData = () => state.instanceData;
-
-    const resolvedRange = () => {
-      if (state.timePreset === 'today') {
-        const d = new Date().toISOString().slice(0, 10);
-        return { start: d, end: d };
-      }
-      if (state.timePreset === 'month') {
-        const now = new Date();
-        const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-        return { start: start, end: now.toISOString().slice(0, 10) };
-      }
-      return { start: state.startDate, end: state.endDate };
-    };
-
-    const loadTraffic = async () => {
-      const { start, end } = resolvedRange();
-      state.loading = true;
-      state.loaded = false;
-      render();
-      try {
-        const j = await window.ociApi.request('/monitor/api/instances/traffic', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tenantIds: [getTenantDbId(tenant)], startDate: start, endDate: end, period: 'day' }),
-        });
-        const list = Array.isArray(j) ? j : [];
-        state.instanceData = list.map(v => ({
-          name: v.displayName || v.instanceName || v.instanceId || tr('tenant.480c21'),
-          in: Number(v.ingressBytes || 0) / 1e12,
-          out: Number(v.egressBytes || 0) / 1e12,
-        }));
-      } catch (err) {
-        state.instanceData = [];
-        shell.showToast(tr('tenant.d920e8') + (err.message || err), { kind: 'error' });
-      }
-      try {
-        const t = await window.ociApi.request('/monitor/api/instances/traffic/trend', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tenantIds: [getTenantDbId(tenant)], startDate: start, endDate: end }),
-        });
-        state.trendPts = (t && Array.isArray(t.traffic)) ? t.traffic.map(x => Number(x || 0) / 1024) : [];
-      } catch (err) {
-        state.trendPts = [];
-      }
-      state.loaded = true;
-      state.loading = false;
-      render();
-    };
-
-    const exportTraffic = () => {
-      try {
-        downloadCsv(`traffic_${getTenantDbId(tenant)}.csv`, ['name', 'in', 'out'], state.instanceData);
-        shell.showToast(tr('tenant.7da992'), { kind: 'success' });
-      } catch (error) {
-        shell.showToast(error.message, { kind: 'warn' });
-      }
-    };
-
-    const render = () => {
-      const s = computeStats();
-      const trendPts = genTrendData();
-      const trendMax = Math.max(...trendPts, 0.001);
-      const insData = genInsData();
-      const insMax = Math.max(...insData.map(x => x.in + x.out), 0.001);
-
-      shell.openModal({
-        title: tr('tenant.40e0f9'),
-        subtitle: <span><span className="mono">{tenantLabel(tenant)}</span> · {getTenantName(tenant)} · <span className="mono" style={{ color: 'var(--fg-3)' }}>/monitor/homePage</span></span>,
-        icon: 'bar-chart-3',
-        iconColor: 'var(--cyan)',
-        size: 'xl',
-        body: (
-          <div style={{ padding: 16 }}>
-            {/* ── 筛选栏 ─────────────────────────────── */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: 12,
-              background: 'var(--bg-2)',
-              border: '1px solid var(--border)',
-              borderRadius: 8,
-              marginBottom: 14,
-              flexWrap: 'wrap',
-            }}>
-              {/* 区域多选 */}
-              <div style={{ position: 'relative' }}>
-                <button type="button"
-                  onClick={() => { state.regionMenuOpen = !state.regionMenuOpen; render(); }}
-                  style={{
-                    padding: '6px 10px',
-                    background: state.regionMenuOpen ? 'var(--bg-3)' : 'var(--bg-1)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 5,
-                    color: 'var(--fg-1)', cursor: 'pointer',
-                    fontSize: 12,
-                    display: 'inline-flex', alignItems: 'center', gap: 6,
-                    minWidth: 200,
-                  }}
-                >
-                  <Icon name="globe" size={13} style={{ color: 'var(--fg-2)' }} />
-                  {state.selectedRegions.length === 0
-                    ? <span style={{ color: 'var(--fg-3)' }}>{tr('tenant.f26489')}</span>
-                    : state.selectedRegions.length === 1
-                      ? <span>{regionShortName(state.selectedRegions[0])}</span>
-                      : <span>{tr('tenant.7bf54e')} <span className="num" style={{ color: 'var(--accent)', fontWeight: 600 }}>{state.selectedRegions.length}</span> {tr('tenant.82c9cb')}</span>
-                  }
-                  <div style={{ flex: 1 }} />
-                  <Icon name="chevron-down" size={12} style={{ transform: state.regionMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
-                </button>
-                {state.regionMenuOpen && (
-                  <div style={{
-                    position: 'absolute', top: 'calc(100% + 4px)', left: 0,
-                    minWidth: 260,
-                    background: 'var(--bg-1)',
-                    border: '1px solid var(--border-strong)',
-                    borderRadius: 6,
-                    boxShadow: '0 12px 32px rgba(0,0,0,0.5)',
-                    zIndex: 10,
-                    padding: 4,
-                  }}>
-                    {availableRegions.map(code => {
-                      const on = state.selectedRegions.includes(code);
-                      return (
-                        <label key={code} style={{
-                          display: 'flex', alignItems: 'center', gap: 8,
-                          padding: '7px 10px',
-                          background: on ? 'var(--accent-soft)' : 'transparent',
-                          color: on ? 'var(--accent)' : 'var(--fg-1)',
-                          borderRadius: 4, cursor: 'pointer',
-                          fontSize: 12,
-                        }}>
-                          <input type="checkbox" checked={on}
-                            onChange={() => {
-                              if (on) state.selectedRegions = state.selectedRegions.filter(x => x !== code);
-                              else state.selectedRegions = [...state.selectedRegions, code];
-                              render();
-                            }}
-                            style={{ accentColor: 'var(--accent)' }}
-                          />
-                          <RegionBadge code={code} lang="zh" />
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>{tr('tenant.db260d')}</span>
-
-              {/* 时间预设按钮 */}
-              <div style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 5, overflow: 'hidden' }}>
-                {[
-                  { id: 'today', label: tr('tenant.296304') },
-                  { id: 'month', label: tr('tenant.0ec94a') },
-                  { id: 'custom', label: tr('tenant.f1d4ff') },
-                ].map((p, i, arr) => {
-                  const on = state.timePreset === p.id;
-                  return (
-                    <button key={p.id} type="button"
-                      onClick={() => { state.timePreset = p.id; render(); }}
-                      style={{
-                        padding: '6px 14px',
-                        background: on ? 'var(--accent)' : 'var(--bg-1)',
-                        color: on ? 'var(--accent-fg)' : 'var(--fg-1)',
-                        border: 'none',
-                        borderRight: i < arr.length - 1 ? '1px solid var(--border)' : 'none',
-                        cursor: 'pointer',
-                        fontFamily: 'inherit', fontSize: 12,
-                        fontWeight: on ? 600 : 500,
-                        transition: 'background 100ms',
-                      }}
-                    >{p.label}</button>
-                  );
-                })}
-              </div>
-
-              {/* 自定义日期选择 */}
-              {state.timePreset === 'custom' && (
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <input type="date" value={state.startDate}
-                    onChange={e => { state.startDate = e.target.value; render(); }}
-                    style={{
-                      padding: '5px 8px', background: 'var(--bg-1)', border: '1px solid var(--border)',
-                      borderRadius: 4, color: 'var(--fg-0)', fontFamily: 'var(--font-mono)', fontSize: 11,
-                    }}
-                  />
-                  <span style={{ color: 'var(--fg-3)' }}>—</span>
-                  <input type="date" value={state.endDate}
-                    onChange={e => { state.endDate = e.target.value; render(); }}
-                    style={{
-                      padding: '5px 8px', background: 'var(--bg-1)', border: '1px solid var(--border)',
-                      borderRadius: 4, color: 'var(--fg-0)', fontFamily: 'var(--font-mono)', fontSize: 11,
-                    }}
-                  />
-                </div>
-              )}
-
-              <div style={{ flex: 1 }} />
-
-              <Button size="sm" variant="primary" icon="search" loading={state.loading} onClick={() => {
-                if (state.selectedRegions.length === 0) { shell.showToast(tr('tenant.2235fa'), { kind: 'warn' }); return; }
-                if (state.timePreset === 'custom') {
-                  if (new Date(state.startDate) > new Date(state.endDate)) { shell.showToast(tr('tenant.b6a697'), { kind: 'warn' }); return; }
-                  const diff = (new Date(state.endDate) - new Date(state.startDate)) / (24 * 3600 * 1000);
-                  if (diff > 92) { shell.showToast(tr('tenant.281253'), { kind: 'warn' }); return; }
-                }
-                loadTraffic();
-              }}>{tr('tenant.bee912')}</Button>
-            </div>
-
-            {/* ── 4 张统计卡片 ─────────────────────── */}
-            <div style={{
-              display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10,
-              marginBottom: 14,
-            }}>
-              <StatCard title={tr('tenant.9e478a')} value={fmtTraffic(s.total)} icon="activity" color="var(--info)" />
-              <StatCard title={tr('tenant.cbc5f6')} value={fmtTraffic(s.in)} icon="arrow-down-to-line" color="var(--accent)" />
-              <StatCard title={tr('tenant.ff3f0d')} value={fmtTraffic(s.out)} icon="arrow-up-from-line" color="var(--orange)" />
-              <StatCard title={tr('tenant.b399a0')} value={`${s.threshold} TB`} icon="alert-triangle" color="var(--danger)" />
-            </div>
-
-            {/* ── 3 张占比进度环 ───────────────────── */}
-            <div style={{
-              display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10,
-              marginBottom: 14,
-            }}>
-              <RingCard title={tr('tenant.b9270e')} percent={s.totalPct} label={`${fmtTraffic(s.total)} / ${s.threshold} TB`} color="var(--info)" />
-              <RingCard title={tr('tenant.84a581')} percent={s.inPct} label={`${fmtTraffic(s.in)}`} color="var(--accent)" />
-              <RingCard title={tr('tenant.20c521')} percent={s.outPct} label={`${fmtTraffic(s.out)}`} color="var(--orange)" />
-            </div>
-
-            {/* ── 总体流量趋势(折线图) ──────────── */}
-            <div style={{
-              padding: 12,
-              background: 'var(--bg-1)',
-              border: '1px solid var(--border)',
-              borderRadius: 8,
-              marginBottom: 14,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                <Icon name="trending-up" size={13} style={{ color: 'var(--info)' }} />
-                <span style={{ fontSize: 12.5, color: 'var(--fg-0)', fontWeight: 600 }}>{tr('tenant.a9719b')}</span>
-                <span style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>{tr('tenant.62af14')}</span>
-                <div style={{ flex: 1 }} />
-                <span style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>{tr('tenant.f149fa')}</span>
-              </div>
-              <TrendChart pts={trendPts} height={120} color="var(--info)" />
-            </div>
-
-            {/* ── 实例流量趋势(堆叠柱) ─────────── */}
-            <div style={{
-              padding: 12,
-              background: 'var(--bg-1)',
-              border: '1px solid var(--border)',
-              borderRadius: 8,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                <Icon name="bar-chart-3" size={13} style={{ color: 'var(--violet)' }} />
-                <span style={{ fontSize: 12.5, color: 'var(--fg-0)', fontWeight: 600 }}>{tr('tenant.9f5294')}</span>
-                <span style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>{tr('tenant.632605')} {insData.length} {tr('tenant.f92360')}</span>
-                <div style={{ flex: 1 }} />
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 10.5, color: 'var(--fg-3)' }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                    <span style={{ width: 8, height: 8, background: 'var(--accent)', borderRadius: 2 }} />{tr('tenant.0768a8')}
-                  </span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                    <span style={{ width: 8, height: 8, background: 'var(--orange)', borderRadius: 2 }} />{tr('tenant.5148cf')}
-                  </span>
-                </span>
-              </div>
-              {insData.length === 0 ? (
-                <div style={{ padding: '30px 20px', textAlign: 'center', color: 'var(--fg-3)', fontSize: 12 }}>
-                  <Icon name="inbox" size={24} style={{ color: 'var(--fg-3)', marginBottom: 6 }} />
-                  <div>{tr('tenant.8864ef')}</div>
-                </div>
-              ) : (
-                <InstanceStackChart data={insData} max={insMax} />
-              )}
-            </div>
-          </div>
-        ),
-        footer: (
-          <>
-            <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('tenant.b15d91')}</Button>
-            <Button variant="outline" size="md" icon="download"
-              onClick={exportTraffic}
-            >{tr('tenant.4fcf74')}</Button>
-          </>
-        ),
-      });
-    };
-    render();
-    loadTraffic();
-  }, [shell]);
-}
-
-// ─── 流量查询辅助组件 ────────────────────────────────
-function StatCard({ title, value, icon, color }) {
-  return (
-    <div style={{
-      padding: 12,
-      background: 'var(--bg-1)',
-      border: '1px solid var(--border)',
-      borderRadius: 8,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-        <Icon name={icon} size={12} style={{ color }} />
-        <span style={{ fontSize: 11, color: 'var(--fg-3)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: 0.5 }}>{title}</span>
-      </div>
-      <div className="num" style={{ fontSize: 20, fontWeight: 700, color, letterSpacing: -0.4 }}>{value}</div>
-    </div>
-  );
-}
-
-function RingCard({ title, percent, label, color }) {
-  const size = 64, stroke = 6;
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const off = c - (percent / 100) * c;
-  return (
-    <div style={{
-      padding: 12,
-      background: 'var(--bg-1)',
-      border: '1px solid var(--border)',
-      borderRadius: 8,
-      display: 'flex', alignItems: 'center', gap: 12,
-    }}>
-      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--bg-3)" strokeWidth={stroke} />
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke}
-          strokeDasharray={c} strokeDashoffset={off} strokeLinecap="round"
-          style={{ transition: 'stroke-dashoffset 400ms' }}
-        />
-      </svg>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 4 }}>{title}</div>
-        <div className="num" style={{ fontSize: 16, fontWeight: 700, color, marginBottom: 2 }}>{percent.toFixed(1)}%</div>
-        <div className="mono" style={{ fontSize: 10.5, color: 'var(--fg-2)' }}>{label}</div>
-      </div>
-    </div>
-  );
-}
-
-function TrendChart({ pts, height = 160, color = 'var(--info)' }) {
-  if (!pts || pts.length === 0) return null;
-
-  // 真实坐标 · 不用 SVG 拉伸(避免 stroke 变形)
-  const W = 800, H = height;
-  const padL = 40, padR = 16, padT = 12, padB = 22;
-  const innerW = W - padL - padR;
-  const innerH = H - padT - padB;
-
-  const max = Math.max(...pts, 0.001);
-  const min = 0;
-  const scaleX = (i) => padL + (i * innerW) / Math.max(pts.length - 1, 1);
-  const scaleY = (v) => padT + innerH - ((v - min) / (max - min || 1)) * innerH;
-
-  // Catmull-Rom → Cubic Bezier 平滑曲线(tension ~ 0.5)
-  const buildSmoothPath = () => {
-    if (pts.length < 2) return `M ${scaleX(0)} ${scaleY(pts[0] || 0)}`;
-    const P = pts.map((v, i) => [scaleX(i), scaleY(v)]);
-    let d = `M ${P[0][0]} ${P[0][1]}`;
-    for (let i = 0; i < P.length - 1; i++) {
-      const p0 = P[i - 1] || P[i];
-      const p1 = P[i];
-      const p2 = P[i + 1];
-      const p3 = P[i + 2] || p2;
-      const cp1x = p1[0] + (p2[0] - p0[0]) / 6;
-      const cp1y = p1[1] + (p2[1] - p0[1]) / 6;
-      const cp2x = p2[0] - (p3[0] - p1[0]) / 6;
-      const cp2y = p2[1] - (p3[1] - p1[1]) / 6;
-      d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2[0]} ${p2[1]}`;
-    }
-    return d;
-  };
-  const linePath = buildSmoothPath();
-  const areaPath = linePath + ` L ${scaleX(pts.length - 1)} ${padT + innerH} L ${scaleX(0)} ${padT + innerH} Z`;
-
-  // 唯一 id(避免多实例冲突)
-  const gid = React.useMemo(() => `tg-${Math.random().toString(36).slice(2, 8)}`, []);
-
-  // hover 状态
-  const [hoverIdx, setHoverIdx] = React.useState(null);
-  const svgRef = React.useRef(null);
-  const onMove = (e) => {
-    const rect = svgRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * W;
-    if (x < padL - 8 || x > W - padR + 8) { setHoverIdx(null); return; }
-    // 找最近点
-    let best = 0, bestDist = Infinity;
-    for (let i = 0; i < pts.length; i++) {
-      const d = Math.abs(scaleX(i) - x);
-      if (d < bestDist) { bestDist = d; best = i; }
-    }
-    setHoverIdx(best);
-  };
-  const onLeave = () => setHoverIdx(null);
-
-  // y 轴刻度(3 档)
-  const yTicks = [0, 0.5, 1].map(t => min + (max - min) * t);
-  // x 轴刻度(首/中/末)
-  const xTickIdx = pts.length === 1 ? [0] : pts.length === 2 ? [0, pts.length - 1] : [0, Math.floor((pts.length - 1) / 2), pts.length - 1];
-
-  const fmt = (v) => v >= 1 ? `${v.toFixed(2)} TB` : `${(v * 1000).toFixed(0)} GB`;
-
-  return (
-    <div style={{ position: 'relative' }}>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${W} ${H}`}
-        width="100%" height={H}
-        preserveAspectRatio="none"
-        onMouseMove={onMove}
-        onMouseLeave={onLeave}
-        style={{ display: 'block', cursor: 'crosshair' }}
-      >
-        <defs>
-          <linearGradient id={`${gid}-area`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor={color} stopOpacity="0.45" />
-            <stop offset="60%"  stopColor={color} stopOpacity="0.10" />
-            <stop offset="100%" stopColor={color} stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id={`${gid}-line`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor={color} stopOpacity="1" />
-            <stop offset="100%" stopColor={color} stopOpacity="0.7" />
-          </linearGradient>
-          <filter id={`${gid}-glow`} x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="1.5" result="b" />
-            <feMerge>
-              <feMergeNode in="b" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-
-        {/* y 轴网格 + 刻度值 */}
-        {yTicks.map((tv, i) => {
-          const y = scaleY(tv);
-          return (
-            <g key={i}>
-              <line x1={padL} y1={y} x2={W - padR} y2={y}
-                stroke="var(--border)" strokeWidth="1" strokeDasharray="2 4" opacity="0.55" />
-              <text x={padL - 6} y={y + 3} fontSize="10" textAnchor="end"
-                fill="var(--fg-3)" fontFamily="var(--font-mono)">
-                {fmt(tv)}
-              </text>
-            </g>
-          );
-        })}
-
-        {/* x 轴刻度(首/中/末) */}
-        {xTickIdx.map(i => {
-          const label = pts.length > 1
-            ? (i === 0 ? tr('tenant.859ea0') : i === pts.length - 1 ? tr('tenant.48ac47') : tr('tenant.05498d').replace('{0}',i + 1))
-            : tr('tenant.c8bc7c');
-          return (
-            <text key={i} x={scaleX(i)} y={H - padB + 14} fontSize="10" textAnchor="middle"
-              fill="var(--fg-3)" fontFamily="inherit">
-              {label}
-            </text>
-          );
-        })}
-
-        {/* 面积渐变 */}
-        <path d={areaPath} fill={`url(#${gid}-area)`}>
-          <animate attributeName="opacity" from="0" to="1" dur="500ms" fill="freeze" />
-        </path>
-
-        {/* 主曲线 */}
-        <path d={linePath} fill="none" stroke={`url(#${gid}-line)`} strokeWidth="2.5"
-          strokeLinecap="round" strokeLinejoin="round" filter={`url(#${gid}-glow)`}>
-          <animate attributeName="stroke-dasharray" from="2000" to="0" dur="800ms" fill="freeze" />
-        </path>
-
-        {/* 数据点(hover 高亮) */}
-        {pts.map((v, i) => {
-          const isHov = hoverIdx === i;
-          return (
-            <g key={i}>
-              {isHov && (
-                <circle cx={scaleX(i)} cy={scaleY(v)} r="8"
-                  fill={color} opacity="0.18" />
-              )}
-              <circle cx={scaleX(i)} cy={scaleY(v)} r={isHov ? 4 : 2.5}
-                fill="var(--bg-1)" stroke={color} strokeWidth="1.6"
-                style={{ transition: 'r 100ms' }} />
-            </g>
-          );
-        })}
-
-        {/* Crosshair(hover 时的垂直虚线) */}
-        {hoverIdx !== null && (
-          <line
-            x1={scaleX(hoverIdx)} x2={scaleX(hoverIdx)}
-            y1={padT} y2={padT + innerH}
-            stroke={color} strokeWidth="1" strokeDasharray="3 3" opacity="0.6"
-          />
-        )}
-      </svg>
-
-      {/* Tooltip */}
-      {hoverIdx !== null && (() => {
-        const svgW = svgRef.current?.getBoundingClientRect().width || W;
-        const scale = svgW / W;
-        const cx = scaleX(hoverIdx) * scale;
-        const cy = scaleY(pts[hoverIdx]) * scale;
-        // 提示框位置(避开右边界)
-        const tipRight = cx > svgW - 130;
-        return (
-          <div style={{
-            position: 'absolute',
-            left: tipRight ? cx - 140 : cx + 10,
-            top: Math.max(4, cy - 40),
-            padding: '6px 10px',
-            background: 'var(--bg-1)',
-            border: `1px solid ${color}`,
-            borderRadius: 6,
-            boxShadow: '0 6px 16px rgba(0, 0, 0, 0.35)',
-            fontSize: 11,
-            color: 'var(--fg-0)',
-            pointerEvents: 'none',
-            zIndex: 10,
-            whiteSpace: 'nowrap',
-          }}>
-            <div style={{ fontSize: 10, color: 'var(--fg-3)', marginBottom: 2 }}>
-              {hoverIdx === 0 ? tr('tenant.859ea0') : hoverIdx === pts.length - 1 ? tr('tenant.48ac47') : tr('tenant.05498d').replace('{0}',hoverIdx + 1)}
-            </div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 6, height: 6, borderRadius: 3, background: color, display: 'inline-block' }} />
-              <span className="num mono" style={{ fontWeight: 600, color }}>{fmt(pts[hoverIdx])}</span>
-            </div>
-          </div>
-        );
-      })()}
-    </div>
-  );
-}
-
-function InstanceStackChart({ data, max }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {data.map((d, i) => {
-        const total = d.in + d.out;
-        const inPct = (d.in / max) * 100;
-        const outPct = (d.out / max) * 100;
-        return (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11 }}>
-            <span className="mono" style={{ width: 110, color: 'var(--fg-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</span>
-            <div style={{ flex: 1, height: 16, background: 'var(--bg-3)', borderRadius: 3, overflow: 'hidden', display: 'flex' }}>
-              <div style={{ width: `${inPct}%`, height: '100%', background: 'var(--accent)', transition: 'width 400ms' }} title={tr('tenant.4e690f').replace('{0}',d.in.toFixed(2))} />
-              <div style={{ width: `${outPct}%`, height: '100%', background: 'var(--orange)', transition: 'width 400ms' }} title={tr('tenant.8f56a1').replace('{0}',d.out.toFixed(2))} />
-            </div>
-            <span className="num mono" style={{ width: 80, textAlign: 'right', color: 'var(--fg-2)' }}>
-              {total < 1 ? `${(total * 1000).toFixed(0)} GB` : `${total.toFixed(2)} TB`}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function useAuditDrawer() {
-  const shell = useShell();
-  return React.useCallback((tenant) => {
-    const domain = `oracleidentitycloudservice.${tenantLabel(tenant).replace(/\*/g, '')}`;
-    const state = {
-      startDate: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString().slice(0, 10),
-      endDate: new Date().toISOString().slice(0, 10),
-      logs: [],
-      loading: false,
-      queried: false,
-    };
-    const statusCfg = {
-      success: { label: tr('tenant.330363'), color: 'var(--accent)', bg: 'var(--accent-soft)' },
-      failed:  { label: tr('tenant.acd5cb'), color: 'var(--danger)', bg: 'var(--danger-soft)' },
-      blocked: { label: tr('tenant.7173f8'), color: 'var(--orange)', bg: 'var(--orange-soft)' },
-    };
-    const envCfg = {
-      Console: { color: 'var(--info)',   bg: 'var(--info-soft)' },
-      API:     { color: 'var(--violet)', bg: 'color-mix(in oklab, var(--violet) 15%, transparent)' },
-      SDK:     { color: 'var(--cyan)',   bg: 'color-mix(in oklab, var(--cyan) 15%, transparent)' },
-    };
-
-    const loadLogs = async () => {
-      state.loading = true;
-      state.queried = false;
-      if (typeof render === 'function') render();
-      try {
-        const j = await window.ociApi.request('/tenants/audit/log', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tenantId: getTenantDbId(tenant), startDate: state.startDate, endDate: state.endDate }),
-        });
-        const list = (j && j.data && Array.isArray(j.data.data)) ? j.data.data : ((j && Array.isArray(j.data)) ? j.data : []);
-        state.logs = list.map(it => ({
-          user: it.userName || '-',
-          ip: it.ipAddress || '-',
-          event: it.eventType || '-',
-          env: it.clientEnv || 'Console',
-          time: it.eventTime || '-',
-          code: it.responseStatus || '',
-          status: String(it.responseStatus || '') === '200' ? 'success' : (String(it.responseStatus || '') === '' ? 'success' : 'failed'),
-          detail: it.responseStatus || '',
-        }));
-        state.queried = true;
-      } catch (err) {
-        state.logs = [];
-        state.queried = true;
-        shell.showToast(tr('tenant.ac12c7') + (err.message || err), { kind: 'error' });
-      } finally {
-        state.loading = false;
-        if (typeof render === 'function') render();
-      }
-    };
-
-    const exportAudit = () => {
-      try {
-        downloadCsv(`audit_${getTenantDbId(tenant)}_${state.startDate}_${state.endDate}.csv`,
-          ['user', 'ip', 'event', 'env', 'time', 'code', 'status', 'detail'], state.logs);
-        shell.showToast(tr('tenant.5680a4'), { kind: 'success' });
-      } catch (error) {
-        shell.showToast(error.message, { kind: 'warn' });
-      }
-    };
-
-    const render = () => {
-      shell.openModal({
-        title: tr('tenant.a722bf'),
-        subtitle: <span><span className="mono">{tenantLabel(tenant)}</span> · Audit Log · <span className="mono" style={{ color: 'var(--fg-3)' }}>{domain}</span></span>,
-        icon: 'file-text',
-        iconColor: 'var(--violet)',
-        size: 'xl',
-        body: (
-          <div style={{ padding: 16 }}>
-            {/* 筛选栏 */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: 12, background: 'var(--bg-2)',
-              border: '1px solid var(--border)', borderRadius: 8, marginBottom: 14,
-              flexWrap: 'wrap',
-            }}>
-              <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>{tr('tenant.cd649f')}</span>
-              <input type="date" value={state.startDate}
-                onChange={e => { state.startDate = e.target.value; render(); }}
-                style={{ padding: '5px 8px', background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--fg-0)', fontFamily: 'var(--font-mono)', fontSize: 11 }}
-              />
-              <span style={{ color: 'var(--fg-3)' }}>—</span>
-              <input type="date" value={state.endDate}
-                onChange={e => { state.endDate = e.target.value; render(); }}
-                style={{ padding: '5px 8px', background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--fg-0)', fontFamily: 'var(--font-mono)', fontSize: 11 }}
-              />
-              <SearchInput placeholder={tr('tenant.103e66')} width={220} />
-              <div style={{ flex: 1 }} />
-              <Button size="sm" variant="primary" icon="search"
-                loading={state.loading}
-                onClick={() => loadLogs()}
-              >{tr('tenant.bee912')}</Button>
-              <Button size="sm" variant="outline" icon="download"
-                onClick={exportAudit}
-              >{tr('tenant.55405e')}</Button>
-            </div>
-
-            {/* 表格 7 列 */}
-            <div style={{
-              border: '1px solid var(--border)', borderRadius: 8, overflow: 'auto',
-              background: 'var(--bg-1)', maxHeight: 440,
-            }}>
-              <table style={{ width: '100%', minWidth: 960, borderCollapse: 'separate', borderSpacing: 0, fontSize: 12 }}>
-                <thead>
-                  <tr>
-                    {[
-                      // 严格对齐原项目 auditLogModal — 7 列（无“状态”列，状态信息融入“响应内容”）
-                      { h: tr('tenant.faaadc'),       w: 50, align: 'center' },
-                      { h: tr('tenant.819767'),     w: 100 },
-                      { h: tr('tenant.6c20be'),      w: 130 },
-                      { h: tr('tenant.f974c8'),   w: 130 },
-                      { h: tr('tenant.fa405f'),       w: 90 },
-                      { h: tr('tenant.12ef20'),   w: 160 },
-                      { h: tr('tenant.47de7c') },
-                    ].map((c, i) => (
-                      <th key={i} style={{
-                        textAlign: c.align || 'left', padding: '10px 12px', width: c.w,
-                        position: 'sticky', top: 0, zIndex: 1,
-                        background: 'var(--bg-2)', color: 'var(--fg-3)',
-                        fontSize: 10.5, fontWeight: 600,
-                        textTransform: 'uppercase', letterSpacing: 0.5,
-                        borderBottom: '1px solid var(--border)',
-                        whiteSpace: 'nowrap',
-                      }}>{c.h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {state.logs.map((r, i) => {
-                    const sc = statusCfg[r.status] || statusCfg.success;
-                    const ec = envCfg[r.env] || envCfg.Console;
-                    return (
-                      <tr key={i} style={{ background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent' }}>
-                        <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-                          <span className="num mono" style={{ color: 'var(--fg-3)' }}>{i + 1}</span>
-                        </td>
-                        <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
-                          <span className="mono" style={{ color: 'var(--fg-0)', fontWeight: 500 }}>{r.user}</span>
-                        </td>
-                        <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
-                          <span className="mono" style={{ color: 'var(--fg-1)', fontSize: 11 }}>{r.ip}</span>
-                        </td>
-                        <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
-                          <span style={{ color: 'var(--fg-0)' }}>{r.event}</span>
-                        </td>
-                        <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
-                          <span style={{ padding: '1px 7px', background: ec.bg, color: ec.color, borderRadius: 3, fontSize: 10.5, fontWeight: 500 }}>{r.env}</span>
-                        </td>
-                        <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
-                          <span className="mono" style={{ color: 'var(--fg-2)', fontSize: 10.5 }}>{r.time}</span>
-                        </td>
-                        <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
-                          <span style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 5,
-                            padding: '1px 7px', borderRadius: 3,
-                            background: sc.bg, color: sc.color,
-                            fontSize: 10.5, fontWeight: 500, marginRight: 6,
-                          }}>{sc.label}</span>
-                          <span style={{ color: 'var(--fg-2)', fontSize: 11 }}>{r.detail}</span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div style={{
-              marginTop: 10, padding: 10,
-              background: 'var(--bg-2)', border: '1px solid var(--border)',
-              borderRadius: 6, fontSize: 11, color: 'var(--fg-2)',
-              display: 'flex', alignItems: 'center', gap: 10,
-            }}>
-              <Icon name="database" size={11} style={{ color: 'var(--fg-3)' }} />
-              {tr('tenant.fbd2b1')} <span className="num" style={{ color: 'var(--fg-0)', fontWeight: 600 }}>{state.logs.length}</span> {tr('tenant.e16681')} <span style={{ color: 'var(--accent)' }} className="num">{state.logs.filter(l => l.status === 'success').length}</span> {tr('tenant.de2a7b')} <span style={{ color: 'var(--danger)' }} className="num">{state.logs.filter(l => l.status === 'failed').length}</span> {tr('tenant.58b0a7')} <span style={{ color: 'var(--orange)' }} className="num">{state.logs.filter(l => l.status === 'blocked').length}</span>
-            </div>
-          </div>
-        ),
-        footer: <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('tenant.b15d91')}</Button>,
-      });
-    };
-    render();
-    loadLogs();
-  }, [shell]);
-}
+// 查看配额已全面升级为独立整页（见 page-tenant-quota.jsx，对齐客户端 TenantQuotaView.swift），不再使用弹窗。
 
 function useUserManageModal() {
   // ═══════════════════════════════════════════════════════════════════════
@@ -5423,11 +4359,13 @@ function useUserManageModal() {
   //   全部走真实后端接口,字段取自 TenantController / service
   // ═══════════════════════════════════════════════════════════════════════
   const shell = useShell();
-  return React.useCallback((tenant) => {
-    const domain = `oracleidentitycloudservice.${tenantLabel(tenant).replace(/\*/g, '')}`;
+  return React.useCallback((tenant, defaultTab = 'users') => {
+    const region = getTenantRegion(tenant);
+    const regName = regionSimpleName(region);
+    const regionText = regName && regName !== region ? `${regName} (${region})` : (region || '—');
 
     const state = {
-      tab: 'users',                              // users | notifications | mfa
+      tab: defaultTab || 'users',                // users | notifications | mfa
       users: [],
       notifyEmails: [],
       addEmailFormOpen: false,
@@ -5438,6 +4376,9 @@ function useUserManageModal() {
         active: false,                           // enablePasswordExpiry
         expireDays: 120,
       },
+      showPasswordPolicyModal: false,
+      ppDraft: null,
+      savingPP: false,
       userGroups: [],
       loading: true,
       formMode: 'closed',                        // closed | add (真实后端仅支持新增)
@@ -5543,93 +4484,16 @@ function useUserManageModal() {
       locked:   { label: tr('tenant.e81c64'), color: 'var(--danger)', bg: 'var(--danger-soft)' },
     };
 
-    // ── 独立 modal:密码策略(tenantPasswordPolicyModal) ─────────
+    // ── 密码策略浮层弹窗（层级高于用户管理） ─────────
     const openPasswordPolicy = async () => {
       await loadPasswordPolicy();
       const draft = { ...state.passwordPolicy };
-      const renderPP = () => {
-        shell.openModal({
-          title: tr('tenant.7ef2da'),
-          subtitle: <span><span className="mono">{tenantLabel(tenant)}</span> · Identity Domain <span className="mono" style={{ color: 'var(--fg-3)' }}>{domain}</span></span>,
-          icon: 'key',
-          iconColor: 'var(--accent)',
-          size: 'md',
-          body: (
-            <div style={{ padding: 20 }}>
-              <div style={{
-                padding: '10px 12px',
-                background: 'var(--info-soft)',
-                border: '1px solid var(--info)',
-                borderRadius: 'var(--radius-sm)',
-                fontSize: 11.5, color: 'var(--info)',
-                marginBottom: 14,
-              }}>
-                <Icon name="info" size={12} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                <b>{tr('tenant.4a9c6f')}</b>:
-                {draft.active
-                  ? tr('tenant.e79d81').replace('{0}',draft.expireDays)
-                  : tr('tenant.83b691')}
-              </div>
-
-              <FormRow label={
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                  {tr('tenant.d5183b')}
-                </span>
-              }>
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '8px 12px', background: draft.active ? 'var(--accent-soft)' : 'var(--bg-2)', border: '1px solid ' + (draft.active ? 'var(--accent)' : 'var(--border)'), borderRadius: 6, width: '100%' }}>
-                  <input type="checkbox" checked={draft.active}
-                    onChange={e => {
-                      draft.active = e.target.checked;
-                      if (draft.active && (!draft.expireDays || draft.expireDays === 0)) {
-                        draft.expireDays = 120;
-                      }
-                      renderPP();
-                    }}
-                    style={{ accentColor: 'var(--accent)' }}
-                  />
-                  <span style={{ fontSize: 12, color: draft.active ? 'var(--accent)' : 'var(--fg-1)' }}>
-                    {tr('tenant.8e1862')}
-                  </span>
-                </label>
-              </FormRow>
-
-              <FormRow label={tr('tenant.544e2c')} hint={tr('tenant.2763d4')} required>
-                <NumberInput
-                  value={draft.expireDays}
-                  onChange={v => {
-                    draft.expireDays = v;
-                    if (v === 0 || v === '' || v === null) {
-                      draft.active = false;
-                    }
-                    renderPP();
-                  }}
-                  min={0} max={365}
-                />
-              </FormRow>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-                <Button size="md" variant="ghost" onClick={render}>{tr('tenant.625fb2')}</Button>
-                <Button size="md" variant="primary" icon="save" onClick={async () => {
-                  const clean = { ...draft };
-                  if (!clean.expireDays || clean.expireDays === 0) clean.active = false;
-                  state.passwordPolicy = clean;
-                  try {
-                    await window.ociApi.request('/tenants/oracle-users/password-policy', {
-                      method: 'POST', headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ tenantId: getTenantDbId(tenant), enablePasswordExpiry: clean.active, expiryDays: clean.active ? clean.expireDays : 0 }),
-                    });
-                    shell.showToast(tr('tenant.67244f').replace('{0}',clean.active ? tr('tenant.expireDays').replace('{0}',clean.expireDays) : tr('tenant.neverForce')), { kind: clean.active ? 'success' : 'info' });
-                    render();
-                  } catch (e) {
-                    shell.showToast(tr('tenant.40f902') + (e.message || e), { kind: 'error' });
-                  }
-                }}>{tr('tenant.2d3f52')}</Button>
-              </div>
-            </div>
-          ),
-        });
-      };
-      renderPP();
+      if (!draft.expireDays || draft.expireDays === 0) {
+        draft.expireDays = 120;
+      }
+      state.ppDraft = draft;
+      state.showPasswordPolicyModal = true;
+      render();
     };
 
     const addEmail = async () => {
@@ -5669,15 +4533,16 @@ function useUserManageModal() {
     const render = () => {
       shell.openModal({
         title: tr('tenant.7d94de'),
-        subtitle: <span><span className="mono">{tenantLabel(tenant)}</span> · Identity Domain <span className="mono" style={{ color: 'var(--fg-3)' }}>{domain}</span></span>,
+        subtitle: <span><span className="mono">{tenantLabel(tenant)}</span><span style={{ margin: '0 6px', color: 'var(--fg-3)' }}>·</span><span>{regionText}</span></span>,
         icon: 'users',
         iconColor: 'var(--accent)',
         size: 'xl',
+        height: 660,
         body: (
-          <div style={{ padding: 16 }}>
+          <div style={{ padding: 16, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
             {/* ── Tab 导航 · 3 个(对齐原项目) ─────────── */}
             <div style={{
-              display: 'flex', gap: 4,
+              display: 'flex', gap: 4, flexShrink: 0,
               padding: 3,
               background: 'var(--bg-2)',
               border: '1px solid var(--border)',
@@ -5726,8 +4591,8 @@ function useUserManageModal() {
 
             {/* ══════ 用户列表 tab ══════════════════════ */}
             {state.tab === 'users' && (
-              <>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexShrink: 0 }}>
                   <SearchInput placeholder={tr('tenant.4843f0')} width={260} />
                   <div style={{ flex: 1 }} />
                   <Button size="sm" variant="primary" icon="user-plus"
@@ -5736,7 +4601,7 @@ function useUserManageModal() {
                   <Button size="sm" variant="cyan" icon="refresh-cw"
                     onClick={() => { loadUsers(); }}
                   >{tr('tenant.93bc1f')}</Button>
-                  <Button size="sm" variant="outline" icon="key" onClick={openPasswordPolicy}>{tr('tenant.e081de')}</Button>
+                  <Button size="sm" variant="orange" icon="key" onClick={openPasswordPolicy}>{tr('tenant.e081de')}</Button>
                 </div>
 
                 {/* 添加用户表单 · 3 个字段(对齐原项目 createUser) */}
@@ -5744,6 +4609,7 @@ function useUserManageModal() {
                   <div style={{
                     padding: 14,
                     marginBottom: 14,
+                    flexShrink: 0,
                     background: 'var(--bg-2)',
                     border: '1px solid var(--border-strong)',
                     borderRadius: 8,
@@ -5810,24 +4676,26 @@ function useUserManageModal() {
                   </div>
                 )}
 
-                {/* 用户表格(横向滚动) */}
+                {/* 用户表格 */}
                 <div style={{
                   border: '1px solid var(--border)',
                   borderRadius: 8,
-                  overflow: 'auto',
+                  overflowY: 'auto',
+                  flex: 1,
+                  minHeight: 0,
                   background: 'var(--bg-1)',
                 }}>
-                  <table style={{ width: '100%', minWidth: 960, borderCollapse: 'separate', borderSpacing: 0, fontSize: 12 }}>
+                  <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12 }}>
                     <thead>
                       <tr>
                         {[
-                          { h: tr('tenant.af6cc1'), w: 180 },
-                          { h: tr('tenant.819767'), w: 130 },
-                          { h: tr('tenant.6ab78f') },
-                          { h: tr('tenant.d05d90'), w: 90 },
-                          { h: tr('tenant.eca37c'), w: 140 },
-                          { h: tr('tenant.39b4f2'), w: 110 },
-                          { h: tr('tenant.2b6bc0'), w: 90, align: 'center' },
+                          { h: tr('tenant.af6cc1'), w: 100, align: 'center' },
+                          { h: tr('tenant.819767'), w: 120, align: 'center' },
+                          { h: tr('tenant.6ab78f'), align: 'center' },
+                          { h: tr('tenant.d05d90'), w: 80, align: 'center' },
+                          { h: tr('tenant.eca37c'), w: 135, align: 'center' },
+                          { h: tr('tenant.39b4f2'), w: 135, align: 'center' },
+                          { h: tr('tenant.2b6bc0'), w: 70, align: 'center' },
                         ].map((c, i) => (
                           <th key={i} style={{
                             textAlign: c.align || 'left', padding: '10px 12px', width: c.w,
@@ -5836,6 +4704,7 @@ function useUserManageModal() {
                             textTransform: 'uppercase', letterSpacing: 0.5,
                             borderBottom: '1px solid var(--border)',
                             whiteSpace: 'nowrap',
+                            position: 'sticky', top: 0, zIndex: 1,
                           }}>{c.h}</th>
                         ))}
                       </tr>
@@ -5860,35 +4729,26 @@ function useUserManageModal() {
                           <tr key={u.id} style={{
                             background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent',
                           }}>
-                            <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
-                              <span className="mono" style={{ fontSize: 10.5, color: 'var(--fg-2)' }}>{u.domain}</span>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }} title={u.domain || 'Default'}>
+                              <span className="mono" style={{ fontSize: 10.5, color: 'var(--fg-2)' }}>{u.domain || 'Default'}</span>
                             </td>
-                            <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                <div style={{
-                                  width: 22, height: 22, borderRadius: 11,
-                                  background: 'var(--accent-soft)', color: 'var(--accent)',
-                                  fontSize: 10, fontWeight: 700,
-                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                  textTransform: 'uppercase',
-                                }}>{(u.username || '?').slice(0, 2)}</div>
-                                <span className="mono" style={{ color: 'var(--fg-0)', fontWeight: 500 }}>{u.username}</span>
-                              </span>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }} title={u.username}>
+                              <span className="mono" style={{ color: 'var(--fg-0)', fontWeight: 500, fontSize: 12 }}>{u.username}</span>
                             </td>
-                            <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
-                              <span className="mono" style={{ fontSize: 11, color: 'var(--fg-1)' }}>{u.email}</span>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220 }} title={u.email}>
+                              <span className="mono" style={{ fontSize: 11, color: 'var(--fg-1)' }}>{u.email || '—'}</span>
                             </td>
-                            <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
                               <span style={{
                                 padding: '1px 8px',
                                 background: sc.bg, color: sc.color,
                                 borderRadius: 3, fontSize: 11, fontWeight: 500,
                               }}>{sc.label}</span>
                             </td>
-                            <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }} title={u.createdAt}>
                               <span className="mono" style={{ fontSize: 10.5, color: 'var(--fg-2)' }}>{u.createdAt}</span>
                             </td>
-                            <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }} title={u.lastLogin}>
                               <span style={{ fontSize: 11, color: 'var(--fg-2)' }}>{u.lastLogin}</span>
                             </td>
                             <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
@@ -5989,13 +4849,13 @@ function useUserManageModal() {
                     />
                   );
                 })()}
-              </>
+              </div>
             )}
 
             {/* ══════ 通知邮箱 tab ══════════════════════ */}
             {state.tab === 'notifications' && (
-              <>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexShrink: 0 }}>
                   <div style={{ flex: 1 }} />
                   <Button size="sm" variant="primary" icon="plus"
                     onClick={() => { state.addEmailFormOpen = true; state.newNotifyEmail = ''; render(); }}
@@ -6010,6 +4870,7 @@ function useUserManageModal() {
                   <div style={{
                     padding: 14,
                     marginBottom: 12,
+                    flexShrink: 0,
                     background: 'var(--bg-2)',
                     border: '1px solid var(--border-strong)',
                     borderRadius: 8,
@@ -6030,7 +4891,9 @@ function useUserManageModal() {
                 <div style={{
                   border: '1px solid var(--border)',
                   borderRadius: 8,
-                  overflow: 'hidden',
+                  overflowY: 'auto',
+                  flex: 1,
+                  minHeight: 0,
                   background: 'var(--bg-1)',
                 }}>
                   <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12 }}>
@@ -6048,6 +4911,7 @@ function useUserManageModal() {
                             fontSize: 10.5, fontWeight: 600,
                             textTransform: 'uppercase', letterSpacing: 0.5,
                             borderBottom: '1px solid var(--border)',
+                            position: 'sticky', top: 0, zIndex: 1,
                           }}>{c.h}</th>
                         ))}
                       </tr>
@@ -6102,6 +4966,7 @@ function useUserManageModal() {
                 <div style={{
                   marginTop: 12,
                   padding: 12,
+                  flexShrink: 0,
                   background: 'var(--bg-2)',
                   borderRadius: 4,
                   fontSize: 12, color: 'var(--fg-2)',
@@ -6109,13 +4974,13 @@ function useUserManageModal() {
                   <span className="num" style={{ color: 'var(--fg-0)', fontWeight: 600 }}>{state.notifyEmails.length}</span>
                   <span> {tr('tenant.d7f30c')}</span>
                 </div>
-              </>
+              </div>
             )}
 
             {/* ══════ MFA 管理 tab · 严格对齐原项目 ══════ */}
             {state.tab === 'mfa' && (
-              <>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', flexShrink: 0 }}>
                   <Button size="sm" variant="orange" icon="key"
                     onClick={() => shell.openConfirm({
                       title: tr('tenant.36e97c'),
@@ -6189,30 +5054,196 @@ function useUserManageModal() {
                     { key: 'emailEnabled', label: tr('tenant.9b99e2'), icon: 'mail' },
                     { key: 'smsEnabled',   label: tr('tenant.9bbe38'), icon: 'message-square' },
                     { key: 'totpEnabled',  label: tr('tenant.0fc010'), icon: 'shield-check' },
-                  ].map(item => {
+                  ].map((item, idx, arr) => {
                     const on = !!(state.mfaStatus && state.mfaStatus[item.key]);
                     return (
                       <div key={item.key} style={{
-                        display: 'flex', alignItems: 'center', gap: 10,
-                        padding: '10px 12px',
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '6px 10px',
                         background: on ? 'var(--accent-soft)' : 'var(--bg-3)',
                         border: '1px solid ' + (on ? 'var(--accent)' : 'var(--border)'),
                         borderRadius: 6,
-                        marginBottom: 12,
+                        marginBottom: idx < arr.length - 1 ? 6 : 0,
                       }}>
-                        <Icon name={item.icon} size={16} style={{ color: on ? 'var(--accent)' : 'var(--fg-3)' }} />
-                        <span style={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: on ? 'var(--accent)' : 'var(--fg-1)' }}>{item.label}</span>
+                        <Icon name={item.icon} size={14} style={{ color: on ? 'var(--accent)' : 'var(--fg-3)' }} />
+                        <span style={{ flex: 1, fontSize: 11.5, fontWeight: 500, color: on ? 'var(--accent)' : 'var(--fg-1)' }}>{item.label}</span>
                         <span style={{
-                          padding: '2px 10px',
-                          background: on ? 'var(--accent)' : 'var(--bg-3)',
+                          padding: '1px 8px',
+                          background: on ? 'var(--accent)' : 'var(--bg-2)',
                           color: on ? 'var(--accent-fg)' : 'var(--fg-3)',
-                          borderRadius: 12, fontSize: 10.5, fontWeight: 600,
+                          borderRadius: 10, fontSize: 10, fontWeight: 600,
                         }}>{on ? 'ON' : 'OFF'}</span>
                       </div>
                     );
                   })}
                 </div>
-              </>
+              </div>
+            )}
+
+            {/* 密码策略浮层模态框 (层级高于用户管理弹窗，对齐图2) */}
+            {state.showPasswordPolicyModal && (
+              <div style={{
+                position: 'fixed', inset: 0,
+                background: 'rgba(0,0,0,0.6)',
+                backdropFilter: 'blur(2px)',
+                zIndex: 120, animation: 'fade-in 150ms',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }} onClick={() => { state.showPasswordPolicyModal = false; render(); }}>
+                <div
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    width: 560, maxWidth: '92vw',
+                    background: 'var(--bg-1)',
+                    border: '1px solid var(--border-strong)',
+                    borderRadius: 'var(--radius-lg)',
+                    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6)',
+                    display: 'flex', flexDirection: 'column',
+                    animation: 'fade-in 180ms',
+                  }}
+                >
+                  {/* Header (对齐图2) */}
+                  <div style={{
+                    padding: '16px 22px',
+                    borderBottom: '1px solid var(--border)',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+                    gap: 12,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 8,
+                        background: 'color-mix(in oklab, var(--accent) 18%, transparent)',
+                        color: 'var(--accent)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0,
+                      }}>
+                        <Icon name="key" size={17} />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--fg-0)' }}>租户密码策略设置</div>
+                        <div style={{ fontSize: 12, color: 'var(--fg-3)', marginTop: 2 }}>
+                          <span className="mono">{tenantLabel(tenant)}</span>
+                          <span style={{ margin: '0 6px' }}>·</span>
+                          <span>{regionText}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <IconButton icon="x" onClick={() => { state.showPasswordPolicyModal = false; render(); }} size={28} style={{ border: '1px solid var(--border)' }} />
+                  </div>
+
+                  {/* Body (对齐图2) */}
+                  <div style={{ padding: 20 }}>
+                    {/* 状态提示横幅 */}
+                    <div style={{
+                      padding: '10px 14px',
+                      background: 'var(--info-soft)',
+                      border: '1px solid var(--info)',
+                      borderRadius: 6,
+                      fontSize: 12, color: 'var(--info)',
+                      marginBottom: 16,
+                      display: 'flex', alignItems: 'center', gap: 8,
+                    }}>
+                      <Icon name="info" size={14} style={{ flexShrink: 0 }} />
+                      <div>
+                        当前密码策略状态: <b>{state.ppDraft?.active ? `已启用 (${state.ppDraft.expireDays}天)` : '未启用'}</b>
+                      </div>
+                    </div>
+
+                    {/* 启用强制修改密码勾选框 */}
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg-1)', marginBottom: 8 }}>启用强制修改密码</div>
+                      <label style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        cursor: 'pointer', padding: '10px 14px',
+                        background: state.ppDraft?.active ? 'var(--accent-soft)' : 'var(--bg-2)',
+                        border: '1px solid ' + (state.ppDraft?.active ? 'var(--accent)' : 'var(--border)'),
+                        borderRadius: 6,
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={!!state.ppDraft?.active}
+                          onChange={e => {
+                            state.ppDraft.active = e.target.checked;
+                            if (state.ppDraft.active && (!state.ppDraft.expireDays || state.ppDraft.expireDays === 0)) {
+                              state.ppDraft.expireDays = 120;
+                            }
+                            render();
+                          }}
+                          style={{ accentColor: 'var(--accent)', cursor: 'pointer', margin: 0 }}
+                        />
+                        <span style={{ fontSize: 12, color: state.ppDraft?.active ? 'var(--accent)' : 'var(--fg-1)' }}>
+                          启用后,该租户下所有用户将在指定天数后被强制修改密码
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* 密码过期天数 (始终显示，对齐图2) */}
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg-1)', marginBottom: 6 }}>
+                        密码过期天数 <span style={{ color: 'var(--danger)' }}>*</span>
+                      </div>
+                      <TextInput
+                        type="number"
+                        value={state.ppDraft?.expireDays ?? 120}
+                        onChange={v => {
+                          state.ppDraft.expireDays = v === '' ? '' : Math.max(0, Math.min(365, parseInt(v) || 0));
+                          render();
+                        }}
+                        placeholder="120"
+                        mono
+                      />
+                    </div>
+                  </div>
+
+                  {/* Footer (对齐图2) */}
+                  <div style={{
+                    padding: '12px 20px',
+                    borderTop: '1px solid var(--border)',
+                    display: 'flex', justifyContent: 'flex-end', gap: 10,
+                  }}>
+                    <Button variant="ghost" size="md" onClick={() => { state.showPasswordPolicyModal = false; render(); }}>
+                      取消
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="md"
+                      icon="save"
+                      loading={state.savingPP}
+                      onClick={async () => {
+                        state.savingPP = true; render();
+                        const clean = { ...state.ppDraft };
+                        if (!clean.expireDays || clean.expireDays === 0) clean.active = false;
+                        try {
+                          const res = await fetch('/tenants/oracle-users/password-policy', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                              tenantId: getTenantDbId(tenant),
+                              enablePasswordExpiry: !!clean.active,
+                              expiryDays: clean.active ? (parseInt(clean.expireDays) || 120) : 0,
+                            }),
+                          });
+                          const j = await res.json();
+                          if (res.ok && j && j.success === true) {
+                            state.passwordPolicy = clean;
+                            state.showPasswordPolicyModal = false;
+                            shell.showToast(clean.active ? `✓ 密码过期策略已启用: ${clean.expireDays} 天` : '✓ 密码策略已更新: 从不强制过期', { kind: 'success' });
+                          } else {
+                            shell.showToast(tr('tenant.40f902') + ((j && j.message) || `HTTP ${res.status}`), { kind: 'error' });
+                          }
+                        } catch (e) {
+                          shell.showToast(tr('tenant.40f902') + (e.message || e), { kind: 'error' });
+                        } finally {
+                          state.savingPP = false;
+                          render();
+                        }
+                      }}
+                    >
+                      保存策略
+                    </Button>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         ),
@@ -6230,27 +5261,43 @@ function useRegionSubscribeModal() {
   const shell = useShell();
   const { lang } = React.useContext(LangContext);
   return React.useCallback((tenant) => {
-    const state = { subscribed: new Set(), allRegions: [], pending: null, loading: true };
+    const state = {
+      tab: 'subscribed',
+      subscribedList: [],
+      unsubscribedList: [],
+      selectedKeys: new Set(),
+      pendingKey: null,
+      subscribingBatch: false,
+      loading: true,
+    };
+
+    const mainRegion = getTenantRegion(tenant);
 
     const loadRegions = async () => {
       state.loading = true;
       render();
-      const main = getTenantRegion(tenant);
       try {
-        const subList = await window.ociApi.request('/tenants/subscribed-regions-data?tenantId=' + encodeURIComponent(getTenantDbId(tenant)));
-        const subs = Array.isArray(subList) ? subList : [];
-        state.subscribed = new Set(subs.map(s => s.regionKey));
-        if (main && !state.subscribed.has(main)) state.subscribed.add(main);
-        let all = subs.map(s => ({ code: s.regionKey || s.regionName, name: s.regionName || s.regionKey, cnName: s.regionName || s.regionKey }));
-        try {
-          const unsub = await window.ociApi.request('/tenants/unsubscribed-regions?tenantId=' + encodeURIComponent(getTenantDbId(tenant)));
-          const list = Array.isArray(unsub) ? unsub : [];
-          all = all.concat(list.map(r => ({ code: r.key, name: r.name || r.key, cnName: r.cnName || r.name || r.key })));
-        } catch (e) { /* 未订阅列表失败时忽略 */ }
-        state.allRegions = all;
+        const [subList, unsubList] = await Promise.all([
+          window.ociApi.request('/tenants/subscribed-regions-data?tenantId=' + encodeURIComponent(getTenantDbId(tenant))).catch(() => []),
+          window.ociApi.request('/tenants/unsubscribed-regions?tenantId=' + encodeURIComponent(getTenantDbId(tenant))).catch(() => []),
+        ]);
+
+        let subs = Array.isArray(subList) ? subList : [];
+        let unsubs = Array.isArray(unsubList) ? unsubList : [];
+
+        // 确保主区域存在于已订阅列表中
+        if (mainRegion && !subs.some(s => (s.regionKey || s.regionName) === mainRegion)) {
+          subs.unshift({
+            regionKey: mainRegion,
+            regionName: mainRegion,
+            status: 'READY',
+            isHomeRegion: true,
+          });
+        }
+
+        state.subscribedList = subs;
+        state.unsubscribedList = unsubs;
       } catch (e) {
-        state.subscribed = new Set(main ? [main] : []);
-        state.allRegions = main ? [{ code: main, name: main, cnName: main }] : [];
         shell.showToast(tr('tenant.afefaa') + (e.message || e), { kind: 'error' });
       } finally {
         state.loading = false;
@@ -6259,90 +5306,361 @@ function useRegionSubscribeModal() {
     };
 
     const render = () => {
-      const subCount = state.subscribed.size;
-      const total = state.allRegions.length;
+      const subCount = state.subscribedList.length;
+      const unsubCount = state.unsubscribedList.length;
+      const totalCount = subCount + unsubCount;
+
+      const mainRegionObj = REGIONS.find(r => r.code === mainRegion);
+      const mainRegionName = mainRegionObj ? (mainRegionObj.simpleName || mainRegionObj.cn || mainRegion) : (mainRegion || '—');
+
+      const allUnsubSelected = unsubCount > 0 && state.selectedKeys.size === unsubCount;
+
+      const toggleSelectAll = () => {
+        if (allUnsubSelected) {
+          state.selectedKeys.clear();
+        } else {
+          state.selectedKeys = new Set(state.unsubscribedList.map(r => r.key));
+        }
+        render();
+      };
+
+      const toggleSelectOne = (key) => {
+        if (state.selectedKeys.has(key)) {
+          state.selectedKeys.delete(key);
+        } else {
+          state.selectedKeys.add(key);
+        }
+        render();
+      };
+
+      const handleSubscribe = async (keys) => {
+        if (!keys || keys.length === 0) return;
+        const isSingle = keys.length === 1;
+        if (isSingle) {
+          state.pendingKey = keys[0];
+        } else {
+          state.subscribingBatch = true;
+        }
+        render();
+
+        try {
+          const res = await fetch('/tenants/subscribe-regions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              tenantId: getTenantDbId(tenant),
+              regionKeys: keys,
+            }),
+          });
+          const j = await res.json();
+          if (res.ok && j && j.success === true) {
+            keys.forEach(k => state.selectedKeys.delete(k));
+            const msg = isSingle
+              ? tr('tenant.cf297f').replace('{0}', regionSimpleName(keys[0]))
+              : `✓ 已提交订阅 ${keys.length} 个区域`;
+            shell.showToast(msg, { kind: 'success' });
+            window.dispatchEvent(new CustomEvent('ocip-refresh-page', { detail: 'tenants' }));
+            await loadRegions();
+          } else {
+            shell.showToast(tr('tenant.79d27a').replace('{0}', (j && (j.error || j.message)) || `HTTP ${res.status}`), { kind: 'error' });
+          }
+        } catch (e) {
+          shell.showToast(tr('tenant.79d27a').replace('{0}', e.message || e), { kind: 'error' });
+        } finally {
+          state.pendingKey = null;
+          state.subscribingBatch = false;
+          render();
+        }
+      };
 
       shell.openModal({
         title: tr('tenant.5e286d'),
-        subtitle: <span><span className="mono">{tenantLabel(tenant)}</span> {tr('tenant.a236d4')} <b>{subCount}</b> / {total}</span>,
+        subtitle: (
+          <span>
+            <span className="mono">{tenantLabel(tenant)}</span>
+            <span style={{ margin: '0 6px', color: 'var(--fg-3)' }}>·</span>
+            <span>已订阅 <b>{state.loading ? '—' : subCount}</b> / {state.loading ? '—' : totalCount}</span>
+          </span>
+        ),
         icon: 'globe',
         iconColor: 'var(--cyan)',
         size: 'lg',
         body: (
           <div style={{ padding: 16 }}>
-            <div style={{
-              padding: '10px 12px', background: 'var(--info-soft)',
-              border: '1px solid var(--info)', borderRadius: 6, fontSize: 11.5,
-              color: 'var(--info)', marginBottom: 14,
-            }}>
-              <Icon name="info" size={11} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-              {tr('tenant.9525fb')} <b>{(state.allRegions.find(r => r.code === getTenantRegion(tenant))?.cnName) || getTenantRegion(tenant)}</b>{tr('tenant.4acb94')}
+            {/* 顶部三项统计卡片 */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 12 }}>
+              <div style={{ padding: '8px 12px', background: 'var(--bg-2)', borderRadius: 6, border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--fg-0)' }}>{state.loading ? '—' : totalCount}</div>
+                <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>全部区域</div>
+              </div>
+              <div style={{ padding: '8px 12px', background: 'var(--accent-soft)', borderRadius: 6, border: '1px solid color-mix(in oklab, var(--accent) 30%, transparent)' }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)' }}>{state.loading ? '—' : subCount}</div>
+                <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 2 }}>已订阅</div>
+              </div>
+              <div style={{ padding: '8px 12px', background: 'var(--bg-2)', borderRadius: 6, border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--fg-0)' }}>{state.loading ? '—' : unsubCount}</div>
+                <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>未订阅</div>
+              </div>
             </div>
 
+            {/* 规则说明横幅 */}
             <div style={{
-              display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6,
-              maxHeight: 380, overflowY: 'auto', paddingRight: 4,
+              padding: '9px 12px', background: 'var(--info-soft)',
+              border: '1px solid var(--info)', borderRadius: 6, fontSize: 11.5,
+              color: 'var(--info)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6,
             }}>
-              {state.allRegions.map(r => {
-                const isMain = r.code === getTenantRegion(tenant);
-                const isSub = state.subscribed.has(r.code);
-                const isPending = state.pending === r.code;
+              <Icon name="info" size={13} style={{ flexShrink: 0 }} />
+              <div>
+                {tr('tenant.9525fb')} <b>{mainRegionName}</b>{tr('tenant.4acb94')}
+              </div>
+            </div>
+
+            {/* 标签页切换 */}
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 12 }}>
+              {[
+                { id: 'subscribed', label: '已订阅', count: subCount },
+                { id: 'unsubscribed', label: '未订阅', count: unsubCount },
+              ].map(t => {
+                const active = state.tab === t.id;
                 return (
-                  <div key={r.code} style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '9px 12px',
-                    background: isSub ? 'var(--accent-soft)' : 'var(--bg-1)',
-                    border: '1px solid ' + (isSub ? 'var(--accent)' : 'var(--border)'),
-                    borderRadius: 6,
+                  <button key={t.id} type="button" onClick={() => { state.tab = t.id; render(); }} style={{
+                    padding: '8px 16px', background: 'transparent', border: 'none',
+                    borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
+                    color: active ? 'var(--accent)' : 'var(--fg-2)',
+                    fontWeight: active ? 600 : 400, fontSize: 13, cursor: 'pointer',
+                    display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: -1,
                   }}>
-                    <RegionBadge code={r.code} lang={lang} />
-                    <div style={{ flex: 1 }} />
-                    {isMain && (
-                      <span style={{ padding: '1px 6px', background: 'var(--accent)', color: 'var(--accent-fg)', borderRadius: 3, fontSize: 10, fontWeight: 600 }}>{tr('tenant.d2ccf9')}</span>
-                    )}
-                    {isSub && !isMain && (
-                      <span style={{ padding: '1px 6px', background: 'var(--accent-soft)', color: 'var(--accent)', borderRadius: 3, fontSize: 10, fontWeight: 500 }}>{tr('tenant.d81371')}</span>
-                    )}
-                    {isPending && (
-                      <span style={{ padding: '1px 6px', background: 'var(--orange-soft)', color: 'var(--orange)', borderRadius: 3, fontSize: 10, fontWeight: 500 }}>{tr('tenant.2585a5')}</span>
-                    )}
-                    {!isSub && !isPending && (
-                      <button type="button" onClick={() => {
-                        state.pending = r.code;
-                        render();
-                        (async () => {
-                          try {
-                            const res = await fetch('/tenants/subscribe-regions', { method: 'POST', headers: { 'Content-Type':'application/json','Accept':'application/json','X-Requested-With':'XMLHttpRequest' }, credentials: 'include', body: JSON.stringify({ tenantId: getTenantDbId(tenant), regionKeys: [r.code] }) });
-                            const j = await res.json();
-                            if (res.ok && j && j.success === true) {
-                              state.subscribed.add(r.code);
-                              shell.showToast(tr('tenant.cf297f').replace('{0}',getRegionSimpleName(r)), { kind: 'success' });
-                              window.dispatchEvent(new CustomEvent('ocip-refresh-page', { detail: 'tenants' }));
-                            } else shell.showToast(tr('tenant.79d27a').replace('{0}',(j && (j.error || j.message)) || `HTTP ${res.status}`), { kind: 'error' });
-                          } catch (e) { shell.showToast(tr('tenant.79d27a').replace('{0}',e.message || e), { kind: 'error' }); }
-                          state.pending = null; render();
-                        })();
-                      }} style={{
-                        padding: '2px 10px', background: 'var(--accent)', border: 'none',
-                        borderRadius: 3, color: 'var(--accent-fg)',
-                        fontSize: 10.5, fontWeight: 500, cursor: 'pointer',
-                      }}>{tr('tenant.a630ef')}</button>
-                    )}
-                    {isSub && !isMain && !isPending && (
-                      <button type="button" onClick={() => shell.showToast(tr('tenant.ef17b9'), { kind: 'info', duration: 5000 })} style={{
-                        padding: '2px 8px', background: 'var(--bg-2)', border: '1px solid var(--border)',
-                        borderRadius: 3, color: 'var(--fg-2)', fontSize: 10, cursor: 'pointer',
-                      }}>{tr('tenant.b30d52')}</button>
-                    )}
-                  </div>
+                    <span>{t.label}</span>
+                    <span style={{
+                      fontSize: 10.5, padding: '1px 6px', borderRadius: 10,
+                      background: active ? 'var(--accent-soft)' : 'var(--bg-3)',
+                      color: active ? 'var(--accent)' : 'var(--fg-3)',
+                    }}>{state.loading ? '—' : t.count}</span>
+                  </button>
                 );
               })}
             </div>
+
+            {/* 标签页内容 */}
+            {state.tab === 'subscribed' ? (
+              <div style={{
+                background: 'var(--bg-1)', border: '1px solid var(--border)',
+                borderRadius: 6, maxHeight: 360, overflowY: 'auto', minHeight: 220,
+              }}>
+                <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12 }}>
+                  <thead>
+                    <tr>
+                      {['区域名称', '区域标识', '主区域', '状态'].map((h, i) => (
+                        <th key={i} style={{
+                          position: 'sticky', top: 0, zIndex: 1,
+                          textAlign: i === 2 || i === 3 ? 'center' : 'left',
+                          padding: '9px 12px', background: 'var(--bg-2)',
+                          color: 'var(--fg-3)', fontSize: 10.5, fontWeight: 600,
+                          textTransform: 'uppercase', letterSpacing: 0.5,
+                          borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap',
+                          width: i === 2 ? 90 : i === 3 ? 100 : undefined,
+                        }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {state.loading ? (
+                      <tr>
+                        <td colSpan={4} style={{ padding: '60px 16px', textAlign: 'center', color: 'var(--fg-3)', fontSize: 12 }}>
+                          <Icon name="loader" size={24} style={{ color: 'var(--info)', marginBottom: 8, animation: 'button-spin 800ms linear infinite' }} />
+                          <div>{tr('tenant.regionSub.loading')}</div>
+                        </td>
+                      </tr>
+                    ) : state.subscribedList.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--fg-3)' }}>
+                          <Icon name="globe" size={32} style={{ opacity: 0.35, marginBottom: 8 }} />
+                          <div style={{ fontSize: 13, fontWeight: 500 }}>暂无已订阅区域</div>
+                          <button type="button" onClick={() => { state.tab = 'unsubscribed'; render(); }} style={{
+                            marginTop: 10, padding: '4px 12px', background: 'var(--accent)', color: 'var(--accent-fg)',
+                            border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12,
+                          }}>去订阅</button>
+                        </td>
+                      </tr>
+                    ) : (
+                      state.subscribedList.map((r, i) => {
+                        const code = r.regionKey || r.regionName;
+                        const isHome = r.isHomeRegion || code === mainRegion;
+                        const rawStatus = (typeof r.status === 'object' && r.status ? r.status.value : r.status) || 'READY';
+                        const st = String(rawStatus).toUpperCase();
+                        return (
+                          <tr key={code || i} style={{
+                            background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent',
+                          }}>
+                            <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                              <RegionBadge code={code} lang={lang} />
+                            </td>
+                            <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                              <span className="mono" style={{ color: 'var(--accent)', fontSize: 11.5 }}>{code}</span>
+                            </td>
+                            <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
+                              {isHome ? (
+                                <span style={{
+                                  padding: '2px 8px', background: 'var(--accent-soft)',
+                                  color: 'var(--accent)', borderRadius: 10, fontSize: 10.5, fontWeight: 600,
+                                }}>{tr('tenant.d2ccf9') || '主区域'}</span>
+                              ) : (
+                                <span style={{ color: 'var(--fg-3)' }}>—</span>
+                              )}
+                            </td>
+                            <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
+                              <span style={{
+                                padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 500,
+                                background: st === 'READY' ? 'var(--accent-soft)' : st === 'PENDING' ? 'var(--orange-soft)' : 'var(--danger-soft)',
+                                color: st === 'READY' ? 'var(--accent)' : st === 'PENDING' ? 'var(--orange)' : 'var(--danger)',
+                              }}>{st === 'READY' ? '已就绪' : st === 'PENDING' ? '订阅中' : st}</span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              state.unsubscribedList.length === 0 ? (
+                <div style={{ padding: 40, textAlign: 'center', color: 'var(--fg-3)' }}>
+                  <Icon name="check-circle" size={32} style={{ color: 'var(--accent)', marginBottom: 8 }} />
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-0)' }}>已订阅全部区域</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--fg-3)', marginTop: 4 }}>当前租户已订阅所有可用区域</div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '8px 12px', background: 'var(--bg-2)', borderRadius: 6,
+                    border: '1px solid var(--border)', marginBottom: 8,
+                  }}>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12 }}>
+                      <input
+                        type="checkbox"
+                        checked={allUnsubSelected}
+                        onChange={toggleSelectAll}
+                        disabled={state.loading || unsubCount === 0}
+                        style={{ cursor: state.loading || unsubCount === 0 ? 'not-allowed' : 'pointer', margin: 0 }}
+                      />
+                      <span style={{ fontWeight: 500 }}>全选{state.loading ? '' : `（共 ${unsubCount} 个区域）`}</span>
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {state.selectedKeys.size > 0 && (
+                        <span style={{ fontSize: 11.5, color: 'var(--fg-2)' }}>
+                          已选 <b style={{ color: 'var(--accent)' }}>{state.selectedKeys.size}</b> 项
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        disabled={state.selectedKeys.size === 0 || state.subscribingBatch || state.loading}
+                        onClick={() => handleSubscribe(Array.from(state.selectedKeys))}
+                        style={{
+                          padding: '4px 14px', background: 'var(--accent)', border: 'none',
+                          borderRadius: 4, color: 'var(--accent-fg)', fontSize: 12, fontWeight: 500,
+                          cursor: state.selectedKeys.size === 0 || state.subscribingBatch || state.loading ? 'not-allowed' : 'pointer',
+                          opacity: state.selectedKeys.size === 0 || state.subscribingBatch || state.loading ? 0.5 : 1,
+                        }}
+                      >
+                        {state.subscribingBatch ? '正在提交...' : (state.selectedKeys.size > 0 ? `订阅所选 (${state.selectedKeys.size})` : '订阅所选')}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    background: 'var(--bg-1)', border: '1px solid var(--border)',
+                    borderRadius: 6, maxHeight: 320, overflowY: 'auto', minHeight: 200,
+                  }}>
+                    {state.loading ? (
+                      <div style={{ padding: '60px 16px', textAlign: 'center', color: 'var(--fg-3)', fontSize: 12 }}>
+                        <Icon name="loader" size={24} style={{ color: 'var(--info)', marginBottom: 8, animation: 'button-spin 800ms linear infinite' }} />
+                        <div>{tr('tenant.regionSub.loadingUnsub')}</div>
+                      </div>
+                    ) : state.unsubscribedList.length === 0 ? (
+                      <div style={{ padding: 40, textAlign: 'center', color: 'var(--fg-3)' }}>
+                        <Icon name="check-circle" size={32} style={{ color: 'var(--accent)', marginBottom: 8 }} />
+                        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-0)' }}>已订阅全部区域</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--fg-3)', marginTop: 4 }}>当前租户已订阅所有可用区域</div>
+                      </div>
+                    ) : (
+                      state.unsubscribedList.map((r, i) => {
+                      const isSelected = state.selectedKeys.has(r.key);
+                      const isPending = state.pendingKey === r.key;
+                      return (
+                        <div
+                          key={r.key}
+                          onClick={(e) => {
+                            if (e.target.tagName === 'BUTTON') return;
+                            toggleSelectOne(r.key);
+                          }}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 12,
+                            padding: '9px 12px',
+                            background: isSelected ? 'color-mix(in oklab, var(--accent) 8%, transparent)' : (i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent'),
+                            borderBottom: i < state.unsubscribedList.length - 1 ? '1px solid var(--border)' : 'none',
+                            cursor: 'pointer', transition: 'background 100ms',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectOne(r.key)}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ cursor: 'pointer', margin: 0 }}
+                          />
+                          <RegionBadge code={r.key} lang={lang} />
+                          <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{r.key}</span>
+                          <div style={{ flex: 1 }} />
+                          <button
+                            type="button"
+                            disabled={isPending || state.subscribingBatch}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSubscribe([r.key]);
+                            }}
+                            style={{
+                              padding: '2px 10px', background: 'var(--accent)', border: 'none',
+                              borderRadius: 3, color: 'var(--accent-fg)', fontSize: 11,
+                              fontWeight: 500, cursor: isPending ? 'wait' : 'pointer',
+                              opacity: isPending ? 0.6 : 1,
+                            }}
+                          >
+                            {isPending ? '订阅中...' : '+ 订阅'}
+                          </button>
+                        </div>
+                      );
+                    }))}
+                  </div>
+                </div>
+              )
+            )}
           </div>
         ),
-        footer: <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('tenant.b15d91')}</Button>,
+        footer: (
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={loadRegions}
+              disabled={state.loading || state.subscribingBatch}
+            >
+              <Icon name="refresh-cw" size={13} style={{ marginRight: 6 }} />
+              刷新
+            </Button>
+            <Button variant="ghost" size="md" onClick={shell.closeModal}>
+              {tr('tenant.b15d91')}
+            </Button>
+          </div>
+        ),
       });
     };
+
     render();
     loadRegions();
   }, [shell, lang]);
@@ -6350,7 +5668,12 @@ function useRegionSubscribeModal() {
 
 function useTrafficAlertModal() {
   const shell = useShell();
+  const userManageModal = useUserManageModal();
   return React.useCallback((tenant) => {
+    const region = getTenantRegion(tenant);
+    const regName = regionSimpleName(region);
+    const regionText = regName || region || '—';
+
     const initial = /pro|prod/i.test(getTenantName(tenant) || '');
     const state = {
       enableStats: true,
@@ -6393,102 +5716,219 @@ function useTrafficAlertModal() {
     const render = () => {
       shell.openModal({
         title: tr('tenant.3746e6'),
-        subtitle: <span><span className="mono">{tenantLabel(tenant)}</span> · Traffic Alert · {getTenantName(tenant)}</span>,
+        subtitle: <span><span className="mono">{tenantLabel(tenant)}</span><span style={{ margin: '0 6px', color: 'var(--fg-3)' }}>·</span><span>{regionText}</span></span>,
         icon: 'bell',
         iconColor: 'var(--orange)',
         size: 'md',
         body: (
-          <div style={{ padding: 20 }}>
-            {/* 启用流量统计 */}
-            <FormRow label={tr('tenant.af63c7')} hint={tr('tenant.b48427')}>
-              <label style={{
-                display: 'inline-flex', alignItems: 'center', gap: 10, cursor: 'pointer',
-                padding: '8px 12px', width: '100%',
+          <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {/* 1. 启用流量统计 · 拟物白勾卡片 */}
+            <div
+              onClick={() => { state.enableStats = !state.enableStats; render(); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
+                padding: '12px 14px',
                 background: state.enableStats ? 'var(--accent-soft)' : 'var(--bg-2)',
                 border: '1px solid ' + (state.enableStats ? 'var(--accent)' : 'var(--border)'),
-                borderRadius: 6,
+                borderRadius: 8,
+                transition: 'all 120ms',
+                userSelect: 'none',
+              }}
+            >
+              <div style={{
+                width: 18, height: 18, borderRadius: 5,
+                background: state.enableStats ? 'var(--accent)' : 'var(--bg-3)',
+                border: '1px solid ' + (state.enableStats ? 'var(--accent)' : 'var(--border-strong)'),
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+                transition: 'all 120ms',
               }}>
-                <input type="checkbox" checked={state.enableStats}
-                  onChange={e => { state.enableStats = e.target.checked; render(); }}
-                  style={{ accentColor: 'var(--accent)' }}
-                />
-                <span style={{ fontSize: 12, color: state.enableStats ? 'var(--accent)' : 'var(--fg-1)' }}>
-                  {state.enableStats ? tr('tenant.c96ff9') : tr('tenant.541215')}
-                </span>
-              </label>
-            </FormRow>
-
-            {/* 预警阈值 */}
-            <FormRow label={tr('tenant.4ce22f')} required hint={tr('tenant.b821c4')}>
-              <NumberInput value={state.threshold}
-                onChange={v => { state.threshold = v; render(); }}
-                min={0} max={100000}
-              />
-            </FormRow>
-
-            {/* 快捷值 */}
-            <div style={{ display: 'flex', gap: 6, marginTop: -8, marginBottom: 14 }}>
-              {[
-                { v: 1000, label: '1 TB' },
-                { v: 5000, label: '5 TB' },
-                { v: 10000, label: '10 TB' },
-                { v: 20000, label: '20 TB' },
-              ].map(p => (
-                <button key={p.v} type="button"
-                  onClick={() => { state.threshold = p.v; render(); }}
-                  style={{
-                    padding: '3px 10px',
-                    background: state.threshold === p.v ? 'var(--accent-soft)' : 'var(--bg-2)',
-                    border: '1px solid ' + (state.threshold === p.v ? 'var(--accent)' : 'var(--border)'),
-                    borderRadius: 3,
-                    color: state.threshold === p.v ? 'var(--accent)' : 'var(--fg-2)',
-                    fontSize: 10.5, fontWeight: 500, cursor: 'pointer',
-                  }}
-                >{p.label}</button>
-              ))}
+                {state.enableStats && <Icon name="check" size={12} style={{ color: '#fff', strokeWidth: 3 }} />}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: state.enableStats ? 'var(--accent)' : 'var(--fg-0)' }}>
+                  {state.enableStats ? '流量监控与预警已启用' : '流量监控与预警未启用'}
+                </div>
+                <div style={{ fontSize: 11.5, color: state.enableStats ? 'var(--fg-1)' : 'var(--fg-2)', marginTop: 3, opacity: 0.9 }}>
+                  开启后按月统计公网出方向流量，并在达到阈值时触发通知告警
+                </div>
+              </div>
             </div>
 
-            {/* 自动关机 */}
-            <FormRow label={tr('tenant.422a89')} hint={tr('tenant.ea9e20')}>
-              <label style={{
-                display: 'inline-flex', alignItems: 'center', gap: 10, cursor: 'pointer',
-                padding: '8px 12px', width: '100%',
-                background: state.autoShutdown ? 'var(--danger-soft)' : 'var(--bg-2)',
-                border: '1px solid ' + (state.autoShutdown ? 'var(--danger)' : 'var(--border)'),
-                borderRadius: 6,
-              }}>
-                <input type="checkbox" checked={state.autoShutdown}
-                  onChange={e => { state.autoShutdown = e.target.checked; render(); }}
-                  style={{ accentColor: 'var(--danger)' }}
+            {/* 2. 预警阈值与快捷药丸按钮 */}
+            <div style={{
+              display: 'flex', flexDirection: 'column', gap: 8,
+              opacity: state.enableStats ? 1 : 0.6,
+              pointerEvents: state.enableStats ? 'auto' : 'none',
+              transition: 'opacity 120ms',
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-1)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span>预警阈值 (GB)</span>
+                <span style={{ color: 'var(--danger)' }}>*</span>
+                <span style={{ color: 'var(--fg-2)', fontWeight: 400, marginLeft: 4, opacity: 0.85 }}>· 每月流量达到该值时预警</span>
+              </div>
+              
+              <div style={{ position: 'relative', width: '100%' }}>
+                <NumberInput
+                  value={state.threshold}
+                  onChange={v => { state.threshold = v; render(); }}
+                  min={0} max={100000}
+                  style={{ paddingRight: 40 }}
                 />
-                <span style={{ fontSize: 12, color: state.autoShutdown ? 'var(--danger)' : 'var(--fg-1)' }}>
-                  {state.autoShutdown ? tr('tenant.9c6ad4') : tr('tenant.5fa0b2')}
-                </span>
-              </label>
-            </FormRow>
+                <span style={{
+                  position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                  fontSize: 11, fontWeight: 600, color: 'var(--fg-3)',
+                  pointerEvents: 'none',
+                }}>GB</span>
+              </div>
 
-            {/* 通知邮箱(预览) */}
-            <FormRow label={tr('tenant.2ba611')} hint={tr('tenant.848519')}>
+              {/* 快捷 Pill 胶囊按钮组 */}
+              <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+                {[
+                  { v: 1000, label: '1 TB' },
+                  { v: 5000, label: '5 TB (推荐)' },
+                  { v: 10000, label: '10 TB' },
+                  { v: 20000, label: '20 TB' },
+                ].map(p => {
+                  const isSel = Number(state.threshold) === p.v;
+                  return (
+                    <button
+                      key={p.v}
+                      type="button"
+                      onClick={() => { state.threshold = p.v; render(); }}
+                      style={{
+                        padding: '5px 12px',
+                        background: isSel ? 'var(--accent)' : 'var(--bg-2)',
+                        border: '1px solid ' + (isSel ? 'var(--accent)' : 'var(--border)'),
+                        borderRadius: 6,
+                        color: isSel ? '#ffffff' : 'var(--fg-1)',
+                        fontSize: 11.5, fontWeight: isSel ? 600 : 500,
+                        cursor: 'pointer',
+                        boxShadow: isSel ? '0 2px 6px rgba(0,0,0,0.15)' : 'none',
+                        transition: 'all 120ms',
+                      }}
+                    >{p.label}</button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 3. 高级防护 · 流量超限自动关机 */}
+            <div style={{
+              display: 'flex', flexDirection: 'column', gap: 6,
+              opacity: state.enableStats ? 1 : 0.6,
+              pointerEvents: state.enableStats ? 'auto' : 'none',
+              transition: 'opacity 120ms',
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-1)' }}>
+                高级保护动作
+              </div>
+              <div
+                onClick={() => { state.autoShutdown = !state.autoShutdown; render(); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
+                  padding: '10px 14px',
+                  background: state.autoShutdown ? 'var(--danger-soft)' : 'var(--bg-2)',
+                  border: '1px solid ' + (state.autoShutdown ? 'var(--danger)' : 'var(--border)'),
+                  borderRadius: 8,
+                  transition: 'all 120ms',
+                  userSelect: 'none',
+                }}
+              >
+                <div style={{
+                  width: 18, height: 18, borderRadius: 5,
+                  background: state.autoShutdown ? 'var(--danger)' : 'var(--bg-3)',
+                  border: '1px solid ' + (state.autoShutdown ? 'var(--danger)' : 'var(--border-strong)'),
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0,
+                  transition: 'all 120ms',
+                }}>
+                  {state.autoShutdown && <Icon name="check" size={12} style={{ color: '#fff', strokeWidth: 3 }} />}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: state.autoShutdown ? 'var(--danger)' : 'var(--fg-0)' }}>
+                    流量超限自动关机
+                  </div>
+                  <div style={{ fontSize: 11.5, color: state.autoShutdown ? 'var(--fg-1)' : 'var(--fg-2)', marginTop: 3, opacity: 0.9 }}>
+                    当月流量达到阈值后自动停止该区域的所有实例，防止产生巨额账单
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 4. 预警通知渠道 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-1)' }}>
+                  预警通知渠道
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    shell.closeModal();
+                    userManageModal(tenant, 'notifications');
+                  }}
+                  style={{
+                    background: 'none', border: 'none', padding: 0,
+                    color: 'var(--accent)', fontSize: 11, cursor: 'pointer',
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                  }}
+                >
+                  <Icon name="settings" size={11} />
+                  管理通知邮箱
+                </button>
+              </div>
+
               {state.notifyEmails.length === 0 ? (
-                <div style={{ padding: 10, background: 'var(--bg-2)', border: '1px dashed var(--border)', borderRadius: 4, textAlign: 'center', fontSize: 11, color: 'var(--fg-3)' }}>
-                  {tr('tenant.ada2e6')}
+                <div style={{
+                  padding: '12px 14px',
+                  background: 'var(--bg-2)',
+                  border: '1px dashed var(--orange)',
+                  borderRadius: 6,
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  gap: 8,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Icon name="alert-triangle" size={14} style={{ color: 'var(--orange)', flexShrink: 0 }} />
+                    <span style={{ fontSize: 11.5, color: 'var(--fg-2)' }}>
+                      暂未配置通知邮箱 — 流量触发预警时将无法接收提醒
+                    </span>
+                  </div>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    onClick={() => {
+                      shell.closeModal();
+                      userManageModal(tenant, 'notifications');
+                    }}
+                  >
+                    前往配置
+                  </Button>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {state.notifyEmails.map(e => (
                     <div key={e} style={{
-                      display: 'flex', alignItems: 'center', gap: 6,
-                      padding: '5px 10px', background: 'var(--bg-2)', border: '1px solid var(--border)',
-                      borderRadius: 4,
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '5px 10px',
+                      background: 'var(--bg-2)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 6,
                     }}>
-                      <Icon name="mail" size={11} style={{ color: 'var(--info)' }} />
-                      <span className="mono" style={{ fontSize: 11, color: 'var(--fg-0)', flex: 1 }}>{e}</span>
-                      <span style={{ padding: '0 5px', background: 'var(--accent-soft)', color: 'var(--accent)', borderRadius: 2, fontSize: 9.5, fontWeight: 500 }}>{tr('tenant.876caf')}</span>
+                      <Icon name="mail" size={12} style={{ color: 'var(--info)' }} />
+                      <span className="mono" style={{ fontSize: 11, color: 'var(--fg-0)' }}>{e}</span>
+                      <span style={{
+                        padding: '1px 5px',
+                        background: 'var(--accent-soft)',
+                        color: 'var(--accent)',
+                        borderRadius: 3,
+                        fontSize: 9.5, fontWeight: 600,
+                      }}>有效</span>
                     </div>
                   ))}
                 </div>
               )}
-            </FormRow>
+            </div>
           </div>
         ),
         footer: (
@@ -6867,7 +6307,7 @@ function useSocialConfigModal() {
                   >{tr('tenant.a4793f')}</Button>
                 </div>
 
-                <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflowY: 'auto', maxHeight: 420 }}>
                   <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12 }}>
                     <thead>
                       <tr>
@@ -6884,6 +6324,7 @@ function useSocialConfigModal() {
                             fontSize: 10.5, fontWeight: 600,
                             textTransform: 'uppercase', letterSpacing: 0.5,
                             borderBottom: '1px solid var(--border)',
+                            position: 'sticky', top: 0, zIndex: 1,
                           }}>{c.h}</th>
                         ))}
                       </tr>
@@ -7159,12 +6600,14 @@ function useUpdateAccountModal() {
           render();
           shell.showToast(tr('tenant.3996cc').replace('{0}',getTenantName(tenant)), { kind: 'success' });
         });
-        es.addEventListener('error', () => {
-          state.lines.push('[System] event: error · SSE failed');
+        es.addEventListener('error', (e) => {
+          state.lines.push(e.data ? '[error] ' + e.data : '[System] event: error · SSE failed');
           state.running = false;
-          try { es.close(); } catch (e) {}
+          try { es.close(); } catch (err) {}
           render();
-          shell.showToast(tr('tenant.930442'), { kind: 'error' });
+          // 后端前置健康探测失败(账号封禁/网络故障)会通过 error 事件推送真实原因
+          shell.showToast(e.data || tr('tenant.930442'), { kind: 'error' });
+          window.dispatchEvent(new CustomEvent('ocip-refresh-page', { detail: 'tenants' }));
         });
         es.onerror = () => {
           if (es && es.readyState === EventSource.CLOSED) {
@@ -7684,12 +7127,12 @@ Object.assign(window, {
   useAddBootModal,
   useTenantProxyQuickModal,
   useApiImportModal, useImportTenantsModal,
-  useTenantDetailDrawer, useQuotaDrawer, useCostDrawer,
-  useTrafficDrawer, useAuditDrawer, useUserManageModal,
+  useTenantDetailDrawer,
+  useUserManageModal,
   useRegionSubscribeModal, useTrafficAlertModal,
   useMailModal, useSocialConfigModal,
   useUpdateAccountModal, useExportTenantModal,
   // 供独立的租户详情页调用
-  showDiskModal, showSecurityModal, showResourceModal, showStorageModal,
+  showDiskModal, showSecurityModal, showResourceModal, showStorageModal, showMysqlModal,
   MiniMetric,
 });

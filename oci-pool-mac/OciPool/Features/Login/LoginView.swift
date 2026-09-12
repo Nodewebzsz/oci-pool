@@ -15,22 +15,25 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            auroraBackground
+            // Web 布局：全屏满铺，左 hero 55% / 右表单 45%（无玻璃壳）
+            LoginPalette.bg(dark)
+                .ignoresSafeArea()
 
             GeometryReader { geo in
-                let w = min(1240, max(920, geo.size.width - 48))
-                let h = min(760, max(640, geo.size.height - 48))
-
                 HStack(spacing: 0) {
                     LoginHeroView(
                         dark: dark,
                         crying: model.cryHero,
-                        shyMode: model.passwordFocused
+                        shyMode: model.passwordFocused,
+                        locale: model.locale
                     )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(width: geo.size.width * 0.55)
+                    .contentShape(Rectangle())
+                    // 点击空白处结束编辑（子控件/按钮优先消费各自的点击）
+                    .onTapGesture { dismissLoginFocus() }
 
                     Rectangle()
-                        .fill(LoginPalette.divider(dark))
+                        .fill(LoginPalette.line(dark))
                         .frame(width: 1)
 
                     LoginRightPanel(
@@ -48,17 +51,10 @@ struct LoginView: View {
                             UserDefaults.standard.set(loc.rawValue, forKey: "appLocale")
                         }
                     )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(width: geo.size.width * 0.45)
+                    .contentShape(Rectangle())
+                    .onTapGesture { dismissLoginFocus() }
                 }
-                .frame(width: w, height: h)
-                .background(LoginPalette.shellFill(dark))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 26)
-                        .stroke(LoginPalette.shellBorder(dark), lineWidth: 1)
-                )
-                .cornerRadius(26)
-                .shadow(color: Color.black.opacity(dark ? 0.55 : 0.14), radius: 30, y: 16)
-                .frame(width: geo.size.width, height: geo.size.height)
             }
 
             if model.showForgotPassword {
@@ -109,51 +105,12 @@ struct LoginView: View {
         }
     }
 
-    // MARK: - Aurora
-
-    private var auroraBackground: some View {
-        ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: dark
-                    ? [Color(hex: "12151a"), Color(hex: "1a1d21"), Color(hex: "151820")]
-                    : [Color(hex: "eef1f6"), Color(hex: "e8ecf3"), Color(hex: "eef2f8")]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            Circle()
-                .fill(Color(hex: dark ? "4d9eff" : "6366f1").opacity(dark ? 0.35 : 0.40))
-                .frame(width: 560, height: 560)
-                .blur(radius: 64)
-                .offset(x: -280, y: -220)
-            Circle()
-                .fill(Color(hex: dark ? "8b5cf6" : "0ea5e9").opacity(dark ? 0.32 : 0.36))
-                .frame(width: 480, height: 480)
-                .blur(radius: 64)
-                .offset(x: 320, y: -40)
-            Circle()
-                .fill(Color(hex: dark ? "38bdf8" : "a78bfa").opacity(dark ? 0.22 : 0.28))
-                .frame(width: 620, height: 620)
-                .blur(radius: 70)
-                .offset(x: -40, y: 320)
-            Circle()
-                .fill(Color(hex: dark ? "22d3ee" : "3b82f6").opacity(dark ? 0.16 : 0.18))
-                .frame(width: 360, height: 360)
-                .blur(radius: 50)
-                .offset(x: 80, y: 40)
-            RadialGradient(
-                gradient: Gradient(colors: [
-                    Color.clear,
-                    Color.black.opacity(dark ? 0.45 : 0.08)
-                ]),
-                center: .center,
-                startRadius: 80,
-                endRadius: 700
-            )
-        }
-        .ignoresSafeArea()
-    }
-
     // MARK: - Meta
+
+    /// 点击登录页空白处：结束编辑（用户名/密码/6 格验证码统一失焦）。
+    private func dismissLoginFocus() {
+        NSApp.keyWindow?.makeFirstResponder(nil)
+    }
 
     private func loadMeta(force: Bool) async {
         let activated = await MainActor.run { model.modeActivated }
@@ -179,7 +136,7 @@ struct LoginView: View {
         if skip { return }
 
         await MainActor.run {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(.easeInOut(duration: 0.12)) {
                 model.isLoadingMeta = true
                 model.metaError = nil
                 model.infoText = nil
@@ -188,10 +145,12 @@ struct LoginView: View {
         }
 
         do {
-            let meta = try await session.fetchLoginPageMeta()
-            let factors = await session.fetchLoginFactors()
+            async let metaTask = session.fetchLoginPageMeta()
+            async let factorsTask = session.fetchLoginFactors()
+            let (meta, factors) = try await (metaTask, factorsTask)
+
             await MainActor.run {
-                withAnimation(.easeInOut(duration: 0.28)) {
+                withAnimation(.easeInOut(duration: 0.15)) {
                     model.allowRegister = meta.allowRegister
                     model.githubEnabled = meta.githubEnabled
                     model.googleEnabled = meta.googleEnabled
@@ -205,13 +164,13 @@ struct LoginView: View {
                     model.metaLoadedURL = target
                     model.isLoadingMeta = false
                     if model.isRemoteServer {
-                        model.infoText = model.locale == .enUS ? "Remote server connected" : "已连接远程服务器"
+                        model.infoText = nil
                     }
                 }
             }
         } catch {
             await MainActor.run {
-                withAnimation(.easeInOut(duration: 0.22)) {
+                withAnimation(.easeInOut(duration: 0.15)) {
                     model.isLoadingMeta = false
                     model.metaLoadedURL = nil
                     model.metaError = error.localizedDescription
@@ -242,6 +201,7 @@ struct LoginView: View {
             model.metaError = nil
             model.metaLoadedURL = nil
             model.isLoadingMeta = false
+            model.resetVerifyState()
         }
         // Align URL only; do not re-write "chosen" flag.
         session.setDeploymentMode(mode, userChosen: false)
@@ -275,6 +235,7 @@ struct LoginView: View {
             model.googleEnabled = false
             model.messageEnabled = false
             model.mfaEnabled = false
+            model.resetVerifyState()
             model.isLoadingMeta = false
         }
 
@@ -282,10 +243,10 @@ struct LoginView: View {
         model.serverURL = session.serverURL
 
         if mode == .remote {
-            // Free local Java if previously started this session.
-            await Task.detached(priority: .userInitiated) {
+            // Free local Java asynchronously in background without blocking UI
+            Task.detached(priority: .utility) {
                 BackendController.shared.stop()
-            }.value
+            }
             // User connects via「连接」when URL ready; auto-try if host already filled.
             await loadMeta(force: false)
         } else {
@@ -307,6 +268,7 @@ struct LoginView: View {
 
         model.serverURL = raw
         session.serverURL = raw
+        model.resetVerifyState()
         if model.deploymentMode == .remote {
             session.lastRemoteServerURL = raw
         }
@@ -350,6 +312,15 @@ struct LoginView: View {
             }
         }
 
+        // Web-parity: the code is only shown on a dedicated verify step AFTER
+        // the first login attempt asks for it. If already verifying, resubmit
+        // the code instead of treating this as a fresh login.
+        let verifying = await MainActor.run { model.showVerifyStep }
+        if verifying {
+            await submitVerification()
+            return
+        }
+
         let valid = await MainActor.run { model.validateLoginFields() }
         if !valid {
             return
@@ -368,18 +339,63 @@ struct LoginView: View {
         }
         let pass = await MainActor.run { model.password }
         let remember = await MainActor.run { model.rememberMe }
-        let vCode: String? = await MainActor.run {
-            if model.showMessageCode && !model.verificationCode.isEmpty {
-                return model.verificationCode
+
+        do {
+            try await session.login(
+                username: user,
+                password: pass,
+                verificationCode: nil,
+                mfaCode: nil,
+                rememberMe: remember
+            )
+            await MainActor.run { model.isSubmitting = false }
+        } catch {
+            let msg = error.localizedDescription
+            if Self.needsVerification(msg) {
+                await MainActor.run {
+                    model.isSubmitting = false
+                    model.enterVerifyStep()
+                }
+                // Web VerifyView 挂载即自动发送一次消息验证码（MFA 模式无需发送）
+                let shouldAutoSend = await MainActor.run { () -> Bool in
+                    model.showMessageCode && model.codeCountdown == 0
+                        && model.codeSentTo == nil
+                        && !model.username.trimmingCharacters(in: .whitespaces).isEmpty
+                }
+                if shouldAutoSend {
+                    await doSendCode()
+                }
+                return
             }
-            return nil
-        }
-        let mCode: String? = await MainActor.run {
-            if model.showMfaCode && !model.mfaCode.isEmpty {
-                return model.mfaCode
+            await MainActor.run {
+                model.errorText = msg
+                model.isSubmitting = false
+                model.cryHero = true
             }
-            return nil
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            await MainActor.run { model.cryHero = false }
         }
+    }
+
+    /// Second login attempt from the verify step — resubmit credentials with the
+    /// message/MFA code the server requested.
+    @MainActor
+    private func submitVerification() async {
+        let valid = model.validateVerifyFields()
+        if !valid { return }
+
+        model.errorText = nil
+        model.infoText = nil
+        model.isSubmitting = true
+        session.serverURL = model.serverURL
+
+        let user = model.username.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        let pass = model.password
+        let remember = model.rememberMe
+        let vCode: String? = model.showMessageCode && !model.verificationCode.isEmpty
+            ? model.verificationCode : nil
+        let mCode: String? = model.showMfaCode && !model.mfaCode.isEmpty
+            ? model.mfaCode : nil
 
         do {
             try await session.login(
@@ -389,16 +405,18 @@ struct LoginView: View {
                 mfaCode: mCode,
                 rememberMe: remember
             )
-            await MainActor.run { model.isSubmitting = false }
+            model.isSubmitting = false
+            model.resetVerifyState()
         } catch {
-            await MainActor.run {
-                model.errorText = error.localizedDescription
-                model.isSubmitting = false
-                model.cryHero = true
-            }
-            try? await Task.sleep(nanoseconds: 1_200_000_000)
-            await MainActor.run { model.cryHero = false }
+            model.isSubmitting = false
+            model.errorText = error.localizedDescription
         }
+    }
+
+    /// Server signals "需要验证码 / MFA" with a message on the failed login.
+    private static func needsVerification(_ message: String) -> Bool {
+        let m = message.lowercased()
+        return m.contains("验证码") || m.contains("mfa")
     }
 
     private func doRegister() async {
@@ -459,6 +477,7 @@ struct LoginView: View {
             await MainActor.run {
                 model.isSendingCode = false
                 model.infoText = model.locale == .enUS ? "Code sent" : "验证码已发送"
+                model.codeSentTo = user
                 model.codeCountdown = 60
             }
             countdownTask?.cancel()

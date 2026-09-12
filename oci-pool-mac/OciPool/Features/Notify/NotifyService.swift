@@ -16,13 +16,18 @@ struct NotifyService {
         let raw = try await client.postJSON(url, body: [
             "enabled": form.enabled,
             "executeHour": form.executeHour,
-            // 通知密钥已废弃，保存时固定清空
-            "notificationSecret": "",
+            "notificationSecret": form.notificationSecret.trimmingCharacters(in: .whitespacesAndNewlines),
             "enableAccountCheck": form.enableAccountCheck,
             "enableBootLog": form.enableBootLog,
             "enableCostCheck": form.enableCostCheck
         ])
         try NotifyJSON.ensureOK(raw, fallback: "保存定时任务失败")
+    }
+
+    func startTgRobot() async throws {
+        let url = try client.makeURL(baseURL, path: "/startTgRobot")
+        let raw = try await client.postJSON(url, body: [:])
+        try NotifyJSON.ensureOK(raw, fallback: "重新注册机器人失败")
     }
 
     func updateTelegram(_ form: NotifyTelegramForm) async throws {
