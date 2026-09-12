@@ -8,7 +8,8 @@ struct ApiTokensView: View {
     @StateObject private var model = ApiTokensViewModel()
 
     private var dark: Bool { appearance.isDarkEffective }
-    private let cardMinHeight: CGFloat = 360
+    private let row1MinHeight: CGFloat = 240
+    private let row2MinHeight: CGFloat = 180
 
     var body: some View {
         PageScaffold(
@@ -25,12 +26,12 @@ struct ApiTokensView: View {
                                 .padding(.bottom, 12)
                         }
                         VStack(spacing: 14) {
-                            EqualHeightCardRow(minHeight: cardMinHeight) {
+                            EqualHeightCardRow(minHeight: row1MinHeight) {
                                 statusCard
                             } second: {
                                 configCard
                             }
-                            EqualHeightCardRow(minHeight: cardMinHeight) {
+                            EqualHeightCardRow(minHeight: row2MinHeight) {
                                 docsCard
                             } second: {
                                 usageCard
@@ -40,7 +41,6 @@ struct ApiTokensView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .appLoading(model.isLoading)
             }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
@@ -71,7 +71,7 @@ struct ApiTokensView: View {
             systemImage: "info.circle",
             accent: model.status.enabled ? AppTheme.sidebarActive : AppTheme.sidebarText(dark),
             enabled: nil,
-            minHeight: cardMinHeight
+            minHeight: row1MinHeight
         ) {
             infoRow("名称", model.status.tokenName.isEmpty ? "—" : model.status.tokenName)
             infoRow("状态", model.status.hasToken ? (model.status.enabled ? "已生成 · 有效" : "已生成 · 已停用") : "未生成")
@@ -115,7 +115,7 @@ struct ApiTokensView: View {
             systemImage: "gearshape",
             accent: AppTheme.info,
             enabled: nil,
-            minHeight: cardMinHeight
+            minHeight: row1MinHeight
         ) {
             FormFieldRow(label: "Token 名称", required: true) {
                 AppTextField(
@@ -177,7 +177,7 @@ struct ApiTokensView: View {
             systemImage: "book",
             accent: Color(hex: "b484e8"),
             enabled: nil,
-            minHeight: cardMinHeight
+            minHeight: row2MinHeight
         ) {
             Text("使用 Bearer Token 调用 Open API。可在浏览器打开 Swagger 或下载 OpenAPI JSON。")
                 .font(.system(size: 12))
@@ -205,7 +205,7 @@ struct ApiTokensView: View {
             systemImage: "terminal",
             accent: AppTheme.orange,
             enabled: nil,
-            minHeight: cardMinHeight
+            minHeight: row2MinHeight
         ) {
             Text("所有 API 请求需在请求头中携带 Bearer Token 完成鉴权。示例：")
                 .font(.system(size: 12))

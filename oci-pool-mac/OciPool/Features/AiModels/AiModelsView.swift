@@ -6,9 +6,6 @@ struct AiModelsView: View {
     @StateObject private var model = AiModelsViewModel()
 
     private var dark: Bool { appearance.isDarkEffective }
-    @State private var availablePage = 0
-    @State private var configuredPage = 0
-    private let panelPageSize = 4
 
     /// Web 4 KPI：可用模型(info cpu)/已配置(accent check-circle)/已启用(violet zap)/主区域(cyan globe)
     private var kpiGrid: some View {
@@ -69,16 +66,6 @@ struct AiModelsView: View {
             .foregroundColor(color)
     }
 
-    /// Web provider 色块：Cohere=cyan / Meta=info / Anthropic=orange
-    private func providerBadge(_ provider: String) -> some View {
-        let p = provider.lowercased()
-        let color: Color = p.contains("cohere") ? Color(hex: "00b6be")
-            : p.contains("meta") ? AppTheme.info
-            : p.contains("anthropic") ? AppTheme.orange
-            : AppTheme.sidebarText(dark)
-        return Circle().fill(color).frame(width: 8, height: 8)
-    }
-
     var body: some View {
         PageScaffold(
             title: "OCI AI 管理",
@@ -87,18 +74,16 @@ struct AiModelsView: View {
             iconColor: Color(hex: "b484e8"),
             toolbar: {
                 HStack(spacing: 8) {
-                    SelectMenu(
-                        options: model.tenants.map { SelectOption(id: $0.id, title: $0.tname.isEmpty ? $0.name : $0.tname) },
-                        selection: Binding(
-                            get: { model.selectedTenantId.isEmpty ? nil : model.selectedTenantId },
-                            set: { model.onTenantChanged($0) }
-                        ),
-                        placeholder: "-- 请选择租户 --",
-                        width: 220,
-                        allowClear: true,
-                        searchable: true
-                    )
-                    // Web：AI 对话紫色按钮（跳转 AI 对话页并预选租户）
+                    // 批量操作为页面级动作（后端 batchToggleTelegramAiConfigs 作用于全库配置），一手位直达
+                    AppButton(title: "全部启用", kind: .secondary) { model.batchEnable(true) }
+                    AppButton(title: "全部禁用", kind: .secondary) { model.batchEnable(false) }
+                    AppButton(
+                        title: "刷新",
+                        systemImage: "arrow.clockwise",
+                        kind: .secondary,
+                        isLoading: model.isLoadingConfigs || model.isLoadingModels
+                    ) { model.reload() }
+                    // AI 对话快捷入口（跳转全屏对话工作台并预选租户）
                     AppButton(title: "AI 对话", systemImage: "message.square", kind: .secondary) {
                         if let tid = Int64(model.selectedTenantId) {
                             NavigationState.shared.openAiChat(tenantId: tid)
@@ -144,19 +129,20 @@ struct AiModelsView: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(AppTheme.sidebarText(dark))
             SelectMenu(
-                options: model.tenants.map { SelectOption(id: $0.id, title: $0.tname.isEmpty ? $0.name : $0.tname) },
+                // 对齐实例列表租户下拉：真实租户名 · 中文区域（如 flashzyxjay · 春川）
+                options: model.tenants.map { SelectOption(id: $0.id, title: $0.safeTitle) },
                 selection: Binding(
                     get: { model.selectedTenantId.isEmpty ? nil : model.selectedTenantId },
                     set: { model.onTenantChanged($0) }
                 ),
-                placeholder: model.isLoadingTenants ? "加载中…" : "选择支持 AI 的租户…",
+                placeholder: model.isLoadingTenants ? "加载中…" : "请选择租户",
                 width: 280,
                 allowClear: true,
                 searchable: model.tenants.count > 5
             )
             Spacer()
             Toggle(isOn: $model.linkTenantFilter) {
-                Text("关联租户")
+                Text("仅显示当前租户配置")
                     .font(.system(size: 12))
             }
             .toggleStyle(SwitchToggleStyle(tint: AppTheme.sidebarActive))
@@ -182,37 +168,15 @@ struct AiModelsView: View {
                 EmptyStateView(icon: "sparkles", title: "暂无可用模型", subtitle: "该租户下没有可列出的模型")
                     .frame(maxHeight: .infinity)
             } else {
-                let pageModels = Array(model.models.dropFirst(availablePage * panelPageSize).prefix(panelPageSize))
-                let totalPages = max(1, Int(ceil(Double(model.models.count) / Double(panelPageSize))))
+                // 对齐原项目：全量滚动列表，一屏纵览全部模型（无分页）
                 ScrollView {
                     LazyVStack(spacing: 8) {
-                        ForEach(pageModels) { m in
+                        ForEach(model.models) { m in
                             modelRow(m)
                         }
                     }
                     .padding(12)
                 }
-                HStack(spacing: 8) {
-                    Spacer()
-                    Button(action: { if availablePage > 0 { availablePage -= 1 } }) {
-                        Image(systemName: "chevron.left").font(.system(size: 11, weight: .semibold))
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .disabled(availablePage == 0)
-                    .opacity(availablePage == 0 ? 0.35 : 1)
-                    Text("\(availablePage + 1) / \(totalPages)")
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundColor(AppTheme.sidebarText(dark))
-                    Button(action: { if availablePage < totalPages - 1 { availablePage += 1 } }) {
-                        Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .disabled(availablePage >= totalPages - 1)
-                    .opacity(availablePage >= totalPages - 1 ? 0.35 : 1)
-                    Spacer()
-                }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 10)
             }
         }
     }
@@ -222,58 +186,26 @@ struct AiModelsView: View {
             if model.isLoadingConfigs && model.configs.isEmpty {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if model.visibleConfigs.isEmpty {
-                EmptyStateView(icon: "tray", title: "暂无已配置的模型", subtitle: "从左侧模型列表点击「添加配置」")
+                EmptyStateView(icon: "tray", title: "暂无已配置的模型", subtitle: "从左侧模型列表点击「添加」")
                     .frame(maxHeight: .infinity)
             } else {
-                let pageConfigs = Array(model.visibleConfigs.dropFirst(configuredPage * panelPageSize).prefix(panelPageSize))
-                let totalPages = max(1, Int(ceil(Double(model.visibleConfigs.count) / Double(panelPageSize))))
+                // 对齐原项目：全量滚动列表（无分页）
                 ScrollView {
                     LazyVStack(spacing: 8) {
-                        ForEach(pageConfigs) { c in
+                        ForEach(model.visibleConfigs) { c in
                             configRow(c)
                         }
                     }
                     .padding(12)
                 }
-                HStack(spacing: 8) {
-                    AppButton(title: "启用全部", kind: .secondary) { model.batchEnable(true) }
-                    AppButton(title: "禁用全部", kind: .secondary) { model.batchEnable(false) }
-                    Spacer()
-                    Button(action: { model.reload() }) {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(AppTheme.navIcon(dark))
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .help("刷新")
-                    Button(action: { if configuredPage > 0 { configuredPage -= 1 } }) {
-                        Image(systemName: "chevron.left").font(.system(size: 11, weight: .semibold))
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .disabled(configuredPage == 0)
-                    .opacity(configuredPage == 0 ? 0.35 : 1)
-                    Text("\(configuredPage + 1) / \(totalPages)")
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundColor(AppTheme.sidebarText(dark))
-                    Button(action: { if configuredPage < totalPages - 1 { configuredPage += 1 } }) {
-                        Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .disabled(configuredPage >= totalPages - 1)
-                    .opacity(configuredPage >= totalPages - 1 ? 0.35 : 1)
-                }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 10)
             }
         }
     }
 
     private func modelRow(_ m: AiAvailableModel) -> some View {
         let added = model.configuredModelIds.contains(m.id)
-        return HStack(alignment: .top, spacing: 10) {
-            providerBadge(m.provider)
-                .padding(.top, 2)
-            VStack(alignment: .leading, spacing: 4) {
+        return HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(m.name.isEmpty ? m.id : m.name)
                         .font(.system(size: 13, weight: .semibold))
@@ -281,16 +213,9 @@ struct AiModelsView: View {
                         .lineLimit(1)
                     categoryBadge(m.name)
                 }
-                Text(m.id)
-                    .font(.system(size: 10.5, design: .monospaced))
+                Text(m.provider.isEmpty ? "OCI" : m.provider)
+                    .font(.system(size: 11))
                     .foregroundColor(AppTheme.sidebarText(dark))
-                    .lineLimit(1)
-                if !m.description.isEmpty {
-                    Text(m.description)
-                        .font(.system(size: 10.5))
-                        .foregroundColor(AppTheme.sidebarText(dark).opacity(0.8))
-                        .lineLimit(2)
-                }
             }
             Spacer(minLength: 0)
             if added {
@@ -301,12 +226,20 @@ struct AiModelsView: View {
                     .padding(.vertical, 5)
                     .background(RoundedRectangle(cornerRadius: 6).fill(AppTheme.sidebarActive.opacity(0.14)))
             } else {
-                AppButton(title: "添加配置", kind: .primary) { model.addModel(m) }
+                AppButton(title: "添加", kind: .primary) { model.addModel(m) }
             }
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 10).fill(AppTheme.sidebarBg(dark)))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1))
+    }
+
+    /// 配置行归属租户显示（对齐租户下拉）：解析为 "租户名 · 中文区域"，找不到则回落原始 ID
+    private func configTenantLabel(_ tenantId: String) -> String {
+        if let t = model.tenants.first(where: { $0.id == tenantId }) {
+            return t.dropdownLabel
+        }
+        return tenantId.isEmpty ? "—" : "租户 \(tenantId)"
     }
 
     private func configRow(_ c: AiConfigItem) -> some View {
@@ -329,29 +262,18 @@ struct AiModelsView: View {
                             c.enabled ? AppTheme.sidebarActive.opacity(0.14) : AppTheme.sidebarHover(dark)))
                         .foregroundColor(c.enabled ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
                 }
-                Text("\(c.modelId) · \(c.provider.isEmpty ? "OCI" : c.provider)")
-                    .font(.system(size: 10.5, design: .monospaced))
+                // 归属租户（对齐租户下拉显示：租户名 · 中文区域），多租户混排时辨明归属
+                Text(configTenantLabel(c.tenantId))
+                    .font(.system(size: 11))
                     .foregroundColor(AppTheme.sidebarText(dark))
                     .lineLimit(1)
-                if !c.region.isEmpty {
-                    Text("区域 \(c.region)")
-                        .font(.system(size: 10.5))
-                        .foregroundColor(AppTheme.sidebarText(dark).opacity(0.8))
-                }
             }
             Spacer(minLength: 0)
             // Web：enabled 态「禁用」用 orange
             AppButton(title: c.enabled ? "禁用" : "启用",
                       kind: c.enabled ? .orange : .primary) { model.toggle(c) }
-            Button(action: { model.delete(c) }) {
-                Image(systemName: "trash")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.sidebarText(dark))
-                    .frame(width: 28, height: 28)
-                    .background(RoundedRectangle(cornerRadius: 5).fill(AppTheme.sidebarHover(dark)))
-            }
-            .buttonStyle(PlainButtonStyle())
-            .help("删除")
+            // 对齐原项目：红色文字「删除」按钮（语义明确，配合删除前确认弹窗）
+            AppButton(title: "删除", kind: .danger) { model.delete(c) }
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 10).fill(AppTheme.sidebarBg(dark)))

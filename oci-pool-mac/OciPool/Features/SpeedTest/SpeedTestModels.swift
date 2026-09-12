@@ -10,6 +10,7 @@ struct SpeedRegionEndpoint: Identifiable, Hashable {
     let endpoint: String
 
     var id: String { code }
+    var flag: String { RegionFlag.emoji(code: code, name: name) }
 }
 
 enum SpeedLatencyState: Equatable {
@@ -49,6 +50,7 @@ struct SpeedRankItem: Identifiable, Hashable {
     let name: String
     let ms: Int
     var id: String { code }
+    var flag: String { RegionFlag.emoji(code: code, name: name) }
 }
 
 // MARK: - Theme (speed_test.css)

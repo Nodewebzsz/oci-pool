@@ -115,9 +115,12 @@ function InstancesPage({ density }) {
   useEffectIn(() => {
     let alive = true;
     setRegionOptions([]);
+    setInstances([]); // 切换租户的一瞬间，立即清空旧实例，杜绝旧数据残留！
+    setLoading(true); // 同步开启 loading，杜绝拉取区域子级选项期间空态抢跑闪现！
     if (!tenantFilter) {
       setRegionLoading(false);
       setRegionFilter('');
+      setLoading(false);
       return () => { alive = false; };
     }
     setRegionLoading(true);
@@ -161,6 +164,7 @@ function InstancesPage({ density }) {
     let alive = true;
     (async () => {
       setLoading(true);
+      setInstances([]); // 刷新与重新加载时立即清空旧数据，杜绝旧数据与 loading 共存！
       setLoadError('');
       try {
         // 原项目 Web 端实例列表:GET /oci/list/json → {content,totalPages,totalElements}。

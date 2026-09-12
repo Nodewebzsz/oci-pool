@@ -46,7 +46,11 @@ final class AiModelsViewModel: ObservableObject {
                 let b = $1.tname.isEmpty ? $1.name : $1.tname
                 return a.localizedCaseInsensitiveCompare(b) == .orderedAscending
             }
-            // 对齐 Web：默认不选中任何租户，由用户手动选择
+            // 对齐原项目 oci-start：默认自动选中第一个租户并加载模型，开箱即见数据
+            if selectedTenantId.isEmpty, let first = tenants.first {
+                selectedTenantId = first.id
+                await loadModels()
+            }
         } catch {
             tenants = []
             errorText = error.localizedDescription
@@ -141,6 +145,9 @@ final class AiModelsViewModel: ObservableObject {
     }
 
     func batchEnable(_ enabled: Bool) {
+        // 对齐原项目：批量操作作用于全库配置，执行前需二次确认防误触
+        let title = enabled ? "批量启用" : "批量禁用"
+        guard AppAlert.confirm(title: title, message: "将对全部 AI 配置执行\(title)？") else { return }
         Task {
             isBusy = true
             do {

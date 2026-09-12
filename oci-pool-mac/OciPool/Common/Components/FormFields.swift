@@ -106,13 +106,25 @@ struct FormFieldRow<Content: View>: View {
     @Environment(\.colorScheme) private var colorScheme
     private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
 
+    private var cleanLabel: String {
+        var s = label.trimmingCharacters(in: .whitespaces)
+        if s.hasSuffix("*") {
+            s = String(s.dropLast(1)).trimmingCharacters(in: .whitespaces)
+        }
+        return s
+    }
+
+    private var isRequiredEffective: Bool {
+        required || label.trimmingCharacters(in: .whitespaces).hasSuffix("*")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 2) {
-                Text(label)
+                Text(cleanLabel)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(AppTheme.sidebarText(dark))
-                if required {
+                if isRequiredEffective {
                     Text("*")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(AppTheme.danger)
@@ -138,6 +150,7 @@ struct AppTextField: View {
     private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
 
     @State private var focused = false
+    @State private var isRevealed = false
 
     var body: some View {
         AppInputChrome(
@@ -151,19 +164,31 @@ struct AppTextField: View {
                         .foregroundColor(AppInputStyle.icon(dark))
                 )
             },
-            trailing: text.isEmpty ? nil : AnyView(
-                Button(action: { text = "" }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: AppInputStyle.iconSize))
-                        .foregroundColor(AppInputStyle.icon(dark).opacity(0.85))
+            trailing: AnyView(
+                HStack(spacing: 6) {
+                    if !text.isEmpty {
+                        Button(action: { text = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: AppInputStyle.iconSize))
+                                .foregroundColor(AppInputStyle.icon(dark).opacity(0.85))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                    if secure {
+                        Button(action: { isRevealed.toggle() }) {
+                            Image(systemName: isRevealed ? "eye.slash" : "eye")
+                                .font(.system(size: AppInputStyle.iconSize))
+                                .foregroundColor(isRevealed ? AppTheme.sidebarActive : AppInputStyle.icon(dark).opacity(0.85))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
                 }
-                .buttonStyle(PlainButtonStyle())
             )
         ) {
             AppNSTextField(
                 text: $text,
                 placeholder: placeholder,
-                secure: secure,
+                secure: secure && !isRevealed,
                 dark: dark,
                 enabled: true,
                 fontSize: AppInputStyle.fontSize,

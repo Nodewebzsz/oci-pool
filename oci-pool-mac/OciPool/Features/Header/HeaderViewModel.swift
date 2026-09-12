@@ -240,7 +240,7 @@ final class HeaderViewModel: ObservableObject {
         let target = version.latestDisplay.isEmpty ? "新版本" : version.latestDisplay
         guard AppAlert.confirm(
             title: "发现 Mac 新版本",
-            message: "将下载 Oci-Start \(target) 的 macOS 安装包（DMG）到「下载」文件夹并自动打开。\n请拖入「应用程序」后重新启动。\n\n只会更新 Mac 客户端，不会升级 Web / 远程服务端。",
+            message: "将下载 OCI-POOL \(target) 的 macOS 安装包（DMG）到「下载」文件夹并自动打开。\n请拖入「应用程序」后重新启动。\n\n只会更新 Mac 客户端，不会升级 Web / 远程服务端。",
             confirmTitle: "下载安装包",
             cancelTitle: "稍后"
         ) else { return }

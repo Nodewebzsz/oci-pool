@@ -103,7 +103,12 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
 
   // 若 tenant 不存在(数据变化/直链非法),让 app 层已经处理了回退,这里兜底
   if (loading) {
-    return <div role="status" style={{ padding: 24, color: 'var(--fg-2)' }}>{tr('td.loading')}</div>;
+    return (
+      <div role="status" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 280, gap: 12, color: 'var(--fg-3)' }}>
+        <Icon name="loader-2" size={20} className="spin" style={{ opacity: 0.6 }} />
+        <span style={{ fontSize: 13 }}>{tr('td.loading') || '正在加载租户详情…'}</span>
+      </div>
+    );
   }
   if (!tenant || !activeRow) {
     return (

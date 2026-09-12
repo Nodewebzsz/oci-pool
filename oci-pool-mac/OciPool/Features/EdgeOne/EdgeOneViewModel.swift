@@ -41,9 +41,15 @@ final class EdgeOneViewModel: ObservableObject {
         ]
     }
 
+    /// 是否为真正未配置密钥或未开启启用开关（后端明确返回未配置/未启用）
     var isNotConfigured: Bool {
         let msg = (errorText ?? "").lowercased()
-        return msg.contains("未配置") || msg.contains("未启用") || (!isLoading && zones.isEmpty)
+        return msg.contains("未配置") || msg.contains("未启用") || msg.contains("not configured")
+    }
+
+    /// 密钥已配置并启用，但腾讯云账号内暂未添加任何站点域名
+    var hasNoZones: Bool {
+        !isZonesLoading && !isNotConfigured && (errorText == nil || errorText!.isEmpty) && zones.isEmpty
     }
 
     var selectedZoneName: String {
@@ -101,7 +107,10 @@ final class EdgeOneViewModel: ObservableObject {
     func loadZones(selectFirst: Bool) async {
         isZonesLoading = true
         errorText = nil
-        defer { isZonesLoading = false }
+        defer {
+            isZonesLoading = false
+            hasLoadedOnce = true
+        }
         do {
             let list = try await service.fetchZones()
             zones = list

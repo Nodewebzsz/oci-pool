@@ -9,7 +9,7 @@ struct SpeedTestView: View {
     private var dark: Bool { appearance.isDarkEffective }
 
     private let regionColumns = [
-        GridItem(.adaptive(minimum: 200, maximum: 360), spacing: 14)
+        GridItem(.adaptive(minimum: 220, maximum: 380), spacing: 12)
     ]
 
     var body: some View {
@@ -52,6 +52,15 @@ struct SpeedTestView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
+            if model.hasCompleted && !model.isTesting {
+                AppButton(
+                    title: "重置",
+                    systemImage: "arrow.counterclockwise",
+                    kind: .secondary
+                ) {
+                    model.resetResults()
+                }
+            }
             AppButton(
                 title: "刷新",
                 systemImage: "arrow.clockwise",
@@ -61,7 +70,7 @@ struct SpeedTestView: View {
                 Task { await model.refresh() }
             }
             AppButton(
-                title: model.isTesting ? "测速中…" : "开始测速",
+                title: model.isTesting ? "测速中…" : (model.hasCompleted ? "重新测速" : "开始测速"),
                 systemImage: "bolt.fill",
                 kind: .primary,
                 isLoading: model.isTesting,
@@ -96,89 +105,179 @@ struct SpeedTestView: View {
         )
     }
 
-    // MARK: - Stats（三等宽紧凑指标卡，避免 2fr 大空白）
+    // MARK: - Stats（对齐 Web 端 3 状态卡风格：分行排版 + 右侧半透明水印图标）
 
     private var statsRow: some View {
-        HStack(alignment: .top, spacing: 14) {
-            metricCard(
-                label: "当前出口 IP",
-                value: model.clientIPText,
-                systemImage: "network",
-                accent: AppTheme.info
-            )
-            metricCard(
-                label: "最优区域",
-                value: model.bestRegionText,
-                systemImage: "trophy.fill",
-                accent: AppTheme.sidebarActive
-            )
-            metricCard(
-                label: "平均延迟",
-                value: model.avgLatencyText,
-                systemImage: "stopwatch",
-                accent: AppTheme.sidebarActive
-            )
-        }
-    }
+        HStack(alignment: .top, spacing: 12) {
+            // 1. 当前 IP
+            ZStack(alignment: .topTrailing) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("当前 IP")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(AppTheme.sidebarText(dark))
+                        .textCase(.uppercase)
 
-    private func metricCard(label: String, value: String, systemImage: String, accent: Color) -> some View {
-        HStack(alignment: .center, spacing: 12) {
-            ZStack {
+                    Text(model.clientIP)
+                        .font(.system(size: 17, weight: .bold, design: .monospaced))
+                        .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .padding(.top, 2)
+
+                    if !model.clientLocation.isEmpty {
+                        Text(model.clientLocation)
+                            .font(.system(size: 11))
+                            .foregroundColor(AppTheme.sidebarText(dark))
+                            .lineLimit(1)
+                            .padding(.top, 1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Image(systemName: "wifi")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundColor(AppTheme.info.opacity(dark ? 0.35 : 0.25))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
+            .background(AppTheme.sidebarBg(dark))
+            .cornerRadius(10)
+            .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(accent.opacity(0.14))
-                    .frame(width: 40, height: 40)
-                Image(systemName: systemImage)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(accent)
-            }
+                    .stroke(AppTheme.border(dark).opacity(0.7), lineWidth: 1)
+            )
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(label)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(AppTheme.sidebarText(dark))
-                    .lineLimit(1)
-                Text(value)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.75)
-                    .fixedSize(horizontal: false, vertical: true)
+            // 2. 最优区域
+            let hasBest = model.bestRegion != nil
+            ZStack(alignment: .topTrailing) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("最优区域")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(AppTheme.sidebarText(dark))
+                        .textCase(.uppercase)
+
+                    if let best = model.bestRegion {
+                        HStack(spacing: 6) {
+                            Text(best.flag)
+                                .font(.system(size: 16))
+                            Text(best.name)
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(dark ? Color.white.opacity(0.95) : Color.primary)
+                                .lineLimit(1)
+                        }
+                        .padding(.top, 2)
+
+                        HStack(spacing: 4) {
+                            Text("\(best.ms) ms")
+                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                .foregroundColor(AppTheme.sidebarActive)
+                            Text("·")
+                                .font(.system(size: 11))
+                                .foregroundColor(AppTheme.sidebarText(dark))
+                            Text(best.code)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(AppTheme.sidebarText(dark))
+                                .lineLimit(1)
+                        }
+                        .padding(.top, 1)
+                    } else {
+                        Text(model.isTesting ? "测试中…" : "--")
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundColor(AppTheme.sidebarText(dark))
+                            .padding(.top, 2)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Image(systemName: "trophy.fill")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundColor(AppTheme.sidebarActive.opacity(hasBest ? (dark ? 0.45 : 0.3) : 0.15))
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
+            .background(
+                hasBest
+                    ? (dark ? Color(hex: "0e221b") : Color(hex: "f0fdf4"))
+                    : AppTheme.sidebarBg(dark)
+            )
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(
+                        hasBest
+                            ? AppTheme.sidebarActive
+                            : AppTheme.border(dark).opacity(0.7),
+                        lineWidth: hasBest ? 1.5 : 1
+                    )
+            )
+
+            // 3. 平均延迟
+            let hasAvg = model.avgLatencyMs != nil
+            ZStack(alignment: .topTrailing) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("平均延迟")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(AppTheme.sidebarText(dark))
+                        .textCase(.uppercase)
+
+                    if let avg = model.avgLatencyMs {
+                        let tone = SpeedLatencyTone.from(ms: avg)
+                        HStack(alignment: .firstTextBaseline, spacing: 2) {
+                            Text("\(avg)")
+                                .font(.system(size: 18, weight: .bold, design: .monospaced))
+                                .foregroundColor(SpeedTestTheme.toneColor(tone, dark: dark))
+                            Text("ms")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(AppTheme.sidebarText(dark))
+                        }
+                        .padding(.top, 2)
+
+                        Text("基于 \(model.testedSuccessCount) / \(model.regions.count) 个区域")
+                            .font(.system(size: 11))
+                            .foregroundColor(AppTheme.sidebarText(dark))
+                            .padding(.top, 1)
+                    } else {
+                        Text("--")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(AppTheme.sidebarText(dark))
+                            .padding(.top, 2)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Image(systemName: "gauge.with.needle")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundColor(Color(hex: "00b6be").opacity(hasAvg ? (dark ? 0.45 : 0.3) : 0.15))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
+            .background(AppTheme.sidebarBg(dark))
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(AppTheme.border(dark).opacity(0.7), lineWidth: 1)
+            )
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
-        .background(AppTheme.sidebarBg(dark))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(AppTheme.border(dark).opacity(0.7), lineWidth: 1)
-        )
     }
 
     // MARK: - Top5
 
     private var rankSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "medal.fill")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(SpeedTestTheme.success)
+            HStack(spacing: 6) {
+                Image(systemName: "award.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.sidebarActive)
                 Text("Top 5 最优线路")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
                 Spacer(minLength: 0)
-                Text("\(model.top5.count)")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.sidebarText(dark))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(AppTheme.sidebarHover(dark))
-                    .cornerRadius(8)
             }
 
-            // Web：5 列奖牌卡（🥇🥈🥉4️⃣5️⃣ + 名称 + code + ms），第 1 名 accent-soft 高亮
+            // Web：5 列奖牌卡（🥇🥈🥉4️⃣5️⃣ + 国旗 + 中文名 + code + ms），第 1 名浅绿高亮
             HStack(spacing: 10) {
                 ForEach(Array(model.top5.enumerated().prefix(5)), id: \.element.id) { index, item in
                     top5Card(index: index, item: item)
@@ -188,9 +287,9 @@ struct SpeedTestView: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(AppTheme.sidebarBg(dark))
-        .cornerRadius(12)
+        .cornerRadius(10)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 10)
                 .stroke(AppTheme.border(dark).opacity(0.7), lineWidth: 1)
         )
     }
@@ -200,31 +299,46 @@ struct SpeedTestView: View {
         let medal = medals[min(index, medals.count - 1)]
         let tone = SpeedTestTheme.toneColor(SpeedLatencyTone.from(ms: item.ms), dark: dark)
         let isFirst = index == 0
-        return VStack(spacing: 6) {
-            Text(medal).font(.system(size: 18))
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 5) {
+                Text(medal).font(.system(size: 15))
+                Text(item.flag).font(.system(size: 15))
+            }
             Text(item.name)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                 .lineLimit(1)
-            Text("\(item.ms) ms")
-                .font(.system(size: 13, weight: .bold, design: .monospaced))
-                .foregroundColor(tone)
+                .padding(.top, 2)
             Text(item.id)
                 .font(.system(size: 9.5, design: .monospaced))
                 .foregroundColor(AppTheme.sidebarText(dark))
                 .lineLimit(1)
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text("\(item.ms)")
+                    .font(.system(size: 15, weight: .bold, design: .monospaced))
+                    .foregroundColor(tone)
+                Text("ms")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+            }
+            .padding(.top, 2)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(isFirst ? AppTheme.sidebarActive.opacity(0.14) : AppTheme.sidebarBg(dark))
+                .fill(
+                    isFirst
+                        ? (dark ? Color(hex: "102820") : Color(hex: "f0fdf4"))
+                        : (dark ? AppTheme.sidebarHover(dark) : Color(hex: "f8fafc"))
+                )
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(isFirst
-                        ? AppTheme.sidebarActive.opacity(0.55)
-                        : AppTheme.border(dark).opacity(0.6), lineWidth: 1)
+                .stroke(
+                    isFirst ? AppTheme.sidebarActive : AppTheme.border(dark).opacity(0.7),
+                    lineWidth: 1
+                )
         )
     }
 
@@ -233,17 +347,20 @@ struct SpeedTestView: View {
     private var regionSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Text("全球 OCI 区域")
+                Image(systemName: "globe")
+                    .font(.system(size: 12))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                Text("全球 OCI 区域 (\(model.regions.count))")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
-                Text("\(model.regions.count)")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.sidebarText(dark))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(AppTheme.sidebarHover(dark))
-                    .cornerRadius(8)
-                Spacer(minLength: 0)
+                Spacer(minLength: 8)
+
+                // 色阶图例对齐 Web 端
+                HStack(spacing: 12) {
+                    legendItem(color: SpeedTestTheme.success, label: "≤ 80 ms")
+                    legendItem(color: SpeedTestTheme.warning, label: "80-250 ms")
+                    legendItem(color: SpeedTestTheme.danger, label: "> 250 ms")
+                }
             }
 
             // Web：测速中整条进度条区块（info 边框 + done/total + info→cyan 渐变）
@@ -291,12 +408,23 @@ struct SpeedTestView: View {
                         .stroke(AppTheme.border(dark).opacity(0.7), lineWidth: 1)
                 )
             } else {
-                LazyVGrid(columns: regionColumns, spacing: 14) {
+                LazyVGrid(columns: regionColumns, spacing: 12) {
                     ForEach(model.regions) { region in
                         regionCard(region)
                     }
                 }
             }
+        }
+    }
+
+    private func legendItem(color: Color, label: String) -> some View {
+        HStack(spacing: 4) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(color)
+                .frame(width: 8, height: 8)
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundColor(AppTheme.sidebarText(dark))
         }
     }
 
@@ -314,40 +442,47 @@ struct SpeedTestView: View {
             return 0
         }()
         let testing = state == .testing
+        let isBest = model.bestRegion?.code == region.code
 
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
+        return VStack(alignment: .leading, spacing: 6) {
+            // 头部：国旗 + 中文名，右侧如果是最优显示 🏆
+            HStack(spacing: 6) {
+                Text(region.flag)
+                    .font(.system(size: 14))
                 Text(region.simpleName)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                     .lineLimit(1)
                 Spacer(minLength: 4)
-                Text(region.code)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(AppTheme.sidebarText(dark))
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 2)
-                    .background(AppTheme.sidebarHover(dark))
-                    .cornerRadius(6)
+                if isBest {
+                    Text("🏆")
+                        .font(.system(size: 13))
+                }
             }
 
+            // 区域 Code 单独占一行，解决挤在右边胶囊被硬折三行的严重缺陷
+            Text(region.code)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor(AppTheme.sidebarText(dark))
+                .lineLimit(1)
+                .padding(.bottom, 2)
+
+            // 大字延迟 + ms
             HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Group {
-                    if testing {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                            .frame(width: 22, height: 22)
-                    } else {
-                        Text(state.displayText)
-                            .font(Font.system(size: state == .timeout ? 15 : 26, weight: .bold).monospacedDigit())
-                            .foregroundColor(
-                                state == .timeout
-                                    ? AppTheme.sidebarText(dark)
-                                    : SpeedTestTheme.toneColor(tone, dark: dark)
-                            )
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.6)
-                    }
+                if testing {
+                    ProgressView()
+                        .scaleEffect(0.65)
+                        .frame(width: 20, height: 20)
+                } else {
+                    Text(state.displayText)
+                        .font(Font.system(size: state == .timeout ? 15 : 22, weight: .bold).monospacedDigit())
+                        .foregroundColor(
+                            state == .timeout
+                                ? AppTheme.sidebarText(dark)
+                                : SpeedTestTheme.toneColor(tone, dark: dark)
+                        )
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
                 }
                 if case .ok = state {
                     Text("ms")
@@ -356,33 +491,45 @@ struct SpeedTestView: View {
                 }
                 Spacer(minLength: 0)
             }
-            .frame(height: 32, alignment: .bottomLeading)
+            .frame(height: 26, alignment: .bottomLeading)
 
+            // 底部细进度条
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule()
                         .fill(SpeedTestTheme.progressTrack(dark))
-                        .frame(height: 5)
+                        .frame(height: 4)
                     Capsule()
                         .fill(barColor(tone: tone, testing: testing))
-                        .frame(width: max(0, geo.size.width * barFraction), height: 5)
+                        .frame(width: max(0, geo.size.width * barFraction), height: 4)
                         .animation(.easeOut(duration: 0.4), value: barFraction)
                 }
             }
-            .frame(height: 5)
+            .frame(height: 4)
         }
-        .padding(14)
-        .background(AppTheme.sidebarBg(dark))
-        .cornerRadius(12)
+        .padding(12)
+        .background(
+            isBest
+                ? (dark ? Color(hex: "102820") : Color(hex: "f0fdf4"))
+                : AppTheme.sidebarBg(dark)
+        )
+        .cornerRadius(10)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 10)
                 .stroke(
-                    testing ? AppTheme.sidebarActive.opacity(0.85) : AppTheme.border(dark).opacity(0.7),
-                    lineWidth: testing ? 1.5 : 1
+                    isBest
+                        ? AppTheme.sidebarActive
+                        : (testing ? AppTheme.info.opacity(0.7) : AppTheme.border(dark).opacity(0.7)),
+                    lineWidth: (isBest || testing) ? 1.5 : 1
                 )
         )
-        .shadow(color: Color.black.opacity(dark ? 0.18 : 0.04), radius: 3, y: 1)
-        .animation(.easeInOut(duration: 0.18), value: testing)
+        .shadow(
+            color: isBest
+                ? AppTheme.sidebarActive.opacity(0.15)
+                : Color.black.opacity(dark ? 0.18 : 0.04),
+            radius: isBest ? 6 : 3,
+            y: 1
+        )
     }
 
     private func barColor(tone: SpeedLatencyTone, testing: Bool) -> Color {

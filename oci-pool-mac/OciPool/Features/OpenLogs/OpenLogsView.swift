@@ -20,8 +20,9 @@ struct OpenLogsView: View {
                 VStack(spacing: 0) {
                     if let err = model.errorText, !err.isEmpty {
                         errorBanner(err)
-                            .padding(.bottom, 12)
+                            .padding(.bottom, 10)
                     }
+                    filterBar
                     terminalCard
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -83,6 +84,98 @@ struct OpenLogsView: View {
         }
     }
 
+    // MARK: - Filter bar
+
+    private var filterBar: some View {
+        HStack(spacing: 10) {
+            // 级别切换胶囊（全部、INFO、WARN、ERROR、SUCCESS）
+            HStack(spacing: 4) {
+                ForEach(OpenLogFilterLevel.allCases) { lvl in
+                    filterLevelButton(lvl)
+                }
+            }
+
+            // 关键字搜索框
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 11))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                TextField("关键字过滤", text: $model.keyword)
+                    .textFieldStyle(PlainTextFieldStyle())
+                    .font(.system(size: 11.5))
+                if !model.keyword.isEmpty {
+                    Button(action: { model.keyword = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(AppTheme.sidebarText(dark))
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .frame(width: 180)
+            .background(dark ? Color(hex: "181c20") : Color(hex: "edf2f7"))
+            .cornerRadius(6)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(AppTheme.border(dark).opacity(0.8), lineWidth: 1)
+            )
+
+            Spacer()
+
+            // 过滤条数统计：共 M / N 条
+            HStack(spacing: 2) {
+                Text("共")
+                    .font(.system(size: 11))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                Text("\(model.filteredEntries.count)")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundColor(AppTheme.sidebarActive)
+                Text(" / \(model.entries.count) 条")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(AppTheme.sidebarBg(dark))
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark).opacity(0.7), lineWidth: 1)
+        )
+        .padding(.bottom, 10)
+    }
+
+    private func filterLevelButton(_ lvl: OpenLogFilterLevel) -> some View {
+        let isSelected = model.filterLevel == lvl
+        let count = model.count(for: lvl)
+        let color = lvl.activeColor
+
+        return Button(action: { model.filterLevel = lvl }) {
+            HStack(spacing: 4) {
+                Text(lvl.rawValue)
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .medium))
+                Text("\(count)")
+                    .font(.system(size: 9.5, weight: .regular, design: .monospaced))
+                    .opacity(isSelected ? 0.9 : 0.6)
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(isSelected ? color.opacity(dark ? 0.22 : 0.12) : Color.clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(isSelected ? color.opacity(0.8) : AppTheme.border(dark).opacity(0.6), lineWidth: 1)
+            )
+            .foregroundColor(isSelected ? color : AppTheme.sidebarText(dark))
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
     // MARK: - Terminal
 
     private var terminalCard: some View {
@@ -139,13 +232,19 @@ struct OpenLogsView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     if model.entries.isEmpty && !model.isLoadingHistory {
-                        Text("没有匹配的日志")
+                        Text("// 暂无日志 — 等待抢机任务输出…")
                             .font(.system(size: 12, design: .monospaced))
                             .foregroundColor(Color.white.opacity(0.35))
                             .padding(.vertical, 8)
                             .id("empty")
+                    } else if model.filteredEntries.isEmpty {
+                        Text("没有匹配的日志")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundColor(Color.white.opacity(0.35))
+                            .padding(.vertical, 8)
+                            .id("no-match")
                     }
-                    ForEach(model.entries) { entry in
+                    ForEach(model.filteredEntries) { entry in
                         Text(entry.text)
                             .font(.system(size: 12, design: .monospaced))
                             .foregroundColor(entry.level.color)
@@ -187,8 +286,13 @@ struct OpenLogsView: View {
             HStack(spacing: 6) {
                 Image(systemName: "list.bullet")
                     .font(.system(size: 10))
-                Text("共 \(model.entries.count) 条")
-                    .font(.system(size: 11, design: .monospaced))
+                if model.filteredEntries.count == model.entries.count {
+                    Text("共 \(model.entries.count) 条")
+                        .font(.system(size: 11, design: .monospaced))
+                } else {
+                    Text("显示 \(model.filteredEntries.count) / 共 \(model.entries.count) 条")
+                        .font(.system(size: 11, design: .monospaced))
+                }
             }
             .foregroundColor(Color.white.opacity(0.55))
 

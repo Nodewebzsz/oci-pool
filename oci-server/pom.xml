@@ -692,7 +692,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <mainClass>com.doubledimple.ociserver.OciServerApplication</mainClass> &lt;!&ndash; 替换为您的主类全限定名 &ndash;&gt;
+                    <mainClass>com.nodewebzsz.ociserver.OciServerApplication</mainClass> &lt;!&ndash; 替换为您的主类全限定名 &ndash;&gt;
                 </configuration>
             </plugin>-->
 
@@ -736,13 +736,13 @@
                         <option>-keep @org.springframework.boot.autoconfigure.SpringBootApplication class *</option>
 
                         &lt;!&ndash; 修改主类保留规则 &ndash;&gt;
-                        <option>-keep class com.doubledimple.ociserver.OciServerApplication {
+                        <option>-keep class com.nodewebzsz.ociserver.OciServerApplication {
                             public static void main(java.lang.String[]);
                             }</option>
 
                         &lt;!&ndash; 保留Spring相关类 &ndash;&gt;
                         <option>-keep class org.springframework.** { *; }</option>
-                        <option>-keep class com.doubledimple.** { *; }</option>
+                        <option>-keep class com.nodewebzsz.** { *; }</option>
 
                         &lt;!&ndash; 其他配置 &ndash;&gt;
                         <option>-dontnote</option>
@@ -775,7 +775,7 @@
                             <goal>repackage</goal>
                         </goals>
                         <configuration>
-                            <mainClass>com.doubledimple.ociserver.OciServerApplication</mainClass>
+                            <mainClass>com.nodewebzsz.ociserver.OciServerApplication</mainClass>
                         </configuration>
                     </execution>
                 </executions>

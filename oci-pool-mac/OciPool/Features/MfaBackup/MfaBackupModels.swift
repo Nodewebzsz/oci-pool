@@ -36,7 +36,7 @@ enum MfaBackupJSON {
                 id: name,
                 keyName: name,
                 secretKey: secret,
-                issuer: str(d["issuer"]).isEmpty ? "Default" : str(d["issuer"]),
+                issuer: str(d["issuer"]).isEmpty ? "mfa-oci-pool" : str(d["issuer"]),
                 qrCodeBase64: str(d["qrCode"]),
                 otpCode: "------",
                 revealSecret: false

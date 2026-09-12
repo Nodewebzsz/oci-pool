@@ -29,8 +29,8 @@ struct LoginHeroView: View {
     private var heroTitle: String { zh ? "现代化的 OCI 池化管理" : "Modern OCI pool management" }
     private var heroSubtitle: String {
         zh
-            ? "14+ 项租户操作 · 45 个 Oracle 商业区域 · 深色主题 · 双语支持 · 现代化 UI 重做,业务逻辑与 doubleDimple/oci-start 完全一致。"
-            : "14+ tenant operations · 45 Oracle commercial regions · dark theme · bilingual · a modernised UI on top of the doubleDimple/oci-start business logic."
+            ? "14+ 项租户操作 · 45 个 Oracle 商业区域 · 深色主题 · 双语支持 · 现代化 UI 重做，自主优化升级。"
+            : "14+ tenant operations · 45 Oracle commercial regions · dark theme · bilingual · a modernised UI with enhanced features."
     }
     private var statTenants: String { zh ? "内置租户" : "Tenants" }
     private var statRegions: String { zh ? "全球区域" : "Regions" }

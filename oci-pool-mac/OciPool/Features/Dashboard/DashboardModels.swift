@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - API envelope (matches com.doubledimple.ocicommon.param.ApiResponse)
+// MARK: - API envelope (matches com.nodewebzsz.ocicommon.param.ApiResponse)
 
 struct APIEnvelope<T: Decodable>: Decodable {
     let success: Bool

@@ -25,7 +25,7 @@ services:
       - ./logs:/oci-pool/logs
     healthcheck: { test: ["CMD", "curl", "-sf", "http://127.0.0.1:9856/actuator/health"], interval: 30s, timeout: 5s, retries: 5, start_period: 60s }
 
-  # 统一入口反代:UI + /ws/console + /websockify/{port}(VNC 动态端口)。
+  # 统一入口反代:UI + /ws/console + /ws/aiChat + /websockify/{port}(VNC 动态端口)。
   # 镜像由 auto-deploy 从 deploy/Dockerfile.web 构建并推到 zszken/oci-pool-web。
   web:
     image: docker.io/zszken/oci-pool-web:latest

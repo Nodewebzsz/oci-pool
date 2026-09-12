@@ -18,6 +18,7 @@
     const body = new FormData();
     if (o.keyName !== undefined && o.keyName !== null && String(o.keyName) !== '') body.append('keyName', String(o.keyName));
     if (o.secretKey !== undefined && o.secretKey !== null && String(o.secretKey) !== '') body.append('secretKey', String(o.secretKey));
+    if (o.issuer !== undefined && o.issuer !== null && String(o.issuer) !== '') body.append('issuer', String(o.issuer));
     if (o.qrCode) body.append('qrCode', o.qrCode);
     if (o.qrUrl) body.append('qrUrl', String(o.qrUrl));
     if (!body.get('secretKey') && !body.get('qrCode') && !body.get('qrUrl')) throw new Error('缺少密钥或二维码');

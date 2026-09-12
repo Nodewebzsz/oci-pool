@@ -29,6 +29,7 @@
     memPage:       { path: '/tools/memos', query: ['page', 'size', 'keyword'] },
     migPage:       { path: '/tools/migration' },
     mfaBackup:     { path: '/tools/mfa-backup' },
+    aiChat:        { path: '/tools/ai-chat', query: ['tenantId'] },
     resList:       { path: '/resources', query: ['page', 'size', 'tenantId', 'region', 'keyword'] },
     resCloudInit:  { path: '/resources/cloud-init', query: ['resourceId'] },
     sysIpQuality:  { path: '/system/ip-quality' },

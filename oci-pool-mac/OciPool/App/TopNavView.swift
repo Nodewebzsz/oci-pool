@@ -762,7 +762,7 @@ private struct AboutSheet: View {
                 .shadow(color: Color(hex: "0ea5e9").opacity(0.25), radius: 8, x: 0, y: 4)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Oci-Start")
+                    Text("OCI-POOL")
                         .font(.system(size: 22, weight: .heavy))
                         .foregroundColor(textPrimary)
                     Text("Created by nodewebzsz")

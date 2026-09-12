@@ -9,6 +9,8 @@ final class OpenLogsViewModel: ObservableObject {
     static let maxLines = 1000
 
     @Published private(set) var entries: [OpenLogEntry] = []
+    @Published var filterLevel: OpenLogFilterLevel = .all
+    @Published var keyword: String = ""
     @Published private(set) var connection: OpenLogsConnectionState = .disconnected
     @Published private(set) var isLoadingHistory = false
     @Published private(set) var errorText: String?
@@ -71,8 +73,9 @@ final class OpenLogsViewModel: ObservableObject {
 
     /// Web logs.action.download：导出日志为 .txt 并 toast
     func exportLogs() {
-        guard !entries.isEmpty else { return }
-        let text = entries.map { $0.text }.joined(separator: "\n")
+        let target = filteredEntries.isEmpty ? entries : filteredEntries
+        guard !target.isEmpty else { return }
+        let text = target.map { $0.text }.joined(separator: "\n")
         let fname = "boot-logs-\(Int(Date().timeIntervalSince1970)).txt"
         let dir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
         let url = dir.appendingPathComponent(fname)
@@ -81,6 +84,36 @@ final class OpenLogsViewModel: ObservableObject {
             NSWorkspace.shared.activateFileViewerSelecting([url])
         } catch {
             Self.exportFail(error)
+        }
+    }
+
+    /// 经过当前过滤规则（级别 + 关键词）筛选后的日志条目
+    var filteredEntries: [OpenLogEntry] {
+        let kw = keyword.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return entries.filter { entry in
+            if !filterLevel.matches(entry.level) {
+                return false
+            }
+            if !kw.isEmpty {
+                return entry.text.lowercased().contains(kw)
+            }
+            return true
+        }
+    }
+
+    /// 各级别统计
+    func count(for filter: OpenLogFilterLevel) -> Int {
+        switch filter {
+        case .all:
+            return entries.count
+        case .info:
+            return entries.filter { $0.level == .info }.count
+        case .warn:
+            return entries.filter { $0.level == .warn }.count
+        case .error:
+            return entries.filter { $0.level == .error }.count
+        case .success:
+            return entries.filter { $0.level == .success }.count
         }
     }
 

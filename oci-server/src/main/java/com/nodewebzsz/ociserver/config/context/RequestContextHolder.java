@@ -1,0 +1,28 @@
+package com.nodewebzsz.ociserver.config.context;
+
+import com.nodewebzsz.dao.entity.Tenant;
+import com.nodewebzsz.ociserver.pojo.request.RequestContext;
+
+/**
+ * @version 1.0.0
+ * @ClassName TenantContextHolder
+ * @Description TODO
+ * @Author nodewebzsz
+ * @Date 2025-12-02 15:56
+ */
+public class RequestContextHolder {
+
+    private static final ThreadLocal<RequestContext> HOLDER = new ThreadLocal<>();
+
+    public static void set(RequestContext context) {
+        HOLDER.set(context);
+    }
+
+    public static RequestContext get() {
+        return HOLDER.get();
+    }
+
+    public static void clear() {
+        HOLDER.remove();
+    }
+}

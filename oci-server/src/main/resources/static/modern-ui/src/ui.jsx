@@ -448,19 +448,26 @@ function SearchInput({ placeholder = 'Search...', value, onChange, width = 260, 
     if (controlled) onChange(v);
     else setInternal(v);
   };
+  const handleClear = () => {
+    if (controlled) onChange('');
+    else setInternal('');
+  };
+  const hasVal = Boolean(curValue && String(curValue).length > 0);
+
   return (
     <div style={{
       display: 'inline-flex',
       alignItems: 'center',
       gap: 8,
-      padding: '0 12px',
+      padding: hasVal ? '0 6px 0 12px' : '0 12px',
       height: heights[size] || 30,
       width,
       background: 'var(--bg-2)',
       border: '1px solid var(--border)',
-      borderRadius: 'var(--radius-sm)'
+      borderRadius: 'var(--radius-sm)',
+      boxSizing: 'border-box',
     }}>
-      <Icon name="search" size={13} style={{ color: 'var(--fg-3)' }} />
+      <Icon name="search" size={13} style={{ color: 'var(--fg-3)', flexShrink: 0 }} />
       <input
         value={curValue || ''}
         onChange={handleChange}
@@ -474,9 +481,36 @@ function SearchInput({ placeholder = 'Search...', value, onChange, width = 260, 
           fontSize: 12.5,
           color: 'var(--fg-0)'
         }} />
-      
+      {hasVal && (
+        <button
+          type="button"
+          onMouseDown={e => e.preventDefault()}
+          onClick={handleClear}
+          tabIndex={-1}
+          title={typeof tr === 'function' ? (tr('logs.action.clear') || 'Clear') : 'Clear'}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            color: 'var(--fg-3)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 18,
+            height: 18,
+            borderRadius: '50%',
+            opacity: 0.65,
+            transition: 'opacity 120ms, color 120ms',
+            flexShrink: 0,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--fg-1)'; }}
+          onMouseLeave={e => { e.currentTarget.style.opacity = '0.65'; e.currentTarget.style.color = 'var(--fg-3)'; }}
+        >
+          <Icon name="x-circle" size={13} />
+        </button>
+      )}
     </div>);
-
 }
 
 // Select

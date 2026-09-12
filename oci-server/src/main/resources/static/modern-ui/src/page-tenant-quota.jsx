@@ -127,6 +127,7 @@ function TenantQuotaPage({ density, ctx, navigate }) {
     if (!tid) return;
 
     setLoading(true);
+    setItems([]); // 查询与翻页时立即清空旧数据，杜绝旧数据与 loading 共存！
     setError(null);
     try {
       const res = await window.ociApi.request(

@@ -47,6 +47,7 @@ function RegionsPage({ density }) {
     (async () => {
       try {
         setLoading(true);
+        setRegions([]); // 刷新与加载时第一时间清空旧数据，杜绝旧数据与 loading 共存！
         setLoadError('');
         const [armResponse, mineResponse] = await Promise.all([
           window.ociApi.request('/resource/arm-data'),

@@ -22,23 +22,12 @@ struct EdgeOneView: View {
                             .padding(.bottom, 12)
                     }
 
-                    if model.isNotConfigured {
-                        EmptyStateView(
-                            icon: "key.fill",
-                            title: "腾讯云 EdgeOne 未配置或未启用",
-                            subtitle: "请先在「密钥配置」中填写 Tencent Cloud SecretId / SecretKey 并开启启用开关，保存后即可管理 DNS 记录与加速域名。",
-                            actionTitle: "立即配置密钥",
-                            action: { model.openConfig() }
-                        )
+                    modePicker
+                        .padding(.bottom, 12)
+                    searchBar
+                        .padding(.bottom, 12)
+                    listBody
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else {
-                        modePicker
-                            .padding(.bottom, 12)
-                        searchBar
-                            .padding(.bottom, 12)
-                        listBody
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
                 }
             },
         )
@@ -76,7 +65,7 @@ struct EdgeOneView: View {
                     get: { model.selectedZoneId },
                     set: { model.onZoneChange($0) }
                 ),
-                placeholder: model.isNotConfigured ? "未配置域名" : "请选择域名",
+                placeholder: model.isNotConfigured ? "未配置密钥" : (model.hasNoZones ? "暂无可用域名" : "请选择域名"),
                 width: 220,
                 enabled: !model.isNotConfigured && !model.zones.isEmpty,
                 allowClear: true,
@@ -260,7 +249,7 @@ struct EdgeOneView: View {
                 DataListColumnHeader(title: "优先级", width: 90)
                 DataListColumnHeader(title: "操作", width: 100)
             } content: {
-                if (!model.hasLoadedOnce || model.isLoading) && model.dnsRecords.isEmpty {
+                if (!model.hasLoadedOnce || model.isZonesLoading || model.isLoading) && model.dnsRecords.isEmpty {
                     VStack(spacing: 10) {
                         Spacer()
                         ProgressView()
@@ -270,13 +259,29 @@ struct EdgeOneView: View {
                         Spacer()
                     }
                     .frame(maxWidth: .infinity, minHeight: 260)
+                } else if model.isNotConfigured {
+                    EmptyStateView(
+                        icon: "key.fill",
+                        title: "腾讯云 EdgeOne 未配置或未启用",
+                        subtitle: "请先在「密钥配置」中填写 Tencent Cloud SecretId / SecretKey 并开启启用开关，保存后即可管理 DNS 记录与加速域名。",
+                        actionTitle: "立即配置密钥",
+                        action: { model.openConfig() }
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 260)
+                } else if model.hasNoZones {
+                    EmptyStateView(
+                        icon: "globe",
+                        title: "暂无 EdgeOne 站点域名",
+                        subtitle: "您的腾讯云 EdgeOne 密钥验证成功，但当前账号下未接入任何站点域名。请前往腾讯云 EdgeOne 控制台接入站点，接入完成后点击下方按钮刷新同步。",
+                        actionTitle: "刷新站点列表",
+                        action: { Task { await model.loadZones(selectFirst: true) } }
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 260)
                 } else if model.selectedZoneId == nil || model.selectedZoneId?.isEmpty == true {
                     EmptyStateView(
-                        icon: "cloud",
-                        title: model.zones.isEmpty ? "暂无可用域名" : "请选择域名",
-                        subtitle: model.zones.isEmpty
-                            ? "请先在「密钥配置」中填写 EdgeOne API Key"
-                            : "从上方下拉选择要管理的 Zone"
+                        icon: "cursorarrow.click",
+                        title: "请选择域名",
+                        subtitle: "从上方下拉菜单中选择要管理的站点域名"
                     )
                     .frame(maxWidth: .infinity, minHeight: 260)
                 } else if model.filteredDns.isEmpty {
@@ -320,7 +325,7 @@ struct EdgeOneView: View {
                 DataListColumnHeader(title: "协议", width: 130)
                 DataListColumnHeader(title: "操作", width: 100)
             } content: {
-                if (!model.hasLoadedOnce || model.isLoading) && model.accelDomains.isEmpty {
+                if (!model.hasLoadedOnce || model.isZonesLoading || model.isLoading) && model.accelDomains.isEmpty {
                     VStack(spacing: 10) {
                         Spacer()
                         ProgressView()
@@ -329,6 +334,31 @@ struct EdgeOneView: View {
                             .foregroundColor(AppTheme.sidebarText(dark))
                         Spacer()
                     }
+                    .frame(maxWidth: .infinity, minHeight: 260)
+                } else if model.isNotConfigured {
+                    EmptyStateView(
+                        icon: "key.fill",
+                        title: "腾讯云 EdgeOne 未配置或未启用",
+                        subtitle: "请先在「密钥配置」中填写 Tencent Cloud SecretId / SecretKey 并开启启用开关，保存后即可管理 DNS 记录与加速域名。",
+                        actionTitle: "立即配置密钥",
+                        action: { model.openConfig() }
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 260)
+                } else if model.hasNoZones {
+                    EmptyStateView(
+                        icon: "globe",
+                        title: "暂无 EdgeOne 站点域名",
+                        subtitle: "您的腾讯云 EdgeOne 密钥验证成功，但当前账号下未接入任何站点域名。请前往腾讯云 EdgeOne 控制台接入站点，接入完成后点击下方按钮刷新同步。",
+                        actionTitle: "刷新站点列表",
+                        action: { Task { await model.loadZones(selectFirst: true) } }
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 260)
+                } else if model.selectedZoneId == nil || model.selectedZoneId?.isEmpty == true {
+                    EmptyStateView(
+                        icon: "cursorarrow.click",
+                        title: "请选择域名",
+                        subtitle: "从上方下拉菜单中选择要管理的站点域名"
+                    )
                     .frame(maxWidth: .infinity, minHeight: 260)
                 } else if model.filteredDomains.isEmpty {
                     EmptyStateView(

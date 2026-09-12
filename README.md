@@ -241,6 +241,23 @@ location ~ ^/websockify/(\d+)$ {
 }
 ```
 
+#### 常见问题：客户端 Remote 模式下「开机日志」一直显示「连接中…」
+
+* **原因**：开机日志采用 SSE（Server-Sent Events）流式长连接。反向代理（如 Nginx / NPM）默认开启了**代理缓冲（proxy_buffering）**，将服务端的实时流数据卡在内存缓冲区中，导致客户端迟迟无法收到响应头。
+* **快速解决**：
+  * **Nginx Proxy Manager (NPM) 用户**：
+    1. 代理详情页：**关闭「缓存资源 (Cache Assets)」**，保持开启「Websockets 支持」；
+    2. 高级配置 ⚙️（Custom Nginx Configuration）：填入以下 5 行防缓冲指令并保存：
+       ```nginx
+       proxy_buffering off;
+       proxy_cache off;
+       chunked_transfer_encoding on;
+       proxy_read_timeout 86400s;
+       proxy_send_timeout 86400s;
+       ```
+       *(注：开启 Websockets 支持后已内置 http 1.1，切勿在此重复写入 `proxy_http_version`，避免触发 Nginx 冲突报错)*。
+  * **原生 Nginx 配置文件用户**：在对应的 `location /` 或 `/system/streamLogs` 中加入上述 5 行 `proxy_buffering off;` 等指令即可。
+
 > 旧版本升级时,除 `security` 配置需完全删除外,其他配置项保持不变即可。
 
 ---

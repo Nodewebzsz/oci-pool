@@ -18,12 +18,14 @@ struct MfaBackupService {
         return MfaBackupJSON.parseBatchOtp(raw)
     }
 
-    func saveSecret(keyName: String, secretKey: String) async throws {
+    func saveSecret(keyName: String, secretKey: String, issuer: String = "") async throws {
         let url = try client.makeURL(baseURL, path: "/save-secret")
-        let (data, http) = try await client.postForm(url, fields: [
+        var fields: [String: String] = [
             "keyName": keyName,
             "secretKey": secretKey
-        ])
+        ]
+        if !issuer.isEmpty { fields["issuer"] = issuer }
+        let (data, http) = try await client.postForm(url, fields: fields)
         guard (200..<400).contains(http.statusCode) else {
             let msg = String(data: data, encoding: .utf8) ?? "保存失败"
             throw APIError.serverMessage(msg.isEmpty ? "保存失败" : msg)

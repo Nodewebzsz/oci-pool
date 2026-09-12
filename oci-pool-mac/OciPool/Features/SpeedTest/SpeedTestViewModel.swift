@@ -6,8 +6,12 @@ import Combine
 final class SpeedTestViewModel: ObservableObject {
     @Published private(set) var regions: [SpeedRegionEndpoint] = []
     @Published private(set) var latency: [String: SpeedLatencyState] = [:]
+    @Published private(set) var clientIP = "测试中…"
+    @Published private(set) var clientLocation = ""
     @Published private(set) var clientIPText = "测试中…"
+    @Published private(set) var bestRegion: SpeedRankItem?
     @Published private(set) var bestRegionText = "--"
+    @Published private(set) var avgLatencyMs: Int?
     @Published private(set) var avgLatencyText = "--"
     @Published private(set) var top5: [SpeedRankItem] = []
     @Published private(set) var isLoadingRegions = false
@@ -16,6 +20,7 @@ final class SpeedTestViewModel: ObservableObject {
     @Published private(set) var hasCompleted = false
     /// 已完成探测数 / 总数（进度条）
     @Published private(set) var testedCount = 0
+    @Published private(set) var testedSuccessCount = 0
     @Published private(set) var aborted = false
     @Published private(set) var errorText: String?
     /// Region currently mid-ping (border highlight like web).
@@ -54,9 +59,14 @@ final class SpeedTestViewModel: ObservableObject {
                 let parts = raw.split(separator: "/", maxSplits: 1).map(String.init)
                 let ip = parts.first ?? raw
                 let loc = parts.count > 1 ? parts[1] : ""
+                clientIP = ip
+                clientLocation = loc
                 clientIPText = loc.isEmpty ? ip : "\(ip)  \(loc)"
             } else {
-                clientIPText = raw.replacingOccurrences(of: "_", with: ".")
+                let ip = raw.replacingOccurrences(of: "_", with: ".")
+                clientIP = ip
+                clientLocation = ""
+                clientIPText = ip
             }
             return
         }
@@ -71,6 +81,8 @@ final class SpeedTestViewModel: ObservableObject {
                 let conn = d["connection"] as? [String: Any] ?? [:]
                 let org = (conn["isp"] as? String) ?? (conn["org"] as? String) ?? ""
                 let loc = parts.joined(separator: " · ") + (org.isEmpty ? "" : " · \(org)")
+                clientIP = ip
+                clientLocation = loc
                 clientIPText = loc.isEmpty ? ip : "\(ip)  \(loc)"
                 return
             }
@@ -82,6 +94,8 @@ final class SpeedTestViewModel: ObservableObject {
                 let country = d["country"] as? String ?? ""
                 let org = (d["org"] as? String ?? "").replacingOccurrences(of: "^AS\\d+\\s*", with: "", options: .regularExpression)
                 let loc = [city, country].filter { !$0.isEmpty }.joined(separator: " · ") + (org.isEmpty ? "" : " · \(org)")
+                clientIP = ip
+                clientLocation = loc
                 clientIPText = loc.isEmpty ? ip : "\(ip)  \(loc)"
                 return
             }
@@ -93,6 +107,8 @@ final class SpeedTestViewModel: ObservableObject {
                 let country = d["country"] as? String ?? ""
                 let org = d["organization_name"] as? String ?? ""
                 let loc = [city, country].filter { !$0.isEmpty }.joined(separator: " · ") + (org.isEmpty ? "" : " · \(org)")
+                clientIP = ip
+                clientLocation = loc
                 clientIPText = loc.isEmpty ? ip : "\(ip)  \(loc)"
                 return
             }
@@ -100,10 +116,14 @@ final class SpeedTestViewModel: ObservableObject {
         // 5) ipify — 仅 IP
         if let d = try? await publicIPJSON("https://api.ipify.org?format=json") as? [String: Any] {
             if let ip = d["ip"] as? String, !ip.isEmpty {
+                clientIP = ip
+                clientLocation = ""
                 clientIPText = ip
                 return
             }
         }
+        clientIP = "获取失败"
+        clientLocation = ""
         clientIPText = "获取失败"
     }
 
@@ -151,10 +171,14 @@ final class SpeedTestViewModel: ObservableObject {
         hasCompleted = false
         aborted = false
         latency = latency.mapValues { _ in .idle }
+        bestRegion = nil
         bestRegionText = "—"
+        avgLatencyMs = nil
         avgLatencyText = "--"
         top5 = []
         activeCode = nil
+        testedCount = 0
+        testedSuccessCount = 0
     }
 
     // MARK: - Test (web initTest)
@@ -164,16 +188,21 @@ final class SpeedTestViewModel: ObservableObject {
         testGeneration += 1
         let gen = testGeneration
         isTesting = true
+        hasCompleted = false
+        bestRegion = nil
         bestRegionText = "loading..."
+        avgLatencyMs = nil
         avgLatencyText = "--"
         top5 = []
         activeCode = nil
+        testedCount = 0
+        testedSuccessCount = 0
 
         var next: [String: SpeedLatencyState] = [:]
         for r in regions { next[r.code] = .testing }
         latency = next
 
-        var green: [SpeedRankItem] = []
+        var rankItems: [SpeedRankItem] = []
         var totalLatency = 0
         var successCount = 0
         var minLatency = 9999
@@ -201,21 +230,23 @@ final class SpeedTestViewModel: ObservableObject {
                     lat[code] = .ok(ms)
                     latency = lat
 
-                    if ms < 150 {
-                        green.append(SpeedRankItem(code: code, name: simpleName, ms: ms))
-                        green.sort { $0.ms < $1.ms }
-                        top5 = Array(green.prefix(5))
-                    }
+                    rankItems.append(SpeedRankItem(code: code, name: simpleName, ms: ms))
+                    rankItems.sort { $0.ms < $1.ms }
+                    top5 = Array(rankItems.prefix(5))
 
                     totalLatency += ms
                     successCount += 1
+                    testedSuccessCount = successCount
                     if ms < minLatency {
                         minLatency = ms
                         bestName = simpleName
+                        bestRegion = SpeedRankItem(code: code, name: simpleName, ms: ms)
                         bestRegionText = "\(bestName) (\(minLatency)ms)"
                     }
                     if successCount > 0 {
-                        avgLatencyText = "\(Int(round(Double(totalLatency) / Double(successCount))))ms"
+                        let avg = Int(round(Double(totalLatency) / Double(successCount)))
+                        avgLatencyMs = avg
+                        avgLatencyText = "\(avg)ms"
                     }
                 } else {
                     var lat = latency
@@ -226,9 +257,11 @@ final class SpeedTestViewModel: ObservableObject {
         }
 
         guard gen == testGeneration else { return }
-        if !bestName.isEmpty {
-            bestRegionText = "\(bestName) (\(minLatency)ms)"
+        if let best = rankItems.first {
+            bestRegion = best
+            bestRegionText = "\(best.name) (\(best.ms)ms)"
         } else if bestRegionText == "loading..." {
+            bestRegion = nil
             bestRegionText = "--"
         }
         isTesting = false

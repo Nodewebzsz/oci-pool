@@ -378,6 +378,8 @@ function AppInner() {
     memPage:    MemPage,
     migPage:    MigPage,
     mfaBackup:  MfaBackupPage,
+    // AI 对话 · 全屏沉浸式工作台（对齐 macOS 客户端 AiChatView）
+    aiChat:     AiChatPage,
     mail: MailPage,
     object: ObjectPage,
     ai: AIPage,
@@ -596,6 +598,7 @@ function labelFor(page) {
     sysSetting: tr('app.b6225b'), sysVpnProxy: tr('app.a57f7d'),
     notifyMgmt: tr('app.4dda7a'), memPage: tr('app.84aae6'),
     migPage: tr('app.2a0005'), mfaBackup: tr('app.0c7c83'),
+    aiChat: tr('nav.aiChat'),
     keyConfig: tr('app.a10eb8'),
   };
   return map[page] || page;

@@ -30,6 +30,35 @@ struct EqualHeightCardRow<A: View, B: View>: View {
     }
 }
 
+/// 三列等宽等高行（兼容 ScrollView）。
+/// 三卡互相撑满高度，底部操作栏自然对齐。
+struct EqualHeightCardRow3<A: View, B: View, C: View>: View {
+    var minHeight: CGFloat = 260
+    let first: A
+    let second: B
+    let third: C
+
+    init(minHeight: CGFloat = 260, @ViewBuilder first: () -> A, @ViewBuilder second: () -> B, @ViewBuilder third: () -> C) {
+        self.minHeight = minHeight
+        self.first = first()
+        self.second = second()
+        self.third = third()
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            first
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            second
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            third
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+        .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .top)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
 /// 标准模块卡片：固定头栏 + 可撑满内容区 + 固定底栏。
 /// - 启用态描边高亮 + 轻微阴影
 /// - 内容区 `Spacer` 顶对齐，footer 始终贴底

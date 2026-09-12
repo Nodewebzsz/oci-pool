@@ -437,7 +437,7 @@ function KeyConfigPage() {
             <FormRow label={tr("token.form.expiry")} required>
               <CustomDropdown value={String(cfg.expirationDays)}
                 onChange={v => setCfg(c => ({ ...c, expirationDays: +v }))}
-                height={32} width="100%">
+                height={32} width={160}>
                 <option value="7">{tr('token.form.expiryDays').replace('{n}', 7)}</option>
                 <option value="30">{tr('token.form.expiryDays').replace('{n}', 30)}</option>
                 <option value="90">{tr('token.form.expiryDays').replace('{n}', 90)}</option>
@@ -1083,7 +1083,7 @@ function CFManagePage() {
       }
       return;
     }
-    setLoading(true); setError('');
+    setLoading(true); setRecords([]); setError('');
     try {
       const result = requireSuccess(await window.ociServices.proxy.cloudflareRecords({ zoneId, page: 1, size: 100 }), tr('dnsp.loadFailRecords'));
       const page = result?.data || {};
@@ -1596,7 +1596,7 @@ function EOManagePage() {
       }
       return;
     }
-    setLoading(true); setError('');
+    setLoading(true); setDnsRecords([]); setDomains([]); setError('');
     try {
       const [dnsResult, domainResult] = await Promise.all([
         window.ociServices.proxy.edgeOneRecords({ zoneId, type: 'dns' }),
@@ -1612,11 +1612,11 @@ function EOManagePage() {
       setHasLoadedOnce(true);
     }
   }, [zoneId, isZonesLoading]);
-  React.useEffect(() => {
-    let alive = true;
+  const reloadZones = React.useCallback(async () => {
     setIsZonesLoading(true);
-    window.ociServices.proxy.edgeOneZones().then(result => {
-      if (!alive) return;
+    setError('');
+    try {
+      const result = await window.ociServices.proxy.edgeOneZones();
       requireSuccess(result, tr('dnsp.eo.zoneLoadFail'));
       const next = Array.isArray(result?.data) ? result.data : [];
       setZones(next);
@@ -1630,17 +1630,18 @@ function EOManagePage() {
           setHasLoadedOnce(true);
         }
       }
-    }).catch(e => {
-      if (alive) {
-        setZones([]);
-        setError(e.message || tr('dnsp.eo.zoneLoadFail'));
-        setLoading(false);
-        setHasLoadedOnce(true);
-      }
-    }).finally(() => {
-      if (alive) setIsZonesLoading(false);
-    });
-    return () => { alive = false; };
+    } catch (e) {
+      setZones([]);
+      setError(e.message || tr('dnsp.eo.zoneLoadFail'));
+      setLoading(false);
+      setHasLoadedOnce(true);
+    } finally {
+      setIsZonesLoading(false);
+    }
+  }, [zoneId]);
+
+  React.useEffect(() => {
+    reloadZones();
   }, []);
   React.useEffect(() => { loadEdgeOneData(); }, [loadEdgeOneData]);
 
@@ -1669,9 +1670,9 @@ function EOManagePage() {
   };
 
   const isNotConfigured = Boolean(
-    (error && (error.includes('未配置') || error.includes('未启用') || error.toLowerCase().includes('not configured'))) ||
-    (!loading && zones.length === 0 && !zoneId)
+    error && (error.includes('未配置') || error.includes('未启用') || error.toLowerCase().includes('not configured'))
   );
+  const hasNoZones = Boolean(!isZonesLoading && !isNotConfigured && !error && zones.length === 0);
 
   const openConfigModal = async () => {
     let cfg = {
@@ -1920,7 +1921,7 @@ function EOManagePage() {
               width="220px"
               disabled={isNotConfigured || zones.length === 0}
             >
-              <option value="">{isNotConfigured ? tr('dnsp.eo.noZonesPh') : tr('dnsp.selectZone')}</option>
+              <option value="">{isNotConfigured ? tr('dnsp.eo.noKeyPh') : (hasNoZones ? tr('dnsp.eo.noZonesPh') : tr('dnsp.selectZone'))}</option>
               {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
             </CustomDropdown>
             <Button variant="orange" size="md" icon="key" onClick={openConfigModal}>{tr('nav.proxyKeyConfig')}</Button>
@@ -1951,36 +1952,7 @@ function EOManagePage() {
         }
       />
 
-      {isNotConfigured ? (
-        /* ─── 未配置/未启用引导卡片（对齐专业控制台 EmptyState） ─── */
-        <div style={{
-          flex: 1, minHeight: 360, display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', padding: 40,
-          background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 8,
-          textAlign: 'center', marginTop: 12,
-        }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: '50%',
-            background: 'color-mix(in oklab, var(--orange) 16%, transparent)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            marginBottom: 16, color: 'var(--orange)',
-          }}>
-            <Icon name="key" size={26} />
-          </div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--fg-0)', marginBottom: 8 }}>
-            {tr('dnsp.eo.notConfiguredTitle')}
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--fg-2)', maxWidth: 460, lineHeight: 1.6, marginBottom: 20 }}>
-            {tr('dnsp.eo.notConfiguredDesc')}
-          </div>
-          <Button variant="orange" size="md" icon="key" onClick={openConfigModal}>
-            {tr('nav.proxyKeyConfig')}
-          </Button>
-        </div>
-      ) : (
-        <>
-
-      {/* Tab 切换 · 严格对齐 record-type-toggle */}
+      {/* Tab 切换 · 严格对齐 record-type-toggle (外层常驻) */}
       <div style={{
         display: 'inline-flex', padding: 3, marginBottom: 12,
         background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 6,
@@ -2007,7 +1979,7 @@ function EOManagePage() {
         ))}
       </div>
 
-      {/* 搜索栏 · DNS 时 2 输入,加速域名时 1 输入 + 状态 select */}
+      {/* 搜索栏 · 外层常驻 */}
       <div style={{
         display: 'flex', gap: 10, padding: 10, marginBottom: 12,
         background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 8,
@@ -2065,7 +2037,7 @@ function EOManagePage() {
         )}
       </div>
 
-      {/* 表格 */}
+      {/* 表格卡片 (外层常驻) */}
       <div style={{ flex: 1, minHeight: 0, background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <div style={{
           padding: '10px 14px', borderBottom: '1px solid var(--border)', background: 'var(--bg-2)',
@@ -2078,7 +2050,66 @@ function EOManagePage() {
           </span>
         </div>
         <div style={{ flex: 1, overflow: 'auto' }}>
-          {tab === 'dns' ? (
+          {(isZonesLoading && !hasLoadedOnce) ? (
+            <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--fg-3)', fontSize: 12 }}>
+              <StatusDot status="running" pulse /> 正在加载站点列表…
+            </div>
+          ) : isNotConfigured ? (
+            /* ─── 未配置/未启用引导卡片 ─── */
+            <div style={{
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', padding: 40,
+              textAlign: 'center', minHeight: 280,
+            }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: '50%',
+                background: 'color-mix(in oklab, var(--orange) 16%, transparent)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                marginBottom: 14, color: 'var(--orange)',
+              }}>
+                <Icon name="key" size={22} />
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--fg-0)', marginBottom: 6 }}>
+                {tr('dnsp.eo.notConfiguredTitle')}
+              </div>
+              <div style={{ fontSize: 12.5, color: 'var(--fg-2)', maxWidth: 440, lineHeight: 1.6, marginBottom: 16 }}>
+                {tr('dnsp.eo.notConfiguredDesc')}
+              </div>
+              <Button variant="orange" size="md" icon="key" onClick={openConfigModal}>
+                {tr('nav.proxyKeyConfig')}
+              </Button>
+            </div>
+          ) : hasNoZones ? (
+            /* ─── 密钥已配置但账号下暂无站点域名引导卡片 ─── */
+            <div style={{
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', padding: 40,
+              textAlign: 'center', minHeight: 280,
+            }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: '50%',
+                background: 'color-mix(in oklab, var(--info) 16%, transparent)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                marginBottom: 14, color: 'var(--info)',
+              }}>
+                <Icon name="globe" size={22} />
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--fg-0)', marginBottom: 6 }}>
+                {tr('dnsp.eo.noZonesTitle')}
+              </div>
+              <div style={{ fontSize: 12.5, color: 'var(--fg-2)', maxWidth: 460, lineHeight: 1.6, marginBottom: 16 }}>
+                {tr('dnsp.eo.noZonesDesc')}
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <Button variant="primary" size="md" icon="refresh-cw" onClick={reloadZones}>
+                  {tr('dnsp.eo.refreshZones')}
+                </Button>
+                <Button variant="outline" size="md" icon="key" onClick={openConfigModal}>
+                  {tr('nav.proxyKeyConfig')}
+                </Button>
+              </div>
+            </div>
+          ) : tab === 'dns' ? (
             /* ═══ DNS 记录 6 列:类型 / 名称 / 值 / TTL / 优先级 / 操作 ═══ */
             <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12 }}>
               <thead>
@@ -2277,8 +2308,6 @@ function EOManagePage() {
           )}
         </div>
       </div>
-      </>
-      )}
     </div>
   );
 }

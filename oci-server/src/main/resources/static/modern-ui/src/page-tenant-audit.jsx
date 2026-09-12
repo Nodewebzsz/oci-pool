@@ -106,6 +106,7 @@ function TenantAuditPage({ density, ctx, navigate }) {
     } else {
       if (!validateRange(sDate, eDate)) return;
       setLoading(true);
+      setLogs([]); // 新检索与刷新时立即清空旧数据，杜绝旧数据与 loading 共存！
       setQueried(false);
       setError(null);
       setNextToken(null);

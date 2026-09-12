@@ -65,7 +65,8 @@ const buildNav = (tr) => [
   { id: 'notifyMgmt', label: tr('nav.notifyMgmt'), icon: 'bell' },
   { id: 'memPage',    label: tr('nav.memPage'),    icon: 'book-open' },
   { id: 'migPage',    label: tr('nav.migPage'),    icon: 'arrow-left-right' },
-  { id: 'mfaBackup',  label: tr('nav.mfaBackup'),  icon: 'smartphone' }]
+  { id: 'mfaBackup',  label: tr('nav.mfaBackup'),  icon: 'smartphone' },
+  { id: 'aiChat',     label: tr('nav.aiChat'),     icon: 'message-square', highlight: true }]
 
 },
 {

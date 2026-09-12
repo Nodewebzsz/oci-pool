@@ -25,6 +25,7 @@ function TenantsPage({ density }) {
   const [tenants, setTenants] = useStateT([]);
   const [totalElements, setTotalElements] = useStateT(0);
   const [loading, setLoading] = useStateT(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useStateT(false);
   const [loadError, setLoadError] = useStateT('');
 
   // 编辑自定义名称 — 对齐原项目 editCustomName / saveCustomName(POST /tenants/updateCustomName)
@@ -142,6 +143,7 @@ function TenantsPage({ density }) {
   // 真实后端 · 加载租户列表(GET /tenants/list/json,原项目 Web 端)并映射为页面所需形状
   const loadTenants = React.useCallback(async () => {
     setLoading(true);
+    setTenants([]); // 刷新与加载时第一时间清空旧数据，杜绝旧数据与 loading 共存！
     setLoadError('');
     try {
       const json = await window.ociApi.getPage('/tenants/list/json', {
@@ -158,6 +160,7 @@ function TenantsPage({ density }) {
       setLoadError(error.message || tr('tenants.err.load'));
     } finally {
       setLoading(false);
+      setHasLoadedOnce(true);
     }
   }, [page, perPage, search, cloudType]);
 
@@ -588,7 +591,7 @@ function TenantsPage({ density }) {
           <Table
             columns={columns}
             rows={paged}
-            loading={loading}
+            loading={!hasLoadedOnce || loading}
             empty={
               <EmptyState
                 icon="users"

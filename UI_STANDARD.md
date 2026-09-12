@@ -1,6 +1,6 @@
 # UI 标准（UI Standard）
 
-> **本文档是项目内表格、操作弹窗、下拉选择框、分页的统一标准。** 后续新增其它统一标准，按章节在本文件追加。
+> **本文档是项目内表格、操作弹窗、下拉选择框、分页、表单校验与按钮禁用的统一标准。** 后续新增其它统一标准，按章节在本文件追加。
 > 标准实现可对照：实例（`InstancesView.swift`）、开机管理（`BootView.swift`，**以此为准**）、租户管理（`TenantsView.swift`）；分页见 `Common/Components/PaginationBar.swift` + `Common/Models/PageState.swift`。
 >
 > 各章「已对齐」清单：已对齐的页面不必重做；新页面照对应章节对齐即可。
@@ -172,45 +172,41 @@ MenuPulseDot(color: statusColor(item), pulse: item.isRunning)
 
 ---
 
-### 1.8 数据列表加载态（Loading）与表头常驻标准（杜绝全屏大遮罩与脏数据残留）
+### 1.8 数据列表加载态（Loading）与生命周期防闪烁铁律（杜绝全屏大遮罩与旧数据共存）
 
 > ⚠️ **曾踩坑**：
 > 1. **首屏切入抹除表头**：使用 `if isLoading && rows.isEmpty` 直接用空白转圈 View 替换整个表格卡片，导致**表头被整个抹掉**；数据加载出来时表头突然弹现，造成严重的**视觉跳动（Jitter）**！
 > 2. **粗暴全局大遮罩**：在最外层容器（含筛选条、KPI 统计卡）挂载 `.appLoading(...)`，导致二次筛选时**整个屏幕 80% 区域（连带顶部筛选条和 KPI 卡）全部被厚重的半透明蒙层覆盖**，视觉极为突兀粗糙！
-> 3. **切换主体旧数据残留（Stale Data）**：切换租户/区域时，旧租户的机器依然留在列表上并盖着 loading，产生“选了租户 B 却看着租户 A 的机器”的数据混淆与误导！
+> 3. **原有数据与 Loading 双态共存（重大视觉混乱）**：点击「刷新」或切换租户时，旧数据依然留在列表上，底层挂着半透明或者浮动转圈框，形成“旧数据与 Loading 同时挂在屏幕上”的脏数据残留！
+> 4. **幽灵空态闪现（Flash of Empty State）**：组件刚挂载第 1 帧由于异步请求尚未发出，误判 `rows.isEmpty` 瞬间闪现「暂无数据」，第 2 帧又跳成 Loading，形成“无数据 → Loading → 有数据”的时序倒挂！
 
-**必须遵守的统一规范**：
+**必须遵守的前后端统一 6 大铁律**：
 
 1. **表头骨架永久置顶常驻（首屏切入零跳动）**：
-   - 表头（Header Row）始终固定在表格卡片最顶端；
-   - 无论是首屏切入、切换租户、还是原地刷新，**表头绝对不消失、不隐藏**。数据行到达后自然平滑填入表头下方，杜绝任何布局闪烁。
+   - 表头（Header Row）始终固定在表格卡片最顶端（原生端独立 HeaderRow 外置，Web 端 `thead { position: sticky, top: 0, zIndex: 1 }`）；
+   - 无论是首屏切入、切换租户、还是原地刷新，**表头绝对不消失、不隐藏、不替换**。数据行到达后自然平滑填入表头下方，杜绝任何布局抖动。
 
-2. **Loading 范围严格收敛在「表格卡片内部」**：
-   - 严禁在外层挂载全局 `.appLoading` 蒙层；
+2. **Loading 范围严格收敛在「表格内部」**：
+   - 严禁在外层容器挂载全局 `.appLoading` 大蒙层；
    - 顶部的「筛选状态条」与「KPI 指标卡」属于页面元信息，在加载过程中必须**始终保持清晰可见，绝不被遮挡**。
 
-3. **区分操作类型的表体过渡策略（核心原则）**：
+3. **旧数据与 Loading 严禁共存原则（立即清空）**：
+   - **核心规范**：无论是用户主动点击「刷新」按钮、切换筛选条件、还是切换租户/区域等主体，**在触发加载的第一行代码必须立即清空旧数据（`rows = []` / `setRows([])`）并开启 `loading = true`**；
+   - 表体内**绝不允许残留上一屏的任何旧数据行**（杜绝半透明 0.6 旧行与转圈同时并存的视觉混乱）；
+   - 表体必须呈现**整表高度垂直与水平居中的纯净专属 Loading 状态**（旋转指示器 + `正在加载...`）；数据请求成功返回后，再将新数据填入表体，干脆利落。
 
-| 操作类型 | 行为触发 | 旧数据行处理 | 视觉呈现 |
-|:---|:---|:---|:---|
-| **主体/作用域切换** | 切换租户、切换区域、重置筛选 | **立即清空**（`rows = []`） | 表头常驻，表体居中展示轻量 `ProgressView()` + `正在加载...`，杜绝旧数据残留混淆 |
-| **同主体原地刷新/翻页** | 点击「刷新」按钮、分页翻页 | **保留当前行** | 表体数据行呈微半透明（`opacity: 0.6`），中央浮现微型更新卡片，平滑过渡 |
+4. **杜绝首屏幽灵空态闪现（`hasLoadedOnce` 状态机守卫）**：
+   - 在状态机中声明 `hasLoadedOnce = false`（首次真实请求完成置 `true`）；
+   - 空状态（`EmptyStateView` / `<EmptyState />`）严格受守卫约束：**仅在 `hasLoadedOnce && !isLoading && rows.isEmpty` 时才允许展示**；
+   - 首次加载完成前（`!hasLoadedOnce`）强制展示置顶表头 + 居中 Loading，严禁闪现空状态！
 
-4. **杜绝首屏幽灵空态闪现（Flash of Empty State）**：
-   - ⚠️ **曾踩坑**：ViewModel 初始化时 `rows = []` 且 `isLoading = false`，视图挂载时 `onAppear` 尚未发起请求，导致第 1 帧直接命中 `rows.isEmpty` 闪现「暂无数据」，随后第 2 帧发起请求才变成 Loading，形成“无数据 → Loading → 有数据”的时序倒挂！
-   - **规范约束**：在 ViewModel 中声明 `@Published private(set) var hasLoadedOnce = false`（首次请求完成在 `defer` 中置 `true`）；
-   - 空状态 `EmptyStateView` 严格限制在 `hasLoadedOnce && !isLoading && rows.isEmpty`；首次加载完成前（`!hasLoadedOnce`）直接展示置顶表头 + 居中 Loading，严禁闪现空状态！
-
-5. **切换筛选主体时同步置为 `isLoading = true`（杜绝拉取选项期间空态闪现）**：
-   - ⚠️ **曾踩坑**：用户切换租户时，代码执行了 `rows = []` 并去异步拉取区域列表 `await service.listRegions(...)`。然而在拉取区域列表的这几百毫秒内，`isLoading` 依然为 `false`（因为真正的 `reload()` 还没被调用），而此时 `hasLoadedOnce` 已经是 `true`、`rows.isEmpty` 也是 `true`，导致在拉取区域列表的空隙中**瞬间闪现出「暂无实例」空态**！等区域拉取回来触发 `reload()` 时，又跳成 Loading，再次发生闪烁！
-   - **规范约束**：在触发切换父级实体（如 `onParentChanged`）或应用筛选（`applyFilter`）的方法头部，**必须在清除旧数据（`rows = []`）的同时，同步执行 `isLoading = true`**！保证在拉取子级选项乃至发起真实数据请求的全周期中，表体始终处于 Loading 态，绝不给空态任何抢跑机会！
+5. **切换父级筛选主体时即刻进入 Loading（杜绝拉取选项期间空态闪现）**：
+   - 用户切换父级租户时，往往需要异步拉取子级区域列表（`listRegions`）。在发起子级请求的第一瞬间，**必须在清空旧数据（`rows = []` / `setRows([])`）的同时，同步执行 `isLoading = true`**；
+   - 保证在拉取子级选项乃至发起真实数据请求的全周期中，表体始终处于 Loading 态，绝不给空态任何抢跑机会！
 
 6. **错误横幅状态生命周期闭环（杜绝报错死锁滞留）**：
-   - ⚠️ **曾踩坑**：在对象存储等页面中，某个租户拉取失败后，`handleError` 赋予了 `errorText`。然而当用户切换到其他正常租户、重新拉取存储桶或重新刷新成功后，代码**从未执行 `errorText = nil`**！导致界面下方明明已经成功拉出了正常的存储桶和数据，上方却依然永久顶着刺眼的红色错误横幅，自相矛盾且产生严重认知混乱！
-   - **规范约束**：
-     - **操作发起即刻清空**：在用户主动触发的切换实体（如 `onTenantChanged`）、重新加载（`loadBuckets(reset: true)`）、点击刷新（`refreshBuckets`）等方法头部，**第一时间执行 `errorText = nil`**，绝不把上一个租户的错误残留在新租户界面上；
-     - **请求成功时确保消退**：数据成功返回后，确保 `errorText = nil`；
-     - **横幅支持主动关闭（Dismiss）**：错误横幅右侧除「重试」按钮外，必须提供「关闭（`xmark`）」按钮（绑定 `model.clearError()`），允许用户获知错误后手动关闭，不再永久霸占视觉高度。
+   - 在用户主动触发切换实体（如 `onTenantChanged`）、重新加载、点击刷新等方法头部，**第一时间执行 `errorText = nil / ''`**，绝不把上一个租户的错误残留在新租户界面上；
+   - 数据成功返回后确保清空错误；错误横幅右侧除「重试」外，必须提供「关闭（`xmark`）」按钮，允许用户获知后主动关闭。
 
 **标准实现模板**：
 ```swift
@@ -768,6 +764,190 @@ HStack(spacing: 12) {
 - 曾出现各页默认值不统一（实例/租户/区域/代理配置为 `10`，邮件服务为 `5`）。**macOS 端已于 2026-09-11 统一为 `20`；Web / Windows 端待改。**
 - 邮件服务的 `size: 5` 不在 `PageState.sizeOptions = [10, 20, 50, 100]` 内，导致每页条数选择器显示的值不在自己的选项列表中。**macOS 端已修正为 `20`；Web 端是硬编码 6/8/8，同样越界且不可调，待改。**
 - 审计日志曾套用 `PaginationBar`（页码条 + 跳页框），而接口是 OCI token 游标：页码总数只能靠 `max(已探明+1, page+2)` 猜、会随翻页增长，跳页框超范围输入被静默夹回。已改为「加载更多」append 形态（两端均已改）。
+
+---
+
+## 第五章 · 配置卡片表单与操作按钮禁用标准（Form Validation & Button Disabled Standard）
+
+适用于所有配置类卡片、表单组件及操作弹窗（如 IP 质量管理、密钥配置、DNS 记录弹窗、代理配置等）。标准实现以 `IpQualityView.swift` / `page-misc.jsx (SysIpQualityPage)` 为准。
+
+### 5.1 核心设计原则
+
+> ⚠️ **曾踩坑**：在必填项未填写时保持按钮高亮可点击，依赖用户点击后弹 Toast 报错。这种方式体验滞后、视觉没有前置约束，且容易产生无效的网络或本地验证请求。
+
+**标准规则**：
+1. **前置防御性校验**：只要卡片或弹窗内的**必填项（带红星 `*` 字段）为空或全为空格**，底部的操作按钮（如「测试连接」、「保存配置」、「确定」）**必须实时进入 Disabled 禁用状态**。
+2. **必填显式标识**：所有参与禁用校验的输入项，Label 必须直观带红星 `*`（如 `服务器地址 *`、`用户名 *`、`API Key *`）。
+3. **按钮联动反馈**：
+   - 禁用态：置灰或淡色半透明，禁止点击与指针交互；
+   - 激活态：当所有必填项满足校验规则后，按钮毫秒级恢复高亮与可点击态。
+4. **禁用态色彩对比度规范（主题色弱化态与文字反转 · 方案 B）**：
+   - ⚠️ **曾踩坑**：严禁在禁用时直接对 Primary 等实心按钮粗暴施加全局 `opacity: 0.5`！在浅色模式的白色背景上，这会导致“半透明白字”浮在“泛白浅绿底”上，对比度暴跌至 1.2:1，文字完全看不清。
+   - **正确做法（方案 B · 主题色弱化态）**：
+     - **禁用背景**：采用对应强调色软底（`accentSoft`，深色 `opacity 0.20`，浅色 `opacity 0.12`）；
+     - **禁用文字与图标**：**严禁使用白色**！必须反转为对应的深强调色（`accent.opacity(0.65 ~ 0.8)`）；
+     - **禁用边框**：保留微弱主题色轮廓细边框（`accent.opacity(0.25 ~ 0.35)`）；
+     - **效果**：既鲜明保留了主按钮的色彩归属倾向（如绿色保存、蓝色操作），又确保在浅白底上文字清晰锐利、对比度达标（>= 4.5:1）。
+
+---
+
+### 5.2 代码规范与模板
+
+#### 1. macOS 客户端（SwiftUI）标准模板
+```swift
+// 1. 计算必填项有效性
+let binding = model.binding(for: carrier)
+let hasHost = !binding.serverIp.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+let hasUser = !binding.username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+let canSubmit = hasHost && hasUser
+
+// 2. 字段 Label 明确标注红星
+FormFieldRow(label: "服务器地址 *") { ... }
+FormFieldRow(label: "用户名 *") { ... }
+
+// 3. 按钮显式绑定 enabled 参数
+AppButton(
+    title: "测试连接",
+    systemImage: "zap",
+    kind: .secondary,
+    isLoading: isTesting,
+    enabled: canSubmit
+) {
+    model.testVPS(carrier)
+}
+
+AppButton(
+    title: "保存",
+    systemImage: "square.and.arrow.down",
+    kind: .primary,
+    isLoading: isSaving,
+    enabled: canSubmit
+) {
+    model.saveVPS(carrier)
+}
+```
+
+#### 2. Web 端（React Modern UI）标准模板
+```jsx
+// 1. 纯函数或变量推导校验状态
+const canSubmit = Boolean(config.host?.trim() && config.username?.trim());
+
+// 2. 表单行标注 required
+<FormRow label="服务器地址" required> ... </FormRow>
+<FormRow label="用户名" required> ... </FormRow>
+
+// 3. 按钮直接设置 disabled 属性
+<Button
+  variant="outline"
+  size="sm"
+  icon="zap"
+  loading={config.testing}
+  disabled={!canSubmit}
+  onClick={onTest}
+>
+  测试连接
+</Button>
+
+<Button
+  variant="primary"
+  size="sm"
+  icon="save"
+  disabled={!canSubmit}
+  onClick={onSave}
+>
+  保存配置
+</Button>
+```
+
+---
+
+### 5.3 已对齐页面清单
+
+| 页面 | 涉及卡片 / 弹窗 | 依赖必填项 | macOS 端 | Web 端 |
+|:---|:---|:---|:---:|:---:|
+| IP 质量管理 | 三大运营商 VPS 探针卡片 | 服务器地址 + 用户名 | ✅ | ✅ |
+| Token / 密钥配置 | Cloudflare 配置卡片 | API Key + 邮箱地址 | ✅ | ✅ |
+| Token / 密钥配置 | EdgeOne 配置卡片 | SecretId + SecretKey | ✅ | ✅ |
+| EO 管理 | DNS 记录添加/编辑弹窗 | 记录名 + 记录值 | ✅ | ✅ |
+
+---
+
+## 第六章 · 文本与密码输入框一键清空标准（Input Clear Button & Visibility Toggle Standard）
+
+适用于全站所有单行输入框、密码输入框及搜索框（如 `TextInput`、`PasswordInput`、`ToolInput`、`SearchInput` 及 macOS 的 `AppTextField`）。标准实现以 Web 端 `shell.jsx`、`ui.jsx`、`page-tools.jsx` 与 macOS 端 `FormFields.swift` 为准。
+
+### 6.1 核心设计原则
+
+> ⚠️ **曾踩坑**：
+> 1. Web 端输入框在用户键入内容后无法一键清空，用户必须连按退格键或全选删除，与 macOS 桌面原生操作习惯割裂。
+> 2. 点击清空按钮时默认触发失去焦点（Blur），导致光标脱离输入框，用户清空后想重新输入必须再次点击输入框。
+> 3. 密码框右侧原本有眼睛显隐按钮，若清空按钮直接绝对定位到最右侧，会与眼睛按钮严重重叠或覆盖。
+
+**标准规则**：
+1. **有内容时即时显现**：
+   - 当输入框内有有效字符且组件处于可编辑状态（非 `disabled`、非 `readOnly`）时，输入框内右侧立即渲染一键清空圆形图标（Web 端 Lucide `x-circle`，macOS 端 SF Symbol `xmark.circle.fill`）；
+   - 内容为空时自动隐藏，不占多余视觉权重。
+2. **免失焦清空体验**：
+   - 清空按钮必须拦截 `onMouseDown` 事件并执行 `e.preventDefault()`，保证点击清空时输入框**始终保持光标聚焦（Focus）**，清空后可立即直接打字。
+3. **密码框双操作布局**：
+   - 普通文本框：右侧预留清空按钮（`paddingRight: 30px`，清空图标定位 `right: 5px`）；
+   - 密码框：右侧并排布局「一键清空 + 明文眼睛」双图标（`paddingRight: 54px`，眼睛固定在 `right: 4px`，清空按钮位于 `right: 28px`），各司其职互不打架。
+4. **搜索框非空清空与联动**：
+   - 搜索输入框（`SearchInput`）在包含关键词时右侧显示一键清空图标，点击即可瞬间重置为全量无过滤状态，且不引起页面几何高度抖动。
+
+---
+
+### 6.2 代码规范与模板
+
+#### 1. Web 端通用组件模板（React Modern UI）
+```jsx
+// shell.jsx / ui.jsx 标准实现
+<div style={{ position: 'relative', width: '100%' }}>
+  <input
+    type={effType}
+    value={value ?? ''}
+    onChange={e => onChange && onChange(e.target.value)}
+    style={{
+      width: '100%',
+      padding: isPass ? '7px 54px 7px 10px' : (hasVal ? '7px 30px 7px 10px' : '7px 10px'),
+      ...
+    }}
+  />
+  {hasVal && (
+    <button
+      type="button"
+      onMouseDown={e => e.preventDefault()} // 保持输入焦点
+      onClick={() => onChange && onChange('')}
+      tabIndex={-1}
+      title={tr('logs.action.clear') || 'Clear'}
+      style={{
+        position: 'absolute', right: isPass ? 28 : 5, top: '50%', transform: 'translateY(-50%)',
+        width: 22, height: 22, border: 'none', background: 'transparent',
+        cursor: 'pointer', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center'
+      }}
+    >
+      <Icon name="x-circle" size={13} />
+    </button>
+  )}
+  {isPass && (
+    <button type="button" onClick={() => setReveal(!reveal)} style={{ position: 'absolute', right: 4, ... }}>
+      <Icon name={reveal ? 'eye-off' : 'eye'} size={13} />
+    </button>
+  )}
+</div>
+```
+
+---
+
+### 6.3 已对齐组件清单
+
+| 组件 / 控件名 | 所在文件 | 支持一键清空 | 密码眼睛协同 | 保持光标不失焦 |
+|:---|:---|:---:|:---:|:---:|
+| `TextInput` 通用文本框 | `shell.jsx` | ✅ (`x-circle`) | ✅ (`right: 28`) | ✅ (`preventDefault`) |
+| `PasswordInput` 密码框 | `shell.jsx` | ✅ (`x-circle`) | ✅ (`right: 28`) | ✅ (`preventDefault`) |
+| `ToolInput` 工具输入框 | `page-tools.jsx` | ✅ (`x-circle`) | ✅ (`right: 28`) | ✅ (`preventDefault`) |
+| `SearchInput` 通用搜索框 | `ui.jsx` | ✅ (`x-circle`) | — | ✅ (`preventDefault`) |
+| `AppTextField` 原生输入框 | `FormFields.swift` | ✅ (`xmark.circle.fill`) | ✅ (同轴切换) | ✅ (原生 NSTextField) |
 
 ---
 

@@ -1,0 +1,18 @@
+package com.nodewebzsz.ocicommon.param;
+
+import lombok.Data;
+
+/**
+ * @version 1.0.0
+ * @ClassName InstallAppNotify
+ * @Description TODO
+ * @Author nodewebzsz
+ * @Date 2025-08-23 08:36
+ */
+@Data
+public class InstallAppNotify {
+
+    private String data;
+
+    private Long appInstallCount;
+}

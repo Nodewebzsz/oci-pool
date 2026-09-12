@@ -5,6 +5,28 @@ struct AiTenantOption: Identifiable, Equatable {
     var name: String = ""
     /// 后端 tname：租户名（自定义名优先）+ 区域，下拉展示用；name 为 userName(OCID)+区域
     var tname: String = ""
+
+    /// 对齐实例列表租户下拉（Web getTenantLabel）：真实租户名 · 中文区域。
+    /// 新后端 tname 格式为 "displayName - regionCode"；旧后端无 tname 时回落 name（"userName - regionCode"）。
+    var dropdownLabel: String {
+        let source = tname.isEmpty ? name : tname
+        let parts = source.components(separatedBy: " - ")
+        if parts.count >= 2 {
+            let displayName = parts.dropLast().joined(separator: " - ")
+            let regionCode = parts.last ?? ""
+            let regionCn = RegionCnName.table[regionCode] ?? regionCode
+            return "\(displayName) · \(regionCn)"
+        }
+        return source
+    }
+
+    /// 兜底非空标题（防止旧后端缺字段时下拉出现空行）
+    var safeTitle: String {
+        let label = dropdownLabel
+        if !label.isEmpty { return label }
+        if !name.isEmpty { return name }
+        return id
+    }
 }
 
 struct AiAvailableModel: Identifiable, Equatable {

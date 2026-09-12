@@ -93,7 +93,7 @@ logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
   level:
-    com.doubledimple.ociserver: INFO
+    com.nodewebzsz.ociserver: INFO
     com.oracle.bmc.core.VirtualNetworkClient: ERROR
     com.oracle.bmc.limits.LimitsClient: ERROR
     com.oracle.bmc.http.client.jersey.JerseyHttpClientBuilder: WARN
@@ -154,7 +154,7 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     operations-sorter: method
-  packages-to-scan: com.doubledimple.ociserver.third.openApi.controller
+  packages-to-scan: com.nodewebzsz.ociserver.third.openApi.controller
 
 sa-token:
   token-name: satoken

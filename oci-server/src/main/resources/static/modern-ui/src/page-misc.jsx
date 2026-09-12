@@ -464,16 +464,11 @@ function MailPage() {
             </div>
 
             {/* Search */}
-            <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
-              <input type="text" value={tenantSearch}
-                onChange={e => { setTenantSearch(e.target.value); setTenantPage(1); }}
+            <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
+              <SearchInput value={tenantSearch}
+                onChange={v => { setTenantSearch(v); setTenantPage(1); }}
                 placeholder={tr('mail.searchPh')}
-                style={{
-                  width: '100%', padding: '6px 10px', fontSize: 12,
-                  background: 'var(--bg-2)', color: 'var(--fg-0)',
-                  border: '1px solid var(--border)', borderRadius: 4,
-                  fontFamily: 'inherit',
-                }} />
+                width="100%" size="sm" />
             </div>
 
             {/* Tenant rows */}
@@ -1048,17 +1043,11 @@ function ObjectPage() {
           </div>
 
           {/* 搜索框 */}
-          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
-            <input type="text" value={bucketSearch}
-              onChange={e => setBucketSearch(e.target.value)}
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
+            <SearchInput value={bucketSearch}
+              onChange={setBucketSearch}
               placeholder={tr('obj.searchPh')}
-              disabled={!currentTenant}
-              style={{
-                width: '100%', padding: '6px 10px', fontSize: 12,
-                background: 'var(--bg-2)', color: 'var(--fg-0)',
-                border: '1px solid var(--border)', borderRadius: 4,
-                fontFamily: 'inherit',
-              }} />
+              width="100%" size="sm" />
           </div>
 
           {/* Bucket 列表 */}
@@ -1516,7 +1505,11 @@ function AIPage() {
               ))}
             </CustomDropdown>
             <Button variant="violet" size="md" icon="message-square" disabled={!currentTenant}
-              onClick={openChatDrawer}
+              onClick={() => {
+                // 跳转全屏 AI 对话工作台并预选租户（对齐 macOS 客户端 AiChatView）
+                try { window.ociRouter?.go('aiChat', { tenantId: String(currentTenant.id) }); }
+                catch (_) { shell.showToast(tr('pageMisc.6554d5'), { kind: 'warn' }); }
+              }}
             >{tr('pageMisc.5a36be')}</Button>
           </>
         }
@@ -1821,6 +1814,614 @@ function AIPage() {
                 style={{ padding: '3px 10px', background: 'var(--bg-1)', color: configPage >= configTotalPages ? 'var(--fg-3)' : 'var(--fg-1)', border: '1px solid var(--border)', borderRadius: 3, cursor: configPage >= configTotalPages ? 'not-allowed' : 'pointer', fontSize: 11, fontFamily: 'inherit' }}>›</button>
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// AI 对话 · 全屏沉浸式工作台（100% 对齐 macOS 客户端 AiChatView）
+//   /tools/ai-chat?tenantId=...
+//     ┌────────────┬──────────────────────────────────────────────┐
+//     │ 左租户轨    │  顶栏:租户切换 · 模型选择 · 上下文 · 清空/复制 │
+//     │ (280px 可折 │──────────────────────────────────────────────│
+//     │  叠,Hero 头 │  消息流:用户右侧气泡 / AI 左侧全宽块 / 三点动画 │
+//     │  像+搜索+列 │──────────────────────────────────────────────│
+//     │  表+底部提示)│  Hero 空态:渐变图标 + 灵感 chip · 自适应输入栏 │
+//     └────────────┴──────────────────────────────────────────────┘
+//   WS 协议: /ws/aiChat · init → chat(isChunk 流式)/chat_end/error
+// ═══════════════════════════════════════════════════════════════════════
+function AiChatPage() {
+  const { t: tr } = useT();
+  const shell = useShell();
+  const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
+  const [tenants, setTenants] = React.useState([]);
+  const [selectedTenantId, setSelectedTenantId] = React.useState(null);
+  const [models, setModels] = React.useState([]);
+  const [selectedModelId, setSelectedModelId] = React.useState('');
+  const [messages, setMessages] = React.useState([]);
+  const [input, setInput] = React.useState('');
+  const [useHistory, setUseHistory] = React.useState(true);
+  const [statusText, setStatusText] = React.useState('请选择租户');
+  const [isConnected, setIsConnected] = React.useState(false);
+  const [isLoadingTenants, setIsLoadingTenants] = React.useState(true);
+  const [isLoadingModels, setIsLoadingModels] = React.useState(false);
+  const [isSending, setIsSending] = React.useState(false);
+  const [errorText, setErrorText] = React.useState('');
+  const [tenantSearch, setTenantSearch] = React.useState('');
+  const [showTenantRail, setShowTenantRail] = React.useState(true);
+  const [inputHeight, setInputHeight] = React.useState(24);
+  const [streamIdx, setStreamIdx] = React.useState(0); // 流式拼接刷新令牌
+
+  const wsRef = React.useRef(null);
+  const currentTenantIdRef = React.useRef(0);
+  const canvasRef = React.useRef(null);
+  const pendingTenantRef = React.useRef(null);
+
+  const selectedTenant = tenants.find(t => String(t.id) === String(selectedTenantId)) || null;
+
+  const filteredTenants = React.useMemo(() => {
+    const q = tenantSearch.trim().toLowerCase();
+    if (!q) return tenants;
+    return tenants.filter(t =>
+      (t.name || '').toLowerCase().includes(q) || (t.region || '').toLowerCase().includes(q));
+  }, [tenants, tenantSearch]);
+
+  const seedWelcome = () => setMessages([
+    { id: 'welcome', role: 'ai', content: '你好！我是 OCI AI 助手。选择左侧租户与模型后，即可开始对话。', time: new Date().toTimeString().slice(0, 5) },
+  ]);
+
+  // ─── 加载租户(对齐客户端 /tenants/list/json · supportAI 过滤) ──
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      setIsLoadingTenants(true);
+      try {
+        const rows = await window.ociServices.tenant.listParentTenants();
+        if (!alive) return;
+        const list = (Array.isArray(rows) ? rows : []).map(row => window.ociTenantRow.normalize(row, []));
+        setTenants(list);
+        // 深链接预选:URL tenantId → 列表首个
+        let initial = null;
+        const routeTenant = (() => { try { return window.ociRouter?.read?.().query?.tenantId || ''; } catch { return ''; } })();
+        if (routeTenant) initial = list.find(t => String(t.id) === String(routeTenant)) || null;
+        if (!initial && list.length) initial = list[0];
+        if (initial) {
+          setSelectedTenantId(String(initial.id));
+          currentTenantIdRef.current = initial.id;
+        }
+      } catch (e) {
+        if (alive) { setErrorText(e.message || '加载租户失败'); }
+      } finally {
+        if (alive) { setIsLoadingTenants(false); setHasLoadedOnce(true); }
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // ─── 加载模型 + 建立 WS(对齐客户端 /ai/models) ──
+  const connectWS = React.useCallback((tenantId, modelId) => {
+    if (wsRef.current) { try { wsRef.current.close(); } catch (_) {} wsRef.current = null; }
+    if (!tenantId || !modelId) return;
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const base = location.host === '9857' || location.port === '9857' ? `${location.hostname}:9857` : location.host;
+    let ws;
+    try { ws = new WebSocket(`${proto}://${base}/ws/aiChat`); } catch (e) { setStatusText('连接失败'); return; }
+    wsRef.current = ws;
+    setStatusText('连接中…');
+    ws.onopen = () => {
+      // 对齐客户端:连接建立后 250ms 发送 init
+      setTimeout(() => {
+        if (wsRef.current !== ws) return;
+        ws.send(JSON.stringify({
+          type: 'init',
+          tenant: { tenantId: String(tenantId), modelId },
+        }));
+      }, 250);
+    };
+    ws.onmessage = (ev) => {
+      let obj;
+      try { obj = JSON.parse(ev.data); } catch (_) { return; }
+      const type = obj.type || '';
+      if (type === 'init') {
+        if (obj.status && obj.status !== 'success') {
+          setIsConnected(false);
+          setStatusText(obj.message || '初始化失败');
+        } else {
+          setIsConnected(true);
+          setStatusText('已连接');
+        }
+      } else if (type === 'chat') {
+        const role = obj.role || '';
+        const msg = obj.message || '';
+        if (role !== 'assistant' || !msg) return;
+        const isChunk = obj.isChunk === true;
+        setMessages(prev => {
+          const next = prev.slice();
+          const last = next[next.length - 1];
+          if (isChunk) {
+            if (last && last.role === 'assistant' && last.streaming) {
+              next[next.length - 1] = { ...last, content: last.content + msg };
+            } else {
+              next.push({ id: `a-${Date.now()}`, role: 'ai', content: msg, time: new Date().toTimeString().slice(0, 5), streaming: true });
+            }
+          } else if (last && last.role === 'assistant' && last.streaming) {
+            next[next.length - 1] = { ...last, content: msg, streaming: false };
+          } else {
+            next.push({ id: `a-${Date.now()}`, role: 'ai', content: msg, time: new Date().toTimeString().slice(0, 5) });
+          }
+          return next;
+        });
+        setStreamIdx(v => v + 1);
+      } else if (type === 'chat_end') {
+        setMessages(prev => {
+          const next = prev.slice();
+          const last = next[next.length - 1];
+          if (last && last.role === 'assistant' && last.streaming) {
+            next[next.length - 1] = { ...last, streaming: false };
+          }
+          return next;
+        });
+        setIsSending(false);
+        setIsConnected(true);
+        setStatusText('已连接');
+      } else if (type === 'error') {
+        setIsSending(false);
+        const m = obj.message || 'AI 错误';
+        setStatusText(m);
+        shell.showToast(m, { kind: 'error' });
+        setMessages(prev => [...prev, { id: `e-${Date.now()}`, role: 'system', content: m, time: new Date().toTimeString().slice(0, 5) }]);
+      }
+    };
+    ws.onclose = () => {
+      if (wsRef.current === ws) {
+        setIsConnected(false);
+        setIsSending(false);
+        setStatusText('已断开');
+      }
+    };
+    ws.onerror = () => { if (wsRef.current === ws) setStatusText('连接异常'); };
+  }, [shell]);
+
+  // 切换租户 → 立即清空消息与模型并重建连接（杜绝旧会话残留）
+  React.useEffect(() => {
+    if (!selectedTenantId) return;
+    setMessages([]);
+    seedWelcome();
+    setModels([]);
+    setSelectedModelId('');
+    setIsConnected(false);
+    setIsLoadingModels(true);
+    setStatusText('加载模型…');
+    let alive = true;
+    (async () => {
+      try {
+        const j = await window.ociApi.request('/ai/models?tenantId=' + encodeURIComponent(String(selectedTenantId)));
+        if (!alive) return;
+        if (j && j.success === false) throw new Error(j.message || '获取模型失败');
+        const list = (j?.models || []).map(m => ({ id: m.id, name: m.displayName || m.id, version: m.version || '' }));
+        setModels(list);
+        const first = list[0]?.id || '';
+        setSelectedModelId(first);
+        if (list.length === 0) setStatusText('该租户暂无可用模型');
+        else connectWS(selectedTenantId, first);
+      } catch (e) {
+        if (alive) { setStatusText(e.message || '获取模型失败'); shell.showToast(e.message || '获取模型失败', { kind: 'error' }); }
+      } finally {
+        if (alive) setIsLoadingModels(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [selectedTenantId, connectWS, shell]);
+
+  // 模型切换 → 重连
+  const onModelChanged = (modelId) => {
+    setSelectedModelId(modelId);
+    if (selectedTenantId && modelId) connectWS(selectedTenantId, modelId);
+  };
+
+  // 卸载时关闭 WS
+  React.useEffect(() => () => { if (wsRef.current) { try { wsRef.current.close(); } catch (_) {} } }, []);
+
+  // 消息自动滚动到底部
+  React.useEffect(() => {
+    const el = canvasRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, isSending, streamIdx]);
+
+  const canSend = isConnected && !isSending && input.trim().length > 0 && !!selectedModelId;
+
+  const send = () => {
+    const text = input.trim();
+    if (!text) return;
+    if (!isConnected) { shell.showToast('WebSocket 未连接', { kind: 'error' }); return; }
+    if (!selectedModelId) { shell.showToast('请选择模型', { kind: 'error' }); return; }
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) { shell.showToast('WebSocket 未连接', { kind: 'error' }); return; }
+    setMessages(prev => [...prev, { id: `u-${Date.now()}`, role: 'user', content: text, time: new Date().toTimeString().slice(0, 5) }]);
+    setInput('');
+    setInputHeight(24);
+    setIsSending(true);
+    setStatusText('AI 思考中…');
+    ws.send(JSON.stringify({
+      type: 'chat',
+      message: text,
+      modelId: selectedModelId,
+      tenantId: String(selectedTenantId),
+      useHistory,
+    }));
+  };
+
+  const clearChat = () => {
+    setMessages([]);
+    seedWelcome();
+    setIsSending(false);
+  };
+
+  const copyLastAssistant = () => {
+    const last = [...messages].reverse().find(m => m.role === 'ai');
+    if (!last) { shell.showToast('暂无回复可复制', { kind: 'error' }); return; }
+    navigator.clipboard?.writeText(last.content);
+    shell.showToast('已复制 AI 回复', { kind: 'success' });
+  };
+
+  const statusColor = isConnected ? 'var(--accent)' : (statusText.includes('断开') || statusText.includes('失败') || statusText.includes('异常')) ? 'var(--danger)' : 'var(--orange)';
+  const showHeroEmpty = messages.length <= 1 && !isSending && (messages.length === 0 || messages[0].role === 'ai');
+
+  const suggestChip = (title) => (
+    <button
+      onClick={() => { if (!canSend) return; setInput(title); setTimeout(() => {
+        const ws = wsRef.current;
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        setMessages(prev => [...prev, { id: `u-${Date.now()}`, role: 'user', content: title, time: new Date().toTimeString().slice(0, 5) }]);
+        setInput(''); setIsSending(true); setStatusText('AI 思考中…');
+        ws.send(JSON.stringify({ type: 'chat', message: title, modelId: selectedModelId, tenantId: String(selectedTenantId), useHistory }));
+      }, 0); }}
+      disabled={!canSend}
+      style={{
+        padding: '8px 12px', fontSize: 12, borderRadius: 999,
+        background: 'var(--bg-2)', color: canSend ? 'var(--fg-1)' : 'var(--fg-3)',
+        border: '1px solid var(--border)', cursor: canSend ? 'pointer' : 'not-allowed',
+        fontFamily: 'inherit', opacity: canSend ? 1 : 0.45,
+      }}
+    >{title}</button>
+  );
+
+  // ─── 左侧租户轨 ──
+  const tenantRail = (
+    <div style={{
+      width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column', minHeight: 0,
+      background: 'var(--bg-1)', borderRight: '1px solid var(--border)',
+    }}>
+      {/* Hero 头部 */}
+      <div style={{ padding: '16px 14px 12px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+            background: 'linear-gradient(135deg, var(--accent) 0%, var(--violet) 100%)',
+            boxShadow: '0 3px 10px color-mix(in oklab, var(--accent) 35%, transparent)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+          }}>
+            <Icon name="sparkles" size={17} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--fg-0)' }}>OCI AI</div>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>智能助手 · 按租户对话</div>
+          </div>
+          <button
+            onClick={() => setShowTenantRail(false)}
+            title="收起租户列"
+            style={{
+              width: 28, height: 28, borderRadius: 7, background: 'var(--bg-2)',
+              color: 'var(--fg-2)', border: '1px solid var(--border)', cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <Icon name="panel-left-close" size={13} />
+          </button>
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <SearchInput placeholder="搜索租户或区域…" value={tenantSearch} onChange={setTenantSearch} size="sm" width="100%" />
+        </div>
+      </div>
+
+      {/* 租户列表 */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 8 }}>
+        {isLoadingTenants ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 40, color: 'var(--fg-3)', fontSize: 12.5 }}>
+            <Icon name="loader-2" size={16} className="spin" />加载租户…
+          </div>
+        ) : filteredTenants.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40, color: 'var(--fg-3)', fontSize: 12 }}>无匹配租户</div>
+        ) : filteredTenants.map(t => {
+          const selected = String(t.id) === String(selectedTenantId);
+          return (
+            <div key={t.id}
+              onClick={() => { setSelectedTenantId(String(t.id)); currentTenantIdRef.current = t.id; setShowTenantRail(false); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 11,
+                padding: '10px', borderRadius: 10, cursor: 'pointer',
+                marginBottom: 4,
+                background: selected ? 'color-mix(in oklab, var(--accent) 14%, transparent)' : 'transparent',
+                border: '1px solid ' + (selected ? 'color-mix(in oklab, var(--accent) 40%, transparent)' : 'transparent'),
+                transition: 'background 120ms',
+              }}
+              onMouseEnter={e => { if (!selected) e.currentTarget.style.background = 'var(--bg-2)'; }}
+              onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent'; }}
+            >
+              <div style={{
+                width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                background: selected
+                  ? 'linear-gradient(135deg, var(--accent) 0%, var(--violet) 90%)'
+                  : 'var(--bg-3)',
+                color: selected ? '#fff' : 'var(--fg-2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 13, fontWeight: 700,
+              }}>{(t.name || '?').charAt(0).toUpperCase()}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--fg-0)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {t.name}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, color: 'var(--fg-3)', marginTop: 3 }}>
+                  <Icon name="map-pin" size={9} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{window.getTenantRegion(t) || '未知区域'}</span>
+                </div>
+              </div>
+              <Icon name="sparkles" size={11} style={{ color: selected ? 'var(--accent)' : 'color-mix(in oklab, var(--accent) 55%, transparent)', flexShrink: 0 }} />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 底部提示 */}
+      <div style={{ padding: '10px 14px', fontSize: 10, color: 'var(--fg-3)', borderTop: '1px solid var(--border)', background: 'var(--bg-2)', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Icon name="info" size={10} />
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>从租户列表点 AI 可直达本页</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ display: 'flex', flex: 1, minHeight: 0, height: '100%' }}>
+      {showTenantRail && tenantRail}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-0)' }}>
+        {/* 顶栏 */}
+        <div style={{
+          padding: '10px 20px', borderBottom: '1px solid var(--border)', background: 'var(--bg-1)',
+          display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
+        }}>
+          {!showTenantRail && (
+            <button
+              onClick={() => setShowTenantRail(true)}
+              title="展开租户列"
+              style={{
+                width: 32, height: 32, borderRadius: 9, background: 'var(--bg-2)',
+                color: 'var(--fg-2)', border: '1px solid var(--border)', cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}
+            >
+              <Icon name="panel-left-open" size={14} />
+            </button>
+          )}
+          <button
+            onClick={() => setShowTenantRail(true)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 10, padding: '4px 10px 4px 4px',
+              background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit', borderRadius: 10,
+            }}
+            title="切换租户"
+          >
+            <div style={{
+              width: 34, height: 34, borderRadius: '50%',
+              background: 'linear-gradient(135deg, var(--accent) 0%, var(--violet) 100%)',
+              color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700,
+            }}>
+              {selectedTenant ? (selectedTenant.name || '?').charAt(0).toUpperCase() : <Icon name="users" size={13} />}
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 14, fontWeight: 600, color: 'var(--fg-0)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {selectedTenant ? selectedTenant.name : '未选择租户'}
+                <Icon name="chevron-down" size={9} style={{ color: 'var(--fg-3)' }} />
+              </div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, color: statusColor, marginTop: 2 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor, animation: isConnected ? 'pulse-dot 2s infinite' : 'none' }} />
+                {statusText}
+              </div>
+            </div>
+          </button>
+
+          <div style={{ flex: 1 }} />
+
+          {isLoadingModels ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--fg-3)', padding: '6px 10px', background: 'var(--bg-2)', borderRadius: 999 }}>
+              <Icon name="loader-2" size={12} className="spin" />加载模型…
+            </span>
+          ) : models.length > 0 ? (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 8px 4px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 10 }}>
+              <Icon name="cpu" size={11} style={{ color: 'var(--violet)' }} />
+              <CustomDropdown value={selectedModelId} onChange={onModelChanged} height={30} width={220}>
+                {models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </CustomDropdown>
+            </div>
+          ) : selectedTenantId ? (
+            <span style={{ fontSize: 11, color: 'var(--orange)', padding: '6px 10px', background: 'color-mix(in oklab, var(--orange) 12%, transparent)', borderRadius: 999 }}>
+              暂无可用模型
+            </span>
+          ) : null}
+
+          <button
+            onClick={() => setUseHistory(v => !v)}
+            title="是否携带历史消息作为上下文"
+            style={{
+              padding: '7px 10px', fontSize: 11.5, borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
+              background: useHistory ? 'color-mix(in oklab, var(--accent) 14%, transparent)' : 'var(--bg-2)',
+              border: '1px solid ' + (useHistory ? 'color-mix(in oklab, var(--accent) 35%, transparent)' : 'var(--border)'),
+              color: useHistory ? 'var(--accent)' : 'var(--fg-2)',
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+            }}
+          >
+            <Icon name="history" size={11} />上下文
+          </button>
+          <button onClick={clearChat} title="清空会话" style={{
+            width: 32, height: 32, borderRadius: 9, background: 'var(--bg-2)', color: 'var(--fg-2)',
+            border: '1px solid var(--border)', cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Icon name="trash-2" size={13} />
+          </button>
+          <button onClick={copyLastAssistant} title="复制最后回复" style={{
+            width: 32, height: 32, borderRadius: 9, background: 'var(--bg-2)', color: 'var(--fg-2)',
+            border: '1px solid var(--border)', cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Icon name="copy" size={13} />
+          </button>
+        </div>
+
+        {/* 消息画布 */}
+        <div ref={canvasRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <div style={{ padding: '16px 20px 88px', display: 'flex', flexDirection: 'column', gap: 20, maxWidth: '100%' }}>
+            {showHeroEmpty && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 48, paddingBottom: 24 }}>
+                <div style={{ position: 'relative', width: 140, height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18 }}>
+                  <div style={{
+                    position: 'absolute', inset: 0, borderRadius: '50%',
+                    background: 'radial-gradient(circle, color-mix(in oklab, var(--accent) 28%, transparent) 0%, color-mix(in oklab, var(--accent) 5%, transparent) 55%, transparent 70%)',
+                  }} />
+                  <div style={{
+                    width: 64, height: 64, borderRadius: '50%',
+                    background: 'linear-gradient(135deg, var(--accent) 0%, var(--violet) 100%)',
+                    boxShadow: '0 6px 16px color-mix(in oklab, var(--accent) 40%, transparent)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+                  }}>
+                    <Icon name="sparkles" size={26} />
+                  </div>
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--fg-0)', marginBottom: 8 }}>有什么可以帮你的？</div>
+                <div style={{ fontSize: 13, color: 'var(--fg-3)', marginBottom: 18, textAlign: 'center' }}>
+                  {selectedTenant ? `正在与 ${selectedTenant.name} 的 OCI AI 模型对话` : '从左侧选择一个租户，开始智能对话'}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {suggestChip('解释当前区域配额')}
+                  {suggestChip('生成安全组建议')}
+                  {suggestChip('总结实例状态')}
+                </div>
+              </div>
+            )}
+
+            {messages.map((m, i) => {
+              if (showHeroEmpty && i === 0 && m.role === 'ai' && messages.length === 1) return null;
+              if (m.role === 'user') {
+                return (
+                  <div key={m.id} style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                    <div style={{ maxWidth: 480, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                      <div style={{
+                        padding: '9px 12px', borderRadius: 8,
+                        background: 'var(--info-soft)', border: '1px solid var(--info)',
+                        fontSize: 12.5, color: 'var(--fg-0)', lineHeight: 1.6,
+                        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                      }}>{m.content}</div>
+                      <div style={{ fontSize: 10, color: 'var(--fg-3)' }}>{m.time}</div>
+                    </div>
+                    <div style={{
+                      width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                      background: 'var(--info-soft)', color: 'var(--info)',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Icon name="user" size={12} />
+                    </div>
+                  </div>
+                );
+              }
+              if (m.role === 'system') {
+                return (
+                  <div key={m.id} style={{ display: 'flex', gap: 10 }}>
+                    <div style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 12,
+                      background: 'color-mix(in oklab, var(--orange) 12%, transparent)',
+                      color: '#d97706', fontSize: 13,
+                    }}>
+                      <Icon name="alert-triangle" size={12} />{m.content}
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <div key={m.id} style={{ display: 'flex', gap: 10 }}>
+                  <div style={{
+                    width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                    background: 'var(--violet-soft)', color: 'var(--violet)',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Icon name="cpu" size={12} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      display: 'inline-block', maxWidth: '100%', padding: '9px 12px', borderRadius: 8,
+                      background: 'var(--bg-2)', border: '1px solid var(--border)',
+                      fontSize: 12.5, color: 'var(--fg-1)', lineHeight: 1.7,
+                      whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                    }}>
+                      {m.content}{m.streaming && <span style={{ display: 'inline-block', width: 7, height: 14, background: 'var(--violet)', marginLeft: 2, verticalAlign: '-2px', animation: 'pulse-dot 1s infinite' }} />}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--fg-3)', marginTop: 4 }}>{m.time}</div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {isSending && (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '4px 0' }}>
+                <Icon name="loader-2" size={14} className="spin" style={{ color: 'var(--fg-3)' }} />
+                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-2)' }}>AI 正在思考…</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 输入区 */}
+        <div style={{ padding: '10px 20px 14px', borderTop: '1px solid var(--border)', background: 'var(--bg-1)', flexShrink: 0 }}>
+          {errorText && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--danger)', marginBottom: 6 }}>
+              <Icon name="alert-circle" size={12} />{errorText}
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
+            <textarea
+              value={input}
+              onChange={e => {
+                setInput(e.target.value);
+                const lines = Math.min(4, (e.target.value.split('\n').length || 1));
+                setInputHeight(Math.min(96, Math.max(24, lines * 24)));
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+              }}
+              placeholder="畅所欲问…"
+              rows={1}
+              style={{
+                flex: 1, resize: 'none', height: inputHeight + 20, lineHeight: '20px',
+                padding: '10px 12px', fontSize: 14, fontFamily: 'inherit', outline: 'none',
+                background: 'var(--bg-2)', color: 'var(--fg-0)',
+                border: '1px solid var(--border)', borderRadius: 10, boxSizing: 'border-box',
+              }}
+            />
+            <button
+              onClick={send}
+              disabled={!canSend}
+              title="发送"
+              style={{
+                width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+                background: canSend ? 'var(--fg-0)' : 'var(--bg-3)',
+                color: canSend ? 'var(--bg-1)' : 'var(--fg-3)',
+                border: 'none', cursor: canSend ? 'pointer' : 'not-allowed',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              {isSending ? <Icon name="loader-2" size={15} className="spin" /> : <Icon name="arrow-up" size={15} />}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -2783,17 +3384,9 @@ function ResListPage() {
           </div>
           <div style={{ flex: 1 }} />
           {/* 搜索 */}
-          <div style={{ position: 'relative' }}>
-            <Icon name="search" size={12} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--fg-3)' }} />
-            <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-              placeholder={tr('pageMisc.4af931')}
-              style={{
-                padding: '6px 10px 6px 30px', fontSize: 12, width: 220,
-                background: 'var(--bg-2)', color: 'var(--fg-0)',
-                border: '1px solid var(--border)', borderRadius: 4,
-                fontFamily: 'inherit',
-              }} />
-          </div>
+          <SearchInput value={search} onChange={setSearch}
+            placeholder={tr('pageMisc.4af931')}
+            width={220} size="md" />
           <Button variant="outline" size="md" icon={showIp ? 'eye' : 'eye-off'}
             onClick={() => setShowIp(!showIp)}
           >{showIp ? tr('pageMisc.cdc37e') : tr('pageMisc.9f749d')}</Button>
@@ -3134,13 +3727,12 @@ function SettingsCard({ title, icon, iconColor = 'var(--fg-2)', actions, childre
   return (
     <div style={{
       background: 'var(--bg-1)', border: '1px solid var(--border)',
-      borderRadius: 8, overflow: 'hidden',
-      // ! 关键 · 在 flex column 容器中禁止被压缩,否则每张卡会塌成一行
-      flexShrink: 0,
+      borderRadius: 8, display: 'flex', flexDirection: 'column',
     }}>
       <div style={{
         padding: '10px 14px', borderBottom: '1px solid var(--border)', background: 'var(--bg-2)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        borderRadius: '7px 7px 0 0',
       }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-0)', display: 'flex', alignItems: 'center', gap: 6 }}>
           {icon && <Icon name={icon} size={13} style={{ color: iconColor }} />}
@@ -3148,9 +3740,13 @@ function SettingsCard({ title, icon, iconColor = 'var(--fg-2)', actions, childre
         </div>
         {actions}
       </div>
-      <div style={{ padding: 14 }}>{children}</div>
+      <div style={{ padding: 14, flex: 1, display: 'flex', flexDirection: 'column' }}>{children}</div>
       {footer && (
-        <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)', background: 'var(--bg-2)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <div style={{
+          padding: '10px 14px', borderTop: '1px solid var(--border)', background: 'var(--bg-2)',
+          display: 'flex', gap: 8, justifyContent: 'flex-end',
+          borderRadius: '0 0 7px 7px',
+        }}>
           {footer}
         </div>
       )}
@@ -3159,66 +3755,143 @@ function SettingsCard({ title, icon, iconColor = 'var(--fg-2)', actions, childre
 }
 
 // ─── 1. IP 质量管理 ─────────────────────────────
-// 对齐原项目 ip_settings.ftl:IP 检测配置卡 + 3 家运营商 VPS 配置卡(电信/联通/移动)
+// 对齐客户端 ModuleSettingsCard 规范：1 + 3 标准布局（顶部通栏策略 + 底部三列三大运营商探针）
 
-// ⚠ 关键:提取到父组件外部
-// 若定义在 SysIpQualityPage 内,每次父 render 都是新函数引用 → React 认为是新组件类型
-// → input 重挂 → 密码框刚点击就失焦(用户敲一个字符就跳走)
-function SysIpQualityCarrierCard({ name, flag, config, setter, iconColor, onTest, onSaveToast }) {
+function SysIpQualityCarrierCard({ name, subtitle, flag, config, setter, iconColor, onTest, onSaveToast }) {
   const { t: tr } = useT();
+
+  let badgeText = tr('pageMisc.463776'); // 未启用
+  let badgeColor = 'var(--fg-3)';
+  let badgeBg = 'var(--bg-3)';
+  let badgeBorder = 'var(--border)';
+
+  if (config.enabled) {
+    if (config.connected) {
+      badgeText = tr('pageMisc.c5ea9c'); // 已连接
+      badgeColor = 'var(--accent)';
+      badgeBg = 'var(--accent-soft)';
+      badgeBorder = 'var(--accent)';
+    } else {
+      badgeText = tr('pageMisc.8c852a'); // 连接失败
+      badgeColor = 'var(--danger)';
+      badgeBg = 'var(--danger-soft)';
+      badgeBorder = 'var(--danger)';
+    }
+  }
+
   return (
-    <SettingsCard
-      title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ fontSize: 14 }}>{flag}</span>{name}
-      </span>}
-      icon="server" iconColor={iconColor}
-      actions={
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
-          padding: '2px 8px', borderRadius: 3,
-          background: config.enabled ? (config.connected ? 'var(--accent-soft)' : 'var(--danger-soft)') : 'var(--bg-3)',
-          color: config.enabled ? (config.connected ? 'var(--accent)' : 'var(--danger)') : 'var(--fg-3)',
-          fontSize: 10.5, fontWeight: 600,
-        }}>
-          <span style={{ width: 5, height: 5, borderRadius: '50%', background: config.enabled ? (config.connected ? 'var(--accent)' : 'var(--danger)') : 'var(--fg-3)' }} />
-          {!config.enabled ? tr('pageMisc.463776') : config.connected ? tr('pageMisc.c5ea9c') : tr('pageMisc.8c852a')}
-        </span>
-      }
-      footer={
-        <>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--fg-2)', cursor: 'pointer', marginRight: 'auto' }}>
-            <input type="checkbox" checked={config.enabled} onChange={e => setter(c => ({ ...c, enabled: e.target.checked }))} />
-            {tr('pageMisc.d5e01b')}
-          </label>
-          <Button variant="info" size="sm" icon="zap"
-            loading={config.testing}
-            disabled={!config.host.trim() || !config.username.trim()}
-            onClick={onTest}
-          >{tr('pageMisc.69e747')}</Button>
-          <Button variant="primary" size="sm" icon="save"
-            disabled={!config.host.trim() || !config.username.trim()}
-            onClick={onSaveToast}
-          >{tr('pageMisc.ed7526')}</Button>
-        </>
-      }
-    >
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 10 }}>
-        <FormRow label="SSH Host" required>
-          <TextInput value={config.host} onChange={v => setter(c => ({ ...c, host: v }))} placeholder="ssh.example.com" mono />
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 8,
+      overflow: 'hidden', minHeight: 330,
+    }}>
+      {/* 头部：图标 + 标题 + 副标题 + 状态胶囊 + 右侧 Switch */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 14px', background: 'var(--bg-2)', borderBottom: '1px solid var(--border)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 6,
+            background: `color-mix(in oklab, ${iconColor} 18%, transparent)`,
+            color: iconColor,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            <Icon name="server" size={15} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-0)' }}>{name}</span>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '1px 6px', borderRadius: 4,
+                background: badgeBg, color: badgeColor,
+                fontSize: 10, fontWeight: 600,
+                border: '1px solid ' + badgeBorder,
+              }}>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: badgeColor }} />
+                {badgeText}
+              </span>
+            </div>
+            <div style={{ fontSize: 10.5, color: 'var(--fg-3)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {subtitle}
+            </div>
+          </div>
+        </div>
+
+        <ToggleSwitch
+          value={config.enabled}
+          onChange={v => setter(c => ({ ...c, enabled: v }))}
+        />
+      </div>
+
+      {/* 表单内容区 */}
+      <div style={{
+        padding: 14, flex: 1, display: 'flex', flexDirection: 'column', gap: 10,
+      }}>
+        <FormRow label="服务器地址" required>
+          <TextInput
+            value={config.host}
+            onChange={v => setter(c => ({ ...c, host: v }))}
+            placeholder="IP 或域名"
+            mono
+          />
         </FormRow>
-        <FormRow label={tr('pageMisc.c76cfe')}>
-          <NumberInput value={config.port} onChange={v => setter(c => ({ ...c, port: v }))} min={1} max={65535} />
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px', gap: 10 }}>
+          <FormRow label="用户名" required>
+            <TextInput
+              value={config.username}
+              onChange={v => setter(c => ({ ...c, username: v }))}
+              placeholder="root"
+              mono
+            />
+          </FormRow>
+          <FormRow label="SSH 端口">
+            <NumberInput
+              value={config.port}
+              onChange={v => setter(c => ({ ...c, port: v }))}
+              min={1} max={65535}
+            />
+          </FormRow>
+        </div>
+
+        <FormRow label="SSH 密码">
+          <PasswordInput
+            value={config.password}
+            onChange={v => setter(c => ({ ...c, password: v }))}
+            placeholder="留空使用密钥认证"
+          />
         </FormRow>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <FormRow label={tr('pageMisc.819767')} required>
-          <TextInput value={config.username} onChange={v => setter(c => ({ ...c, username: v }))} placeholder="root" mono />
-        </FormRow>
-        <FormRow label={tr('pageMisc.a81052')}>
-          <PasswordInput value={config.password} onChange={v => setter(c => ({ ...c, password: v }))} placeholder={tr('pageMisc.b65427')} />
-        </FormRow>
+
+      {/* 底部 Footer：左侧测试连接，右侧保存 */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 14px', background: 'var(--bg-2)', borderTop: '1px solid var(--border)',
+      }}>
+        <Button
+          variant="outline"
+          size="sm"
+          icon="zap"
+          loading={config.testing}
+          disabled={!config.host.trim() || !config.username.trim()}
+          onClick={onTest}
+        >
+          {tr('pageMisc.69e747')}
+        </Button>
+
+        <Button
+          variant="primary"
+          size="sm"
+          icon="save"
+          disabled={!config.host.trim() || !config.username.trim()}
+          onClick={onSaveToast}
+        >
+          {tr('pageMisc.ed7526')}
+        </Button>
       </div>
-    </SettingsCard>
+    </div>
   );
 }
 
@@ -3226,8 +3899,10 @@ function SysIpQualityPage() {
   const { t: tr } = useT();
   const shell = useShell();
 
-  // 检测配置
-  const [checkCfg, setCheckCfg] = React.useState({ enabled: false, intervalHours: 6, autoRotate: false, threshold: 60 });
+  // 检测配置（对齐真实后端接口：启用状态 + 周期小时）
+  const [checkCfg, setCheckCfg] = React.useState({ enabled: false, intervalHours: 6 });
+  const [savingCheck, setSavingCheck] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
 
   // 3 家运营商 VPS 配置
   const initCarrier = () => ({
@@ -3240,18 +3915,25 @@ function SysIpQualityPage() {
   const [unicom,  setUnicom]  = React.useState(initCarrier());
   const [mobile,  setMobile]  = React.useState(initCarrier());
 
-  React.useEffect(() => {
-    let alive = true;
-    window.ociServices.system.ipSettings().then(result => {
+  const loadSettings = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await window.ociServices.system.ipSettings();
       const d = result?.data || result || {};
-      if (!alive) return;
       const ip = d.ipCheck || {};
       setCheckCfg(c => ({ ...c, enabled: !!ip.enabled, intervalHours: Number(ip.checkInterval || ip.intervalHours || c.intervalHours) }));
       const map = (v) => ({ enabled: !!v?.enabled, host: v?.serverIp || '', port: Number(v?.sshPort || 22), username: v?.username || '', password: v?.password || '', connected: false, testing: false });
       setTelecom(map(d.telecom)); setUnicom(map(d.unicom)); setMobile(map(d.mobile));
-    }).catch(() => {});
-    return () => { alive = false; };
-  }, []);
+    } catch (e) {
+      shell.showToast(e.message || '加载配置失败', { kind: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  }, [shell]);
+
+  React.useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const testConn = (type, carrier, setter) => {
     if (!carrier.host.trim() || !carrier.username.trim()) {
@@ -3271,8 +3953,23 @@ function SysIpQualityPage() {
     } catch (e) { shell.showToast(e.message || tr('pageMisc.7f1f79'), { kind: 'error' }); }
   };
 
-  // CarrierCard 已提取到组件外部(见文件顶部 SysIpQualityCarrierCard)
-  // 避免在父组件内部定义子组件导致每次 render 都是新函数引用 → input 重挂 → 焦点丢失
+  const saveGlobalCheck = async () => {
+    setSavingCheck(true);
+    try {
+      await window.ociServices.system.updateIpCheckConfig({
+        enabled: checkCfg.enabled,
+        checkInterval: checkCfg.intervalHours,
+        vpsUsername: '',
+        vpsPassword: '',
+        sshPort: 22
+      });
+      shell.showToast(tr('pageMisc.3b961b'), { kind: 'success' });
+    } catch (e) {
+      shell.showToast(e.message || tr('pageMisc.7f1f79'), { kind: 'error' });
+    } finally {
+      setSavingCheck(false);
+    }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
@@ -3281,56 +3978,127 @@ function SysIpQualityPage() {
         subtitle={tr('pageMisc.c06317')}
         icon="shield"
         iconColor="var(--info)"
+        actions={
+          <Button variant="outline" size="md" icon="refresh-cw" loading={loading} onClick={loadSettings}>
+            刷新
+          </Button>
+        }
       />
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 2, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {/* IP 检测配置 */}
-        <SettingsCard
-          title={tr('pageMisc.c37f97')}
-          icon="shield-check" iconColor="var(--info)"
-          footer={
-            <Button variant="primary" size="sm" icon="save"
-              onClick={async () => {
-                try {
-                  await window.ociServices.system.updateIpCheckConfig({ enabled: checkCfg.enabled, checkInterval: checkCfg.intervalHours, vpsUsername: '', vpsPassword: '', sshPort: 22 });
-                  shell.showToast(tr('pageMisc.3b961b'), { kind: 'success' });
-                } catch (e) { shell.showToast(e.message || tr('pageMisc.7f1f79'), { kind: 'error' }); }
-              }}
-            >{tr('pageMisc.ed7526')}</Button>
-          }
-        >
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-            <FormRow label={tr('pageMisc.d5e01b')} hint={tr('pageMisc.c9f5f2')}>
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '8px 12px', background: checkCfg.enabled ? 'var(--accent-soft)' : 'var(--bg-2)', border: '1px solid ' + (checkCfg.enabled ? 'var(--accent)' : 'var(--border)'), borderRadius: 4 }}>
-                <input type="checkbox" checked={checkCfg.enabled} onChange={e => setCheckCfg(c => ({ ...c, enabled: e.target.checked }))} />
-                <span style={{ fontSize: 12, color: checkCfg.enabled ? 'var(--accent)' : 'var(--fg-2)' }}>{checkCfg.enabled ? tr('pageMisc.53ace4') : tr('pageMisc.463776')}</span>
-              </label>
-            </FormRow>
-            <FormRow label={tr('pageMisc.828182')} required>
-              <NumberInput value={checkCfg.intervalHours} onChange={v => setCheckCfg(c => ({ ...c, intervalHours: Math.max(1, Math.min(168, v)) }))} min={1} max={168} />
-            </FormRow>
-            <FormRow label={tr('pageMisc.bd690c')} hint={tr('pageMisc.fbef46')}>
-              <NumberInput value={checkCfg.threshold} onChange={v => setCheckCfg(c => ({ ...c, threshold: Math.max(0, Math.min(100, v)) }))} min={0} max={100} />
-            </FormRow>
-            <FormRow label={tr('pageMisc.4be5c6')} hint={tr('pageMisc.4a22ef')}>
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '8px 12px', background: checkCfg.autoRotate ? 'var(--orange-soft)' : 'var(--bg-2)', border: '1px solid ' + (checkCfg.autoRotate ? 'var(--orange)' : 'var(--border)'), borderRadius: 4 }}>
-                <input type="checkbox" checked={checkCfg.autoRotate} onChange={e => setCheckCfg(c => ({ ...c, autoRotate: e.target.checked }))} />
-                <span style={{ fontSize: 12, color: checkCfg.autoRotate ? 'var(--orange)' : 'var(--fg-2)' }}>{checkCfg.autoRotate ? tr('pageMisc.53ace4') : tr('pageMisc.463776')}</span>
-              </label>
-            </FormRow>
-          </div>
-        </SettingsCard>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 2, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* 1. IP 质量检测全局配置通栏卡片（对齐客户端标准） */}
+        <div style={{
+          display: 'flex', flexDirection: 'column',
+          background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 8,
+          overflow: 'hidden', padding: 14, gap: 12,
+        }}>
+          {/* 顶部标题行 */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: 6,
+                background: 'color-mix(in oklab, var(--info) 18%, transparent)',
+                color: 'var(--info)',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}>
+                <Icon name="shield-check" size={16} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg-0)' }}>IP 质量检测全局配置</span>
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '1px 7px', borderRadius: 4,
+                    background: checkCfg.enabled ? 'var(--accent-soft)' : 'var(--bg-3)',
+                    color: checkCfg.enabled ? 'var(--accent)' : 'var(--fg-3)',
+                    fontSize: 10.5, fontWeight: 600,
+                    border: '1px solid ' + (checkCfg.enabled ? 'var(--accent)' : 'var(--border)'),
+                  }}>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: checkCfg.enabled ? 'var(--accent)' : 'var(--fg-3)' }} />
+                    {checkCfg.enabled ? tr('pageMisc.53ace4') : tr('pageMisc.463776')}
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>
+                  定期检测所有实例的公网 IP 质量，确保链路通畅可用
+                </div>
+              </div>
+            </div>
 
-        {/* 3 家运营商 VPS 配置 */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-          <SysIpQualityCarrierCard name={tr('pageMisc.89a632')} flag="🟢" config={telecom} setter={setTelecom} iconColor="var(--accent)"
+            <ToggleSwitch
+              value={checkCfg.enabled}
+              onChange={v => setCheckCfg(c => ({ ...c, enabled: v }))}
+            />
+          </div>
+
+          <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }} />
+
+          {/* 核心参数区：周期 + 说明 + 保存按钮 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg-1)' }}>检测周期:</span>
+              <CustomDropdown
+                value={String(checkCfg.intervalHours)}
+                onChange={v => setCheckCfg(c => ({ ...c, intervalHours: Number(v) }))}
+                width="110px"
+                height={30}
+                options={[1, 2, 3, 4, 6, 8, 12, 24].map(h => ({
+                  value: String(h),
+                  label: `${h} 小时`,
+                }))}
+              />
+            </div>
+
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              fontSize: 11.5, color: 'var(--fg-3)', lineHeight: 1.5, flex: 1,
+            }}>
+              <Icon name="info" size={13} style={{ color: 'var(--info)', flexShrink: 0 }} />
+              <span>按设定周期自动执行检测；当且仅当所有已配置并启用的运营商探针均检测不可达时，系统将自动分配更换新公网 IP。</span>
+            </div>
+
+            <Button
+              variant="primary"
+              size="sm"
+              icon="save"
+              loading={savingCheck}
+              onClick={saveGlobalCheck}
+            >
+              保存全局配置
+            </Button>
+          </div>
+        </div>
+
+        {/* 2. 3 家运营商 VPS 配置三列并排（对齐客户端标准） */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+          <SysIpQualityCarrierCard
+            name={tr('pageMisc.89a632')}
+            subtitle="China Telecom · SSH 探测节点"
+            flag="🟢"
+            config={telecom}
+            setter={setTelecom}
+            iconColor="var(--accent)"
             onTest={() => testConn('telecom', telecom, setTelecom)}
-            onSaveToast={() => saveCarrier('telecom', telecom, setTelecom)} />
-          <SysIpQualityCarrierCard name={tr('pageMisc.6a883e')} flag="🟡" config={unicom} setter={setUnicom} iconColor="var(--orange)"
+            onSaveToast={() => saveCarrier('telecom', telecom, setTelecom)}
+          />
+          <SysIpQualityCarrierCard
+            name={tr('pageMisc.6a883e')}
+            subtitle="China Unicom · SSH 探测节点"
+            flag="🟡"
+            config={unicom}
+            setter={setUnicom}
+            iconColor="var(--orange)"
             onTest={() => testConn('unicom', unicom, setUnicom)}
-            onSaveToast={() => saveCarrier('unicom', unicom, setUnicom)} />
-          <SysIpQualityCarrierCard name={tr('pageMisc.a470d2')} flag="🔴" config={mobile} setter={setMobile} iconColor="var(--danger)"
+            onSaveToast={() => saveCarrier('unicom', unicom, setUnicom)}
+          />
+          <SysIpQualityCarrierCard
+            name={tr('pageMisc.a470d2')}
+            subtitle="China Mobile · SSH 探测节点"
+            flag="🔴"
+            config={mobile}
+            setter={setMobile}
+            iconColor="var(--danger)"
             onTest={() => testConn('mobile', mobile, setMobile)}
-            onSaveToast={() => saveCarrier('mobile', mobile, setMobile)} />
+            onSaveToast={() => saveCarrier('mobile', mobile, setMobile)}
+          />
         </div>
       </div>
     </div>
@@ -3531,16 +4299,20 @@ function SysSettingPage() {
   const [channelNotify, setChannelNotify] = React.useState({ enabled: false });
   const [securitySaving, setSecuritySaving] = React.useState('');
 
-  // 各卡必填字段是否齐全(为空则禁用对应保存按钮)
+  const [loading, setLoading] = React.useState(false);
+
+  // 各卡必填字段是否齐全（严格对齐 UI 标准第五章：必填项未填满时，保存按钮强制置灰禁用）
   const accountReady = !!(account.currentPass.trim()
     && (account.newUser.trim() || account.newPass.trim())
     && (!account.newPass.trim() || (account.newPass.trim().length >= 8 && account.newPass.trim() === account.confirmPass.trim())));
+  const githubReady = !!(github.clientId.trim() && github.clientSecret.trim() && github.webhookUrl.trim());
   const googleReady = !!(google.email.trim() && google.clientId.trim() && google.clientSecret.trim() && google.webhookUrl.trim());
   const turnstileReady = !!(turnstile.siteKey.trim() && turnstile.secretKey.trim());
   const mfaReady = !!mfa.appName.trim();
 
   // 加载安全管理页真实配置(GET /api/system/securitySettingsConfigs)
   const loadSettings = async () => {
+    setLoading(true);
     try {
       const json = await window.ociServices.system.securitySettings();
       if (!json || !json.success) return;
@@ -3552,7 +4324,11 @@ function SysSettingPage() {
       if (d.siteLogoName !== undefined && d.siteLogoName !== null) setSiteLogo(String(d.siteLogoName));
       if (d.channelNotifyEnabled !== undefined && d.channelNotifyEnabled !== null) setChannelNotify({ enabled: !!d.channelNotifyEnabled });
       if (d.currentUsername) setAccount(a => ({ ...a, currentUser: d.currentUsername || a.currentUser }));
-    } catch (e) { shell.showToast(e.message || tr('pageMisc.118d1d'), { kind: 'error' }); }
+    } catch (e) {
+      shell.showToast(e.message || tr('pageMisc.118d1d'), { kind: 'error' });
+    } finally {
+      setLoading(false);
+    }
   };
   React.useEffect(() => { loadSettings(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
@@ -3599,6 +4375,142 @@ function SysSettingPage() {
       setMfa(m => ({ ...m, enabled: false, secret: '', qr: '', verifyCode: '' }));
       shell.showToast(tr('pageMisc.ccbbf4'), { kind: 'warn' });
     } catch (e) { shell.showToast(tr('pageMisc.661ba6').replace('{0}',e.message || e), { kind: 'error' }); }
+  };
+
+  // ── MFA 绑定向导弹窗（方案 1：独立模态，彻底消除页面垂直跳动与大空洞） ──
+  const openMfaSetupModal = async () => {
+    let localSecret = mfa.secret;
+    let localQr = mfa.qr;
+    let localCode = '';
+    let localResult = '';
+    let localStatus = '';
+    let isVerifying = false;
+
+    // 若尚未生成密钥，打开向导时自动初始化生成
+    if (!localSecret) {
+      try {
+        await window.ociServices.system.regenerateMfaSecret();
+        const json = await window.ociServices.system.securitySettings();
+        if (json && json.data && json.data.mfa) {
+          localSecret = json.data.mfa.secretKey || '';
+          localQr = json.data.mfa.qrCode ? 'data:image/png;base64,' + json.data.mfa.qrCode : '';
+          setMfa(m => ({ ...m, secret: localSecret, qr: localQr }));
+        }
+      } catch (e) {
+        shell.showToast(e.message || '生成密钥失败', { kind: 'error' });
+      }
+    }
+
+    const paint = () => shell.openModal({
+      title: 'MFA 绑定向导',
+      subtitle: '使用 Google Authenticator / 微软 Authenticator 扫码绑定',
+      icon: 'smartphone',
+      iconColor: 'var(--accent)',
+      size: 'md',
+      body: (
+        <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* 步骤 1：扫码绑定 */}
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            padding: 16, background: 'var(--bg-2)', borderRadius: 8, border: '1px solid var(--border)',
+          }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--fg-0)', marginBottom: 10 }}>
+              步骤 1：打开手机认证器 App 扫描二维码
+            </div>
+            {localQr ? (
+              <img src={localQr} alt="MFA QR" style={{ width: 150, height: 150, background: 'white', borderRadius: 6, padding: 8, boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }} />
+            ) : (
+              <div style={{ width: 150, height: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-3)', borderRadius: 6, color: 'var(--fg-3)', fontSize: 12 }}>
+                正在生成二维码…
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 8 }}>
+              支持 Google Authenticator、Microsoft Authenticator、1Password 等
+            </div>
+          </div>
+
+          {/* 步骤 2：手动备用密钥 */}
+          {localSecret && (
+            <div>
+              <div style={{ fontSize: 11.5, color: 'var(--fg-2)', marginBottom: 6 }}>
+                步骤 2：若无法扫码，可手动复制密钥录入
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input type="text" value={localSecret} readOnly
+                  style={{ flex: 1, height: 32, boxSizing: 'border-box', padding: '0 10px', background: 'var(--bg-3)', color: 'var(--fg-0)', border: '1px solid var(--border)', borderRadius: 4, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none' }} />
+                <Button variant="outline" size="md" icon="copy" style={{ height: 32, padding: '0 12px', whiteSpace: 'nowrap' }} onClick={() => { navigator.clipboard.writeText(localSecret); shell.showToast('已复制密钥', { kind: 'success' }); }}>
+                  复制
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* 步骤 3：验证动态码 */}
+          <div>
+            <div style={{ fontSize: 11.5, color: 'var(--fg-2)', marginBottom: 6 }}>
+              步骤 3：输入认证器显示的 6 位动态验证码完成激活
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input type="text" value={localCode}
+                onChange={e => { localCode = e.target.value.replace(/\D/g, '').slice(0, 6); localResult = ''; localStatus = ''; paint(); }}
+                placeholder="6 位数字" maxLength={6}
+                style={{ flex: 1, height: 34, boxSizing: 'border-box', padding: '0 12px', background: 'var(--bg-2)', color: 'var(--fg-0)', border: '1px solid var(--border)', borderRadius: 4, fontSize: 14, fontFamily: 'var(--font-mono)', letterSpacing: 4, textAlign: 'center', outline: 'none' }} />
+              <Button variant="info" size="md" icon="check"
+                loading={isVerifying}
+                disabled={localCode.length !== 6}
+                style={{ height: 34, padding: '0 14px', whiteSpace: 'nowrap' }}
+                onClick={async () => {
+                  isVerifying = true; paint();
+                  try {
+                    const j = await window.ociServices.system.verifyMfaCode({ code: localCode });
+                    if (j && j.success) {
+                      localStatus = 'success';
+                      localResult = '验证成功！MFA 多因子认证已激活启用';
+                      paint();
+                      setMfa(m => ({ ...m, enabled: true, secret: localSecret, qr: localQr }));
+                      await window.ociServices.system.updateMfaConfig({ enabled: true, issuer: mfa.appName || 'OCI-Pool Verify' });
+                      shell.showToast('MFA 验证通过并已启用', { kind: 'success' });
+                      setTimeout(() => { shell.closeModal(); loadSettings(); }, 1200);
+                    } else {
+                      localStatus = 'error';
+                      localResult = (j && j.message) || '验证码错误，请重新输入';
+                      paint();
+                    }
+                  } catch (err) {
+                    localStatus = 'error';
+                    localResult = err.message || '验证失败';
+                    paint();
+                  } finally {
+                    isVerifying = false; paint();
+                  }
+                }}
+              >
+                验证并启用
+              </Button>
+            </div>
+            {localResult && (
+              <div style={{
+                marginTop: 10, padding: '8px 12px', borderRadius: 4, fontSize: 12, fontWeight: 500,
+                color: localStatus === 'success' ? 'var(--accent)' : 'var(--danger)',
+                background: localStatus === 'success' ? 'var(--accent-soft)' : 'var(--danger-soft)',
+                border: '1px solid ' + (localStatus === 'success' ? 'var(--accent)' : 'var(--danger)'),
+              }}>
+                {localStatus === 'success' ? '✓ ' : '✗ '}{localResult}
+              </div>
+            )}
+          </div>
+        </div>
+      ),
+      footer: (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+          <Button variant="outline" size="md" onClick={shell.closeModal}>
+            关闭
+          </Button>
+        </div>
+      )
+    });
+
+    paint();
   };
 
   // 账号安全·保存修改 —— 对齐原项目 system_settings.js 的 updateAccount():
@@ -3736,21 +4648,25 @@ function SysSettingPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      {/* 对齐原项目:侧边栏名"安全管理" · 页面主标题"系统设置"(sys.config) */}
+      {/* 顶部标题栏 · 补全刷新按钮 */}
       <PageHeader
         title={tr('pageMisc.140976')}
         subtitle={tr('pageMisc.43a59b')}
         icon="settings"
         iconColor="var(--accent)"
+        actions={
+          <Button variant="outline" size="md" icon="refresh-cw" loading={loading} onClick={loadSettings}>
+            刷新
+          </Button>
+        }
       />
-      {/* 严格对齐原项目 settings-grid:2 列布局,每张卡自适应高度 */}
+      {/* 2 列网格布局，同行卡片 Flex 自然撑满等高、底栏水平对齐 */}
       <div style={{
-        flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 2,
+        flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 4, paddingBottom: 24,
         display: 'grid',
         gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-        gridAutoRows: 'min-content',   // 每行高度取内容,不拉伸对齐
-        alignItems: 'start',
-        gap: 12,
+        gap: 14,
+        alignItems: 'stretch',
       }}>
 
         {/* ① 账号安全卡 · 对齐原项目 sys.security · 图标色 #4a9eff */}
@@ -3796,14 +4712,14 @@ function SysSettingPage() {
         {/* ② GitHub OAuth 卡 · 图标色 #adbac7 */}
         <SettingsCard title={tr('pageMisc.d220de')} icon="github" iconColor="#adbac7"
           actions={
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--fg-2)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={github.enabled} onChange={e => setGithub(g => ({ ...g, enabled: e.target.checked }))} />
-              {tr('pageMisc.7854b5')}
-            </label>
+            <ToggleSwitch
+              value={github.enabled}
+              onChange={v => setGithub(g => ({ ...g, enabled: v }))}
+            />
           }
           footer={<Button variant="primary" size="sm" icon="save"
             loading={securitySaving === 'github'}
-            disabled={!github.githubId || !github.clientId || !github.clientSecret || !github.webhookUrl}
+            disabled={!githubReady}
             onClick={() => shell.openConfirm({ title: tr('pageMisc.89c802'), confirmLabel: tr('pageMisc.be5fbb'), onConfirm: saveGithub })}
           >{tr('pageMisc.ed7526')}</Button>}>
           {/* GitHub 用户名 + 获取 ID 按钮 · 对齐原项目 github-fetch-btn */}
@@ -3847,10 +4763,10 @@ function SysSettingPage() {
         {/* ③ Google OAuth 卡 */}
         <SettingsCard title={tr('pageMisc.260efe')} icon="chrome" iconColor="#4285f4"
           actions={
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--fg-2)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={google.enabled} onChange={e => setGoogle(g => ({ ...g, enabled: e.target.checked }))} />
-              {tr('pageMisc.7854b5')}
-            </label>
+            <ToggleSwitch
+              value={google.enabled}
+              onChange={v => setGoogle(g => ({ ...g, enabled: v }))}
+            />
           }
           footer={<Button variant="primary" size="sm" icon="save"
             loading={securitySaving === 'google'}
@@ -3885,127 +4801,90 @@ function SysSettingPage() {
           </FormRow>
         </SettingsCard>
 
-        {/* MFA 配置卡 */}
-        {/* ⑤ MFA 双因子认证卡 · 图标色 #1abc9c 对齐原项目 */}
-        {/* 结构严格对齐:默认只显示"应用名称"字段;有 secret 后才显示二维码/密钥/验证码测试 */}
-        <SettingsCard title={tr('pageMisc.033c7a')} icon="smartphone" iconColor="#1abc9c"
-          actions={
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--fg-2)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={mfa.enabled}
-                onChange={e => setMfa(m => ({ ...m, enabled: e.target.checked }))} />
-              {tr('pageMisc.7854b5')}
-            </label>
-          }
-          footer={
-            <>
-              {mfa.secret && (
-                <Button variant="danger" size="sm" icon="trash-2"
-                  onClick={() => shell.openConfirm({
-                    title: tr('pageMisc.db54f0'),
-                    body: <div>{tr('pageMisc.f5e8a7')}<b>{tr('pageMisc.528676')}</b>{tr('pageMisc.5bba60')}</div>,
-                    danger: true, confirmLabel: tr('pageMisc.2f4aad'),
-                    onConfirm: deleteMfa,
-                  })}
-                >{tr('pageMisc.5a288b')}</Button>
-              )}
-              <Button variant="info" size="sm" icon="refresh-cw"
-                onClick={genMfaSecret}
-              >{mfa.secret ? tr('pageMisc.a7c232') : tr('pageMisc.b0bf4b')}</Button>
-              <Button variant="primary" size="sm" icon="save"
-                onClick={saveMfa}
-                disabled={!mfaReady}
-              >{tr('pageMisc.ed7526')}</Button>
-            </>
-          }>
-          {/* 应用名称 · 永远显示 · 默认 OCI-Pool Verify */}
-          <FormRow label={tr('pageMisc.27c386')} hint={tr('pageMisc.32d037')}>
-            <TextInput value={mfa.appName} onChange={v => setMfa(m => ({ ...m, appName: v }))} placeholder="OCI-Pool Verify" />
-          </FormRow>
-
-          {/* 只有生成过密钥后才显示 · 严格对齐原项目 <#if mfaConfig.secretKey??> */}
-          {mfa.secret && (
-            <>
-              {/* 二维码区 · 真实后端返回 base64 二维码(mfa.qrCode) */}
-              <FormRow label={tr('pageMisc.22b03c')} hint={tr('pageMisc.daff8a')}>
-                <div style={{ display: 'flex', justifyContent: 'center', padding: 14, background: 'var(--bg-2)', borderRadius: 6, border: '1px solid var(--border)' }}>
-                  {mfa.qr ? (
-                    <img src={mfa.qr} alt={tr('pageMisc.e2a841')} style={{ width: 160, height: 160, background: 'white', borderRadius: 4, padding: 8 }} />
-                  ) : (
-                    <div style={{ fontSize: 11, color: 'var(--fg-3)', padding: '20px 0' }}>{tr('pageMisc.69578b')}</div>
+        {/* MFA 配置卡（方案 1：向导弹窗流，主卡片永远紧凑恒定，彻底消灭高度跳动与大空洞） */}
+        {(() => {
+          const isMfaActivated = mfa.enabled && !!mfa.secret;
+          return (
+            <SettingsCard title={tr('pageMisc.033c7a')} icon="smartphone" iconColor="#1abc9c"
+              actions={
+                <ToggleSwitch
+                  value={mfa.enabled}
+                  onChange={v => setMfa(m => ({ ...m, enabled: v }))}
+                />
+              }
+              footer={
+                <>
+                  {isMfaActivated && (
+                    <Button variant="danger" size="sm" icon="trash-2"
+                      onClick={() => shell.openConfirm({
+                        title: tr('pageMisc.db54f0'),
+                        body: <div>{tr('pageMisc.f5e8a7')}<b>{tr('pageMisc.528676')}</b>{tr('pageMisc.5bba60')}</div>,
+                        danger: true, confirmLabel: tr('pageMisc.2f4aad'),
+                        onConfirm: deleteMfa,
+                      })}
+                    >{tr('pageMisc.5a288b')}</Button>
                   )}
-                </div>
+                  <Button variant="info" size="sm" icon={isMfaActivated ? "refresh-cw" : "key"}
+                    onClick={openMfaSetupModal}
+                  >{isMfaActivated ? '重新配置' : '配置向导'}</Button>
+                  <Button variant="primary" size="sm" icon="save"
+                    onClick={saveMfa}
+                    disabled={!mfaReady}
+                  >{tr('pageMisc.ed7526')}</Button>
+                </>
+              }>
+              {/* 应用名称 */}
+              <FormRow label={tr('pageMisc.27c386')} hint={tr('pageMisc.32d037')}>
+                <TextInput value={mfa.appName} onChange={v => setMfa(m => ({ ...m, appName: v }))} placeholder="OCI-Pool Verify" />
               </FormRow>
 
-              {/* MFA 密钥 · readonly */}
-              <FormRow label={tr('pageMisc.da5826')} hint={tr('pageMisc.7365ab')}>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <input type="text" value={mfa.showSecret ? mfa.secret : '•'.repeat(mfa.secret.length)} readOnly
-                    style={{ flex: 1, padding: '7px 10px', background: 'var(--bg-3)', color: 'var(--fg-0)', border: '1px solid var(--border)', borderRadius: 4, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', letterSpacing: 1.5 }} />
-                  <button onClick={() => setMfa(m => ({ ...m, showSecret: !m.showSecret }))}
-                    style={{ padding: '4px 10px', background: 'var(--bg-2)', color: 'var(--fg-2)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', fontSize: 11, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center' }}>
-                    <Icon name={mfa.showSecret ? 'eye-off' : 'eye'} size={12} />
-                  </button>
-                  <button onClick={() => { navigator.clipboard.writeText(mfa.secret); shell.showToast(tr('pageMisc.5e7930'), { kind: 'info' }); }}
-                    style={{ padding: '4px 10px', background: 'var(--bg-2)', color: 'var(--fg-2)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>
-                    {tr('pageMisc.79d3ab')}
-                  </button>
-                </div>
-              </FormRow>
-
-              {/* 验证码测试 */}
-              <FormRow label={tr('pageMisc.983f59')} hint={tr('pageMisc.a6e3fa')}>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <input type="text" value={mfa.verifyCode} onChange={e => setMfa(m => ({ ...m, verifyCode: e.target.value.replace(/\D/g, '').slice(0, 6), verifyResult: '', verifyStatus: '' }))}
-                    placeholder={tr('pageMisc.9885d5')}
-                    maxLength={6}
-                    style={{ flex: 1, padding: '7px 12px', background: 'var(--bg-2)', color: 'var(--fg-0)', border: '1px solid var(--border)', borderRadius: 4, fontSize: 14, fontFamily: 'var(--font-mono)', letterSpacing: 4, textAlign: 'center', outline: 'none' }} />
-                  <Button variant="info" size="sm" icon="check"
-                    disabled={mfa.verifyCode.length !== 6}
-                    onClick={verifyMfaCode}
-                  >{tr('pageMisc.9d1e1d')}</Button>
-                </div>
-                {/* 卡片内联验证结果(常驻 · 不需盯底部 toast) */}
-                {mfa.verifyResult && (
+              {/* 设备绑定状态（主卡片恒定展示，必须完成第三步动态码验证才算真正激活绑定） */}
+              <FormRow label="设备绑定状态">
+                {isMfaActivated ? (
                   <div style={{
-                    marginTop: 8,
-                    display: 'flex', alignItems: 'center', gap: 7,
-                    fontSize: 12.5, fontWeight: 600,
-                    color: mfa.verifyStatus === 'success' ? 'var(--accent)' : 'var(--danger)',
-                    background: mfa.verifyStatus === 'success'
-                      ? 'color-mix(in oklab, var(--accent) 12%, transparent)'
-                      : 'color-mix(in oklab, var(--danger) 12%, transparent)',
-                    border: '1px solid ' + (mfa.verifyStatus === 'success' ? 'var(--accent)' : 'var(--danger)'),
-                    borderRadius: 6, padding: '9px 12px',
+                    padding: '9px 12px', background: 'var(--accent-soft)', border: '1px solid var(--accent)',
+                    borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   }}>
-                    <Icon name={mfa.verifyStatus === 'success' ? 'check-circle-2' : 'x-octagon'} size={14} />
-                    <span>{mfa.verifyStatus === 'success' ? '✓ ' : '✗ '}{mfa.verifyResult}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Icon name="check-circle" size={14} style={{ color: 'var(--accent)' }} />
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>已绑定 TOTP 认证器</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>
+                        {mfa.showSecret ? mfa.secret : '••••••••••••'}
+                      </span>
+                      <button onClick={() => setMfa(m => ({ ...m, showSecret: !m.showSecret }))}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--fg-2)', padding: 0 }}>
+                        <Icon name={mfa.showSecret ? 'eye-off' : 'eye'} size={12} />
+                      </button>
+                      <button onClick={() => { navigator.clipboard.writeText(mfa.secret); shell.showToast(tr('pageMisc.5e7930'), { kind: 'info' }); }}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--fg-2)', padding: 0 }}>
+                        <Icon name="copy" size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    padding: '10px 12px', background: 'var(--bg-2)', border: '1px dashed var(--border)',
+                    borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'var(--fg-3)',
+                  }}>
+                    <Icon name="info" size={13} style={{ color: 'var(--fg-3)', flexShrink: 0 }} />
+                    <span>尚未完成动态验证绑定。点击下方「配置向导」扫码并在第三步完成验证以激活。</span>
                   </div>
                 )}
               </FormRow>
-            </>
-          )}
-          {!mfa.secret && (
-            <div style={{
-              padding: '12px 14px', marginTop: 4,
-              background: 'color-mix(in oklab, #1abc9c 8%, transparent)',
-              border: '1px dashed #1abc9c',
-              borderRadius: 4,
-              fontSize: 11.5, color: 'var(--fg-2)', lineHeight: 1.6,
-            }}>
-              <Icon name="info" size={11} style={{ verticalAlign: 'middle', marginRight: 5, color: '#1abc9c' }} />
-              {tr('pageMisc.6f317b')}<b>{tr('pageMisc.b0bf4b')}</b>{tr('pageMisc.74089b')}
-            </div>
-          )}
-        </SettingsCard>
+            </SettingsCard>
+          );
+        })()}
 
         {/* Turnstile 验证码卡 */}
         {/* ⑥ Turnstile 验证码卡 · 图标色 #f0881a */}
         <SettingsCard title={tr('pageMisc.8bad94')} icon="bot" iconColor="#f0881a"
           actions={
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--fg-2)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={turnstile.enabled} onChange={e => setTurnstile(t => ({ ...t, enabled: e.target.checked }))} />
-              {tr('pageMisc.7854b5')}
-            </label>
+            <ToggleSwitch
+              value={turnstile.enabled}
+              onChange={v => setTurnstile(t => ({ ...t, enabled: v }))}
+            />
           }
           footer={<Button variant="primary" size="sm" icon="save"
             loading={securitySaving === 'turnstile'}
@@ -4037,11 +4916,10 @@ function SysSettingPage() {
         {/* ⑦ 开机频道通知卡 · 严格对齐原项目 sys.channelNotify · 图标色 #9b59b6 */}
         <SettingsCard title={tr('pageMisc.85fe64')} icon="satellite" iconColor="#9b59b6"
           actions={
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--fg-2)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={channelNotify.enabled}
-                onChange={e => setChannelNotify(c => ({ ...c, enabled: e.target.checked }))} />
-              {tr('pageMisc.7854b5')}
-            </label>
+            <ToggleSwitch
+              value={channelNotify.enabled}
+              onChange={v => setChannelNotify(c => ({ ...c, enabled: v }))}
+            />
           }
           footer={
             <Button variant="primary" size="sm" icon="save"
@@ -4786,4 +5664,6 @@ Object.assign(window, {
   // 系统管理 4 页
   SysIpQualityPage, SysLogsPage, SysSettingPage, SysVpnProxyPage,
   openChatDrawerFor,
+  // 全屏 AI 对话工作台（对齐 macOS 客户端 AiChatView）
+  AiChatPage,
 });

@@ -77,7 +77,9 @@ function GrabPage({ density }) {
   useEffectG(() => {
     let alive = true;
     setRegionOptions([]);
-    if (!tenantFilter) { setRegionLoading(false); setRegionFilter(''); return () => { alive = false; }; }
+    setTasks([]); // 切换租户时立即清空旧任务，杜绝旧数据残留！
+    setLoading(true); // 同步开启 loading，杜绝拉取区域子级选项期间空态抢跑闪现！
+    if (!tenantFilter) { setRegionLoading(false); setRegionFilter(''); setLoading(false); return () => { alive = false; }; }
     setRegionLoading(true);
     (async () => {
       try {
@@ -129,6 +131,7 @@ function GrabPage({ density }) {
 
   const loadTasks = React.useCallback(async () => {
     setLoading(true);
+    setTasks([]); // 刷新与重新加载时立即清空旧数据，杜绝旧数据与 loading 共存！
     setLoadError('');
     try {
       const pageData = await window.ociServices.boot.fullBootList({

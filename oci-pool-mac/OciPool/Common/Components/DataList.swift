@@ -49,27 +49,37 @@ struct DataListRow<Content: View>: View {
     }
 
     var body: some View {
-        Button(action: { action?() }) {
-            HStack(spacing: 0) {
-                content()
+        Group {
+            if let action = action {
+                Button(action: action) {
+                    rowContent
+                }
+                .buttonStyle(PlainButtonStyle())
+            } else {
+                rowContent
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, appearance.density.rowPadding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                isSelected
-                    ? AppTheme.sidebarActive.opacity(0.18)
-                    : Color.clear
-            )
-            .contentShape(Rectangle())
         }
-        .buttonStyle(PlainButtonStyle())
         .overlay(
             Rectangle()
                 .frame(height: 1)
                 .foregroundColor(AppTheme.border(dark).opacity(0.35)),
             alignment: .bottom
         )
+    }
+
+    private var rowContent: some View {
+        HStack(spacing: 0) {
+            content()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, appearance.density.rowPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            isSelected
+                ? AppTheme.sidebarActive.opacity(0.18)
+                : Color.clear
+        )
+        .contentShape(Rectangle())
     }
 }
 

@@ -17,6 +17,38 @@ enum OpenLogsConnectionState: Equatable {
     }
 }
 
+// MARK: - Filter level
+
+enum OpenLogFilterLevel: String, CaseIterable, Identifiable {
+    case all = "全部"
+    case info = "INFO"
+    case warn = "WARN"
+    case error = "ERROR"
+    case success = "SUCCESS"
+
+    var id: String { rawValue }
+
+    func matches(_ level: OpenLogLevel) -> Bool {
+        switch self {
+        case .all: return true
+        case .info: return level == .info
+        case .warn: return level == .warn
+        case .error: return level == .error
+        case .success: return level == .success
+        }
+    }
+
+    var activeColor: Color {
+        switch self {
+        case .all: return Color.primary
+        case .info: return Color(hex: "00b6be")
+        case .warn: return AppTheme.orange
+        case .error: return AppTheme.danger
+        case .success: return AppTheme.sidebarActive
+        }
+    }
+}
+
 // MARK: - Log entry
 
 enum OpenLogLevel: Equatable {
