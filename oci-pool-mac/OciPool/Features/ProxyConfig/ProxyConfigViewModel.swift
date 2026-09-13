@@ -18,7 +18,7 @@ final class ProxyConfigViewModel: ObservableObject {
     @Published var tenantSearch = ""
     @Published var tenantPageIndex = 0
 
-    static let tenantPageSize = 7
+    static let tenantPageSize = 20
 
     private let session: AppSession
     private var service: ProxyConfigService { ProxyConfigService(baseURL: session.serverURL) }

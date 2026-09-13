@@ -5243,6 +5243,8 @@ function ProxyFormBody({ existing, parentTenants = [], bodyRef, onSave }) {
   const [saving, setSaving] = React.useState(false);
   const [testing, setTesting] = React.useState(false);
   const [tenantSearch, setTenantSearch] = React.useState('');
+  const [tenantPage, setTenantPage] = React.useState(1);
+  const tenantPageSize = 20;
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -5263,6 +5265,16 @@ function ProxyFormBody({ existing, parentTenants = [], bodyRef, onSave }) {
       return name.includes(q) || reg.includes(q);
     });
   }, [parentTenants, tenantSearch]);
+
+  const totalTenantPages = Math.max(1, Math.ceil(filteredTenants.length / tenantPageSize));
+  const pagedTenants = React.useMemo(() => {
+    const start = (tenantPage - 1) * tenantPageSize;
+    return filteredTenants.slice(start, start + tenantPageSize);
+  }, [filteredTenants, tenantPage, tenantPageSize]);
+
+  React.useEffect(() => {
+    setTenantPage(1);
+  }, [tenantSearch]);
 
   const testConnection = async () => {
     if (testing) return;
@@ -5551,12 +5563,12 @@ function ProxyFormBody({ existing, parentTenants = [], bodyRef, onSave }) {
             </div>
           </div>
 
-          {filteredTenants.length === 0 ? (
+          {pagedTenants.length === 0 ? (
             <div style={{ padding: 20, textAlign: 'center', color: 'var(--fg-3)', fontSize: 11 }}>
               无匹配租户
             </div>
           ) : (
-            filteredTenants.map(t => {
+            pagedTenants.map(t => {
               const checked = form.tenantIds.includes(String(t.id));
               const regionMeta = (window.REGION_MAP && (window.REGION_MAP[t.region]?.simpleName || window.REGION_MAP[t.region]?.cn)) || t.region || `#${t.id}`;
               return (
@@ -5595,6 +5607,38 @@ function ProxyFormBody({ existing, parentTenants = [], bodyRef, onSave }) {
               );
             })
           )}
+        </div>
+
+        {/* 原生箭头翻页栏 (100% 对齐客户端 HStack 原生箭头) */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '6px 4px 0', fontSize: 11, color: 'var(--fg-3)',
+        }}>
+          <button
+            type="button"
+            disabled={tenantPage <= 1}
+            onClick={() => setTenantPage(p => Math.max(1, p - 1))}
+            style={{
+              background: 'transparent', border: 'none', cursor: tenantPage <= 1 ? 'default' : 'pointer',
+              color: tenantPage <= 1 ? 'var(--border-strong)' : 'var(--fg-1)',
+              padding: '2px 6px', display: 'flex', alignItems: 'center',
+            }}
+          >
+            <Icon name="chevron-left" size={12} />
+          </button>
+          <span>{tenantPage} / {totalTenantPages} · 共 {filteredTenants.length} 个</span>
+          <button
+            type="button"
+            disabled={tenantPage >= totalTenantPages}
+            onClick={() => setTenantPage(p => Math.min(totalTenantPages, p + 1))}
+            style={{
+              background: 'transparent', border: 'none', cursor: tenantPage >= totalTenantPages ? 'default' : 'pointer',
+              color: tenantPage >= totalTenantPages ? 'var(--border-strong)' : 'var(--fg-1)',
+              padding: '2px 6px', display: 'flex', alignItems: 'center',
+            }}
+          >
+            <Icon name="chevron-right" size={12} />
+          </button>
         </div>
       </div>
     </div>
