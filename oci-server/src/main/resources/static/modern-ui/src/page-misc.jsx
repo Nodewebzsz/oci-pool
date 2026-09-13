@@ -670,14 +670,14 @@ function MailPage() {
               <thead>
                 <tr>
                   {[
-                    { h: tr('mail.col.subject') },
-                    { h: tr('mail.col.sender'),    w: 260 },
+                    { h: tr('mail.col.subject'), align: 'center' },
+                    { h: tr('mail.col.sender'),    w: 260, align: 'center' },
                     { h: tr('mail.col.recipients'),    w: 80,  align: 'center' },
                     { h: tr('mail.col.status'),      w: 100, align: 'center' },
-                    { h: tr('mail.col.sentAt'),  w: 160 },
+                    { h: tr('mail.col.sentAt'),  w: 160, align: 'center' },
                   ].map((c, i) => (
                     <th key={i} style={{
-                      textAlign: c.align || 'left', padding: '9px 12px', width: c.w,
+                      textAlign: c.align || 'center', padding: '9px 12px', width: c.w,
                       background: 'var(--bg-2)', color: 'var(--fg-3)',
                       fontSize: 10.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
                       borderBottom: '1px solid var(--border)',
@@ -709,10 +709,10 @@ function MailPage() {
                   const s = statusMap[r.status];
                   return (
                     <tr key={r.id} style={{ background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent' }}>
-                      <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)', color: 'var(--fg-0)' }}>
+                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)', color: 'var(--fg-0)' }}>
                         <span title={r.subject} style={{ fontSize: 11.5 }}>{r.subject}</span>
                       </td>
-                      <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span className="mono" title={r.sender} style={{ fontSize: 10.5, color: 'var(--fg-2)' }}>{r.sender}</span>
                       </td>
                       <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)', textAlign: 'center' }}>
@@ -727,7 +727,7 @@ function MailPage() {
                           <Icon name={s.icon} size={9} />{s.label}
                         </span>
                       </td>
-                      <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span className="mono" style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>{r.sentAt}</span>
                       </td>
                     </tr>
@@ -1216,7 +1216,7 @@ function ObjectPage() {
                       { h: tr('obj.col.action'), w: 160, align: 'center' },
                     ].map((c, i) => (
                       <th key={i} style={{
-                        textAlign: c.align || 'left', padding: '9px 12px', width: c.w,
+                        textAlign: c.align || 'center', padding: '9px 12px', width: c.w,
                         position: 'sticky', top: 0, zIndex: 1,
                         background: 'var(--bg-2)', color: 'var(--fg-3)',
                         fontSize: 10.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
@@ -1237,16 +1237,16 @@ function ObjectPage() {
                     const info = objTypeInfo(obj.name);
                     return (
                       <tr key={obj.name} style={{ background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent' }}>
-                        <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                             <Icon name={info.icon} size={13} style={{ color: info.color, flexShrink: 0 }} />
                             <span className="mono" style={{ fontSize: 11.5, color: 'var(--fg-0)' }}>{obj.name}</span>
                           </span>
                         </td>
-                        <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                           <span className="num mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>{obj.size}</span>
                         </td>
-                        <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                           <span className="mono" style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>{obj.modified}</span>
                         </td>
                         <td style={{ padding: '6px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
@@ -5122,7 +5122,7 @@ function _LegacySysVpnProxyPage() {
                   { h: tr('pageMisc.2b6bc0'),      w: 100, align: 'center' },
                 ].map((c, i) => (
                   <th key={i} style={{
-                    textAlign: c.align || 'left', padding: '9px 12px', width: c.w,
+                    textAlign: c.align || 'center', padding: '9px 12px', width: c.w,
                     background: 'var(--bg-2)', color: 'var(--fg-3)',
                     fontSize: 10.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
                     borderBottom: '1px solid var(--border)',
@@ -5141,7 +5141,7 @@ function _LegacySysVpnProxyPage() {
                 const st = statusCfg[p.connStatus] || statusCfg.unknown;
                 return (
                   <tr key={p.id} style={{ background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent' }}>
-                    <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                       <span style={{ fontSize: 12, color: 'var(--fg-0)', fontWeight: 500 }}>{p.customName}</span>
                     </td>
                     <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
@@ -5152,16 +5152,16 @@ function _LegacySysVpnProxyPage() {
                         fontSize: 10.5, fontWeight: 700,
                       }}>{p.type}</span>
                     </td>
-                    <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                       <span className="mono" style={{ fontSize: 11.5, color: 'var(--fg-1)' }}>{p.url}</span>
                     </td>
                     <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                       <span className="num mono" style={{ fontSize: 11.5, color: 'var(--fg-1)' }}>{p.port}</span>
                     </td>
-                    <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                       <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>{p.username || '—'}</span>
                     </td>
-                    <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                       <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{p.password ? '••••••' : '—'}</span>
                     </td>
                     <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
@@ -5544,7 +5544,7 @@ function SysVpnProxyPage() {
                     { h: tr('pageMisc.2b6bc0'), w: 120, align: 'center' },
                   ].map((c, i) => (
                     <th key={i} style={{
-                      textAlign: c.align || 'left', padding: '9px 12px', width: c.w,
+                      textAlign: c.align || 'center', padding: '9px 12px', width: c.w,
                       background: 'var(--bg-2)', color: 'var(--fg-3)',
                       fontSize: 10.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
                       borderBottom: '1px solid var(--border)',
@@ -5579,7 +5579,7 @@ function SysVpnProxyPage() {
                   const forced = p.forceProxy === 1 || p.forceProxy === true || p.forceProxy === '1';
                   return (
                     <tr key={p.id} style={{ background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent' }}>
-                      <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span style={{ fontSize: 12, color: 'var(--fg-0)', fontWeight: 500 }}>{p.customName || '—'}</span>
                       </td>
                       <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
@@ -5590,19 +5590,19 @@ function SysVpnProxyPage() {
                           fontSize: 10.5, fontWeight: 700,
                         }}>{p.proxyType}</span>
                       </td>
-                      <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span className="mono" style={{ fontSize: 11.5, color: 'var(--fg-1)' }}>{p.proxyHost}</span>
                       </td>
                       <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span className="num mono" style={{ fontSize: 11.5, color: 'var(--fg-1)' }}>{p.proxyPort}</span>
                       </td>
-                      <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>{p.proxyUsername || '—'}</span>
                       </td>
-                      <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{p.proxyPassword ? '••••••' : '—'}</span>
                       </td>
-                      <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span style={{ fontSize: 11.5, color: tenantIds.length ? 'var(--fg-1)' : 'var(--fg-3)' }}>{tenantLabel}</span>
                       </td>
                       <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>

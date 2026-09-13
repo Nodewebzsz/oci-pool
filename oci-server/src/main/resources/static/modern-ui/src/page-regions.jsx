@@ -199,7 +199,7 @@ function RegionsPage({ density }) {
       render: r => <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>{r.firstAt}</span>,
     },
     {
-      key: 'totalGrabs', label: tr('regions.col.totalGrabs'), align: 'right', width: 90,
+      key: 'totalGrabs', label: tr('regions.col.totalGrabs'), width: 90,
       render: r => (
         <span className="num" style={{
           fontWeight: 600,
@@ -208,7 +208,7 @@ function RegionsPage({ density }) {
       ),
     },
     {
-      key: 'monthlyOpenCount', label: tr('regions.col.monthly'), align: 'right', width: 90,
+      key: 'monthlyOpenCount', label: tr('regions.col.monthly'), width: 90,
       render: r => (
         r.monthlyOpenCount > 0
           ? <span className="num" style={{ color: 'var(--orange)', fontWeight: 700 }}>{r.monthlyOpenCount}</span>

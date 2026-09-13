@@ -355,7 +355,7 @@ function TenantGrabPage({ density, ctx, navigate, updateDetailCtx }) {
                 ].map((c, i) => (
                   <th key={i} style={{
                     position: 'sticky', top: 0, zIndex: 1,
-                    textAlign: c.align || 'left',
+                    textAlign: c.align || 'center',
                     padding: '10px 12px',
                     width: c.w,
                     background: 'var(--bg-2)',
@@ -383,22 +383,22 @@ function TenantGrabPage({ density, ctx, navigate, updateDetailCtx }) {
                 <tr key={r.seq} style={{
                   background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent',
                 }}>
-                  <td style={{ padding: '11px 12px', color: 'var(--fg-2)', borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '11px 12px', textAlign: 'center', color: 'var(--fg-2)', borderBottom: '1px solid var(--border)' }}>
                     <span className="num">{(page - 1) * perPage + i + 1}</span>
                   </td>
-                  <td style={{ padding: '11px 12px', borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '11px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                     <span className="mono" style={{
                       padding: '2px 6px', background: 'var(--bg-3)',
                       borderRadius: 3, fontSize: 11, color: 'var(--fg-1)',
                     }}>{r.tenantName}</span>
                   </td>
-                  <td style={{ padding: '11px 12px', color: 'var(--fg-0)', borderBottom: '1px solid var(--border)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '11px 12px', textAlign: 'center', color: 'var(--fg-0)', borderBottom: '1px solid var(--border)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {getTenantName(r)}
                   </td>
-                  <td style={{ padding: '11px 12px', borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '11px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                     <RegionBadge code={r.region} lang={lang} />
                   </td>
-                  <td style={{ padding: '11px 12px', borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '11px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                     <TaskStatusPill status={r.status} />
                   </td>
                   <td style={{ padding: '11px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
@@ -449,7 +449,7 @@ function TenantGrabPage({ density, ctx, navigate, updateDetailCtx }) {
                       <span className="num" style={{ color: 'var(--fg-3)' }}>0</span>
                     )}
                   </td>
-                  <td style={{ padding: '11px 12px', borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '11px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                     <span style={{
                       padding: '1px 6px',
                       background: getInstanceArch(r) === 'ARM' ? 'var(--info-soft)' : 'var(--violet-soft)',
@@ -458,7 +458,7 @@ function TenantGrabPage({ density, ctx, navigate, updateDetailCtx }) {
                       fontFamily: 'var(--font-mono)',
                     }}>{getInstanceArch(r)}</span>
                   </td>
-                  <td style={{ padding: '11px 12px', borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '11px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                     <span className="mono" style={{ fontSize: 10.5, color: 'var(--fg-2)' }}>{r.createdAt}</span>
                   </td>
                   <td style={{ padding: '11px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>

@@ -300,7 +300,7 @@ function TenantResourcesPage({ density, ctx, navigate, updateDetailCtx }) {
                 ].map((c, i) => (
                   <th key={i} style={{
                     position: 'sticky', top: 0, zIndex: 1,
-                    textAlign: c.align || 'left',
+                    textAlign: c.align || 'center',
                     padding: '10px 12px',
                     width: c.w,
                     background: 'var(--bg-2)',
@@ -327,29 +327,29 @@ function TenantResourcesPage({ density, ctx, navigate, updateDetailCtx }) {
                 <tr key={inst.seq || i} style={{
                   background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent',
                 }}>
-                  <td style={{ padding: '11px 12px', color: 'var(--fg-3)', borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '11px 12px', textAlign: 'center', color: 'var(--fg-3)', borderBottom: '1px solid var(--border)' }}>
                     <span className="num">{(page - 1) * perPage + i + 1}</span>
                   </td>
-                  <td style={{ padding: '11px 12px', borderBottom: '1px solid var(--border)' }} title={inst.tenantName || ''}>
+                  <td style={{ padding: '11px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }} title={inst.tenantName || ''}>
                     <span title={inst.tenantName || ''} className="mono" style={{
                       padding: '2px 6px', background: 'var(--bg-3)',
                       borderRadius: 3, fontSize: 11, color: 'var(--fg-1)',
                       cursor: 'pointer',
                     }}>{masked ? window.maskName(inst.tenantName) : inst.tenantName}</span>
                   </td>
-                  <td style={{ padding: '11px 12px', color: 'var(--fg-0)', borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '11px 12px', textAlign: 'center', color: 'var(--fg-0)', borderBottom: '1px solid var(--border)' }}>
                     {regionShortLabel(inst.region || getTenantRegion(tenant))}
                   </td>
-                  <td style={{ padding: '11px 12px', borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '11px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                       <StatusDot status={inst.status} size={5} pulse={inst.status === 'running'} />
                       <span className="mono" style={{ fontSize: 11.5, color: 'var(--fg-0)' }}>{inst.name}</span>
                     </span>
                   </td>
-                  <td style={{ padding: '11px 12px', color: 'var(--fg-1)', borderBottom: '1px solid var(--border)' }} className="mono">
+                  <td style={{ padding: '11px 12px', textAlign: 'center', color: 'var(--fg-1)', borderBottom: '1px solid var(--border)' }} className="mono">
                     {getInstanceCpu(inst)}C{getInstanceMem(inst)}G
                   </td>
-                  <td style={{ padding: '11px 12px', borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '11px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                     <span style={{
                       padding: '1px 6px',
                       background: getInstanceArch(inst) === 'ARM' ? 'var(--info-soft)' : 'var(--violet-soft)',
@@ -358,13 +358,13 @@ function TenantResourcesPage({ density, ctx, navigate, updateDetailCtx }) {
                       fontFamily: 'var(--font-mono)',
                     }}>{getInstanceArch(inst)}</span>
                   </td>
-                  <td style={{ padding: '11px 12px', color: 'var(--fg-1)', borderBottom: '1px solid var(--border)' }} className="mono">
+                  <td style={{ padding: '11px 12px', textAlign: 'center', color: 'var(--fg-1)', borderBottom: '1px solid var(--border)' }} className="mono">
                     {inst.disk}GB/{inst.vpu == null || inst.vpu === '' ? 0 : inst.vpu}
                   </td>
-                  <td style={{ padding: '11px 12px', color: 'var(--fg-1)', borderBottom: '1px solid var(--border)' }} className="mono">
+                  <td style={{ padding: '11px 12px', textAlign: 'center', color: 'var(--fg-1)', borderBottom: '1px solid var(--border)' }} className="mono">
                     {getInstanceIp(inst) || '—'}
                   </td>
-                  <td style={{ padding: '11px 12px', borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '11px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                     {inst.ipv6 === 'enabled'
                       ? <span style={{
                           padding: '1px 6px', background: 'var(--accent-soft)', color: 'var(--accent)',
@@ -373,7 +373,7 @@ function TenantResourcesPage({ density, ctx, navigate, updateDetailCtx }) {
                       : <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{tr('status.disabled')}</span>
                     }
                   </td>
-                  <td style={{ padding: '11px 12px', borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '11px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                     <span className="mono" style={{ fontSize: 10.5, color: 'var(--fg-2)' }}>{inst.createdAt}</span>
                   </td>
                   <td style={{ padding: '11px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>

@@ -1897,7 +1897,7 @@ function openNetworkManageModal(shell, inst) {
                       { h: tr('inst.2b6bc0'),       w: 60,  align: 'center' },
                     ].map((c, i) => (
                       <th key={i} style={{
-                        textAlign: c.align || 'left', padding: '9px 12px', width: c.w,
+                        textAlign: c.align || 'center', padding: '9px 12px', width: c.w,
                         background: 'var(--bg-2)', color: 'var(--fg-3)',
                         fontSize: 10.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
                         borderBottom: '1px solid var(--border)',
@@ -1923,7 +1923,7 @@ function openNetworkManageModal(shell, inst) {
                       background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent',
                     }}>
                       {/* 名称 + VNIC ID 副行 —— 上下留白拉开层级 */}
-                      <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '12px 14px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <div style={{
                           fontSize: 13, color: 'var(--fg-0)', fontWeight: 500,
                           lineHeight: 1.35, marginBottom: 5,
@@ -1956,7 +1956,7 @@ function openNetworkManageModal(shell, inst) {
                         {stateBadge(v.state)}
                       </td>
                       {/* 公网 IPv4 + 操作图标 */}
-                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                           <span className="mono" style={{ fontSize: 11.5, color: 'var(--cyan)' }}>{v.publicIp}</span>
                           <button onClick={() => copyText(v.publicIp, tr('inst.ac168c'))} title={tr('inst.79d3ab')} disabled={!v.publicIp}
@@ -1976,11 +1976,11 @@ function openNetworkManageModal(shell, inst) {
                         </span>
                       </td>
                       {/* 私网 IPv4 */}
-                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span className="mono" style={{ fontSize: 11.5, color: 'var(--fg-1)' }}>{v.privateIp}</span>
                       </td>
                       {/* 子网 ID */}
-                      <td title={v.subnetId} style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td title={v.subnetId} style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span className="mono" style={{ fontSize: 10.5, color: 'var(--fg-2)' }}>{ellipsisMiddle(v.subnetId, 22)}</span>
                       </td>
                       {/* IPv6 数量 */}

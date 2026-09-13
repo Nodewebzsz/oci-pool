@@ -342,21 +342,21 @@ function GrabPage({ density }) {
           </span>
         );
       } },
-    { key: 'totalTasks', label: tr('grab.col.total'), width: 58, minWidth: 54, thPad: 6, align: 'right',
+    { key: 'totalTasks', label: tr('grab.col.total'), width: 58, minWidth: 54, thPad: 6,
       render: r => <span className="num" style={{ color: 'var(--fg-0)', fontWeight: 500 }}>{r.totalTasks}</span> },
-    { key: 'executing', label: tr('grab.col.executing'), width: 58, minWidth: 54, thPad: 6, align: 'right',
+    { key: 'executing', label: tr('grab.col.executing'), width: 58, minWidth: 54, thPad: 6,
       render: r => (
         <span className="num" style={{ color: r.executing > 0 ? 'var(--accent)' : 'var(--fg-3)', fontWeight: r.executing > 0 ? 600 : 400 }}>{r.executing}</span>
       ) },
-    { key: 'totalAttempts', label: tr('grab.col.attempts'), width: 58, minWidth: 54, thPad: 6, align: 'right',
+    { key: 'totalAttempts', label: tr('grab.col.attempts'), width: 58, minWidth: 54, thPad: 6,
       render: r => <span className="num" style={{ color: 'var(--fg-1)', fontWeight: 500 }}>{getGrabAttempts(r).toLocaleString()}</span> },
-    { key: 'yesterdayAttempts', label: tr('grab.col.yesterday'), width: 58, minWidth: 54, thPad: 6, align: 'right',
+    { key: 'yesterdayAttempts', label: tr('grab.col.yesterday'), width: 58, minWidth: 54, thPad: 6,
       render: r => <span className="num" style={{ color: 'var(--fg-2)' }}>{getGrabYesterday(r)}</span> },
-    { key: 'todayAttempts', label: tr('grab.col.today'), width: 58, minWidth: 54, thPad: 6, align: 'right',
+    { key: 'todayAttempts', label: tr('grab.col.today'), width: 58, minWidth: 54, thPad: 6,
       render: r => <span className="num" style={{ color: 'var(--cyan)', fontWeight: 500 }}>{getGrabToday(r)}</span> },
-    { key: 'failed', label: tr('grab.col.failed'), width: 58, minWidth: 54, thPad: 6, align: 'right',
+    { key: 'failed', label: tr('grab.col.failed'), width: 58, minWidth: 54, thPad: 6,
       render: r => <span className="num" style={{ color: 'var(--danger)' }}>{getGrabFailed(r).toLocaleString()}</span> },
-    { key: 'succeeded', label: tr('grab.col.success'), width: 58, minWidth: 54, thPad: 6, align: 'right',
+    { key: 'succeeded', label: tr('grab.col.success'), width: 58, minWidth: 54, thPad: 6,
       render: r => getGrabSucceeded(r) > 0
         ? (
           <button
