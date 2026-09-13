@@ -237,6 +237,31 @@
     const pwLabels = ['极弱', '弱', '中等', '安全', '非常强'];
     const pwColors = ['var(--danger)', 'var(--danger)', 'var(--orange)', 'var(--accent)', 'var(--accent)'];
 
+    // 每日抢机时段快捷场景预设
+    const TIME_PRESETS = [
+      { label: '全天执行', value: '' },
+      { label: '凌晨 (1-8点)', value: '1-8' },
+      { label: '白天 (9-18点)', value: '9-18' },
+      { label: '夜间 (18-24点)', value: '18-24' },
+    ];
+
+    // 时段大白话解析与防呆判定
+    const parsedRange = useMemo(() => {
+      if (!dayGap || !dayGap.trim()) {
+        return { allDay: true, start: 0, end: 24, text: '全天 24 小时持续轮询抢机' };
+      }
+      const parts = dayGap.split('-').map(x => parseInt(x.trim(), 10));
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1]) && parts[0] >= 0 && parts[1] <= 24 && parts[0] < parts[1]) {
+        const sStr = String(parts[0]).padStart(2, '0') + ':00';
+        const eStr = String(parts[1]).padStart(2, '0') + ':00';
+        return {
+          allDay: false, start: parts[0], end: parts[1],
+          text: `仅在每日 ${sStr} ~ ${eStr} 期间尝试抢机，其余时间自动静默挂起`,
+        };
+      }
+      return { allDay: false, invalid: true, text: '时段格式有误（需为 起始小时-结束小时，如 1-8，且不支持跨天）' };
+    }, [dayGap]);
+
     // 提交保存开机任务 (严格带 API 风控二次确认)
     const handleSubmit = () => {
       const finalImageId = customImageId.trim() || imageId;
@@ -622,24 +647,103 @@
                   </div>
                 </FormRow>
 
-                {/* 开机实例数 + 跨天间隔 */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <FormRow label="开机实例数量" required>
-                    <NumberInput
-                      value={instanceCount}
-                      onChange={v => setInstanceCount(Math.max(1, v))}
-                      min={1} max={10}
-                    />
-                  </FormRow>
-                  <FormRow label="抢机时间范围 (可选)" hint="如: 1-8 (表示凌晨1点至8点)">
-                    <TextInput
-                      mono
-                      value={dayGap}
-                      onChange={setDayGap}
-                      placeholder="留空表示全天不限"
-                    />
-                  </FormRow>
-                </div>
+                {/* 开机实例数量 */}
+                <FormRow label="开机实例数量" required hint="成功开机达到该数量后，后台抢机任务将自动完成并停止">
+                  <NumberInput
+                    value={instanceCount}
+                    onChange={v => setInstanceCount(Math.max(1, v))}
+                    min={1} max={10}
+                  />
+                </FormRow>
+
+                {/* 每日抢机时段 (场景胶囊 + 起止联动 + 实时大白话反馈) */}
+                <FormRow label="每日抢机时段 (可选)" hint="按需限制抢机时间窗口，避免占用白天 API 额度，支持凌晨放货精准抢机">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {/* 场景快捷胶囊 */}
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {TIME_PRESETS.map(p => {
+                        const active = (dayGap || '') === p.value;
+                        return (
+                          <button
+                            key={p.label}
+                            type="button"
+                            onClick={() => setDayGap(p.value)}
+                            style={{
+                              flex: 1, padding: '5px 0', borderRadius: 6, fontSize: 11,
+                              cursor: 'pointer', border: '1px solid ' + (active ? 'var(--accent)' : 'var(--border)'),
+                              background: active ? 'var(--accent-soft)' : 'var(--bg-2)',
+                              color: active ? 'var(--accent)' : 'var(--fg-1)',
+                              fontWeight: active ? 700 : 400,
+                              transition: 'all 80ms',
+                            }}
+                          >
+                            {p.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* 自定义起止时间下拉选择 */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 11, color: 'var(--fg-3)', flexShrink: 0 }}>从</span>
+                        <CustomDropdown
+                          value={String(parsedRange.allDay ? 0 : (parsedRange.start ?? 0))}
+                          onChange={v => {
+                            const newStart = parseInt(v, 10);
+                            const curEnd = parsedRange.allDay ? 24 : (parsedRange.end ?? 24);
+                            const nextEnd = newStart >= curEnd ? Math.min(24, newStart + 1) : curEnd;
+                            setDayGap(`${newStart}-${nextEnd}`);
+                          }}
+                          height={30}
+                          width="100%"
+                        >
+                          {Array.from({ length: 24 }).map((_, i) => (
+                            <option key={i} value={String(i)}>{String(i).padStart(2, '0')}:00</option>
+                          ))}
+                        </CustomDropdown>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 11, color: 'var(--fg-3)', flexShrink: 0 }}>至</span>
+                        <CustomDropdown
+                          value={String(parsedRange.allDay ? 24 : (parsedRange.end ?? 24))}
+                          onChange={v => {
+                            const newEnd = parseInt(v, 10);
+                            const curStart = parsedRange.allDay ? 0 : (parsedRange.start ?? 0);
+                            const nextStart = newEnd <= curStart ? Math.max(0, newEnd - 1) : curStart;
+                            setDayGap(`${nextStart}-${newEnd}`);
+                          }}
+                          height={30}
+                          width="100%"
+                        >
+                          {Array.from({ length: 24 }).map((_, i) => {
+                            const val = i + 1;
+                            const curStart = parsedRange.allDay ? 0 : (parsedRange.start ?? 0);
+                            return (
+                              <option key={val} value={String(val)} disabled={val <= curStart}>
+                                {String(val).padStart(2, '0')}:00
+                              </option>
+                            );
+                          })}
+                        </CustomDropdown>
+                      </div>
+                    </div>
+
+                    {/* 实时大白话反馈提示条 */}
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '6px 10px', borderRadius: 6,
+                      background: parsedRange.invalid ? 'var(--danger-soft)' : 'color-mix(in oklab, var(--accent) 10%, transparent)',
+                      border: '1px solid ' + (parsedRange.invalid ? 'var(--danger)' : 'oklch(from var(--accent) l c h / 0.2)'),
+                      fontSize: 11,
+                      color: parsedRange.invalid ? 'var(--danger)' : 'var(--accent)',
+                    }}>
+                      <Icon name={parsedRange.invalid ? 'alert-triangle' : 'clock'} size={12} style={{ flexShrink: 0 }} />
+                      <span>{parsedRange.text}</span>
+                    </div>
+                  </div>
+                </FormRow>
               </div>
 
               {/* 卡片 4：镜像与访问 (imageCard) */}
