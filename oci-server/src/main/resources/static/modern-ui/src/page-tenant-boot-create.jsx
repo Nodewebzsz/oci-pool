@@ -86,7 +86,6 @@
     const [selectedOS, setSelectedOS] = useState('');
     const [selectedVersion, setSelectedVersion] = useState('');
     const [imageId, setImageId] = useState('');
-    const [customImageId, setCustomImageId] = useState('');
 
     // 访问凭据状态
     const [rootPassword, setRootPassword] = useState(() => randomPassword());
@@ -278,9 +277,8 @@
 
     // 提交保存开机任务 (严格带 API 风控二次确认)
     const handleSubmit = () => {
-      const finalImageId = customImageId.trim() || imageId;
-      if (!finalImageId) {
-        shell.showToast('请选择有效的系统镜像或填写镜像 OCID', { kind: 'warn' });
+      if (!imageId) {
+        shell.showToast('请选择有效的系统镜像', { kind: 'warn' });
         return;
       }
       if (!rootPassword || rootPassword.length < 8) {
@@ -311,7 +309,7 @@
               loopTime: Number(loopTime) || 60,
               operatingSystem: selectedOS,
               operatingSystemVersion: selectedVersion,
-              imageId: finalImageId,
+              imageId,
               rootPassword,
               remark: remark.trim() || `${tenant?.tenancyName || 'tenant'}-${architecture}`,
               dayGap: dayGap ? String(dayGap) : '',
@@ -814,14 +812,33 @@
                   </CustomDropdown>
                 </FormRow>
 
-                {/* 镜像 OCID (自动绑定，支持展开覆盖) */}
-                <FormRow label="镜像 OCID" hint="由系统根据选择自动匹配，高级用户可手动指定覆盖">
-                  <TextInput
-                    mono
-                    value={customImageId || imageId}
-                    onChange={setCustomImageId}
-                    placeholder="ocid1.image.oc1..."
-                  />
+                {/* 镜像 OCID (只读展示，不可编辑，仅供查看与一键复制) */}
+                <FormRow label="镜像 OCID" hint="由系统根据上方操作系统与版本自动匹配绑定，仅供查看">
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <TextInput
+                      mono
+                      readOnly
+                      allowClear={false}
+                      value={imageId || (loadingImages ? '探测匹配中…' : '—')}
+                      style={{ background: 'var(--bg-3)', color: 'var(--fg-2)', cursor: 'default' }}
+                    />
+                    {imageId && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        icon="copy"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(imageId)
+                            .then(() => shell.showToast('已复制镜像 OCID 到剪贴板', { kind: 'success' }))
+                            .catch(() => shell.showToast('复制失败', { kind: 'error' }));
+                        }}
+                        title="复制镜像 OCID"
+                      >
+                        复制
+                      </Button>
+                    )}
+                  </div>
                 </FormRow>
 
                 {/* Root 密码 (默认明文显示，内嵌眼睛可自由切换隐藏) */}
