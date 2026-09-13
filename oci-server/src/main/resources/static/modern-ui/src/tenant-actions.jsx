@@ -111,7 +111,7 @@ function useTenantProxyQuickModal() {
         icon: 'shield', iconColor: 'var(--accent)',
         width: 540,
         body: (
-          <div style={{ padding: '4px 2px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ padding: '16px 22px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ fontSize: 12, color: 'var(--fg-3)', lineHeight: 1.5 }}>
               选择已有代理，或直接新建并绑定到该租户（其它租户也可共用）。
             </div>
@@ -122,7 +122,7 @@ function useTenantProxyQuickModal() {
                 type="button"
                 onClick={() => { state.mode = 'bind'; render(); }}
                 style={{
-                  padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                  padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
                   background: !isCreate ? 'var(--accent)' : 'var(--bg-2)',
                   color: !isCreate ? '#ffffff' : 'var(--fg-1)',
                   border: '1px solid ' + (!isCreate ? 'var(--accent)' : 'var(--border)'),
@@ -135,7 +135,7 @@ function useTenantProxyQuickModal() {
                 type="button"
                 onClick={() => { state.mode = 'create'; render(); }}
                 style={{
-                  padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                  padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
                   background: isCreate ? 'var(--accent)' : 'var(--bg-2)',
                   color: isCreate ? '#ffffff' : 'var(--fg-1)',
                   border: '1px solid ' + (isCreate ? 'var(--accent)' : 'var(--border)'),
@@ -158,8 +158,9 @@ function useTenantProxyQuickModal() {
                   background: 'var(--bg-2)',
                   border: '1px solid var(--border)',
                   borderRadius: 10,
-                  padding: 6,
-                  maxHeight: 330,
+                  padding: '8px',
+                  minHeight: 220,
+                  maxHeight: 340,
                   overflowY: 'auto',
                   display: 'flex',
                   flexDirection: 'column',

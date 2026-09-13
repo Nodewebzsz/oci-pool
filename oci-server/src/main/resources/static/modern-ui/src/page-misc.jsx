@@ -5331,7 +5331,7 @@ function ProxyFormBody({ existing, parentTenants = [], bodyRef, onSave }) {
       display: 'grid',
       gridTemplateColumns: 'minmax(0, 1.45fr) 280px',
       gap: 16,
-      padding: '4px 2px',
+      padding: '16px 22px 20px',
       minHeight: 440,
     }}>
       {/* ─── 左侧：代理核心参数卡片 (100% 对齐图4客户端 leftPane) ─── */}
@@ -5555,7 +5555,7 @@ function ProxyFormBody({ existing, parentTenants = [], bodyRef, onSave }) {
           ) : (
             filteredTenants.map(t => {
               const checked = form.tenantIds.includes(String(t.id));
-              const regionMeta = (window.REGION_MAP && window.REGION_MAP[t.region]?.cn) || t.region || `#${t.id}`;
+              const regionMeta = (window.REGION_MAP && (window.REGION_MAP[t.region]?.simpleName || window.REGION_MAP[t.region]?.cn)) || t.region || `#${t.id}`;
               return (
                 <div
                   key={t.id}
