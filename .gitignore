@@ -81,6 +81,7 @@ gitleaks.sarif
 
 # 本地数据应急备份文件
 deploy/data_backup_incident/
+deploy/data.bak*/
 
 # Workbuddy AI internals
 .workbuddy-ai/
