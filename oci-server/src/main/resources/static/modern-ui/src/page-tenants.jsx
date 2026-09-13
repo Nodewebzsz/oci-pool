@@ -465,7 +465,7 @@ function TenantsPage({ density }) {
         <button
           onClick={e => { e.stopPropagation(); addBoot(r); }}
           style={{
-            background: 'var(--orange)', color: 'oklch(0.14 0.02 55)',
+            background: 'var(--orange)', color: '#ffffff',
             border: 'none', borderRadius: 4,
             padding: '4px 10px',
             fontFamily: 'inherit', fontSize: 11, fontWeight: 600,

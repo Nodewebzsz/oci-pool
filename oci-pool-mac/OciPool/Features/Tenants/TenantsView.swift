@@ -553,7 +553,7 @@ struct TenantsView: View {
         }
     }
 
-    /// Web 实例操作：橙色 zap「创建实例」按钮（color: oklch(0.14 0.02 55)）
+    /// Web 实例操作：橙色 zap「创建实例」按钮（统一白色文字与图标，对齐 Web 端）
     @ViewBuilder
     private func bootCell(_ item: TenantItem, width: CGFloat) -> some View {
         if item.cloudType == 1 {
@@ -563,7 +563,7 @@ struct TenantsView: View {
                     Text("创建实例")
                         .font(.system(size: 11, weight: .semibold))
                 }
-                .foregroundColor(Color(hex: "2a1a04"))
+                .foregroundColor(.white)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 4)
                 .background(AppTheme.orange)
