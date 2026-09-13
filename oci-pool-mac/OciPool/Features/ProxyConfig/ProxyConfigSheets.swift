@@ -13,7 +13,7 @@ struct ProxyConfigSheet: View {
             title: (model.activeForm?.isEditing == true) ? "编辑代理配置" : "新增代理配置",
             systemImage: "arrow.left.arrow.right",
             width: 760,
-            height: 520,
+            height: 570,
             onClose: { model.closeForm() },
             footer: {
                 HStack {
@@ -318,30 +318,11 @@ struct ProxyConfigSheet: View {
     private func tenantRow(id: Int64?, title: String, meta: String, selected: Bool) -> some View {
         Button(action: { model.selectTenant(id) }) {
             HStack(spacing: 8) {
-                // 全局用圆点；租户用方框多选
-                if id == nil {
-                    Circle()
-                        .strokeBorder(selected ? AppTheme.sidebarActive : AppTheme.border(dark), lineWidth: 1.5)
-                        .background(Circle().fill(selected ? AppTheme.sidebarActive : Color.clear))
-                        .frame(width: 12, height: 12)
-                } else {
-                    RoundedRectangle(cornerRadius: 3)
-                        .strokeBorder(selected ? AppTheme.sidebarActive : AppTheme.border(dark), lineWidth: 1.5)
-                        .background(
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(selected ? AppTheme.sidebarActive : Color.clear)
-                        )
-                        .frame(width: 12, height: 12)
-                        .overlay(
-                            Group {
-                                if selected {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 7, weight: .bold))
-                                        .foregroundColor(.white)
-                                }
-                            }
-                        )
-                }
+                // 全局和租户全量统一使用单选圆点 Circle，彻底移除多选框
+                Circle()
+                    .strokeBorder(selected ? AppTheme.sidebarActive : AppTheme.border(dark), lineWidth: 1.5)
+                    .background(Circle().fill(selected ? AppTheme.sidebarActive : Color.clear))
+                    .frame(width: 12, height: 12)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
                         .font(.system(size: 12, weight: .medium))

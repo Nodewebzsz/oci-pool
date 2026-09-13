@@ -5246,9 +5246,12 @@ function ProxyFormBody({ existing, parentTenants = [], bodyRef, onSave }) {
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const toggleTenant = (id) => {
-    const sId = String(id);
-    set('tenantIds', form.tenantIds.includes(sId) ? form.tenantIds.filter(x => x !== sId) : [...form.tenantIds, sId]);
+  const selectTenant = (id) => {
+    if (!id) {
+      set('tenantIds', []);
+    } else {
+      set('tenantIds', [String(id)]);
+    }
   };
 
   const filteredTenants = React.useMemo(() => {
@@ -5528,7 +5531,7 @@ function ProxyFormBody({ existing, parentTenants = [], bodyRef, onSave }) {
         }}>
           {/* 首项：全局共享 (fallback pool) */}
           <div
-            onClick={() => set('tenantIds', [])}
+            onClick={() => selectTenant(null)}
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '7px 8px', borderRadius: 6, cursor: 'pointer',
@@ -5559,7 +5562,7 @@ function ProxyFormBody({ existing, parentTenants = [], bodyRef, onSave }) {
               return (
                 <div
                   key={t.id}
-                  onClick={() => toggleTenant(t.id)}
+                  onClick={() => selectTenant(t.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8,
                     padding: '7px 8px', borderRadius: 6,
@@ -5571,15 +5574,11 @@ function ProxyFormBody({ existing, parentTenants = [], bodyRef, onSave }) {
                   onMouseLeave={e => { if (!checked) e.currentTarget.style.background = 'transparent'; }}
                 >
                   <span style={{
-                    width: 12, height: 12, borderRadius: 3,
+                    width: 12, height: 12, borderRadius: '50%',
                     border: checked ? 'none' : '1.5px solid var(--border-strong)',
                     background: checked ? 'var(--accent)' : 'transparent',
-                    color: '#fff', fontSize: 8, fontWeight: 800,
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                     flexShrink: 0,
-                  }}>
-                    {checked && '✓'}
-                  </span>
+                  }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
                       fontSize: 12, fontWeight: checked ? 600 : 400,
@@ -5643,6 +5642,7 @@ function SysVpnProxyPage() {
         setParentTenants((list || []).map(t => ({
           id: t.id != null ? String(t.id) : '',
           name: t.tenancyName || t.userName || ('#' + t.id),
+          region: t.region || t.homeRegion || '',
         })));
       } catch (_) {
         setParentTenants([]);

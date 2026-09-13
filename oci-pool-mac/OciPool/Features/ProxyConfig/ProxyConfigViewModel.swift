@@ -301,7 +301,7 @@ final class ProxyConfigViewModel: ObservableObject {
         tenantPageIndex = next
     }
 
-    /// 多选：nil/0 = 切回全局（清空）；有 id = 切换勾选
+    /// 单选模式：nil/0 = 切回全局（清空）；有 id = 专属单选绑定
     func selectTenant(_ id: Int64?) {
         guard var form = activeForm else { return }
         if id == nil || (id ?? 0) <= 0 {
@@ -310,11 +310,7 @@ final class ProxyConfigViewModel: ObservableObject {
             return
         }
         let tid = id!
-        if let idx = form.tenantIds.firstIndex(of: tid) {
-            form.tenantIds.remove(at: idx)
-        } else {
-            form.tenantIds.append(tid)
-        }
+        form.tenantIds = [tid]
         activeForm = form
     }
 
