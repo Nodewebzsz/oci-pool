@@ -4196,7 +4196,11 @@ function SysLogsPage() {
           background: 'oklch(0.13 0.010 240)',
           borderBottom: '1px solid var(--border)',
         }}>
-          <h2 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--fg-0)' }}>
+          <h2 style={{
+            display: 'flex', alignItems: 'center', gap: 8, margin: 0,
+            fontSize: 13, fontWeight: 600, color: 'var(--accent)',
+            fontFamily: 'var(--font-mono)',
+          }}>
             <Icon name="terminal" size={14} style={{ color: 'var(--accent)' }} />
             <span>{tr('pageMisc.c308cb')}</span>
             <span style={{
