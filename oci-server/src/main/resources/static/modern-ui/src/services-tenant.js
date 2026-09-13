@@ -115,6 +115,7 @@
         imageId: o.imageId,
         rootPassword: o.rootPassword,
         remark: o.remark,
+        dayGap: o.dayGap || '',
         cloudType: o.cloudType,
       }),
     });

@@ -130,6 +130,20 @@
       return () => { active = false; };
     }, [tenantDbId, initialRegionCode]);
 
+    // 语义化版本倒序排序 (如 24.04 > 22.04 > 20.04，确保较新官方版本优先排在前面并默认选中)
+    const sortVersions = (arr) => {
+      return [...arr].sort((a, b) => {
+        const parse = s => (String(s).match(/\d+/g) || []).map(Number);
+        const pa = parse(a.operatingSystemVersion), pb = parse(b.operatingSystemVersion);
+        const len = Math.max(pa.length, pb.length);
+        for (let i = 0; i < len; i++) {
+          const va = pa[i] || 0, vb = pb[i] || 0;
+          if (va !== vb) return vb - va; // 倒序
+        }
+        return String(b.operatingSystemVersion || '').localeCompare(String(a.operatingSystemVersion || ''));
+      });
+    };
+
     // 2. 真实探测系统镜像 (当租户/区域/架构切换时自动拉取真实可用镜像)
     const activeTenantId = selectedRegionTenantId || tenantDbId;
     useEffect(() => {
@@ -155,8 +169,8 @@
               const prefOS = osSet.find(o => o.toLowerCase().includes('ubuntu')) || osSet[0];
               setSelectedOS(prefOS);
 
-              // 自动提取对应版本
-              const versions = list.filter(x => x.operatingSystem === prefOS);
+              // 自动提取对应版本，按语义化版本倒序排列，优先默认选中较新版本
+              const versions = sortVersions(list.filter(x => x.operatingSystem === prefOS));
               if (versions.length > 0) {
                 setSelectedVersion(versions[0].operatingSystemVersion || '');
                 setImageId(versions[0].imageId || '');
@@ -178,10 +192,10 @@
       return () => { active = false; };
     }, [activeTenantId, architecture]);
 
-    // 操作系统切换联动
+    // 操作系统切换联动 (自动按倒序排列并默认选中首项新版本)
     const handleOSChange = (os) => {
       setSelectedOS(os);
-      const versions = images.filter(x => x.operatingSystem === os);
+      const versions = sortVersions(images.filter(x => x.operatingSystem === os));
       if (versions.length > 0) {
         setSelectedVersion(versions[0].operatingSystemVersion || '');
         setImageId(versions[0].imageId || '');
@@ -230,7 +244,7 @@
       return Array.from(new Set(images.map(x => x.operatingSystem).filter(Boolean))).sort();
     }, [images]);
     const availableVersions = useMemo(() => {
-      return images.filter(x => x.operatingSystem === selectedOS);
+      return sortVersions(images.filter(x => x.operatingSystem === selectedOS));
     }, [images, selectedOS]);
 
     const pwScore = scorePassword(rootPassword);
@@ -570,14 +584,14 @@
                   <FormRow label="OCPU (核心数)" required>
                     <NumberInput
                       value={ocpu}
-                      onChange={v => setOcpu(Math.max(1, v))}
+                      onChange={v => { setOcpu(Math.max(1, v)); setSelectedTemplateId(''); }}
                       min={1} max={128}
                     />
                   </FormRow>
                   <FormRow label="内存容量 (GB)" required>
                     <NumberInput
                       value={memory}
-                      onChange={v => setMemory(Math.max(1, v))}
+                      onChange={v => { setMemory(Math.max(1, v)); setSelectedTemplateId(''); }}
                       min={1} max={1024}
                     />
                   </FormRow>
@@ -619,7 +633,7 @@
                 <FormRow label="引导卷大小 (GB)" required hint="免费账户总块存储配额上限为 200GB">
                   <NumberInput
                     value={disk}
-                    onChange={v => setDisk(Math.max(47, v))}
+                    onChange={v => { setDisk(Math.max(47, v)); setSelectedTemplateId(''); }}
                     min={47} max={32768}
                   />
                 </FormRow>
@@ -810,13 +824,14 @@
                   />
                 </FormRow>
 
-                {/* Root 密码 (输入框内嵌眼睛显隐，移除外部重复的独立眼睛按钮) */}
+                {/* Root 密码 (默认明文显示，内嵌眼睛可自由切换隐藏) */}
                 <FormRow label="实例 Root 初始密码" required>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                     <TextInput
                       mono
                       icon="key"
                       type="password"
+                      defaultReveal={true}
                       value={rootPassword}
                       onChange={setRootPassword}
                       placeholder="初始密码 (至少8位)"

@@ -736,9 +736,10 @@ function TextInput({
   readOnly = false,
   allowClear = true,
   icon,
+  defaultReveal = false,
   ...rest
 }) {
-  const [reveal, setReveal] = React.useState(false);
+  const [reveal, setReveal] = React.useState(defaultReveal);
   const isPass = type === 'password';
   const effType = isPass && reveal ? 'text' : type;
   const hasVal = Boolean(value !== undefined && value !== null && String(value).length > 0 && !disabled && !readOnly && typeof onChange === 'function' && allowClear);
