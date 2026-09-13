@@ -266,7 +266,13 @@ function TenantsPage({ density }) {
   // Action dispatch for the row menu
   const runAction = (id, tenant) => {
     switch (id) {
-      case 'add-boot':         return addBoot(tenant);
+      case 'add-boot':
+        if (window.__ocipNavigate) {
+          window.__ocipNavigate('tenant-boot-create', { tenantDbId: getTenantDbId(tenant), region: getTenantRegion(tenant) });
+        } else {
+          window.ociRouter.go('tenant-boot-create', { tenantDbId: getTenantDbId(tenant), region: getTenantRegion(tenant) });
+        }
+        return;
       case 'update-account':    return updateAccount(tenant);
       case 'tenant-detail':
         // 跳转到独立的租户详情页
@@ -463,7 +469,14 @@ function TenantsPage({ density }) {
     { key: 'instOp', label: tr('tenants.col.instOp'),
       render: r => (
         <button
-          onClick={e => { e.stopPropagation(); addBoot(r); }}
+          onClick={e => {
+            e.stopPropagation();
+            if (window.__ocipNavigate) {
+              window.__ocipNavigate('tenant-boot-create', { tenantDbId: getTenantDbId(r), region: getTenantRegion(r) });
+            } else {
+              window.ociRouter.go('tenant-boot-create', { tenantDbId: getTenantDbId(r), region: getTenantRegion(r) });
+            }
+          }}
           style={{
             background: 'var(--orange)', color: '#ffffff',
             border: 'none', borderRadius: 4,

@@ -277,8 +277,8 @@ function AppInner() {
   }, [authState, route]);
 
   const page = route.page;
-  // 子页面上下文(tenant-detail/grab/resources/traffic/audit/cost/quota):从路由参数/查询还原
-  const CHILD_PAGE_IDS = ['tenant-detail', 'tenant-grab', 'tenant-resources', 'tenant-traffic', 'tenant-audit', 'tenant-cost', 'tenant-quota'];
+  // 子页面上下文(tenant-detail/grab/resources/traffic/audit/cost/quota/boot-create):从路由参数/查询还原
+  const CHILD_PAGE_IDS = ['tenant-detail', 'tenant-grab', 'tenant-resources', 'tenant-traffic', 'tenant-audit', 'tenant-cost', 'tenant-quota', 'tenant-boot-create'];
   const detailCtx = CHILD_PAGE_IDS.includes(page)
     ? {
         tenantId: route.params.tenantDbId,
@@ -363,6 +363,7 @@ function AppInner() {
     'tenant-audit': TenantAuditPage,
     'tenant-cost': TenantCostPage,
     'tenant-quota': TenantQuotaPage,
+    'tenant-boot-create': TenantBootCreatePage,
     instances: InstancesPage,
     grab: GrabPage,
     regions: RegionsPage,
@@ -403,6 +404,7 @@ function AppInner() {
     'tenant-audit': 'tenants',     // 审计日志归属"租户管理"
     'tenant-cost': 'tenants',      // 费用统计归属"租户管理"
     'tenant-quota': 'tenants',     // 账号配额归属"租户管理"
+    'tenant-boot-create': 'tenants', // 创建实例归属"租户管理"
   };
   // 若上次停在依赖 ctx 的子页但 ctx 丢了,回退到 tenants 列表。
   // 租户是否仍存在由详情页对应的后端请求判定，不能依赖本地模拟列表。
@@ -590,6 +592,7 @@ function labelFor(page) {
     'tenant-traffic': '实例流量监控',
     'tenant-audit': '审计日志',
     'tenant-cost': '费用统计',
+    'tenant-boot-create': '创建开机任务',
     instances: tr('app.cd50e3'),
     grab: tr('app.8c19ed'), regions: tr('app.d3d0e3'), logs: tr('app.61eb6d'),
     proxyKeyConfig: tr('app.215666'), cfManage: tr('app.ed4f87'), eoManage: tr('app.4c89a3'),

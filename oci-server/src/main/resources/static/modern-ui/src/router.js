@@ -13,6 +13,7 @@
     'tenant-audit':      { path: '/tenants/:tenantDbId/audit', param: 'tenantDbId', query: ['from'] },
     'tenant-cost':       { path: '/tenants/:tenantDbId/cost', param: 'tenantDbId', query: ['from'] },
     'tenant-quota':      { path: '/tenants/:tenantDbId/quota', param: 'tenantDbId', query: ['from'] },
+    'tenant-boot-create': { path: '/tenants/:tenantDbId/boot-create', param: 'tenantDbId', query: ['region', 'from'] },
     instances:     { path: '/instances', query: ['page', 'size', 'tenantId', 'regionId'] },
     grab:          { path: '/grab', query: ['page', 'size', 'tenantId'] },
     regions:       { path: '/regions' },
