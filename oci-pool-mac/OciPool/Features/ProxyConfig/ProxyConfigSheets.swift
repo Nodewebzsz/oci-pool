@@ -14,6 +14,7 @@ struct ProxyConfigSheet: View {
             systemImage: "arrow.left.arrow.right",
             width: 760,
             height: 570,
+            scrollableContent: false,
             onClose: { model.closeForm() },
             footer: {
                 HStack {
@@ -280,8 +281,17 @@ struct ProxyConfigSheet: View {
                         }
                     }
                 }
+                .padding(4)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(dark ? Color.black.opacity(0.18) : Color.white)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(AppSheetSurface.border(dark), lineWidth: 1)
+            )
 
             HStack {
                 Button(action: { model.changeTenantPage(-1) }) {
