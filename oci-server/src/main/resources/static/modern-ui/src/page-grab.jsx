@@ -342,21 +342,21 @@ function GrabPage({ density }) {
           </span>
         );
       } },
-    { key: 'totalTasks', label: tr('grab.col.total'), width: 68, minWidth: 60, align: 'right',
+    { key: 'totalTasks', label: tr('grab.col.total'), width: 58, minWidth: 54, thPad: 6, align: 'right',
       render: r => <span className="num" style={{ color: 'var(--fg-0)', fontWeight: 500 }}>{r.totalTasks}</span> },
-    { key: 'executing', label: tr('grab.col.executing'), width: 68, minWidth: 60, align: 'right',
+    { key: 'executing', label: tr('grab.col.executing'), width: 58, minWidth: 54, thPad: 6, align: 'right',
       render: r => (
         <span className="num" style={{ color: r.executing > 0 ? 'var(--accent)' : 'var(--fg-3)', fontWeight: r.executing > 0 ? 600 : 400 }}>{r.executing}</span>
       ) },
-    { key: 'totalAttempts', label: tr('grab.col.attempts'), width: 68, minWidth: 60, align: 'right',
+    { key: 'totalAttempts', label: tr('grab.col.attempts'), width: 58, minWidth: 54, thPad: 6, align: 'right',
       render: r => <span className="num" style={{ color: 'var(--fg-1)', fontWeight: 500 }}>{getGrabAttempts(r).toLocaleString()}</span> },
-    { key: 'yesterdayAttempts', label: tr('grab.col.yesterday'), width: 68, minWidth: 60, align: 'right',
+    { key: 'yesterdayAttempts', label: tr('grab.col.yesterday'), width: 58, minWidth: 54, thPad: 6, align: 'right',
       render: r => <span className="num" style={{ color: 'var(--fg-2)' }}>{getGrabYesterday(r)}</span> },
-    { key: 'todayAttempts', label: tr('grab.col.today'), width: 68, minWidth: 60, align: 'right',
+    { key: 'todayAttempts', label: tr('grab.col.today'), width: 58, minWidth: 54, thPad: 6, align: 'right',
       render: r => <span className="num" style={{ color: 'var(--cyan)', fontWeight: 500 }}>{getGrabToday(r)}</span> },
-    { key: 'failed', label: tr('grab.col.failed'), width: 68, minWidth: 60, align: 'right',
+    { key: 'failed', label: tr('grab.col.failed'), width: 58, minWidth: 54, thPad: 6, align: 'right',
       render: r => <span className="num" style={{ color: 'var(--danger)' }}>{getGrabFailed(r).toLocaleString()}</span> },
-    { key: 'succeeded', label: tr('grab.col.success'), width: 68, minWidth: 60, align: 'right',
+    { key: 'succeeded', label: tr('grab.col.success'), width: 58, minWidth: 54, thPad: 6, align: 'right',
       render: r => getGrabSucceeded(r) > 0
         ? (
           <button
@@ -386,9 +386,9 @@ function GrabPage({ density }) {
         )
         : <span className="num" style={{ color: 'var(--fg-3)' }}>0</span>
     },
-    { key: 'arch', label: tr('grab.col.arch'), width: 76, minWidth: 70, align: 'center',
+    { key: 'arch', label: tr('grab.col.arch'), width: 64, minWidth: 60, thPad: 6, align: 'center',
       render: r => <span style={{ padding: '1px 6px', background: getInstanceArch(r) === 'ARM' ? 'var(--info-soft)' : 'var(--violet-soft)', color: getInstanceArch(r) === 'ARM' ? 'var(--info)' : 'var(--violet)', borderRadius: 3, fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{getInstanceArch(r)}</span> },
-    { key: 'createdAt', label: tr('common.createdAt'), width: 140, minWidth: 130,
+    { key: 'createdAt', label: tr('common.createdAt'), width: 180, minWidth: 150,
       render: r => <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>{r.createdAt}</span> },
     { key: 'actions', label: tr('common.operation'), width: 48, minWidth: 48, align: 'center', ellipsis: false,
       render: r => {
