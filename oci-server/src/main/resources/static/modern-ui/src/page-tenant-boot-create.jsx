@@ -90,7 +90,6 @@
 
     // 访问凭据状态
     const [rootPassword, setRootPassword] = useState(() => randomPassword());
-    const [showPassword, setShowPassword] = useState(false);
 
     // 提交锁定状态
     const [saving, setSaving] = useState(false);
@@ -680,7 +679,7 @@
                   </CustomDropdown>
                 </FormRow>
 
-                {/* 系统版本选择 */}
+                {/* 系统版本选择 (纯净展示版本号，去除乱码哈希后缀) */}
                 <FormRow label="镜像版本" required>
                   <CustomDropdown
                     value={selectedVersion}
@@ -691,7 +690,7 @@
                   >
                     {availableVersions.map(v => (
                       <option key={v.imageId} value={v.operatingSystemVersion}>
-                        {v.operatingSystemVersion} ({v.displayName || v.imageId?.slice(-8)})
+                        {v.operatingSystemVersion}
                       </option>
                     ))}
                   </CustomDropdown>
@@ -707,24 +706,16 @@
                   />
                 </FormRow>
 
-                {/* Root 密码 (带随机生成与强度条) */}
+                {/* Root 密码 (输入框内嵌眼睛显隐，移除外部重复的独立眼睛按钮) */}
                 <FormRow label="实例 Root 初始密码" required>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                     <TextInput
                       mono
                       icon="key"
-                      type={showPassword ? 'text' : 'password'}
+                      type="password"
                       value={rootPassword}
                       onChange={setRootPassword}
                       placeholder="初始密码 (至少8位)"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      icon={showPassword ? 'eye-off' : 'eye'}
-                      onClick={() => setShowPassword(!showPassword)}
-                      title={showPassword ? '隐藏密码' : '显示密码'}
                     />
                     <Button
                       type="button"
