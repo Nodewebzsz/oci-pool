@@ -477,46 +477,6 @@ struct TenantBootCreateView: View {
             enabled: nil,
             minHeight: pairMinHeight
         ) {
-            FormFieldRow(label: "Root 密码") {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 8) {
-                        AppTextField(
-                            text: $model.bootRootPassword,
-                            placeholder: "root 登录密码",
-                            secure: isPasswordMasked,
-                            leadingSystemImage: "key"
-                        )
-                        Button(action: { isPasswordMasked.toggle() }) {
-                            Image(systemName: isPasswordMasked ? "eye" : "eye.slash")
-                                .font(.system(size: 12))
-                                .foregroundColor(AppTheme.sidebarText(dark))
-                                .frame(width: 28, height: 28)
-                                .background(RoundedRectangle(cornerRadius: 6).fill(AppInputStyle.fill(dark)))
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        AppButton(title: "随机", systemImage: "arrow.clockwise", kind: .secondary) {
-                            model.bootRootPassword = randomPassword()
-                        }
-                    }
-                    // 密码强度条
-                    HStack(spacing: 3) {
-                        ForEach(0..<4) { idx in
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(idx < passwordStrengthScore ? AppTheme.sidebarActive : Color.gray.opacity(0.3))
-                                .frame(height: 3)
-                        }
-                    }
-                }
-            }
-
-            FormFieldRow(label: "任务备注") {
-                AppTextField(
-                    text: $model.bootRemark,
-                    placeholder: "如：新加坡-ARM-满血",
-                    leadingSystemImage: "tag"
-                )
-            }
-
             FormFieldRow(label: "操作系统") {
                 if model.bootOSList.isEmpty {
                     HStack(spacing: 8) {
@@ -572,26 +532,63 @@ struct TenantBootCreateView: View {
                 }
             }
 
-            FormFieldRow(label: "Image ID") {
-                Text(model.bootImageId.isEmpty ? "请先选择操作系统和版本" : model.bootImageId)
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundColor(
-                        model.bootImageId.isEmpty
-                            ? AppTheme.sidebarText(dark)
-                            : (dark ? Color.white.opacity(0.9) : Color.primary)
+            // 镜像 OCID (对齐 Web 端只读展示，不可编辑，带一键复制)
+            FormFieldRow(label: "镜像 OCID") {
+                HStack(spacing: 8) {
+                    AppTextField(
+                        text: .constant(model.bootImageId.isEmpty ? "探测匹配中…" : model.bootImageId),
+                        placeholder: "ocid1.image.oc1...",
+                        leadingSystemImage: "doc.text"
                     )
-                    .lineLimit(3)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
-                    .frame(minHeight: 56, alignment: .topLeading)
-                    .background(
-                        RoundedRectangle(cornerRadius: AppInputStyle.radius)
-                            .fill(AppInputStyle.fill(dark))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: AppInputStyle.radius)
-                            .stroke(AppTheme.border(dark).opacity(0.7), lineWidth: 1)
-                    )
+                    .disabled(true)
+                    if !model.bootImageId.isEmpty {
+                        AppButton(title: "复制", systemImage: "doc.on.doc", kind: .secondary) {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(model.bootImageId, forType: .string)
+                            ToastCenter.shared.success("已复制镜像 OCID 到剪贴板")
+                        }
+                    }
+                }
+            }
+
+            FormFieldRow(label: "Root 密码") {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        AppTextField(
+                            text: $model.bootRootPassword,
+                            placeholder: "root 登录密码",
+                            secure: isPasswordMasked,
+                            leadingSystemImage: "key"
+                        )
+                        Button(action: { isPasswordMasked.toggle() }) {
+                            Image(systemName: isPasswordMasked ? "eye" : "eye.slash")
+                                .font(.system(size: 12))
+                                .foregroundColor(AppTheme.sidebarText(dark))
+                                .frame(width: 28, height: 28)
+                                .background(RoundedRectangle(cornerRadius: 6).fill(AppInputStyle.fill(dark)))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        AppButton(title: "随机", systemImage: "arrow.clockwise", kind: .secondary) {
+                            model.bootRootPassword = randomPassword()
+                        }
+                    }
+                    // 密码强度条
+                    HStack(spacing: 3) {
+                        ForEach(0..<4) { idx in
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(idx < passwordStrengthScore ? AppTheme.sidebarActive : Color.gray.opacity(0.3))
+                                .frame(height: 3)
+                        }
+                    }
+                }
+            }
+
+            FormFieldRow(label: "任务备注") {
+                AppTextField(
+                    text: $model.bootRemark,
+                    placeholder: "如：新加坡-ARM-满血",
+                    leadingSystemImage: "tag"
+                )
             }
         } footer: {
             if model.bootImageId.isEmpty {
