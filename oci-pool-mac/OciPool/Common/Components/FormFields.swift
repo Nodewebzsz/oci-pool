@@ -142,6 +142,7 @@ struct AppTextField: View {
     var placeholder: String = ""
     var secure: Bool = false
     var leadingSystemImage: String? = nil
+    var allowClear: Bool = true
     var height: CGFloat = AppInputStyle.height
     var onCommit: (() -> Void)? = nil
 
@@ -166,7 +167,7 @@ struct AppTextField: View {
             },
             trailing: AnyView(
                 HStack(spacing: 6) {
-                    if !text.isEmpty {
+                    if allowClear && !text.isEmpty {
                         Button(action: { text = "" }) {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: AppInputStyle.iconSize))

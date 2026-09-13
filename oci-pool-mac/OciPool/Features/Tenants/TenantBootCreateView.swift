@@ -50,22 +50,42 @@ struct TenantBootCreateView: View {
         bootTemplates.filter { $0.arch == model.bootArchitecture }
     }
 
+    private var headerSubtitle: String? {
+        guard let t = tenant else { return nil }
+        let realName = t.tenantPrimaryName
+        let regCn = RegionCnName.table[t.region] ?? (t.region.isEmpty ? "主区域" : t.region)
+        return "\(realName) · \(regCn)"
+    }
+
     var body: some View {
         PageScaffold(
-            title: "",
-            subtitle: nil,
-            systemImage: "",
-            toolbar: { EmptyView() },
+            title: "创建开机任务",
+            subtitle: headerSubtitle,
+            systemImage: "bolt.fill",
+            iconColor: AppTheme.orange,
+            parentTitle: "租户管理",
+            onParentClick: {
+                model.closeBootCreate()
+            },
+            toolbar: {
+                HStack(spacing: 10) {
+                    AppButton(title: "返回租户列表", systemImage: "arrow.left", kind: .secondary) {
+                        model.closeBootCreate()
+                    }
+
+                    AppButton(title: "保存开机任务", systemImage: "bolt.fill", kind: .primary) {
+                        guard let t = tenant else { return }
+                        model.submitBoot(t)
+                    }
+                }
+            },
             content: {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
-                        // 1. 顶部自定义 PageHeader 卡片 (带面包屑导航 + 返回/保存按钮，100% 对齐 Web 端)
-                        customHeader
-
-                        // 2. Oracle API 开机风控警示横幅
+                        // 1. Oracle API 开机风控警示横幅
                         apiRiskBanner
 
-                        // 3. 上排双卡片：架构区域 | 规格模板 (等高并排，无多余底栏灰条)
+                        // 2. 上排双卡片：架构区域 | 规格模板 (等高并排，100% 宽度撑满)
                         HStack(alignment: .top, spacing: 14) {
                             archCard
                                 .frame(maxWidth: .infinity)
@@ -73,7 +93,7 @@ struct TenantBootCreateView: View {
                                 .frame(maxWidth: .infinity)
                         }
 
-                        // 4. 下排双卡片：部署配置 | 镜像与访问 (等高并排，无多余底栏灰条)
+                        // 3. 下排双卡片：部署配置 | 镜像与访问 (等高并排，100% 宽度撑满)
                         HStack(alignment: .top, spacing: 14) {
                             configCard
                                 .frame(maxWidth: .infinity)
@@ -81,8 +101,8 @@ struct TenantBootCreateView: View {
                                 .frame(maxWidth: .infinity)
                         }
                     }
-                    .padding(.horizontal, 22)
-                    .padding(.vertical, 16)
+                    .padding(.top, 14)
+                    .padding(.bottom, 24)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -90,66 +110,6 @@ struct TenantBootCreateView: View {
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         .environmentObject(appearance)
-    }
-
-    // ─── 1. 顶部 Header (卡片化 + 面包屑导航 + 双操作按钮) ─────────
-    private var customHeader: some View {
-        HStack(spacing: 12) {
-            // 橙色闪电软底图标 (对齐 Web zap)
-            RoundedRectangle(cornerRadius: 8)
-                .fill(AppTheme.orange.opacity(0.18))
-                .frame(width: 32, height: 32)
-                .overlay(
-                    Image(systemName: "bolt.fill")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(AppTheme.orange)
-                )
-
-            VStack(alignment: .leading, spacing: 3) {
-                // 面包屑导航：租户管理 / 创建开机任务
-                HStack(spacing: 6) {
-                    Button(action: { model.closeBootCreate() }) {
-                        Text("租户管理")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(mutedText)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    Text("/")
-                        .font(.system(size: 14))
-                        .foregroundColor(mutedText.opacity(0.6))
-                    Text("创建开机任务")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(primaryText)
-                }
-
-                // 副标题：真实租户名 · 中文城市名
-                if let t = tenant {
-                    let realName = t.tenantPrimaryName
-                    let regCn = RegionCnName.table[t.region] ?? (t.region.isEmpty ? "主区域" : t.region)
-                    Text("\(realName) · \(regCn)")
-                        .font(.system(size: 11.5))
-                        .foregroundColor(mutedText)
-                }
-            }
-
-            Spacer(minLength: 16)
-
-            // 右侧双操作按钮 (对齐 Web 端)
-            HStack(spacing: 10) {
-                AppButton(title: "返回租户列表", systemImage: "arrow.left", kind: .secondary) {
-                    model.closeBootCreate()
-                }
-
-                AppButton(title: "保存开机任务", systemImage: "bolt.fill", kind: .primary) {
-                    guard let t = tenant else { return }
-                    model.submitBoot(t)
-                }
-            }
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
-        .background(RoundedRectangle(cornerRadius: 10).fill(cardBg))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(cardBorder, lineWidth: 1))
     }
 
     // ─── 2. Oracle API 开机风控警告横幅 ─────────────────────────────
@@ -407,9 +367,9 @@ struct TenantBootCreateView: View {
                     }
                 }
 
-                // 开机实例数量 * (去除多余 # 号)
+                // 开机实例数量 * (去除多余 # 号与清除叉)
                 FormFieldRow(label: "开机实例数量 *") {
-                    AppTextField(text: $model.bootCount, placeholder: "1")
+                    AppTextField(text: $model.bootCount, placeholder: "1", allowClear: false)
                 }
 
                 // 每日抢机时段 (可选) (场景胶囊 + 实时大白话反馈条)
@@ -426,20 +386,72 @@ struct TenantBootCreateView: View {
                             }
                         }
 
+                    // 起止时间联动下拉框 (从 00:00 至 24:00)
+                    HStack(spacing: 8) {
                         HStack(spacing: 6) {
-                            Image(systemName: timeRangeHint.isAllDay ? "clock.fill" : "moon.stars.fill")
+                            Text("从")
                                 .font(.system(size: 11))
-                                .foregroundColor(accent)
-                            Text(timeRangeHint.text)
-                                .font(.system(size: 11))
-                                .foregroundColor(accent)
+                                .foregroundColor(mutedText)
+                            SelectMenu(
+                                options: startHourOptions,
+                                selection: Binding(
+                                    get: { "\(parsedStartHour)" },
+                                    set: { val in
+                                        let newStart = Int(val ?? "0") ?? 0
+                                        let curEnd = parsedEndHour
+                                        let nextEnd = newStart >= curEnd ? min(24, newStart + 1) : curEnd
+                                        model.bootDayGap = "\(newStart)-\(nextEnd)"
+                                    }
+                                ),
+                                placeholder: "00:00",
+                                width: 110,
+                                allowClear: false
+                            )
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(accent.opacity(0.12))
-                        )
+
+                        HStack(spacing: 6) {
+                            Text("至")
+                                .font(.system(size: 11))
+                                .foregroundColor(mutedText)
+                            SelectMenu(
+                                options: endHourOptions(start: parsedStartHour),
+                                selection: Binding(
+                                    get: { "\(parsedEndHour)" },
+                                    set: { val in
+                                        let newEnd = Int(val ?? "24") ?? 24
+                                        let curStart = parsedStartHour
+                                        let nextStart = newEnd <= curStart ? max(0, newEnd - 1) : curStart
+                                        model.bootDayGap = "\(nextStart)-\(newEnd)"
+                                    }
+                                ),
+                                placeholder: "24:00",
+                                width: 110,
+                                allowClear: false
+                            )
+                        }
+                        Spacer()
+                    }
+
+                    // 实时大白话状态反馈条 (全宽撑满 + 淡绿细边框 + 空心时钟图标)
+                    HStack(spacing: 6) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 11))
+                            .foregroundColor(accent)
+                        Text(timeRangeHint.text)
+                            .font(.system(size: 11))
+                            .foregroundColor(accent)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(accent.opacity(0.12))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(accent.opacity(0.25), lineWidth: 1)
+                    )
                     }
                 }
             }
@@ -617,13 +629,13 @@ struct TenantBootCreateView: View {
         let active = binding.wrappedValue == value
         return Button(action: { binding.wrappedValue = value }) {
             Text(label)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(active ? .white : primaryText)
+                .font(.system(size: 11, weight: active ? .bold : .medium))
+                .foregroundColor(active ? accent : primaryText)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(active ? accent : AppInputStyle.fill(dark))
+                        .fill(active ? accent.opacity(0.14) : AppInputStyle.fill(dark))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
@@ -656,6 +668,30 @@ struct TenantBootCreateView: View {
         if let t = tenant {
             model.bootRemark = "\(t.tenantPrimaryName)-\(tpl.id)"
         }
+    }
+
+    private var parsedStartHour: Int {
+        let raw = model.bootDayGap.trimmingCharacters(in: .whitespacesAndNewlines)
+        if raw.isEmpty { return 0 }
+        let parts = raw.components(separatedBy: "-").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+        if parts.count == 2, parts[0] >= 0, parts[0] <= 23 { return parts[0] }
+        return 0
+    }
+
+    private var parsedEndHour: Int {
+        let raw = model.bootDayGap.trimmingCharacters(in: .whitespacesAndNewlines)
+        if raw.isEmpty { return 24 }
+        let parts = raw.components(separatedBy: "-").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+        if parts.count == 2, parts[1] >= 1, parts[1] <= 24 { return parts[1] }
+        return 24
+    }
+
+    private var startHourOptions: [SelectOption] {
+        (0...23).map { SelectOption(id: "\($0)", title: String(format: "%02d:00", $0)) }
+    }
+
+    private func endHourOptions(start: Int) -> [SelectOption] {
+        ((start + 1)...24).map { SelectOption(id: "\($0)", title: String(format: "%02d:00", $0)) }
     }
 
     private var timeRangeHint: (isAllDay: Bool, text: String) {
