@@ -810,25 +810,87 @@ function DensityToggle({ value, onToggle }) {
 // ─── 通知中心 popover(topbar 内嵌 · 锚定铃铛下方) ─────────────
 function NotificationsButton() {
   const shell = useShell();
+  const { t: tr } = useT();
   const openHistory = useNotifyHistoryModal();
   const [open, setOpen] = React.useState(false);
   const [rect, setRect] = React.useState(null);
   const btnRef = React.useRef(null);
 
-  // 通知数据 · 与原 modal 版一致
-  const notifs = [
-    { level: 'success', time: tr('layout.dc7a65'),  title: tr('layout.2a2c26'), desc: tr('layout.28663f') },
-    { level: 'warning', time: tr('layout.fa9631'), title: tr('layout.f5ec53'), desc: tr('layout.db3f97') },
-    { level: 'error',   time: tr('layout.75aa52'),  title: tr('layout.5ef2d0'), desc: tr('layout.0193b6') },
-    { level: 'info',    time: tr('layout.61e704'),  title: tr('layout.d545a9'), desc: tr('layout.2e120f') },
-    { level: 'success', time: tr('layout.2f8d6f'),      title: tr('layout.2a2c26'), desc: tr('layout.7d898e') },
-    { level: 'info',    time: tr('layout.369d41'),    title: tr('layout.348d77'),  desc: tr('layout.118274') },
-  ];
+  // 真实通知数据与未读数量
+  const [notifs, setNotifs] = React.useState([]);
+  const [unreadCount, setUnreadCount] = React.useState(0);
+  const [loading, setLoading] = React.useState(false);
+
+  // 刷新未读数量
+  const refreshUnread = React.useCallback(async () => {
+    try {
+      if (!window.ociServices?.notify?.countUnread) return;
+      const res = await window.ociServices.notify.countUnread();
+      const count = Number(res?.data ?? res ?? 0);
+      setUnreadCount(isNaN(count) ? 0 : count);
+    } catch {
+      // 静默失败
+    }
+  }, []);
+
+  // 拉取真实通知列表（最多 6 条）
+  const loadNotifs = React.useCallback(async () => {
+    if (!window.ociServices?.notify?.list) return;
+    setLoading(true);
+    try {
+      const res = await window.ociServices.notify.list({ pageNum: 1, pageSize: 6, sort: 'createTime', order: 'desc' });
+      const page = res?.data || res;
+      const list = Array.isArray(page?.content) ? page.content : Array.isArray(page) ? page : [];
+      const parsed = list.map((item, idx) => {
+        const createdAt = item?.createTime || item?.updateTime || '';
+        let time = '—';
+        if (createdAt) {
+          const ts = Date.parse(createdAt);
+          if (ts) {
+            const age = Math.max(0, Date.now() - ts);
+            time = age < 60e3 ? (tr('notify.time.justNow') || '刚刚')
+                 : age < 3600e3 ? `${Math.floor(age / 60e3)} 分钟前`
+                 : age < 86400e3 ? `${Math.floor(age / 3600e3)} 小时前`
+                 : `${Math.floor(age / 86400e3)} 天前`;
+          } else {
+            time = String(createdAt).replace('T', ' ');
+          }
+        }
+        const type = String(item?.messageType || '').toLowerCase();
+        const level = type.includes('error') || type.includes('fail') ? 'error'
+                    : type.includes('warn') ? 'warning'
+                    : type.includes('success') ? 'success' : 'info';
+        return {
+          id: item?.businessId || item?.id || `msg-${idx}`,
+          businessId: item?.businessId || item?.id,
+          level,
+          title: item?.subject || tr('notify.system') || '系统通知',
+          desc: item?.content || '',
+          time,
+          read: Number(item?.readStatus) === 1,
+        };
+      });
+      setNotifs(parsed);
+    } catch (e) {
+      console.warn('加载通知列表失败:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [tr]);
+
+  // 组件挂载时获取未读数，每 60 秒轮询
+  React.useEffect(() => {
+    refreshUnread();
+    const timer = setInterval(refreshUnread, 60000);
+    return () => clearInterval(timer);
+  }, [refreshUnread]);
 
   const toggle = () => {
     if (open) { setOpen(false); return; }
     if (btnRef.current) setRect(btnRef.current.getBoundingClientRect());
     setOpen(true);
+    loadNotifs();
+    refreshUnread();
   };
 
   React.useEffect(() => {
@@ -845,6 +907,35 @@ function NotificationsButton() {
       document.removeEventListener('keydown', onKey);
     };
   }, [open]);
+
+  // 全部标记已读
+  const handleMarkAll = async () => {
+    try {
+      if (window.ociServices?.notify?.readAll) {
+        await window.ociServices.notify.readAll();
+      }
+      setNotifs(prev => prev.map(n => ({ ...n, read: true })));
+      setUnreadCount(0);
+      shell.showToast(tr('layout.2746f9') || '已全部标为已读', { kind: 'success' });
+    } catch (e) {
+      shell.showToast(e.message || '标记已读失败', { kind: 'error' });
+    }
+  };
+
+  // 点击单条通知
+  const handleItemClick = async (n) => {
+    if (!n.read && n.businessId && window.ociServices?.notify?.get) {
+      try {
+        await window.ociServices.notify.get({ businessId: n.businessId });
+        setNotifs(prev => prev.map(item => item.id === n.id ? { ...item, read: true } : item));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      } catch {}
+    }
+    setOpen(false);
+    if (n.desc) {
+      shell.showToast(n.title + '：' + n.desc, { kind: 'info' });
+    }
+  };
 
   const styleFor = (level) => {
     if (level === 'success') return { c: 'var(--accent)', soft: 'var(--accent-soft)', icon: 'check-circle-2' };
@@ -880,65 +971,79 @@ function NotificationsButton() {
         background: 'var(--bg-2)',
       }}>
         <Icon name="bell" size={13} style={{ color: 'var(--orange)' }} />
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-0)' }}>{tr('layout.3a955e')}</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-0)' }}>{tr('layout.3a955e') || '通知中心'}</span>
         <span className="mono" style={{
           fontSize: 10, color: 'var(--fg-2)',
           padding: '1px 6px', borderRadius: 3,
           background: 'var(--bg-3)',
-        }}>{notifs.length} {tr('layout.cc1bac')}</span>
+        }}>{notifs.length} {tr('layout.cc1bac') || '条'}</span>
         <div style={{ flex: 1 }} />
         <button
           type="button"
-          onClick={() => { shell.showToast(tr('layout.2746f9'), { kind: 'success' }); setOpen(false); }}
+          onClick={handleMarkAll}
+          disabled={notifs.length === 0 || unreadCount === 0}
           style={{
-            fontSize: 10.5, color: 'var(--info)',
+            fontSize: 10.5, color: (notifs.length === 0 || unreadCount === 0) ? 'var(--fg-3)' : 'var(--info)',
             background: 'transparent', border: 'none',
-            padding: '2px 4px', cursor: 'pointer',
+            padding: '2px 4px', cursor: (notifs.length === 0 || unreadCount === 0) ? 'default' : 'pointer',
             fontFamily: 'inherit',
           }}
-        >{tr('layout.1d1a68')}</button>
+        >{tr('layout.1d1a68') || '全部已读'}</button>
       </div>
 
       {/* 通知列表 */}
-      <div style={{ flex: 1, overflowY: 'auto' }}>
-        {notifs.map((n, i) => {
-          const s = styleFor(n.level);
-          return (
-            <div key={i} style={{
-              padding: '10px 14px',
-              borderBottom: i < notifs.length - 1 ? '1px solid var(--border)' : 'none',
-              display: 'flex', gap: 10, alignItems: 'flex-start',
-              cursor: 'pointer',
-              transition: 'background 100ms',
-            }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-2)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-              onClick={() => { setOpen(false); shell.showToast(tr('layout.c81363').replace('{0}',n.title), { kind: 'info' }); }}
-            >
-              <div style={{
-                width: 24, height: 24, borderRadius: 6,
-                background: s.soft, color: s.c,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0,
-              }}>
-                <Icon name={s.icon} size={13} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                  <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--fg-0)' }}>{n.title}</span>
-                  <span style={{ fontSize: 10, color: 'var(--fg-3)', flexShrink: 0, whiteSpace: 'nowrap' }}>{n.time}</span>
-                </div>
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 120 }}>
+        {loading && notifs.length === 0 ? (
+          <div style={{ padding: '36px 20px', textAlign: 'center', color: 'var(--fg-3)', fontSize: 12 }}>
+            <Icon name="loader-2" size={18} className="spin" style={{ display: 'block', margin: '0 auto 8px', opacity: 0.5 }} />
+            <span>加载通知…</span>
+          </div>
+        ) : notifs.length === 0 ? (
+          <div style={{ padding: '36px 20px', textAlign: 'center', color: 'var(--fg-3)', fontSize: 12 }}>
+            <Icon name="inbox" size={24} style={{ display: 'block', margin: '0 auto 8px', opacity: 0.4 }} />
+            <span>暂无系统通知</span>
+          </div>
+        ) : (
+          notifs.map((n, i) => {
+            const s = styleFor(n.level);
+            return (
+              <div key={n.id || i} style={{
+                padding: '10px 14px',
+                borderBottom: i < notifs.length - 1 ? '1px solid var(--border)' : 'none',
+                display: 'flex', gap: 10, alignItems: 'flex-start',
+                cursor: 'pointer',
+                background: n.read ? 'transparent' : 'oklch(from var(--info) l c h / 0.05)',
+                transition: 'background 100ms',
+              }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-2)'}
+                onMouseLeave={e => e.currentTarget.style.background = n.read ? 'transparent' : 'oklch(from var(--info) l c h / 0.05)'}
+                onClick={() => handleItemClick(n)}
+              >
                 <div style={{
-                  fontSize: 11, color: 'var(--fg-2)',
-                  marginTop: 2, lineHeight: 1.5,
-                  overflow: 'hidden',
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-                }}>{n.desc}</div>
+                  width: 24, height: 24, borderRadius: 6,
+                  background: s.soft, color: s.c,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  <Icon name={s.icon} size={13} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ fontSize: 11.5, fontWeight: n.read ? 500 : 600, color: n.read ? 'var(--fg-2)' : 'var(--fg-0)' }}>{n.title}</span>
+                    <span style={{ fontSize: 10, color: 'var(--fg-3)', flexShrink: 0, whiteSpace: 'nowrap' }}>{n.time}</span>
+                  </div>
+                  <div style={{
+                    fontSize: 11, color: 'var(--fg-2)',
+                    marginTop: 2, lineHeight: 1.5,
+                    overflow: 'hidden',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                  }}>{n.desc}</div>
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
       {/* Footer */}
@@ -959,7 +1064,7 @@ function NotificationsButton() {
             display: 'inline-flex', alignItems: 'center', gap: 4,
           }}
         >
-          {tr('layout.0467cc')}
+          {tr('layout.0467cc') || '查看全部'}
           <Icon name="chevron-right" size={11} />
         </button>
       </div>
@@ -970,7 +1075,7 @@ function NotificationsButton() {
     <>
       <button ref={btnRef}
         onClick={toggle}
-        title={tr('layout.5660bc')}
+        title={tr('layout.5660bc') || '通知中心'}
         style={{
           position: 'relative',
           width: 30, height: 30, padding: 0,
@@ -984,12 +1089,14 @@ function NotificationsButton() {
         }}
       >
         <Icon name="bell" size={14} />
-        <span style={{
-          position: 'absolute', top: 4, right: 5,
-          width: 7, height: 7, borderRadius: '50%',
-          background: 'var(--orange)',
-          boxShadow: '0 0 0 2px var(--bg-1)',
-        }} />
+        {unreadCount > 0 && (
+          <span style={{
+            position: 'absolute', top: 4, right: 5,
+            width: 7, height: 7, borderRadius: '50%',
+            background: 'var(--orange)',
+            boxShadow: '0 0 0 2px var(--bg-1)',
+          }} />
+        )}
       </button>
       {popover && ReactDOM.createPortal(popover, document.body)}
     </>
