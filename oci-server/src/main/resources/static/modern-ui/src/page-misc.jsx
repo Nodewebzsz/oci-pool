@@ -5334,262 +5334,265 @@ function ProxyFormBody({ existing, parentTenants = [], bodyRef, onSave }) {
       padding: '4px 2px',
       minHeight: 440,
     }}>
-      {/* ─── 左侧：代理核心参数卡片 ─── */}
+      {/* ─── 左侧：代理核心参数卡片 (100% 对齐图4客户端 leftPane) ─── */}
       <div style={{
         display: 'flex', flexDirection: 'column', gap: 10,
         background: 'var(--bg-2)', border: '1px solid var(--border)',
-        borderRadius: 'var(--radius)', padding: '14px 16px',
+        borderRadius: 12, padding: 14,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
           <div style={{
             width: 28, height: 28, borderRadius: 7,
-            background: 'var(--cyan-soft)', color: 'var(--cyan)',
+            background: 'color-mix(in oklab, var(--accent) 15%, transparent)', color: 'var(--accent)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>
             <Icon name="server" size={14} />
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-0)' }}>代理参数</div>
-            <div style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>类型、地址、认证与可用状态</div>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>类型、地址、认证与可用状态</div>
           </div>
         </div>
 
-        <FormRow label={tr('pageMisc.664795') || "自定义名称"} required>
-          <TextInput value={form.customName} onChange={v => set('customName', v)} placeholder="e.g. JP-Tokyo-01" />
-        </FormRow>
-
-        <FormRow label={tr('pageMisc.89acb7') || "代理类型"} required>
-          <RadioGroup
-            value={form.proxyType}
-            onChange={v => set('proxyType', v)}
-            options={[
-              { value: 'HTTP', label: 'HTTP', icon: 'globe' },
-              { value: 'HTTPS', label: 'HTTPS', icon: 'shield' },
-              { value: 'SOCKS5', label: 'SOCKS5', icon: 'shuffle' },
-            ]}
+        <FormRow label="自定义名称">
+          <TextInput
+            icon="tag"
+            value={form.customName}
+            onChange={v => set('customName', v)}
+            placeholder="可选，仅展示"
           />
         </FormRow>
 
+        <FormRow label="代理类型" required>
+          <CustomDropdown
+            value={form.proxyType}
+            onChange={v => set('proxyType', v)}
+            height={32}
+            width={180}
+          >
+            <option value="HTTP">HTTP</option>
+            <option value="HTTPS">HTTPS</option>
+            <option value="SOCKS5">SOCKS5</option>
+          </CustomDropdown>
+        </FormRow>
+
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
-          <FormRow label="URL / Host" required>
-            <TextInput value={form.proxyHost} onChange={v => set('proxyHost', v)} placeholder="proxy.example.com" mono />
+          <FormRow label="代理地址" required>
+            <TextInput
+              mono
+              icon="globe"
+              value={form.proxyHost}
+              onChange={v => set('proxyHost', v)}
+              placeholder="192.168.1.1 / 127.0.0.1"
+            />
           </FormRow>
-          <FormRow label={tr('pageMisc.c76cfe') || "端口"} required>
-            <NumberInput value={form.proxyPort} onChange={v => set('proxyPort', v)} min={1} max={65535} />
+          <FormRow label="端口" required>
+            <TextInput
+              mono
+              icon="hash"
+              value={String(form.proxyPort)}
+              onChange={v => set('proxyPort', v.replace(/\D/g, ''))}
+              placeholder="8080"
+            />
           </FormRow>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <FormRow label={tr('pageMisc.819767') || "用户名"}>
-            <TextInput value={form.proxyUsername} onChange={v => set('proxyUsername', v)} placeholder={tr('pageMisc.dd5eb8') || "留空表示无鉴权"} mono />
+          <FormRow label="用户名">
+            <TextInput
+              mono
+              icon="user"
+              value={form.proxyUsername}
+              onChange={v => set('proxyUsername', v)}
+              placeholder="留空表示无鉴权"
+            />
           </FormRow>
-          <FormRow label={tr('pageMisc.a81052') || "密码"}>
-            <PasswordInput value={form.proxyPassword} onChange={v => set('proxyPassword', v)} placeholder={tr('pageMisc.dd5eb8') || "留空表示无鉴权"} />
+          <FormRow label="密码">
+            <TextInput
+              mono
+              icon="key"
+              type="password"
+              value={form.proxyPassword}
+              onChange={v => set('proxyPassword', v)}
+              placeholder="留空表示无鉴权"
+            />
           </FormRow>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <FormRow label={tr('pageMisc.3fea7c') || "状态"} required>
-            <CustomDropdown value={String(form.availableStatus)} onChange={v => set('availableStatus', +v)} height={32} width="100%">
-              <option value="1">{tr('pageMisc.ad6b70') || "可用"}</option>
-              <option value="0">{tr('pageMisc.d1e4a7') || "禁用"}</option>
+          <FormRow label="状态" required>
+            <CustomDropdown
+              value={String(form.availableStatus)}
+              onChange={v => set('availableStatus', +v)}
+              height={32}
+              width="100%"
+            >
+              <option value="1">可用</option>
+              <option value="0">禁用</option>
             </CustomDropdown>
           </FormRow>
-          <FormRow label={tr('pageMisc.72243a') || "强制使用代理"} required>
-            <CustomDropdown value={String(form.forceProxy)} onChange={v => set('forceProxy', +v)} height={32} width="100%">
-              <option value="0">{tr('pageMisc.781c06') || "非强制 (可回退直连)"}</option>
-              <option value="1">{tr('pageMisc.4def0b') || "强制 (严格走代理)"}</option>
+          <FormRow label="强制使用代理" required>
+            <CustomDropdown
+              value={String(form.forceProxy)}
+              onChange={v => set('forceProxy', +v)}
+              height={32}
+              width="100%"
+            >
+              <option value="0">非强制</option>
+              <option value="1">强制</option>
             </CustomDropdown>
           </FormRow>
         </div>
 
-        {/* 动态盾牌提示横幅 (对齐客户端人性化解释) */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '8px 12px', borderRadius: 6,
-          background: Number(form.forceProxy) === 1 ? 'var(--orange-soft)' : 'var(--accent-soft)',
-          border: '1px solid ' + (Number(form.forceProxy) === 1 ? 'oklch(from var(--orange) l c h / 0.25)' : 'oklch(from var(--accent) l c h / 0.25)'),
-          fontSize: 11, color: Number(form.forceProxy) === 1 ? 'var(--orange)' : 'var(--accent)',
-          marginTop: 2,
-        }}>
-          <Icon name={Number(form.forceProxy) === 1 ? 'alert-triangle' : 'shield'} size={13} style={{ flexShrink: 0 }} />
-          <span>
+        {/* 动态盾牌释义 (100% 对齐图4客户端单行极简文字，无浅绿厚重背景) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+          <Icon
+            name="shield"
+            size={11}
+            style={{ color: Number(form.forceProxy) === 1 ? 'var(--orange)' : 'var(--accent)', flexShrink: 0 }}
+          />
+          <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>
             {Number(form.forceProxy) === 1
-              ? '已开启强制代理：代理链路异常时不回退，直接拒绝云厂商操作'
-              : '非强制代理：代理链路异常或不通时，允许系统平滑回退直连'}
+              ? '已开启强制：代理不通时拒绝向云厂商发起请求'
+              : '非强制：代理不通时可回退直连'}
           </span>
         </div>
       </div>
 
-      {/* ─── 右侧：绑定租户专区 ─── */}
+      {/* ─── 右侧：绑定租户专区 (100% 对齐图4客户端 rightPane) ─── */}
       <div style={{
         display: 'flex', flexDirection: 'column',
         background: 'var(--bg-2)', border: '1px solid var(--border)',
-        borderRadius: 'var(--radius)', padding: '14px',
+        borderRadius: 12, padding: 14,
         minWidth: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
           <div style={{
             width: 28, height: 28, borderRadius: 7,
-            background: 'var(--info-soft)', color: 'var(--info)',
+            background: 'color-mix(in oklab, var(--accent) 15%, transparent)', color: 'var(--accent)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>
             <Icon name="link" size={14} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-0)' }}>绑定租户</div>
-            <div style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>多选；留空为全局共享池</div>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>可多选；空 = 全局共享代理池</div>
           </div>
         </div>
 
-        {/* 当前绑定状态卡 */}
+        {/* 当前绑定状态卡 (100% 对齐图4客户端软绿底卡片) */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '8px 10px', borderRadius: 6,
-          background: form.tenantIds.length === 0 ? 'var(--bg-3)' : 'var(--accent-soft)',
-          border: '1px solid ' + (form.tenantIds.length === 0 ? 'var(--border)' : 'oklch(from var(--accent) l c h / 0.25)'),
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '10px 12px', borderRadius: 10,
+          background: 'color-mix(in oklab, var(--accent) 14%, transparent)',
           marginBottom: 10,
         }}>
           <Icon
             name={form.tenantIds.length === 0 ? "globe" : "users"}
-            size={13}
-            style={{ color: form.tenantIds.length === 0 ? 'var(--fg-3)' : 'var(--accent)', flexShrink: 0 }}
+            size={16}
+            style={{ color: 'var(--accent)', flexShrink: 0 }}
           />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 10, color: 'var(--fg-3)', fontWeight: 500 }}>当前归属</div>
+            <div style={{ fontSize: 10, color: 'var(--fg-3)', fontWeight: 500, marginBottom: 1 }}>当前绑定</div>
             <div style={{
-              fontSize: 11.5, fontWeight: 600,
-              color: form.tenantIds.length === 0 ? 'var(--fg-1)' : 'var(--accent)',
+              fontSize: 12, fontWeight: 600,
+              color: 'var(--fg-0)',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
-              {form.tenantIds.length === 0 ? '全局共享代理池' : `专属代理（已绑定 ${form.tenantIds.length} 租户）`}
+              {form.tenantIds.length === 0 ? '全局共享' : `已绑定 ${form.tenantIds.length} 个租户`}
             </div>
           </div>
-          {form.tenantIds.length > 0 && (
-            <button
-              type="button"
-              onClick={() => set('tenantIds', [])}
-              title="解除全部绑定设为全局共享"
-              style={{
-                background: 'transparent', border: 'none', cursor: 'pointer',
-                fontSize: 10, color: 'var(--fg-3)', textDecoration: 'underline',
-              }}
-            >
-              清空
-            </button>
-          )}
         </div>
 
-        {/* 搜索租户输入框 */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '5px 8px', borderRadius: 6,
-          background: 'var(--bg-1)', border: '1px solid var(--border)',
-          marginBottom: 8,
-        }}>
-          <Icon name="search" size={12} style={{ color: 'var(--fg-3)', flexShrink: 0 }} />
-          <input
+        {/* 搜索租户输入框 (占位符为纯字「搜索租户」) */}
+        <div style={{ marginBottom: 8 }}>
+          <TextInput
+            icon="search"
             value={tenantSearch}
-            onChange={e => setTenantSearch(e.target.value)}
-            placeholder="搜索租户名 / 区域..."
-            style={{
-              flex: 1, minWidth: 0, background: 'transparent',
-              border: 'none', outline: 'none',
-              fontSize: 11, color: 'var(--fg-0)',
-              fontFamily: 'inherit',
-            }}
+            onChange={setTenantSearch}
+            placeholder="搜索租户"
           />
-          {tenantSearch && (
-            <button
-              type="button"
-              onClick={() => setTenantSearch('')}
-              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--fg-3)', padding: 0 }}
-            >
-              <Icon name="x" size={11} />
-            </button>
-          )}
         </div>
 
-        {/* 快捷操作条 */}
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          fontSize: 10.5, color: 'var(--fg-3)', marginBottom: 6, padding: '0 2px',
-        }}>
-          <span>共 {filteredTenants.length} 个租户</span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <span
-              onClick={() => set('tenantIds', parentTenants.map(t => String(t.id)))}
-              style={{ cursor: 'pointer', color: 'var(--accent)' }}
-            >
-              全选
-            </span>
-            <span>·</span>
-            <span
-              onClick={() => set('tenantIds', [])}
-              style={{ cursor: 'pointer', color: 'var(--fg-3)' }}
-            >
-              重置
-            </span>
-          </div>
-        </div>
-
-        {/* 租户列表 */}
+        {/* 租户列表 (首项为全局共享，各项带中文区域名) */}
         <div style={{
           flex: 1,
           overflowY: 'auto',
           background: 'var(--bg-1)',
           border: '1px solid var(--border)',
-          borderRadius: 6,
+          borderRadius: 8,
           padding: '4px',
           display: 'flex', flexDirection: 'column', gap: 2,
-          minHeight: 180,
-          maxHeight: 250,
+          minHeight: 220,
+          maxHeight: 280,
         }}>
+          {/* 首项：全局共享 (fallback pool) */}
+          <div
+            onClick={() => set('tenantIds', [])}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '7px 8px', borderRadius: 6, cursor: 'pointer',
+              background: form.tenantIds.length === 0 ? 'color-mix(in oklab, var(--accent) 14%, transparent)' : 'transparent',
+              transition: 'all 80ms',
+            }}
+          >
+            <span style={{
+              width: 12, height: 12, borderRadius: '50%',
+              border: form.tenantIds.length === 0 ? 'none' : '1.5px solid var(--border-strong)',
+              background: form.tenantIds.length === 0 ? 'var(--accent)' : 'transparent',
+              flexShrink: 0,
+            }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg-0)' }}>全局共享</div>
+              <div style={{ fontSize: 10, color: 'var(--fg-3)' }}>fallback pool</div>
+            </div>
+          </div>
+
           {filteredTenants.length === 0 ? (
-            <div style={{ padding: 24, textAlign: 'center', color: 'var(--fg-3)', fontSize: 11 }}>
+            <div style={{ padding: 20, textAlign: 'center', color: 'var(--fg-3)', fontSize: 11 }}>
               无匹配租户
             </div>
           ) : (
             filteredTenants.map(t => {
               const checked = form.tenantIds.includes(String(t.id));
-              const label = t.name || t.tenancyName || t.defName || `租户 #${t.id}`;
+              const regionMeta = (window.REGION_MAP && window.REGION_MAP[t.region]?.cn) || t.region || `#${t.id}`;
               return (
-                <label
+                <div
                   key={t.id}
+                  onClick={() => toggleTenant(t.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '6px 8px', borderRadius: 4,
+                    padding: '7px 8px', borderRadius: 6,
                     cursor: 'pointer',
-                    background: checked ? 'oklch(from var(--accent) l c h / 0.08)' : 'transparent',
-                    border: '1px solid ' + (checked ? 'oklch(from var(--accent) l c h / 0.2)' : 'transparent'),
+                    background: checked ? 'color-mix(in oklab, var(--accent) 14%, transparent)' : 'transparent',
                     transition: 'all 80ms',
                   }}
                   onMouseEnter={e => { if (!checked) e.currentTarget.style.background = 'var(--bg-2)'; }}
                   onMouseLeave={e => { if (!checked) e.currentTarget.style.background = 'transparent'; }}
                 >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleTenant(t.id)}
-                    style={{ cursor: 'pointer', accentColor: 'var(--accent)' }}
-                  />
                   <span style={{
-                    flex: 1, minWidth: 0,
-                    fontSize: 11.5,
-                    fontWeight: checked ? 600 : 400,
-                    color: checked ? 'var(--accent)' : 'var(--fg-0)',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }} title={label}>
-                    {label}
+                    width: 12, height: 12, borderRadius: 3,
+                    border: checked ? 'none' : '1.5px solid var(--border-strong)',
+                    background: checked ? 'var(--accent)' : 'transparent',
+                    color: '#fff', fontSize: 8, fontWeight: 800,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0,
+                  }}>
+                    {checked && '✓'}
                   </span>
-                  {t.region && (
-                    <span className="mono" style={{
-                      fontSize: 9, color: 'var(--fg-3)', flexShrink: 0,
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: 12, fontWeight: checked ? 600 : 400,
+                      color: 'var(--fg-0)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
-                      {t.region}
-                    </span>
-                  )}
-                </label>
+                      {t.name || t.tenancyName}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--fg-3)', marginTop: 1 }}>
+                      {regionMeta}
+                    </div>
+                  </div>
+                </div>
               );
             })
           )}
@@ -5687,7 +5690,7 @@ function SysVpnProxyPage() {
     shell.openModal({
       title: isEdit ? '编辑代理配置' : '新增代理配置',
       icon: 'arrow-left-right',
-      iconColor: 'var(--cyan)',
+      iconColor: 'var(--accent)',
       width: 760,
       body: <ProxyFormBody existing={existing || null} parentTenants={parentTenants} bodyRef={bodyRef}
         onSave={({ success, error, message }) => {
@@ -5696,17 +5699,11 @@ function SysVpnProxyPage() {
         }} />,
       footer: (
         <>
-          <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('common.cancel') || '取消'}</Button>
-          <Button
-            variant="outline"
-            size="md"
-            icon="wifi"
-            onClick={() => bodyRef.current && bodyRef.current.test()}
-          >
-            {tr('proxy.testConn') || '测试连接'}
-          </Button>
           <div style={{ flex: 1 }} />
-          <Button variant="primary" size="md" icon="check" onClick={() => bodyRef.current && bodyRef.current.save()}>{tr('pageMisc.be5fbb') || '保存'}</Button>
+          <Button variant="ghost" size="md" onClick={shell.closeModal}>取消</Button>
+          <Button variant="primary" size="md" icon="download" onClick={() => bodyRef.current && bodyRef.current.save()}>
+            保存
+          </Button>
         </>
       ),
     });

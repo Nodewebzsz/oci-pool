@@ -735,6 +735,7 @@ function TextInput({
   disabled = false,
   readOnly = false,
   allowClear = true,
+  icon,
   ...rest
 }) {
   const [reveal, setReveal] = React.useState(false);
@@ -745,6 +746,7 @@ function TextInput({
   const padRight = isPass
     ? (allowClear ? '54px' : '32px')
     : (allowClear ? '30px' : '10px');
+  const padLeft = icon ? '30px' : '10px';
 
   return (
     <div style={{
@@ -755,6 +757,21 @@ function TextInput({
       maxWidth: style.maxWidth,
       display: style.display || (style.width && style.width !== '100%' ? 'inline-block' : 'block'),
     }}>
+      {icon && (
+        <Icon
+          name={icon}
+          size={13}
+          style={{
+            position: 'absolute',
+            left: 10,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            color: 'var(--fg-3)',
+            pointerEvents: 'none',
+            zIndex: 1,
+          }}
+        />
+      )}
       <input
         type={effType}
         value={value ?? ''}
@@ -766,7 +783,7 @@ function TextInput({
         readOnly={readOnly}
         style={{
           width: '100%',
-          padding: `7px ${padRight} 7px 10px`,
+          padding: `7px ${padRight} 7px ${padLeft}`,
           background: disabled || readOnly ? 'var(--bg-3)' : 'var(--bg-2)',
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius-sm)',

@@ -108,7 +108,8 @@ function useTenantProxyQuickModal() {
       const tenantDisplayName = tenant?.name || tenant?.tenancyName || tenant?.defName || `租户 #${tenantId}`;
       shell.openModal({
         title: `快速配置代理 · ${tenantDisplayName}`,
-        icon: 'shield', iconColor: 'var(--accent)', size: 'md',
+        icon: 'shield', iconColor: 'var(--accent)',
+        width: 540,
         body: (
           <div style={{ padding: '4px 2px', display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ fontSize: 12, color: 'var(--fg-3)', lineHeight: 1.5 }}>
