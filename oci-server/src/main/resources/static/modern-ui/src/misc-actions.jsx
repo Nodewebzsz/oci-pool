@@ -327,6 +327,15 @@ function normalizeNotification(raw, index = 0, tr = (k) => k) {
   };
 }
 
+function cleanNotifySnippet(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/^—+[^—\n]+—+/g, '') // 去除首行 ———— 装饰标题 ————
+    .replace(/[-=_~]{3,}/g, ' ')   // 去除连续破折号长横线
+    .replace(/\s+/g, ' ')          // 合并连续空格与换行
+    .trim();
+}
+
 function NotificationItems({ items, compact = false, onRead }) {
   const { t: tr } = useT();
   const styleFor = (lv) => {
@@ -342,7 +351,15 @@ function NotificationItems({ items, compact = false, onRead }) {
       <div style={{ width: 28, height: 28, borderRadius: 7, background: s.soft, color: s.c, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name={s.icon} size={14} /></div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 12.5, fontWeight: n.read ? 500 : 600, color: 'var(--fg-0)' }}>{n.title}</span><span className="mono" style={{ fontSize: 9.5, color: s.c }}>{n.source}</span><div style={{ flex: 1 }} /><span style={{ fontSize: 10.5, color: 'var(--fg-3)', whiteSpace: 'nowrap' }}>{n.time}</span></div>
-        <div style={{ fontSize: 11.5, color: 'var(--fg-2)', marginTop: 3, lineHeight: 1.6 }}>{n.desc || '—'}</div>
+        <div style={{
+          fontSize: 11.5, color: 'var(--fg-2)', marginTop: 3, lineHeight: 1.5,
+          overflow: 'hidden',
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical',
+          wordBreak: 'break-word',
+          overflowWrap: 'anywhere',
+        }}>{cleanNotifySnippet(n.desc) || '—'}</div>
       </div>
     </div>;
   })}</div>;
@@ -883,6 +900,7 @@ function NotifyHistoryBody({ shell }) {
       <div style={{
         maxHeight: 'calc(100vh - 420px)', minHeight: 240,
         overflowY: 'auto',
+        overflowX: 'hidden',
         background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 8,
       }}>
         {filtered.length === 0 ? (
@@ -901,7 +919,7 @@ function NotifyHistoryBody({ shell }) {
                 });
               }}
               style={{
-                padding: '12px 16px',
+                padding: '10px 14px',
                 borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : 'none',
                 display: 'flex', gap: 12, alignItems: 'flex-start',
                 cursor: 'pointer',
@@ -914,7 +932,7 @@ function NotifyHistoryBody({ shell }) {
             >
               {!n.read && (
                 <span style={{
-                  position: 'absolute', left: 0, top: 12, bottom: 12, width: 2,
+                  position: 'absolute', left: 0, top: 10, bottom: 10, width: 2,
                   background: 'var(--info)', borderRadius: 999,
                 }} />
               )}
@@ -926,29 +944,42 @@ function NotifyHistoryBody({ shell }) {
               }}>
                 <Icon name={s.icon} size={14} />
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
                   <span style={{
                     fontSize: 12.5,
                     fontWeight: n.read ? 500 : 600,
                     color: 'var(--fg-0)',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   }}>{n.title}</span>
                   <span className="mono" style={{
                     fontSize: 9.5, color: s.c,
                     padding: '1px 5px', borderRadius: 3,
                     background: s.soft,
                     textTransform: 'uppercase', letterSpacing: 0.4,
+                    flexShrink: 0,
                   }}>{n.source}</span>
                   {!n.read && (
                     <span style={{
                       width: 6, height: 6, borderRadius: '50%',
                       background: 'var(--info)',
+                      flexShrink: 0,
                     }} />
                   )}
                   <div style={{ flex: 1 }} />
                   <span style={{ fontSize: 10.5, color: 'var(--fg-3)', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>{n.time}</span>
                 </div>
-                <div style={{ fontSize: 11.5, color: 'var(--fg-2)', lineHeight: 1.6 }}>{n.desc}</div>
+                <div style={{
+                  fontSize: 11.5, color: 'var(--fg-2)', lineHeight: 1.5,
+                  overflow: 'hidden',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  wordBreak: 'break-word',
+                  overflowWrap: 'anywhere',
+                }}>
+                  {cleanNotifySnippet(n.desc)}
+                </div>
               </div>
             </div>
           );
@@ -967,7 +998,7 @@ function useNotifyHistoryModal() {
       subtitle: tr('notify.historySub'),
       icon: 'bell',
       iconColor: 'var(--orange)',
-      size: 'xl',
+      size: 'lg',
       body: <NotifyHistoryBody shell={shell} />,
       footer: (
         <>
@@ -982,52 +1013,174 @@ function useNotifyHistoryModal() {
   }, [shell]);
 }
 
-// ─── 消息详情查看弹窗（保持当前主题暗色卡片风格） ─────────────────────────
+// ─── 消息详情查看弹窗（结构化美观公告排版 · 保持当前主题规范） ─────────────
+function FormattedMessageContent({ rawText }) {
+  if (!rawText) return <div style={{ color: 'var(--fg-3)', fontSize: 12 }}>（无具体正文）</div>;
+
+  const lines = String(rawText).split('\n');
+  const cleanedLines = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    // 忽略与顶部标题重复的装饰行（如 ———— 发现新版本 ————）
+    if (/^—+\s*.*[新版|通知|提醒].*\s*—+$/.test(trimmed)) continue;
+    // 忽略裸露的连续破折号横线
+    if (/^[-=_~]{3,}$/.test(trimmed)) continue;
+    cleanedLines.push(lines[i]);
+  }
+
+  const elements = [];
+  let currentGroup = [];
+
+  cleanedLines.forEach((rawLine, idx) => {
+    const line = rawLine.trim();
+    if (!line) {
+      if (currentGroup.length > 0) {
+        elements.push({ type: 'p', lines: [...currentGroup], key: `p-${idx}` });
+        currentGroup = [];
+      }
+      return;
+    }
+
+    // 识别更新条目（- 开头）
+    if (line.startsWith('- ') || line.startsWith('• ') || line.startsWith('* ')) {
+      if (currentGroup.length > 0) {
+        elements.push({ type: 'p', lines: [...currentGroup], key: `p-${idx}` });
+        currentGroup = [];
+      }
+      elements.push({ type: 'li', text: line.replace(/^[-•*]\s*/, ''), key: `li-${idx}` });
+      return;
+    }
+
+    // 识别小节标题（如 "版本信息:"、"更新内容:"、"变更:"、"注意事项:"）
+    if (/^(版本信息|更新内容|变更|功能优化|修复问题|Bug修复|注意事项|系统信息)[:：]?$/.test(line)) {
+      if (currentGroup.length > 0) {
+        elements.push({ type: 'p', lines: [...currentGroup], key: `p-${idx}` });
+        currentGroup = [];
+      }
+      elements.push({ type: 'header', text: line, key: `h-${idx}` });
+      return;
+    }
+
+    // 识别 Key-Value（如 "发布版本: 【1.1.3】" 或 "发布时间: ..."）
+    if (/^(发布版本|发布时间|用户|机器名|公网IP|区域|状态)[:：]/.test(line)) {
+      if (currentGroup.length > 0) {
+        elements.push({ type: 'p', lines: [...currentGroup], key: `p-${idx}` });
+        currentGroup = [];
+      }
+      elements.push({ type: 'kv', text: line, key: `kv-${idx}` });
+      return;
+    }
+
+    currentGroup.push(rawLine);
+  });
+
+  if (currentGroup.length > 0) {
+    elements.push({ type: 'p', lines: [...currentGroup], key: 'p-end' });
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {elements.map((el) => {
+        if (el.type === 'header') {
+          return (
+            <div key={el.key} style={{
+              fontSize: 12, fontWeight: 700, color: 'var(--fg-0)',
+              marginTop: 6, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <span style={{ width: 3, height: 11, background: 'var(--accent)', borderRadius: 2 }} />
+              <span>{el.text}</span>
+            </div>
+          );
+        }
+        if (el.type === 'kv') {
+          return (
+            <div key={el.key} style={{
+              fontSize: 11.5, color: 'var(--fg-1)',
+              background: 'var(--bg-3)', padding: '3px 8px', borderRadius: 4,
+              fontFamily: 'var(--font-mono)', display: 'inline-flex', alignItems: 'center',
+              alignSelf: 'flex-start', margin: '2px 0', border: '1px solid var(--border)',
+            }}>
+              {el.text}
+            </div>
+          );
+        }
+        if (el.type === 'li') {
+          return (
+            <div key={el.key} style={{
+              display: 'flex', alignItems: 'flex-start', gap: 6,
+              fontSize: 11.5, color: 'var(--fg-1)', lineHeight: 1.6, paddingLeft: 2,
+            }}>
+              <span style={{ color: 'var(--accent)', fontWeight: 700, lineHeight: 1.3 }}>•</span>
+              <span style={{ flex: 1, wordBreak: 'break-word' }}>{el.text}</span>
+            </div>
+          );
+        }
+        return (
+          <div key={el.key} style={{
+            fontSize: 11.5, color: 'var(--fg-1)', lineHeight: 1.65,
+            whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          }}>
+            {el.lines.join('\n')}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function MessageDetailBody({ item, loading, error }) {
   if (loading) {
     return (
-      <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--fg-3)', fontSize: 13 }}>
-        <Icon name="loader-2" size={20} className="spin" style={{ display: 'block', margin: '0 auto 10px', opacity: 0.6 }} />
+      <div style={{ padding: '36px 20px', textAlign: 'center', color: 'var(--fg-3)', fontSize: 12 }}>
+        <Icon name="loader-2" size={18} className="spin" style={{ display: 'block', margin: '0 auto 8px', opacity: 0.6 }} />
         <span>加载消息详情…</span>
       </div>
     );
   }
   if (error) {
     return (
-      <div style={{ padding: '30px 20px', textAlign: 'center', color: 'var(--danger)', fontSize: 13 }}>
+      <div style={{ padding: '24px 20px', textAlign: 'center', color: 'var(--danger)', fontSize: 12 }}>
         {error}
       </div>
     );
   }
 
   const rawContent = item?.content || item?.desc || '';
-  const firstLineIndex = rawContent.indexOf('\n');
-  let firstLine = '';
-  let otherContent = rawContent;
 
-  if (firstLineIndex !== -1) {
-    firstLine = rawContent.substring(0, firstLineIndex).trim();
-    otherContent = rawContent.substring(firstLineIndex + 1).trim();
-  }
+  // 提取版本号（若存在）
+  const verMatch = rawContent.match(/发布版本[:：]\s*【?([a-zA-Z0-9._-]+)】?/);
+  const versionTag = verMatch ? verMatch[1] : null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
-      {/* 顶部元信息条：时间 + 消息类型胶囊 */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
+      {/* 顶部紧凑元信息条：时间 + 消息来源 + 版本号徽章 */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '8px 12px', background: 'var(--bg-2)', borderRadius: 'var(--radius-sm)',
-        border: '1px solid var(--border)', fontSize: 11.5, color: 'var(--fg-3)',
+        padding: '6px 10px', background: 'var(--bg-2)', borderRadius: 'var(--radius-sm)',
+        border: '1px solid var(--border)', fontSize: 11, color: 'var(--fg-3)',
       }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <Icon name="clock" size={12} />
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          <Icon name="clock" size={11} />
           <span className="mono">{item?.createTime || item?.time || '—'}</span>
         </div>
-        <div style={{
-          padding: '2px 8px', borderRadius: 4,
-          background: 'var(--bg-3)', color: 'var(--fg-1)',
-          fontSize: 10.5, fontWeight: 600, fontFamily: 'var(--font-mono)',
-        }}>
-          {item?.messageType || item?.source || 'SYSTEM'}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          {versionTag && (
+            <span style={{
+              padding: '1px 6px', borderRadius: 3,
+              background: 'var(--accent-soft)', color: 'var(--accent)',
+              fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)',
+            }}>
+              {versionTag.startsWith('v') ? versionTag : `v${versionTag}`}
+            </span>
+          )}
+          <span style={{
+            padding: '1px 6px', borderRadius: 3,
+            background: 'var(--bg-3)', color: 'var(--fg-2)',
+            fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)',
+          }}>
+            {item?.messageType || item?.source || 'SYSTEM'}
+          </span>
         </div>
       </div>
 
@@ -1036,33 +1189,11 @@ function MessageDetailBody({ item, loading, error }) {
         background: 'var(--bg-2)',
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius)',
-        padding: '16px 18px',
-        maxHeight: '50vh',
+        padding: '12px 14px',
+        maxHeight: '48vh',
         overflowY: 'auto',
       }}>
-        {firstLine && (
-          <div style={{
-            textAlign: 'center',
-            fontSize: 14, fontWeight: 700,
-            color: 'var(--fg-0)',
-            marginBottom: 14,
-            paddingBottom: 12,
-            borderBottom: '1px dashed var(--border-strong)',
-            lineHeight: 1.5,
-          }}>
-            {firstLine}
-          </div>
-        )}
-        <div style={{
-          fontSize: 12,
-          lineHeight: 1.8,
-          color: 'var(--fg-1)',
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'break-all',
-          fontFamily: 'var(--font-mono), system-ui, sans-serif',
-        }}>
-          {otherContent || '（无具体正文）'}
-        </div>
+        <FormattedMessageContent rawText={rawContent} />
       </div>
     </div>
   );
