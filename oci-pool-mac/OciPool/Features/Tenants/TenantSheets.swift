@@ -62,6 +62,8 @@ struct TenantSheetHost: View {
                 mysqlSheet(t)
             case .proxyQuick(let t):
                 proxyQuickSheet(t)
+            case .restrictedApi(let t):
+                restrictedApiSheet(t)
             }
         }
         .onDisappear {
@@ -3616,6 +3618,506 @@ struct TenantSheetHost: View {
             p.isEnabled ? "通畅" : "不通",
             p.tenantLabel
         ].joined(separator: " · ")
+    }
+
+    // MARK: - 一键切换为受限 API (复刻 Web 端与 IMG_0749.JPG)
+
+    private func restrictedApiSheet(_ t: TenantItem) -> some View {
+        let realName = t.tenancyName.isEmpty ? t.userName : t.tenancyName
+        let titleDisplay = (!t.customAlias.isEmpty && t.customAlias != realName)
+            ? "\(realName) (\(t.customAlias))"
+            : realName
+        let regCn = RegionCnName.table[t.region] ?? (t.region.isEmpty ? "—" : t.region)
+        let isHome = t.isHomeRegion
+        let isCompleted = model.restrictedCurrentStep == 8
+        let isExecuting = model.restrictedPhase == .executing && !isCompleted && model.restrictedErrorMsg.isEmpty
+        let surface = AppSheetSurface.surface(dark)
+        let surface2 = AppSheetSurface.surface2(dark)
+
+        return chrome(
+            title: "切换为受限 API",
+            systemImage: "shield.checkerboard",
+            iconColor: AppTheme.sidebarActive,
+            width: 580,
+            height: 600,
+            scrollableContent: true,
+            footer: {
+                HStack(spacing: 10) {
+                    Spacer()
+                    if model.restrictedPhase == .backup {
+                        AppButton(title: "取消", kind: .secondary) {
+                            presentationMode.wrappedValue.dismiss()
+                        }
+                        AppButton(
+                            title: "开始切换为受限 API",
+                            systemImage: "shield.checkerboard",
+                            kind: .primary,
+                            enabled: model.restrictedConfirmedBackup
+                        ) {
+                            model.startRestrictedApiSwitch(t)
+                        }
+                    } else if isExecuting {
+                        AppButton(
+                            title: "正在切换受限 API...",
+                            kind: .primary,
+                            isLoading: true,
+                            enabled: false
+                        ) {}
+                    } else {
+                        AppButton(title: "关闭", kind: .primary) {
+                            presentationMode.wrappedValue.dismiss()
+                        }
+                    }
+                }
+            }
+        ) {
+            VStack(alignment: .leading, spacing: 14) {
+                // 1. 顶部租户元数据栏 (真实租户名/别名 + 区域 + 主区域标签 + Default 域)
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "shield.checkerboard")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(AppTheme.sidebarActive)
+                            Text(titleDisplay)
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(primaryText)
+                        }
+
+                        HStack(spacing: 6) {
+                            Text(regCn)
+                                .font(.system(size: 11.5))
+                                .foregroundColor(mutedText)
+                            if !t.region.isEmpty {
+                                Text("· \(t.region)")
+                                    .font(.system(size: 11.5, design: .monospaced))
+                                    .foregroundColor(mutedText.opacity(0.85))
+                            }
+                            if isHome {
+                                Text("主区域")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(AppTheme.sidebarActive)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 1)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 3)
+                                            .fill(AppTheme.sidebarActive.opacity(0.14))
+                                    )
+                            }
+                        }
+                        .padding(.leading, 23)
+                    }
+
+                    Spacer()
+
+                    Text("Default")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(mutedText)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 3)
+                        .background(
+                            RoundedRectangle(cornerRadius: 999)
+                                .fill(surface2)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 999)
+                                .stroke(border, lineWidth: 1)
+                        )
+                }
+
+                // 2. 状态徽章条
+                HStack(spacing: 8) {
+                    if isCompleted {
+                        Text("新 API 已启用")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(AppTheme.sidebarActive)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(
+                                RoundedRectangle(cornerRadius: 999)
+                                    .fill(AppTheme.sidebarActive.opacity(0.15))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 999)
+                                    .stroke(AppTheme.sidebarActive, lineWidth: 1)
+                            )
+                    }
+                    Text("不撤销 OCI 云端原 Key")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(mutedText)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 999)
+                                .fill(surface2)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 999)
+                                .stroke(border, lineWidth: 1)
+                        )
+                }
+
+                // 3. 阶段 1: 前置安全备份阶段
+                if model.restrictedPhase == .backup {
+                    VStack(alignment: .leading, spacing: 14) {
+                        // 权限收敛说明
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("权限收敛说明")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(primaryText)
+                            Text("系统将在 Oracle 云端自动创建受限组、策略与用户。新 API 仅拥有：实例管理、存储卷管理、虚拟网络管理与用户只读查看权限。云端原全权 API 保持完好不撤销。")
+                                .font(.system(size: 11.5))
+                                .foregroundColor(mutedText)
+                                .lineSpacing(3)
+                        }
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(surface2)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(border, lineWidth: 1)
+                        )
+
+                        // 强制备份卡片
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.down.circle.fill")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(AppTheme.sidebarActive)
+                                Text("强制前置备份：请妥善导出原管理员凭据")
+                                    .font(.system(size: 12.5, weight: .bold))
+                                    .foregroundColor(primaryText)
+                            }
+
+                            if model.restrictedLoadingBackup {
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                    Text("正在加载原凭据信息...")
+                                        .font(.system(size: 11.5))
+                                        .foregroundColor(mutedText)
+                                }
+                                .padding(.vertical, 8)
+                            } else {
+                                // 结构化凭据微卡片
+                                VStack(spacing: 8) {
+                                    // User OCID
+                                    HStack(spacing: 8) {
+                                        Text("用户 OCID")
+                                            .font(.system(size: 11.5, weight: .medium))
+                                            .foregroundColor(mutedText)
+                                            .frame(width: 68, alignment: .leading)
+                                        Text(model.restrictedBackupData?.userOcid ?? "-")
+                                            .font(.system(size: 11.5, design: .monospaced))
+                                            .foregroundColor(primaryText)
+                                            .lineLimit(1)
+                                            .truncationMode(.middle)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                        if let ocid = model.restrictedBackupData?.userOcid, !ocid.isEmpty {
+                                            Button(action: { model.copyText(ocid, toast: "用户 OCID 已复制") }) {
+                                                Image(systemName: "doc.on.doc")
+                                                    .font(.system(size: 11.5))
+                                                    .foregroundColor(mutedText)
+                                            }
+                                            .buttonStyle(PlainButtonStyle())
+                                        }
+                                    }
+
+                                    // Fingerprint
+                                    HStack(spacing: 8) {
+                                        Text("密钥指纹")
+                                            .font(.system(size: 11.5, weight: .medium))
+                                            .foregroundColor(mutedText)
+                                            .frame(width: 68, alignment: .leading)
+                                        Text(model.restrictedBackupData?.fingerprint ?? "-")
+                                            .font(.system(size: 11.5, design: .monospaced))
+                                            .foregroundColor(primaryText)
+                                            .lineLimit(1)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                        if let fp = model.restrictedBackupData?.fingerprint, !fp.isEmpty {
+                                            Button(action: { model.copyText(fp, toast: "密钥指纹已复制") }) {
+                                                Image(systemName: "doc.on.doc")
+                                                    .font(.system(size: 11.5))
+                                                    .foregroundColor(mutedText)
+                                            }
+                                            .buttonStyle(PlainButtonStyle())
+                                        }
+                                    }
+                                }
+                                .padding(10)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(surface2)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(border, lineWidth: 1)
+                                )
+
+                                // 下载与复制按钮
+                                HStack(spacing: 8) {
+                                    AppButton(
+                                        title: model.restrictedBackupDownloaded ? "私钥已下载 (.pem)" : "下载原私钥 (.pem)",
+                                        systemImage: model.restrictedBackupDownloaded ? "checkmark.circle.fill" : "arrow.down.doc",
+                                        kind: .secondary
+                                    ) {
+                                        model.downloadRestrictedPem()
+                                    }
+
+                                    AppButton(
+                                        title: model.restrictedConfigDownloaded ? "配置已下载 (config)" : "下载 OCI 配置 (config)",
+                                        systemImage: model.restrictedConfigDownloaded ? "checkmark.circle.fill" : "doc.text",
+                                        kind: .secondary
+                                    ) {
+                                        model.downloadRestrictedConfig()
+                                    }
+
+                                    AppButton(
+                                        title: model.restrictedConfigCopied ? "已复制" : "复制配置",
+                                        systemImage: model.restrictedConfigCopied ? "checkmark" : "doc.on.doc",
+                                        kind: .secondary
+                                    ) {
+                                        model.copyRestrictedConfig()
+                                    }
+                                }
+
+                                Divider()
+                                    .padding(.vertical, 2)
+
+                                // 确认复选框
+                                Button(action: { model.restrictedConfirmedBackup.toggle() }) {
+                                    HStack(alignment: .top, spacing: 8) {
+                                        Image(systemName: model.restrictedConfirmedBackup ? "checkmark.square.fill" : "square")
+                                            .font(.system(size: 14))
+                                            .foregroundColor(model.restrictedConfirmedBackup ? AppTheme.sidebarActive : mutedText)
+                                        Text("我已在本地妥善保存原私钥与 config 配置文件，确认开始执行切换")
+                                            .font(.system(size: 11.5))
+                                            .foregroundColor(primaryText)
+                                            .multilineTextAlignment(.leading)
+                                    }
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                        }
+                        .padding(14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(surface)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(border, lineWidth: 1)
+                        )
+                    }
+                }
+
+                // 4. 阶段 2: 执行中 / 已完成 (8 步时间线)
+                if model.restrictedPhase == .executing {
+                    VStack(alignment: .leading, spacing: 14) {
+                        // 成功横幅
+                        if isCompleted {
+                            HStack(alignment: .top, spacing: 10) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 15))
+                                    .foregroundColor(AppTheme.sidebarActive)
+                                    .padding(.top, 2)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("已完成 OCI-POOL 内的 API 替换，并清除本任务保存的临时密钥副本。OCI 云端原 API Key 保留，本次不会删除或撤销。")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(primaryText)
+                                    Text("已删除 OCI-POOL 密钥目录内不再使用的旧私钥文件。")
+                                        .font(.system(size: 11.5))
+                                        .foregroundColor(mutedText)
+                                }
+                            }
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(surface)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(border, lineWidth: 1)
+                            )
+                        }
+
+                        // 错误横幅
+                        if !model.restrictedErrorMsg.isEmpty {
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(AppTheme.orange)
+                                Text(model.restrictedErrorMsg)
+                                    .font(.system(size: 12))
+                                    .foregroundColor(AppTheme.orange)
+                            }
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(AppTheme.orange.opacity(0.12))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(AppTheme.orange.opacity(0.3), lineWidth: 1)
+                            )
+                        }
+
+                        // 8 步时间线
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(Array(model.restrictedSteps.enumerated()), id: \.element.id) { index, st in
+                                restrictedStepRow(
+                                    step: st.id,
+                                    title: st.title,
+                                    status: st.status,
+                                    time: st.time,
+                                    progressText: st.progressText,
+                                    isLast: index == model.restrictedSteps.count - 1
+                                )
+                            }
+                        }
+                        .padding(.vertical, 6)
+
+                        // 查看任务信息折叠面板
+                        VStack(alignment: .leading, spacing: 8) {
+                            Button(action: { model.restrictedDetailsOpen.toggle() }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: model.restrictedDetailsOpen ? "chevron.down" : "chevron.right")
+                                        .font(.system(size: 11))
+                                    Text("查看本次任务信息")
+                                        .font(.system(size: 12, weight: .medium))
+                                }
+                                .foregroundColor(mutedText)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+
+                            if model.restrictedDetailsOpen {
+                                VStack(spacing: 6) {
+                                    taskMetaRow(label: "专用组", value: model.restrictedTaskSummary?.groupName ?? "-")
+                                    taskMetaRow(label: "组 OCID", value: model.restrictedTaskSummary?.groupId ?? "-")
+                                    taskMetaRow(label: "权限策略", value: model.restrictedTaskSummary?.policyName ?? "-")
+                                    taskMetaRow(label: "策略 OCID", value: model.restrictedTaskSummary?.policyId ?? "-")
+                                    taskMetaRow(label: "受限用户", value: model.restrictedTaskSummary?.userName ?? "-")
+                                    taskMetaRow(label: "用户 OCID", value: model.restrictedTaskSummary?.userId ?? "-")
+                                    taskMetaRow(label: "密钥指纹", value: model.restrictedTaskSummary?.fingerprint ?? "-")
+                                }
+                                .padding(12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(surface2)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(border, lineWidth: 1)
+                                )
+                            }
+                        }
+                        .padding(.top, 6)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func restrictedStepRow(step: Int, title: String, status: RestrictedStepStatus, time: String, progressText: String, isLast: Bool) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            // 左侧指示器 + 竖虚线
+            VStack(spacing: 0) {
+                ZStack {
+                    Circle()
+                        .strokeBorder(
+                            status == .completed ? AppTheme.sidebarActive :
+                            status == .error ? AppTheme.orange :
+                            status == .running ? AppTheme.orange : border,
+                            lineWidth: 1.5
+                        )
+                        .background(
+                            Circle().fill(
+                                status == .completed ? AppTheme.sidebarActive.opacity(0.15) :
+                                status == .running ? AppTheme.orange.opacity(0.12) :
+                                Color.clear
+                            )
+                        )
+                        .frame(width: 22, height: 22)
+
+                    if status == .completed {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(AppTheme.sidebarActive)
+                    } else if status == .running {
+                        ProgressView()
+                            .scaleEffect(0.6)
+                    } else if status == .error {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(AppTheme.orange)
+                    } else {
+                        Text("\(step)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(mutedText)
+                    }
+                }
+
+                if !isLast {
+                    Rectangle()
+                        .fill(status == .completed ? AppTheme.sidebarActive.opacity(0.5) : border)
+                        .frame(width: 1, height: 22)
+                }
+            }
+
+            // 右侧文本
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 13, weight: status == .completed || status == .running ? .semibold : .regular))
+                    .foregroundColor(status == .completed ? primaryText : status == .running ? AppTheme.sidebarActive : mutedText)
+                if status == .completed && !time.isEmpty {
+                    Text("已完成 · \(time)")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(mutedText)
+                }
+                if status == .running {
+                    Text(progressText.isEmpty ? "执行中..." : progressText)
+                        .font(.system(size: 11))
+                        .foregroundColor(AppTheme.sidebarActive)
+                }
+                if status == .error {
+                    Text(progressText.isEmpty ? "执行失败" : progressText)
+                        .font(.system(size: 11))
+                        .foregroundColor(AppTheme.orange)
+                }
+            }
+            .padding(.bottom, isLast ? 0 : 12)
+
+            Spacer()
+        }
+    }
+
+    private func taskMetaRow(label: String, value: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(label)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(mutedText)
+                .frame(width: 65, alignment: .leading)
+            Text(value)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(primaryText)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if value != "-" {
+                Button(action: { model.copyText(value, toast: "\(label) 已复制") }) {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 10))
+                        .foregroundColor(mutedText)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
     }
 }
 

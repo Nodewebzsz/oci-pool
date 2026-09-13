@@ -1090,6 +1090,8 @@ enum TenantSheet: Identifiable, Equatable {
     case mysql(TenantItem)
     /// 租户护盾：快速绑定代理
     case proxyQuick(TenantItem)
+    /// 一键切换为受限 API
+    case restrictedApi(TenantItem)
 
     var id: String {
         switch self {
@@ -1101,23 +1103,70 @@ enum TenantSheet: Identifiable, Equatable {
         case .traffic(let t): return "traffic-\(t.id)"
         case .email(let t): return "email-\(t.id)"
         case .social(let t): return "social-\(t.id)"
-        case .bootVolumes(let t): return "vol-\(t.id)"
-        case .accountCheck: return "check"
+        case .bootVolumes(let t): return "boot-volumes-\(t.id)"
+        case .accountCheck: return "account-check"
         case .exportAll: return "export-all"
         case .exportOne(let t): return "export-\(t.id)"
-        case .importJSON: return "import"
-        case .updateProgress(let id, _): return "upd-\(id)"
+        case .importJSON: return "import-json"
+        case .updateProgress(let id, _): return "update-\(id)"
         case .syncProgress(let id, _): return "sync-\(id)"
-        case .bootCreate(let t): return "boot-\(t.id)"
-        case .regionSub(let t): return "regs-\(t.id)"
-        case .trafficQuery(let t): return "tq-\(t.id)"
-        case .aiChat(let t): return "ai-\(t.id)"
+        case .bootCreate(let t): return "boot-create-\(t.id)"
+        case .regionSub(let t): return "region-sub-\(t.id)"
+        case .trafficQuery(let t): return "traffic-query-\(t.id)"
+        case .aiChat(let t): return "ai-chat-\(t.id)"
         case .passwordResult: return "pwd-result"
         case .securityRules(let t): return "rules-\(t.id)"
         case .mysql(let t): return "mysql-\(t.id)"
         case .proxyQuick(let t): return "proxy-\(t.id)"
+        case .restrictedApi(let t): return "restricted-\(t.id)"
         }
     }
+}
+
+// ─── Restricted API Models ──────────────────────────────────────
+
+enum RestrictedApiPhase: Equatable {
+    case backup
+    case executing
+}
+
+enum RestrictedStepStatus: Equatable {
+    case pending
+    case running
+    case completed
+    case error
+}
+
+struct RestrictedApiStep: Identifiable, Equatable {
+    let id: Int
+    let title: String
+    var status: RestrictedStepStatus = .pending
+    var time: String = ""
+    var progressText: String = ""
+}
+
+struct RestrictedApiBackupData: Codable, Equatable {
+    var tenantId: Int64?
+    var userName: String?
+    var userOcid: String?
+    var tenancyOcid: String?
+    var fingerprint: String?
+    var region: String?
+    var fileName: String?
+    var keyContent: String?
+    var configSnippet: String?
+}
+
+struct RestrictedApiTaskSummary: Codable, Equatable {
+    var domainName: String?
+    var groupName: String?
+    var groupId: String?
+    var policyName: String?
+    var policyId: String?
+    var userName: String?
+    var userId: String?
+    var fingerprint: String?
+    var time: String?
 }
 
 // MARK: - Subpage models

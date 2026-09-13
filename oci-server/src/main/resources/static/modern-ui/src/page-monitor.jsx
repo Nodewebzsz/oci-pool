@@ -74,7 +74,7 @@ function MonitorPage({ density }) {
   const timeLabels = ['24h', '18h', '12h', '6h', '3h', 'now'];
 
   return (
-    <div className="monitor-page">
+    <div className="monitor-page" style={{ paddingBottom: 16 }}>
       <div className="monitor-header">
         <PageHeader
           title={tr('monitor.title')}

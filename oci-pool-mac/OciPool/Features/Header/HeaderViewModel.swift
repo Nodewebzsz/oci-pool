@@ -203,7 +203,29 @@ final class HeaderViewModel: ObservableObject {
     }
 
     func checkVersion() async {
-        let current = Self.appMarketingVersion
+        let fallbackCurrent = Self.appMarketingVersion
+        // 1. 优先调用内嵌/连接后端的 /api/version/check (与 Web 端 100% 对齐，具备服务端缓存，不消耗 GitHub 限流)
+        if let url = try? APIClient.shared.makeURL(session.serverURL, path: "/api/version/check") {
+            if let data = try? await APIClient.shared.getJSON(url),
+               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                let cur = (obj["currentVersion"] as? String) ?? ""
+                let lat = (obj["latestVersion"] as? String) ?? ""
+                let need = (obj["needUpdate"] as? Bool) ?? false
+                if !cur.isEmpty || !lat.isEmpty {
+                    version = VersionCheckInfo(
+                        needUpdate: need,
+                        latestVersion: lat,
+                        currentVersion: cur.isEmpty ? fallbackCurrent : cur,
+                        dmgURL: "https://github.com/Nodewebzsz/oci-pool/releases",
+                        dmgFileName: "OciPool.dmg"
+                    )
+                    return
+                }
+            }
+        }
+
+        // 2. 服务端未就绪时，回退调用 GitHub Release API
+        let current = version.currentVersion.isEmpty ? fallbackCurrent : version.currentVersion
         do {
             guard let release = try await fetchLatestMacDMGRelease() else {
                 version = VersionCheckInfo(

@@ -59,6 +59,7 @@ final class MainShellViewController: NSViewController {
             .environmentObject(navigation)
             .environmentObject(session)
             .environmentObject(appearance)
+            .environmentObject(header)
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         sidebarHost = NSHostingController(rootView: AnyView(sidebarRoot))
 

@@ -662,7 +662,7 @@ private struct AboutSheet: View {
     @State private var copied = false
     @State private var zoomImage: NSImage?
 
-    private let trc20 = "TMHTdWVm6ThvhihWqM1ViSDKMMsGcCBHtT"
+    private let trc20 = "0x9d724717a27975521974b5eafd244c07f36fcf78"
     private let githubURL = "https://github.com/Nodewebzsz/oci-pool"
     private let telegramURL = "https://t.me/+M7XhteVCMMU5ZDhh"
     private let releasesURL = "https://github.com/Nodewebzsz/oci-pool/releases"
@@ -901,8 +901,9 @@ private struct AboutSheet: View {
             }
 
             HStack(spacing: 16) {
+                let ts = "\(Int(Date().timeIntervalSince1970))"
                 donateCard(
-                    path: "/images/weixin.JPG",
+                    path: "/images/weixin.JPG?t=\(ts)",
                     title: "微信支付",
                     titleIcon: "message.fill",
                     titleColor: Color(hex: "07C160"),
@@ -910,7 +911,7 @@ private struct AboutSheet: View {
                     showCopy: false
                 )
                 donateCard(
-                    path: "/images/binance_qr.jpg",
+                    path: "/images/binance_qr.jpg?t=\(ts)",
                     title: "币安/USDT",
                     titleIcon: "dollarsign.circle.fill",
                     titleColor: Color(hex: "F3BA2F"),
@@ -967,7 +968,7 @@ private struct AboutSheet: View {
                         HStack(spacing: 5) {
                             Image(systemName: copied ? "checkmark" : "doc.on.doc")
                                 .font(.system(size: 10, weight: .semibold))
-                            Text(copied ? "已复制" : "TRC20 复制地址")
+                            Text(copied ? "已复制" : "BSC 复制地址")
                                 .font(.system(size: 11, weight: .medium))
                         }
                         .foregroundColor(copied ? AppTheme.sidebarActive : textSecondary)
@@ -1052,10 +1053,23 @@ private struct AboutRemoteQR: View {
             return
         }
         loading = true
-        DispatchQueue.global(qos: .userInitiated).async {
-            let img = NSImage(contentsOf: url)
-            DispatchQueue.main.async {
-                self.image = img
+        Task {
+            var req = URLRequest(url: url)
+            req.cachePolicy = .reloadIgnoringLocalCacheData
+            req.timeoutInterval = 10
+            do {
+                let (data, resp) = try await URLSession.shared.compatData(for: req)
+                if let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode), let img = NSImage(data: data) {
+                    await MainActor.run {
+                        self.image = img
+                        self.loading = false
+                    }
+                    return
+                }
+            } catch {
+                // fall through
+            }
+            await MainActor.run {
                 self.loading = false
             }
         }

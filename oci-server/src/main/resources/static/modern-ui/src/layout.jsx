@@ -408,7 +408,368 @@ function UserAvatar({ userName, size = 26 }) {
   );
 }
 
+// ─── 关于与版本信息弹窗组件 (100% 对齐客户端图 1 与原版规范) ───────────
+function AboutVersionPanel() {
+  const { t: tr } = useT();
+  const shell = useShell();
+  const [info, setInfo] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [zoomImg, setZoomImg] = React.useState(null);
+  const [copiedUsdt, setCopiedUsdt] = React.useState(false);
+  const qrTimestamp = React.useMemo(() => Date.now(), []);
+
+  React.useEffect(() => {
+    let alive = true;
+    window.ociApi.request('/api/version/check')
+      .then((d) => { if (alive) setInfo(d); })
+      .catch((e) => { if (alive) console.warn('version check failed', e); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, []);
+
+  const fmt = (v) => (v && !/^v/i.test(v) ? `v${v}` : (v || tr('layout.7042f5')));
+  const cur = fmt(info && info.currentVersion);
+  const latest = fmt(info && info.latestVersion);
+  const needUpdate = !!(info && info.needUpdate);
+
+  const BSC_USDT_ADDR = '0x9d724717a27975521974b5eafd244c07f36fcf78';
+  const copyUsdt = (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(BSC_USDT_ADDR).then(() => {
+      setCopiedUsdt(true);
+      shell.showToast('BSC 充值收款地址已复制到剪贴板', { kind: 'success' });
+      setTimeout(() => setCopiedUsdt(false), 2000);
+    });
+  };
+
+  return (
+    <div style={{ padding: '24px 28px 24px' }}>
+      {/* 1. 顶部品牌与版本状态左右并排 (100% 对齐客户端图 1) */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, marginBottom: 20 }}>
+        {/* 左侧品牌 Hero */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{
+            width: 60,
+            height: 60,
+            borderRadius: 16,
+            background: 'linear-gradient(135deg, #e0f2fe, #bae6fd)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#0ea5e9',
+            boxShadow: '0 4px 14px rgba(14, 165, 233, 0.25)',
+            flexShrink: 0
+          }}>
+            <Icon name="send" size={26} color="#0ea5e9" strokeWidth={2.2} />
+          </div>
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--fg-0)', letterSpacing: -0.3, lineHeight: 1.2 }}>
+              OCI-POOL
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--fg-3)', marginTop: 4 }}>
+              Created by nodewebzsz
+            </div>
+          </div>
+        </div>
+
+        {/* 右侧版本对比卡 + 升级按钮 */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            background: 'var(--bg-2)',
+            border: '1px solid var(--border)',
+            borderRadius: 12,
+            padding: '10px 18px'
+          }}>
+            {/* 当前版本 */}
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--fg-3)', textTransform: 'uppercase', marginBottom: 2 }}>
+                当前版本
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="mono" style={{ fontSize: 15, fontWeight: 800, color: 'var(--fg-0)' }}>
+                  {loading ? '...' : cur}
+                </span>
+                {!loading && (
+                  needUpdate ? (
+                    <span style={{
+                      fontSize: 9.5,
+                      fontWeight: 700,
+                      color: '#b45309',
+                      background: '#fef3c7',
+                      borderRadius: 4,
+                      padding: '1px 5px',
+                      lineHeight: '14px'
+                    }}>
+                      可更新
+                    </span>
+                  ) : (
+                    <span style={{
+                      fontSize: 9.5,
+                      fontWeight: 700,
+                      color: '#15803d',
+                      background: '#dcfce7',
+                      borderRadius: 4,
+                      padding: '1px 5px',
+                      lineHeight: '14px'
+                    }}>
+                      最新
+                    </span>
+                  )
+                )}
+              </div>
+            </div>
+
+            {/* 竖向分割线 */}
+            <div style={{ width: 1, height: 32, background: 'var(--border)', margin: '0 16px' }} />
+
+            {/* 最新版本 */}
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--fg-3)', textTransform: 'uppercase', marginBottom: 2 }}>
+                最新版本
+              </div>
+              <div className="mono" style={{ fontSize: 15, fontWeight: 800, color: needUpdate ? '#dc2626' : 'var(--fg-0)' }}>
+                {loading ? '...' : latest}
+              </div>
+            </div>
+          </div>
+
+          {/* 发现新版本时的升级按钮 (对齐客户端红色大按钮) */}
+          {!loading && needUpdate && (
+            <a
+              href={info?.downloadUrl || 'https://github.com/Nodewebzsz/oci-pool/releases'}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 14px',
+                borderRadius: 8,
+                background: '#dc2626',
+                color: '#ffffff',
+                fontSize: 12,
+                fontWeight: 600,
+                textDecoration: 'none',
+                boxShadow: '0 2px 8px rgba(220, 38, 38, 0.3)',
+                transition: 'opacity 150ms'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+            >
+              <Icon name="arrow-down-circle" size={13} color="#ffffff" />
+              <span>升级指引与发布页</span>
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* 2. 官方通道三列按钮 (100% 对齐客户端图 1) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+        {[
+          { href: 'https://github.com/Nodewebzsz/oci-pool', label: '开源仓库', icon: 'code' },
+          { href: 'https://t.me/+M7XhteVCMMU5ZDhh', label: 'Telegram', icon: 'send' },
+          { href: 'https://github.com/Nodewebzsz/oci-pool/releases', label: '更新日志', icon: 'file-text' },
+        ].map((item) => (
+          <a
+            key={item.label}
+            href={item.href}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              padding: '11px 0',
+              borderRadius: 8,
+              background: 'var(--bg-2)',
+              border: '1px solid var(--border)',
+              color: 'var(--fg-1)',
+              fontSize: 12,
+              fontWeight: 500,
+              textDecoration: 'none',
+              transition: 'all 150ms'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = 'var(--accent)';
+              e.currentTarget.style.background = 'var(--bg-3)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'var(--border)';
+              e.currentTarget.style.background = 'var(--bg-2)';
+            }}
+          >
+            <Icon name={item.icon} size={14} color="var(--fg-2)" />
+            <span>{item.label}</span>
+          </a>
+        ))}
+      </div>
+
+      {/* 3. 请作者喝杯咖啡 (100% 对齐客户端图 1 与原版模板) */}
+      <div style={{
+        background: 'var(--bg-2)',
+        border: '1px solid var(--border)',
+        borderRadius: 12,
+        padding: '16px 20px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13.5, fontWeight: 700, color: 'var(--fg-0)' }}>
+            <span>请作者喝杯咖啡</span>
+            <span style={{ color: '#f43f5e' }}>❤️</span>
+          </div>
+          <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+            点击二维码可放大预览
+          </span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+          {/* 微信支付卡片 */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            padding: 12,
+            background: 'var(--bg-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 10
+          }}>
+            <img
+              src={`/images/weixin.JPG?t=${qrTimestamp}`}
+              alt="微信支付"
+              onClick={() => setZoomImg(`/images/weixin.JPG?t=${qrTimestamp}`)}
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: 8,
+                objectFit: 'cover',
+                cursor: 'zoom-in',
+                border: '1px solid var(--border)'
+              }}
+              title="点击放大预览"
+            />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: 'var(--fg-0)' }}>
+                <span style={{ color: '#07C160', display: 'inline-flex' }}>
+                  <Icon name="message-circle" size={15} color="#07C160" />
+                </span>
+                <span>微信支付</span>
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--fg-3)', marginTop: 6 }}>
+                扫码赞赏支持
+              </div>
+            </div>
+          </div>
+
+          {/* 币安/USDT 卡片 */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            padding: 12,
+            background: 'var(--bg-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 10
+          }}>
+            <img
+              src={`/images/binance_qr.jpg?t=${qrTimestamp}`}
+              alt="币安打赏"
+              onClick={() => setZoomImg(`/images/binance_qr.jpg?t=${qrTimestamp}`)}
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: 8,
+                objectFit: 'cover',
+                cursor: 'zoom-in',
+                border: '1px solid var(--border)'
+              }}
+              title="点击放大预览"
+            />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: 'var(--fg-0)' }}>
+                <span style={{ color: '#F3BA2F', display: 'inline-flex' }}>
+                  <Icon name="dollar-sign" size={15} color="#F3BA2F" />
+                </span>
+                <span>币安/USDT</span>
+              </div>
+              <div
+                onClick={copyUsdt}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  marginTop: 6,
+                  padding: '3px 8px',
+                  borderRadius: 6,
+                  background: 'var(--bg-2)',
+                  border: '1px solid var(--border)',
+                  fontSize: 11,
+                  color: copiedUsdt ? 'var(--accent)' : 'var(--fg-2)',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  transition: 'all 120ms'
+                }}
+                title="点击复制 BSC 收款地址: 0x9d724717a27975521974b5eafd244c07f36fcf78"
+              >
+                <Icon name={copiedUsdt ? "check" : "copy"} size={11} color={copiedUsdt ? "var(--accent)" : "var(--fg-3)"} />
+                <span>{copiedUsdt ? '已复制' : 'BSC 复制地址'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. 二维码放大灯箱 (Lightbox) */}
+      {zoomImg && (
+        <div
+          onClick={() => setZoomImg(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            cursor: 'zoom-out'
+          }}
+        >
+          <img
+            src={zoomImg}
+            alt="放大预览"
+            style={{
+              maxWidth: '85vw',
+              maxHeight: '80vh',
+              borderRadius: 12,
+              boxShadow: '0 20px 50px rgba(0,0,0,0.6)'
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function openAboutModal(shell, tr) {
+  shell.openModal({
+    title: tr('layout.81d9f5') || '关于',
+    subtitle: 'OCI-POOL',
+    icon: 'info',
+    iconColor: 'var(--accent)',
+    width: 680,
+    body: <AboutVersionPanel />,
+    footer: (
+      <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+        <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('layout.b15d91') || '关闭'}</Button>
+      </div>
+    ),
+  });
+}
+
 function Sidebar({ activePage, onNavigate, collapsed = false, tabletOverlay = false, onNavigateComplete }) {
+  const shell = useShell();
   const { t: tr } = useT();
   const NAV = buildNav(tr);
 
@@ -437,11 +798,27 @@ function Sidebar({ activePage, onNavigate, collapsed = false, tabletOverlay = fa
     });
   }, [activeSectionId]);
 
-  // 侧边栏底部展示后端真实运行版本(原先误写死为上游 v2.14.0)
-  const [appVersion, setAppVersion] = React.useState('');
+  // 侧边栏底部展示后端真实运行版本（支持本地缓存秒出 + 异步静默校准 + 更新微徽章）
+  const [versionInfo, setVersionInfo] = React.useState(null);
+  const [appVersion, setAppVersion] = React.useState(() => {
+    try {
+      return localStorage.getItem('oci_cached_app_version') || '';
+    } catch (_) {
+      return '';
+    }
+  });
+
   React.useEffect(() => {
     window.ociApi.request('/api/version/check').then((info) => {
-      if (info && info.currentVersion) setAppVersion(info.currentVersion);
+      if (info) {
+        setVersionInfo(info);
+        if (info.currentVersion) {
+          setAppVersion(info.currentVersion);
+          try {
+            localStorage.setItem('oci_cached_app_version', info.currentVersion);
+          } catch (_) {}
+        }
+      }
     }).catch(() => {});
   }, []);
 
@@ -617,20 +994,104 @@ function Sidebar({ activePage, onNavigate, collapsed = false, tabletOverlay = fa
       </nav>
 
       {/* Status footer */}
-      {!collapsed &&
-      <div style={{
-        padding: '10px 14px',
-        borderTop: '1px solid var(--border)',
-        fontSize: 11,
-        color: 'var(--fg-3)'
-      }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      {!collapsed && (
+        <div style={{
+          padding: '10px 14px',
+          borderTop: '1px solid var(--border)',
+          fontSize: 11,
+          color: 'var(--fg-3)',
+          boxSizing: 'border-box',
+          minHeight: 54,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 16 }}>
             <StatusDot status="running" size={6} pulse />
-            <span style={{ color: 'var(--fg-1)' }}>{tr('tw.sidebar.running')}</span>
+            <span style={{ color: 'var(--fg-1)', lineHeight: '16px' }}>{tr('tw.sidebar.running')}</span>
           </div>
-          <div style={{ fontSize: 10, color: 'var(--fg-3)', fontFamily: 'var(--font-mono)', marginTop: 3 }}>{appVersion ? `v${appVersion.replace(/^[vV]-?/, '')}` : ''}</div>
+
+          <div
+            style={{
+              height: 16,
+              minHeight: 16,
+              lineHeight: '16px',
+              fontSize: 10,
+              fontFamily: 'var(--font-mono)',
+              marginTop: 4,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              visibility: appVersion ? 'visible' : 'hidden'
+            }}
+          >
+            <span
+              onClick={() => openAboutModal(shell, tr)}
+              style={{
+                color: 'var(--fg-3)',
+                cursor: 'pointer',
+                transition: 'color 150ms'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--fg-1)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--fg-3)'; }}
+              title={tr('layout.81d9f5')}
+            >
+              {appVersion ? `v${appVersion.replace(/^[vV]-?/, '')}` : '\u00A0'}
+            </span>
+
+            {versionInfo && versionInfo.needUpdate && (
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openAboutModal(shell, tr);
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  fontSize: 9.5,
+                  fontWeight: 600,
+                  color: '#d97706',
+                  background: 'rgba(217, 119, 6, 0.12)',
+                  border: '1px solid rgba(217, 119, 6, 0.28)',
+                  borderRadius: 4,
+                  padding: '0 5px',
+                  height: 16,
+                  boxSizing: 'border-box',
+                  cursor: 'pointer',
+                  lineHeight: '14px',
+                  userSelect: 'none',
+                  transition: 'all 150ms'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(217, 119, 6, 0.22)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(217, 119, 6, 0.12)';
+                }}
+                title={
+                  versionInfo.latestVersion
+                    ? `${tr('layout.7042f6')} v${versionInfo.latestVersion.replace(/^[vV]-?/, '')} · 点击查看更新详情`
+                    : `${tr('layout.7042f6')} · 点击查看更新详情`
+                }
+              >
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: 4,
+                    height: 4,
+                    borderRadius: '50%',
+                    background: '#d97706'
+                  }}
+                />
+                <span>↑ 新版{versionInfo.latestVersion ? ` v${versionInfo.latestVersion.replace(/^[vV]-?/, '')}` : ''}</span>
+              </span>
+            )}
+          </div>
         </div>
-      }
+      )}
     </aside>);
 
 }
@@ -1109,51 +1570,8 @@ function NotificationsButton() {
 
 
 // ─── 账号菜单 popover(topbar 内嵌 · 锚定头像下方) ─────────────
-// ─── 账号菜单 popover(topbar 内嵌 · 锚定头像下方) ─────────────
 // 菜单项对齐原项目(common/header.ftl):资产分析+等级徽章 / 切换云厂商 / 关于 / 退出登录
 // 保留现代暗色卡片风格。
-// “关于”弹框内容：先打开弹框，版本信息异步自加载（避免等待版本检查阻塞弹框）。
-function AboutVersionPanel() {
-  const { t: tr } = useT();
-  const [info, setInfo] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
-  React.useEffect(() => {
-    let alive = true;
-    window.ociApi.request('/api/version/check')
-      .then((d) => { if (alive) setInfo(d); })
-      .catch((e) => { if (alive) console.warn('version check failed', e); })
-      .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
-  }, []);
-  const fmt = (v) => (v && !/^v/i.test(v) ? `v${v}` : (v || tr('layout.7042f5')));
-  const cur = fmt(info && info.currentVersion);
-  const latest = fmt(info && info.latestVersion);
-  const needUpdate = !!(info && info.needUpdate);
-  return (
-    <div style={{ padding: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <div style={{ width: 48, height: 48, borderRadius: 12, background: 'linear-gradient(135deg, var(--accent), var(--cyan))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'oklch(0.14 0.02 155)', fontWeight: 800, fontSize: 18 }}>OCI</div>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--fg-0)' }}>OCI-POOL Manager</div>
-          <div style={{ fontSize: 11.5, color: 'var(--fg-3)', marginTop: 2 }}>{tr('layout.8183de')}</div>
-        </div>
-      </div>
-      <div style={{ marginTop: 16, fontSize: 12, color: 'var(--fg-1)' }}>{tr('layout.9b601b')} <span className="mono" style={{ color: 'var(--accent)', fontWeight: 600 }}>{loading ? tr('pageMisc.84561c') : cur}</span></div>
-      {!loading && needUpdate && (
-        <div style={{ marginTop: 8, fontSize: 12, color: 'var(--warn, #d97706)' }}>{tr('layout.7042f6')} → {latest}</div>
-      )}
-      <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {[
-          { href: 'https://github.com/Nodewebzsz/oci-pool', label: tr('layout.072ab5') },
-          { href: 'https://t.me/+M7XhteVCMMU5ZDhh', label: 'Telegram' },
-          { href: 'https://github.com/Nodewebzsz/oci-pool/releases', label: tr('layout.23093b') },
-        ].map((l) => (
-          <a key={l.label} href={l.href} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: 'var(--accent)', textDecoration: 'none', padding: '6px 12px', borderRadius: 6, background: 'var(--bg-2)', border: '1px solid var(--border)' }}>{l.label}</a>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function UserMenuButton() {
   const shell = useShell();
@@ -1288,15 +1706,7 @@ function UserMenuButton() {
 
   const handleAbout = () => {
     setOpen(false);
-    shell.openModal({
-      title: tr('layout.81d9f5'),
-      icon: 'info',
-      size: 'md',
-      body: <AboutVersionPanel />,
-      footer: (
-        <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('layout.b15d91')}</Button>
-      ),
-    });
+    openAboutModal(shell, tr);
   };
 
   const handleLogout = () => {

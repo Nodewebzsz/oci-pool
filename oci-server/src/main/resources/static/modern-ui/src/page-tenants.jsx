@@ -206,6 +206,7 @@ function TenantsPage({ density }) {
   const socialConfig     = useSocialConfigModal();
   const updateAccount    = useUpdateAccountModal();
   const exportTenant     = useExportTenantModal();
+  const switchRestrictedApi = useRestrictedApiModal();
 
   const filtered = tenants;
   const paged = tenants;
@@ -282,6 +283,7 @@ function TenantsPage({ density }) {
         return;
       case 'region-subscribe': return regionSubscribe(tenant);
       case 'user-manage':      return userManage(tenant);
+      case 'switch-restricted-api': return switchRestrictedApi(tenant, loadTenants);
       case 'traffic-alert':    return trafficAlert(tenant);
       case 'traffic-query':
         // 跳转到独立的实例流量监控大盘页面（对齐客户端整页模式）
@@ -651,6 +653,7 @@ function TenantActionMenu({ tenant, anchorEl, onClose, onAction }) {
     { id: 'add-boot',         label: tr('tenants.menu.addBoot'), icon: 'plus'        },
     { id: 'tenant-detail',    label: tr('tenants.menu.detail'), icon: 'info'        },
     { id: 'user-manage',      label: tr('tenants.menu.userManage'), icon: 'users'       },
+    { id: 'switch-restricted-api', label: tr('tenants.menu.switchRestrictedApi') || '切换为受限 API', icon: 'shield-check', color: 'var(--accent)' },
     { id: 'traffic-query',    label: tr('tenants.menu.trafficQuery'), icon: 'bar-chart-3' },
     { id: 'cost',             label: tr('tenants.menu.cost'), icon: 'info'        },
     { id: 'mail',             label: tr('tenants.menu.mail'), icon: 'mail'        },

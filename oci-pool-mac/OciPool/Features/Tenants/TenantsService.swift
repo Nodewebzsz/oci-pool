@@ -676,6 +676,25 @@ struct TenantsService {
         }
     }
 
+    /// 获取原 API 私钥与标准配置（用于前置离线备份）
+    func getRestrictedApiBackupKey(tenantId: Int64) async throws -> RestrictedApiBackupData {
+        let url = try client.makeURL(baseURL, path: "/tenants/restricted-api/backup-key", query: ["tenantId": "\(tenantId)"])
+        let data = try await client.getJSON(url)
+        struct Envelope: Decodable {
+            let success: Bool?
+            let code: Int?
+            let msg: String?
+            let message: String?
+            let data: RestrictedApiBackupData?
+        }
+        let env = try JSONDecoder().decode(Envelope.self, from: data)
+        if env.success == true, let d = env.data {
+            return d
+        }
+        let msg = env.msg ?? env.message ?? "获取备份凭证失败"
+        throw APIError.serverMessage(msg)
+    }
+
     // MARK: - SSE helpers (update / account check) — macOS 11 safe (no URLSession.bytes)
 
     /// Consume SSE until complete/error. `onEvent` may be called off-main.

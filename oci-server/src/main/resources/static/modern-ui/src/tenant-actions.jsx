@@ -6678,50 +6678,57 @@ function useUpdateAccountModal() {
   // ═══════════════════════════════════════════════════════════════════════
   const shell = useShell();
   return React.useCallback((tenant) => {
-    // 先弹二次确认(对齐原项目的 Swal 确认)
+    const src = (tenant && tenant._ui) ? tenant : (window.ociTenantRow ? window.ociTenantRow.normalize(tenant, window.REGIONS) : (tenant || {}));
+    const realTenancyName = src.tenancyName || (window.getTenantName ? window.getTenantName(src) : '') || tenant.userName || '租户';
+    const regCode = (window.getTenantRegion ? window.getTenantRegion(src) : '') || tenant.region || '';
+    const regObj = window.REGION_MAP?.[regCode];
+    const regCn = regObj ? (regObj.simpleName || regObj.cn || regObj.name) : regCode;
+
+    // 先弹二次确认 (统一使用真实租户名，去除接口路径与协议)
     shell.openConfirm({
-      title: tr('tenant.993f1b').replace('{0}',getTenantName(tenant)),
-      body: <div>{tr('tenant.72e05f')} <span className="mono">/tenants/updateTenant</span> {tr('tenant.9e334c')}</div>,
-      confirmLabel: tr('tenant.6f80db'),
+      title: `更新租户 ${realTenancyName}?`,
+      body: <div>将从 Oracle Cloud 实时同步该租户最新的区域、配额、密码策略及账单等元数据，可能耗时 5-10 秒。</div>,
+      confirmLabel: tr('tenant.6f80db') || '开始更新',
       onConfirm: () => runUpdate(tenant),
     });
 
     function runUpdate(tenant) {
-      // 真实 SSE:/tenants/updateTenant?tenantId=xxx · progress/success/error 事件流
       let es = null;
       const state = {
-        lines: ['[System] connecting to /tenants/updateTenant ...'],
+        lines: ['正在连接 Oracle Cloud 服务...'],
         running: true,
+        hasError: false,
+        errorDetail: '',
         startedAt: Date.now(),
       };
       const scrollRef = { el: null };
 
       const render = () => {
         shell.openModal({
-          title: tr('tenant.da428c').replace('{0}',getTenantName(tenant)),
-          subtitle: <span>SSE stream · <span className="mono" style={{ color: 'var(--fg-3)' }}>/tenants/updateTenant?tenantId={getTenantDbId(tenant)}</span></span>,
+          title: `${realTenancyName} · 账号更新`,
+          subtitle: <span>{regCn || 'Oracle Cloud'}{regCode ? ` · ${regCode}` : ''} · 实时同步元数据</span>,
           icon: 'refresh-cw',
-          iconColor: 'var(--accent)',
+          iconColor: state.hasError ? 'var(--danger)' : 'var(--accent)',
           size: 'lg',
           dismissable: !state.running,
           body: (
             <div style={{ padding: 20 }}>
-              {/* 状态条 */}
+              {/* 状态条: 严格区分 running / error / success */}
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '8px 12px', marginBottom: 12,
-                background: state.running ? 'var(--info-soft)' : 'var(--accent-soft)',
-                border: '1px solid ' + (state.running ? 'var(--info)' : 'var(--accent)'),
+                background: state.running ? 'var(--info-soft)' : state.hasError ? 'var(--danger-soft)' : 'var(--accent-soft)',
+                border: '1px solid ' + (state.running ? 'var(--info)' : state.hasError ? 'var(--danger)' : 'var(--accent)'),
                 borderRadius: 6,
               }}>
-                <Icon name={state.running ? 'loader' : 'check-circle'} size={14}
-                  style={{ color: state.running ? 'var(--info)' : 'var(--accent)' }} />
-                <span style={{ fontSize: 12, fontWeight: 600, color: state.running ? 'var(--info)' : 'var(--accent)' }}>
-                  {state.running ? 'streaming ...' : 'connection closed · success'}
+                <Icon name={state.running ? 'loader' : state.hasError ? 'alert-triangle' : 'check-circle'} size={14}
+                  style={{ color: state.running ? 'var(--info)' : state.hasError ? 'var(--danger)' : 'var(--accent)' }} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: state.running ? 'var(--info)' : state.hasError ? 'var(--danger)' : 'var(--accent)' }}>
+                  {state.running ? '正在同步元数据中...' : state.hasError ? `更新终止 · ${state.errorDetail || '检测到异常'}` : '更新完成 · 成功'}
                 </span>
                 <span style={{ flex: 1 }} />
                 <span className="num mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-                  {((Date.now() - state.startedAt) / 1000).toFixed(1)}s · {state.lines.length} lines
+                  {((Date.now() - state.startedAt) / 1000).toFixed(1)}s · {state.lines.length} 行
                 </span>
               </div>
 
@@ -6746,11 +6753,11 @@ function useUpdateAccountModal() {
               >
                 {state.lines.map((line, i) => {
                   let color = '#c9d1d9';
-                  if (line.startsWith('[System]')) color = '#7ee787';
+                  if (line.startsWith('[System]') || line.startsWith('正在连接')) color = '#7ee787';
                   else if (line.startsWith('→')) color = '#79c0ff';
                   else if (line.trim().startsWith('✓')) color = '#7ee787';
                   else if (line.trim().startsWith('·')) color = '#8b949e';
-                  else if (line.trim().startsWith('✗')) color = '#ff7b72';
+                  else if (line.trim().startsWith('✗') || line.includes('[error]')) color = '#ff7b72';
                   return (
                     <div key={i} style={{ color }}>
                       {i === state.lines.length - 1 && state.running && line ? (
@@ -6772,17 +6779,17 @@ function useUpdateAccountModal() {
           ),
           footer: state.running ? (
             <Button variant="ghost" size="md"
-              onClick={() => { if (es) es.close(); state.running = false; state.lines.push('[System] aborted by user'); render(); shell.showToast(tr('tenant.c12968'), { kind: 'warn' }); }}
-            >{tr('tenant.625fb2')}</Button>
+              onClick={() => { if (es) es.close(); state.running = false; state.lines.push('[System] 用户手动中止更新'); render(); shell.showToast(tr('tenant.c12968') || '已中止', { kind: 'warn' }); }}
+            >{tr('tenant.625fb2') || '中止'}</Button>
           ) : (
             <>
-              <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('tenant.b15d91')}</Button>
+              <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('tenant.b15d91') || '关闭'}</Button>
               <Button variant="outline" size="md" icon="clipboard"
                 onClick={() => {
                   navigator.clipboard.writeText(state.lines.join('\n'));
-                  shell.showToast(tr('tenant.6a523f'), { kind: 'success' });
+                  shell.showToast(tr('tenant.6a523f') || '日志已复制', { kind: 'success' });
                 }}
-              >{tr('tenant.3615f7')}</Button>
+              >{tr('tenant.3615f7') || '复制日志'}</Button>
             </>
           ),
         });
@@ -6795,19 +6802,22 @@ function useUpdateAccountModal() {
           render();
         });
         es.addEventListener('success', () => {
-          state.lines.push('[System] event: success · SSE connection closed');
+          state.lines.push('✓ 元数据同步完成');
           state.running = false;
+          state.hasError = false;
           try { es.close(); } catch (e) {}
           render();
-          shell.showToast(tr('tenant.3996cc').replace('{0}',getTenantName(tenant)), { kind: 'success' });
+          shell.showToast(tr('tenant.3996cc').replace('{0}', realTenancyName), { kind: 'success' });
+          window.dispatchEvent(new CustomEvent('ocip-refresh-page', { detail: 'tenants' }));
         });
         es.addEventListener('error', (e) => {
-          state.lines.push(e.data ? '[error] ' + e.data : '[System] event: error · SSE failed');
+          state.hasError = true;
+          state.errorDetail = e.data || '连接异常中断';
+          state.lines.push(e.data ? '[error] ' + e.data : '✗ 连接异常或服务未响应');
           state.running = false;
           try { es.close(); } catch (err) {}
           render();
-          // 后端前置健康探测失败(账号封禁/网络故障)会通过 error 事件推送真实原因
-          shell.showToast(e.data || tr('tenant.930442'), { kind: 'error' });
+          shell.showToast(e.data || '账号更新终止', { kind: 'error' });
           window.dispatchEvent(new CustomEvent('ocip-refresh-page', { detail: 'tenants' }));
         });
         es.onerror = () => {
@@ -7324,12 +7334,686 @@ function useExportTenantModal() {
     render();
   }, [shell]);
 }
+
+// ─── 垂直时间线步进节点组件 (复刻 IMG_0749.JPG) ─────────────────────────────
+function RestrictedTimelineStep({ step, title, status, time, progressText, isLast }) {
+  const isDone = status === 'completed';
+  const isRunning = status === 'running';
+  const isError = status === 'error';
+
+  return (
+    <div style={{ display: 'flex', gap: 14, position: 'relative' }}>
+      {/* 节点图标与竖向虚线 */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+        <div style={{
+          width: 22, height: 22, borderRadius: '50%',
+          border: isDone ? '1.5px solid var(--accent)' : isError ? '1.5px solid var(--danger)' : isRunning ? '1.5px solid var(--info)' : '1px solid var(--border)',
+          background: isDone ? 'var(--accent-soft)' : isRunning ? 'var(--info-soft)' : 'transparent',
+          color: isDone ? 'var(--accent)' : isError ? 'var(--danger)' : isRunning ? 'var(--info)' : 'var(--fg-3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 10.5, fontWeight: 700,
+          transition: 'all 200ms'
+        }}>
+          {isDone ? <Icon name="check" size={12} strokeWidth={2.5} /> :
+           isRunning ? <Icon name="loader-2" size={12} className="spin" /> :
+           isError ? <Icon name="x" size={12} strokeWidth={2.5} /> : step}
+        </div>
+        {!isLast && (
+          <div style={{
+            flex: 1, width: 1, minHeight: 22,
+            borderLeft: '1px dashed ' + (isDone ? 'var(--accent)' : 'var(--border)'),
+            margin: '3px 0',
+            opacity: isDone ? 0.6 : 0.4
+          }} />
+        )}
+      </div>
+
+      {/* 步骤文本与时间 */}
+      <div style={{ paddingBottom: isLast ? 0 : 14, flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontSize: 13,
+          fontWeight: isDone || isRunning ? 600 : 500,
+          color: isDone ? 'var(--fg-0)' : isRunning ? 'var(--info)' : isError ? 'var(--danger)' : 'var(--fg-3)'
+        }}>
+          {title}
+        </div>
+        {isDone && time && (
+          <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>
+            已完成 · {time}
+          </div>
+        )}
+        {isRunning && (
+          <div style={{ fontSize: 11, color: 'var(--info)', marginTop: 2 }}>
+            {progressText || '执行中...'}
+          </div>
+        )}
+        {isError && (
+          <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 2 }}>
+            {progressText || '执行失败'}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── 一键切换为受限 API Modal (复刻 IMG_0749.JPG) ─────────────────────────
+function useRestrictedApiModal() {
+  const shell = useShell();
+
+  return React.useCallback((tenant, onReload) => {
+    const tenantDbId = window.getTenantDbId ? window.getTenantDbId(tenant) : (tenant.id || tenant.tenantDbId);
+    const src = (tenant && tenant._ui) ? tenant : (window.ociTenantRow ? window.ociTenantRow.normalize(tenant, window.REGIONS) : (tenant || {}));
+    const realTenancyName = src.tenancyName || (window.getTenantName ? window.getTenantName(src) : '') || tenant.userName || '租户';
+    const customAlias = window.getTenantAlias ? window.getTenantAlias(src) : '';
+    const titleDisplay = (customAlias && customAlias !== realTenancyName)
+      ? `${realTenancyName} (${customAlias})`
+      : realTenancyName;
+    const regCode = (window.getTenantRegion ? window.getTenantRegion(src) : '') || tenant.region || '';
+    const regObj = window.REGION_MAP?.[regCode];
+    const regCn = regObj ? (regObj.simpleName || regObj.cn || regObj.name) : regCode;
+    const isHome = src.isHomeRegion || src.parenId === 0 || src.parenId === '0' || tenant.parenId === 0;
+
+    let sseSource = null;
+
+    const state = {
+      phase: 'backup', // 'backup' | 'executing'
+      loadingBackup: true,
+      backupData: null,
+      backupDownloaded: false,
+      configDownloaded: false,
+      configCopied: false,
+      confirmedBackup: false,
+
+      // 8 步执行进度
+      currentStep: 0,
+      steps: [
+        { id: 1, title: '创建专用组', status: 'pending', time: '', progressText: '' },
+        { id: 2, title: '创建权限策略', status: 'pending', time: '', progressText: '' },
+        { id: 3, title: '创建受限用户并加入组', status: 'pending', time: '', progressText: '' },
+        { id: 4, title: '生成新 Key 并上传公钥', status: 'pending', time: '', progressText: '' },
+        { id: 5, title: '等待新 Key 和权限生效', status: 'pending', time: '', progressText: '' },
+        { id: 6, title: '切换系统的 API 配置', status: 'pending', time: '', progressText: '' },
+        { id: 7, title: '复验新配置', status: 'pending', time: '', progressText: '' },
+        { id: 8, title: '清理项目内旧凭据并完成', status: 'pending', time: '', progressText: '' },
+      ],
+
+      // 任务信息折叠面板
+      detailsOpen: false,
+      taskSummary: null,
+      errorMsg: '',
+    };
+
+    // 1. 加载备份信息
+    const loadBackup = async () => {
+      state.loadingBackup = true;
+      render();
+      try {
+        const res = await window.ociApi.request(`/tenants/restricted-api/backup-key?tenantId=${encodeURIComponent(tenantDbId)}`);
+        if (res && res.success && res.data) {
+          state.backupData = res.data;
+        }
+      } catch (err) {
+        console.warn('加载备份密钥失败:', err);
+      } finally {
+        state.loadingBackup = false;
+        render();
+      }
+    };
+
+    // 下载私钥 .pem 文件
+    const downloadPem = () => {
+      if (!state.backupData || !state.backupData.keyContent) return;
+      const blob = new Blob([state.backupData.keyContent], { type: 'application/x-pem-file' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = state.backupData.fileName || `${realTenancyName}_private_key.pem`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      state.backupDownloaded = true;
+      render();
+      shell.showToast('原私钥文件已下载 (.pem)', { kind: 'success' });
+    };
+
+    // 下载 OCI config 配置文件
+    const downloadConfig = () => {
+      if (!state.backupData || !state.backupData.configSnippet) return;
+      const blob = new Blob([state.backupData.configSnippet], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${realTenancyName}.config`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      state.configDownloaded = true;
+      render();
+      shell.showToast('OCI 配置文件已下载', { kind: 'success' });
+    };
+
+    // 复制 Config 片段
+    const copyConfig = () => {
+      if (!state.backupData || !state.backupData.configSnippet) return;
+      navigator.clipboard.writeText(state.backupData.configSnippet).then(() => {
+        state.configCopied = true;
+        render();
+        shell.showToast('OCI Config 已复制到剪贴板', { kind: 'success' });
+      });
+    };
+
+    // 2. 开始执行 8 步切换流程 (SSE)
+    const startSwitch = () => {
+      state.phase = 'executing';
+      state.currentStep = 1;
+      state.steps[0].status = 'running';
+      state.steps[0].progressText = '正在创建云端专用组...';
+      render();
+
+      sseSource = new EventSource(`/tenants/restricted-api/switch-stream?tenantId=${encodeURIComponent(tenantDbId)}`);
+
+      sseSource.addEventListener('step', (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type === 'step_progress') {
+            const idx = payload.step - 1;
+            if (state.steps[idx]) {
+              state.steps[idx].status = 'running';
+              state.steps[idx].progressText = payload.detail || '';
+              render();
+            }
+          } else if (payload.type === 'step_done') {
+            const stepNum = payload.step;
+            const idx = stepNum - 1;
+            if (state.steps[idx]) {
+              state.steps[idx].status = 'completed';
+              state.steps[idx].time = payload.time || '';
+              state.steps[idx].progressText = '';
+            }
+            state.currentStep = stepNum;
+            // 激活下一步为 running
+            if (stepNum < 8 && state.steps[stepNum]) {
+              state.steps[stepNum].status = 'running';
+              state.steps[stepNum].progressText = '正在执行...';
+            }
+            if (stepNum === 8) {
+              state.taskSummary = payload;
+              if (onReload) onReload();
+            }
+            render();
+          }
+        } catch (e) {
+          console.error('解析 SSE 步骤数据失败', e);
+        }
+      });
+
+      sseSource.addEventListener('error', (event) => {
+        try {
+          const payload = JSON.parse(event.data || '{}');
+          state.errorMsg = payload.message || '切换过程中遇到异常，请检查网络或代理';
+        } catch (_) {
+          state.errorMsg = '连接已中断，请检查服务状态';
+        }
+        const curIdx = Math.max(0, state.currentStep - 1);
+        if (state.steps[curIdx]) {
+          state.steps[curIdx].status = 'error';
+          state.steps[curIdx].progressText = state.errorMsg;
+        }
+        if (sseSource) {
+          sseSource.close();
+          sseSource = null;
+        }
+        render();
+      });
+
+      sseSource.addEventListener('success', () => {
+        if (sseSource) {
+          sseSource.close();
+          sseSource = null;
+        }
+        render();
+      });
+    };
+
+    const handleClose = () => {
+      if (sseSource) {
+        sseSource.close();
+        sseSource = null;
+      }
+      shell.closeModal();
+    };
+
+    const render = () => {
+      const isCompleted = state.currentStep === 8;
+      const isExecuting = state.phase === 'executing' && !isCompleted && !state.errorMsg;
+
+      shell.openModal({
+        title: '切换为受限 API',
+        width: 580,
+        onClose: handleClose,
+        body: (
+          <div style={{ padding: '18px 22px 22px' }}>
+            {/* 顶部租户元数据栏 (方案 B: 真实租户名/别名 + 区域代码/中文名 + 主区域与身份域胶囊) */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Icon name="shield-check" size={18} color="var(--accent)" />
+                  <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--fg-0)', letterSpacing: -0.2 }}>
+                    {titleDisplay}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, marginLeft: 26, fontSize: 11.5, color: 'var(--fg-3)' }}>
+                  <span>{regCn || '—'}</span>
+                  {regCode && <span className="mono" style={{ opacity: 0.85 }}>· {regCode}</span>}
+                  {isHome && (
+                    <span style={{
+                      fontSize: 10,
+                      padding: '0 5px',
+                      borderRadius: 3,
+                      background: 'var(--accent-soft)',
+                      color: 'var(--accent)',
+                      fontWeight: 600,
+                      lineHeight: '15px'
+                    }}>
+                      主区域
+                    </span>
+                  )}
+                </div>
+              </div>
+              <span style={{
+                padding: '3px 10px',
+                background: 'var(--bg-3)',
+                borderRadius: 999,
+                fontSize: 11,
+                color: 'var(--fg-2)',
+                fontWeight: 600,
+                border: '1px solid var(--border)',
+                flexShrink: 0
+              }}>
+                Default
+              </span>
+            </div>
+
+            {/* 状态徽章条 (对齐 IMG_0749.JPG) */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              {isCompleted && (
+                <span style={{
+                  padding: '2px 8px',
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  background: 'var(--accent-soft)',
+                  color: 'var(--accent)',
+                  border: '1px solid var(--accent)'
+                }}>
+                  新 API 已启用
+                </span>
+              )}
+              <span style={{
+                padding: '2px 8px',
+                borderRadius: 999,
+                fontSize: 11,
+                fontWeight: 500,
+                background: 'var(--bg-2)',
+                color: 'var(--fg-2)',
+                border: '1px solid var(--border)'
+              }}>
+                不撤销 OCI 云端原 Key
+              </span>
+            </div>
+
+            {/* 阶段 1: 前置安全备份 */}
+            {state.phase === 'backup' && (
+              <div>
+                <div style={{
+                  padding: '12px 14px',
+                  background: 'var(--bg-2)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  color: 'var(--fg-2)',
+                  lineHeight: 1.6,
+                  marginBottom: 16
+                }}>
+                  <div style={{ fontWeight: 600, color: 'var(--fg-0)', marginBottom: 4 }}>
+                    权限收敛说明
+                  </div>
+                  <div>系统将在 Oracle 云端自动创建受限组、策略与用户。新 API 仅拥有：<b>实例管理、存储卷管理、虚拟网络管理与用户只读查看权限</b>。云端原全权 API 保持完好不撤销。</div>
+                </div>
+
+                <div style={{
+                  padding: '14px 16px',
+                  background: 'var(--bg-1)',
+                  border: '1px solid var(--border-strong)',
+                  borderRadius: 8,
+                  marginBottom: 16
+                }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--fg-0)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Icon name="download" size={14} color="var(--accent)" />
+                    <span>强制前置备份：请妥善导出原管理员凭据</span>
+                  </div>
+
+                  {state.loadingBackup ? (
+                    <div style={{ fontSize: 11.5, color: 'var(--fg-3)', padding: '12px 0' }}>正在加载原凭据信息...</div>
+                  ) : (
+                    <div>
+                      {/* 结构化凭据微卡片 */}
+                      <div style={{
+                        background: 'var(--bg-2)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 6,
+                        padding: '10px 12px',
+                        marginBottom: 14,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 8
+                      }}>
+                        {/* 用户 OCID 行 */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontSize: 11.5 }}>
+                          <span style={{ color: 'var(--fg-3)', width: 72, flexShrink: 0, fontWeight: 500 }}>用户 OCID</span>
+                          <span
+                            className="mono"
+                            style={{
+                              color: 'var(--fg-0)',
+                              flex: 1,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              userSelect: 'all'
+                            }}
+                            title={state.backupData?.userOcid || ''}
+                          >
+                            {state.backupData?.userOcid || '-'}
+                          </span>
+                          {state.backupData?.userOcid && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(state.backupData.userOcid);
+                                shell.showToast('用户 OCID 已复制', { kind: 'info' });
+                              }}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: 'var(--fg-3)',
+                                padding: '2px 4px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                borderRadius: 3,
+                                transition: 'color 120ms'
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent)'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--fg-3)'; }}
+                              title="复制用户 OCID"
+                            >
+                              <Icon name="copy" size={13} />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* 密钥指纹行 */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontSize: 11.5 }}>
+                          <span style={{ color: 'var(--fg-3)', width: 72, flexShrink: 0, fontWeight: 500 }}>密钥指纹</span>
+                          <span
+                            className="mono"
+                            style={{
+                              color: 'var(--fg-0)',
+                              flex: 1,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              userSelect: 'all'
+                            }}
+                            title={state.backupData?.fingerprint || ''}
+                          >
+                            {state.backupData?.fingerprint || '-'}
+                          </span>
+                          {state.backupData?.fingerprint && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(state.backupData.fingerprint);
+                                shell.showToast('密钥指纹已复制', { kind: 'info' });
+                              }}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: 'var(--fg-3)',
+                                padding: '2px 4px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                borderRadius: 3,
+                                transition: 'color 120ms'
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent)'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--fg-3)'; }}
+                              title="复制密钥指纹"
+                            >
+                              <Icon name="copy" size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          icon={state.backupDownloaded ? 'check' : 'download'}
+                          onClick={downloadPem}
+                          disabled={!state.backupData?.keyContent}
+                        >
+                          {state.backupDownloaded ? '私钥已下载 (.pem)' : '下载原私钥 (.pem)'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          icon={state.configDownloaded ? 'check' : 'file-text'}
+                          onClick={downloadConfig}
+                          disabled={!state.backupData?.configSnippet}
+                        >
+                          {state.configDownloaded ? '配置已下载 (config)' : '下载 OCI 配置 (config)'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={state.configCopied ? 'check' : 'copy'}
+                          onClick={copyConfig}
+                          disabled={!state.backupData?.configSnippet}
+                        >
+                          {state.configCopied ? '已复制' : '复制配置'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 8,
+                    cursor: 'pointer',
+                    marginTop: 14,
+                    paddingTop: 12,
+                    borderTop: '1px dashed var(--border)'
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={state.confirmedBackup}
+                      onChange={(e) => {
+                        state.confirmedBackup = e.target.checked;
+                        render();
+                      }}
+                      style={{ marginTop: 2 }}
+                    />
+                    <span style={{ fontSize: 11.5, color: 'var(--fg-1)', lineHeight: 1.5 }}>
+                      我已在本地妥善保存原私钥与 config 配置文件，确认开始执行切换
+                    </span>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* 阶段 2: 执行中 / 已完成 */}
+            {state.phase === 'executing' && (
+              <div>
+                {/* 完成提示卡片 */}
+                {isCompleted && (
+                  <div style={{
+                    padding: '12px 14px',
+                    background: 'var(--bg-1)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 8,
+                    display: 'flex',
+                    gap: 10,
+                    alignItems: 'flex-start',
+                    marginBottom: 16
+                  }}>
+                    <Icon name="check-circle" size={16} color="var(--accent)" style={{ marginTop: 2, flexShrink: 0 }} />
+                    <div style={{ fontSize: 12, color: 'var(--fg-1)', lineHeight: 1.6 }}>
+                      <div>已完成 OCI-POOL 内的 API 替换，并清除本任务保存的临时密钥副本。OCI 云端原 API Key 保留，本次不会删除或撤销。</div>
+                      <div style={{ marginTop: 2 }}>已删除 OCI-POOL 密钥目录内不再使用的旧私钥文件。</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 错误提示 */}
+                {state.errorMsg && (
+                  <div style={{
+                    padding: '10px 14px',
+                    background: 'var(--danger-soft)',
+                    border: '1px solid var(--danger)',
+                    borderRadius: 8,
+                    color: 'var(--danger)',
+                    fontSize: 12,
+                    marginBottom: 16,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8
+                  }}>
+                    <Icon name="alert-triangle" size={14} color="var(--danger)" />
+                    <span>{state.errorMsg}</span>
+                  </div>
+                )}
+
+                {/* 8 步时间线 */}
+                <div style={{ margin: '8px 0 16px 4px' }}>
+                  {state.steps.map((st, i) => (
+                    <RestrictedTimelineStep
+                      key={st.id}
+                      step={st.id}
+                      title={st.title}
+                      status={st.status}
+                      time={st.time}
+                      progressText={st.progressText}
+                      isLast={i === state.steps.length - 1}
+                    />
+                  ))}
+                </div>
+
+                {/* 折叠任务元数据 */}
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 }}>
+                  <div
+                    onClick={() => {
+                      state.detailsOpen = !state.detailsOpen;
+                      render();
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      cursor: 'pointer',
+                      color: 'var(--fg-2)',
+                      fontSize: 12,
+                      userSelect: 'none'
+                    }}
+                  >
+                    <Icon name={state.detailsOpen ? 'chevron-down' : 'chevron-right'} size={13} />
+                    <span>查看本次任务信息</span>
+                  </div>
+
+                  {state.detailsOpen && (
+                    <div style={{
+                      marginTop: 10,
+                      padding: 12,
+                      background: 'var(--bg-2)',
+                      borderRadius: 6,
+                      border: '1px solid var(--border)',
+                      fontSize: 11.5
+                    }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '6px 12px' }}>
+                        <span style={{ color: 'var(--fg-3)' }}>专用组</span>
+                        <span className="mono" style={{ color: 'var(--fg-0)' }}>{state.taskSummary?.groupName || '-'}</span>
+
+                        <span style={{ color: 'var(--fg-3)' }}>组 OCID</span>
+                        <span className="mono" style={{ color: 'var(--fg-1)', wordBreak: 'break-all' }}>{state.taskSummary?.groupId || '-'}</span>
+
+                        <span style={{ color: 'var(--fg-3)' }}>权限策略</span>
+                        <span className="mono" style={{ color: 'var(--fg-0)' }}>{state.taskSummary?.policyName || '-'}</span>
+
+                        <span style={{ color: 'var(--fg-3)' }}>策略 OCID</span>
+                        <span className="mono" style={{ color: 'var(--fg-1)', wordBreak: 'break-all' }}>{state.taskSummary?.policyId || '-'}</span>
+
+                        <span style={{ color: 'var(--fg-3)' }}>受限用户</span>
+                        <span className="mono" style={{ color: 'var(--fg-0)' }}>{state.taskSummary?.userName || '-'}</span>
+
+                        <span style={{ color: 'var(--fg-3)' }}>用户 OCID</span>
+                        <span className="mono" style={{ color: 'var(--fg-1)', wordBreak: 'break-all' }}>{state.taskSummary?.userId || '-'}</span>
+
+                        <span style={{ color: 'var(--fg-3)' }}>密钥指纹</span>
+                        <span className="mono" style={{ color: 'var(--fg-0)' }}>{state.taskSummary?.fingerprint || '-'}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ),
+        footer: (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            {state.phase === 'backup' ? (
+              <>
+                <Button variant="ghost" size="md" onClick={handleClose}>取消</Button>
+                <Button
+                  variant="primary"
+                  size="md"
+                  icon="shield-check"
+                  disabled={!state.confirmedBackup}
+                  onClick={startSwitch}
+                >
+                  开始切换为受限 API
+                </Button>
+              </>
+            ) : isExecuting ? (
+              <Button variant="primary" size="md" disabled loading>
+                正在切换受限 API...
+              </Button>
+            ) : (
+              <Button variant="primary" size="md" onClick={handleClose}>
+                关闭
+              </Button>
+            )}
+          </div>
+        )
+      });
+    };
+
+    loadBackup();
+  }, [shell]);
+}
+
 Object.assign(window, {
   useAddBootModal,
   useTenantProxyQuickModal,
   useApiImportModal, useImportTenantsModal,
   useTenantDetailDrawer,
   useUserManageModal,
+  useRestrictedApiModal,
   useRegionSubscribeModal, useTrafficAlertModal,
   useMailModal, useSocialConfigModal,
   useUpdateAccountModal, useExportTenantModal,

@@ -237,6 +237,34 @@ final class TenantsViewModel: ObservableObject {
     @Published var costLoading = false
     @Published var costError: String?
     @Published var costFilterPositiveOnly = false
+
+    // Restricted API (切换为受限 API)
+    @Published var restrictedPhase: RestrictedApiPhase = .backup
+    @Published var restrictedLoadingBackup = false
+    @Published var restrictedBackupData: RestrictedApiBackupData? = nil
+    @Published var restrictedBackupDownloaded = false
+    @Published var restrictedConfigDownloaded = false
+    @Published var restrictedConfigCopied = false
+    @Published var restrictedConfirmedBackup = false
+    @Published var restrictedCurrentStep = 0
+    @Published var restrictedSteps: [RestrictedApiStep] = defaultRestrictedSteps
+    @Published var restrictedDetailsOpen = false
+    @Published var restrictedTaskSummary: RestrictedApiTaskSummary? = nil
+    @Published var restrictedErrorMsg: String = ""
+    @Published var restrictedIsExecuting = false
+
+    static var defaultRestrictedSteps: [RestrictedApiStep] {
+        [
+            RestrictedApiStep(id: 1, title: "创建专用组"),
+            RestrictedApiStep(id: 2, title: "创建权限策略"),
+            RestrictedApiStep(id: 3, title: "创建受限用户并加入组"),
+            RestrictedApiStep(id: 4, title: "生成新 Key 并上传公钥"),
+            RestrictedApiStep(id: 5, title: "等待新 Key 和权限生效"),
+            RestrictedApiStep(id: 6, title: "切换系统的 API 配置"),
+            RestrictedApiStep(id: 7, title: "复验新配置"),
+            RestrictedApiStep(id: 8, title: "清理项目内旧凭据并完成")
+        ]
+    }
     @Published var costChartType = "all" // all | compute | storage | network | other
     /// 费用明细客户端分页（与租户列表共用 `PaginationBar` / `PageState`）
     @Published var costPageState = PageState(page: 0, size: 20)
@@ -360,10 +388,11 @@ final class TenantsViewModel: ObservableObject {
     }
 
     func updateTenantSSE(_ item: TenantItem) {
-        // 对齐 Web 端二次确认弹窗
+        // 对齐 Web 端二次确认弹窗：使用真实租户名，去除接口路径与协议
+        let realName = item.tenancyName.isEmpty ? item.userName : item.tenancyName
         guard AppAlert.confirm(
-            title: "更新租户「\(item.displayName)」?",
-            message: "该操作会调用 /tenants/updateTenant 通过 SSE 拉取最新的区域、配额、密码策略、账单等元数据，可能耗时 5-10 秒。",
+            title: "更新租户「\(realName)」?",
+            message: "将从 Oracle Cloud 实时同步该租户最新的区域、配额、密码策略及账单等元数据，可能耗时 5-10 秒。",
             confirmTitle: "开始更新",
             cancelTitle: "取消"
         ) else { return }
@@ -476,6 +505,179 @@ final class TenantsViewModel: ObservableObject {
             ToastCenter.shared.success("代理已创建并绑定")
         } catch {
             ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
+        }
+    }
+
+    // MARK: - Restricted API (切换为受限 API)
+
+    func openRestrictedApi(_ item: TenantItem) {
+        restrictedPhase = .backup
+        restrictedLoadingBackup = true
+        restrictedBackupData = nil
+        restrictedBackupDownloaded = false
+        restrictedConfigDownloaded = false
+        restrictedConfigCopied = false
+        restrictedConfirmedBackup = false
+        restrictedCurrentStep = 0
+        restrictedSteps = Self.defaultRestrictedSteps
+        restrictedDetailsOpen = false
+        restrictedTaskSummary = nil
+        restrictedErrorMsg = ""
+        restrictedIsExecuting = false
+
+        activeSheet = .restrictedApi(item)
+
+        Task {
+            do {
+                let data = try await service.getRestrictedApiBackupKey(tenantId: item.id)
+                restrictedBackupData = data
+            } catch {
+                ToastCenter.shared.error("加载备份密钥失败: \(error.localizedDescription)")
+            }
+            restrictedLoadingBackup = false
+        }
+    }
+
+    func downloadRestrictedPem() {
+        guard let content = restrictedBackupData?.keyContent, !content.isEmpty else { return }
+        let fileName = restrictedBackupData?.fileName ?? "private_key.pem"
+        let savePanel = NSSavePanel()
+        savePanel.nameFieldStringValue = fileName
+        savePanel.canCreateDirectories = true
+        savePanel.allowedFileTypes = ["pem", "txt"]
+        savePanel.message = "请选择保存原管理员私钥文件的位置"
+        if savePanel.runModal() == .OK, let dest = savePanel.url {
+            do {
+                try content.write(to: dest, atomically: true, encoding: .utf8)
+                restrictedBackupDownloaded = true
+                ToastCenter.shared.success("原管理员私钥已保存 (.pem)")
+            } catch {
+                ToastCenter.shared.error("保存私钥失败: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func downloadRestrictedConfig() {
+        guard let content = restrictedBackupData?.configSnippet, !content.isEmpty else { return }
+        let tenantName = restrictedBackupData?.userName ?? "oci"
+        let fileName = "\(tenantName).config"
+        let savePanel = NSSavePanel()
+        savePanel.nameFieldStringValue = fileName
+        savePanel.canCreateDirectories = true
+        savePanel.allowedFileTypes = ["config", "txt", "conf"]
+        savePanel.message = "请选择保存 OCI 配置文件的位置"
+        if savePanel.runModal() == .OK, let dest = savePanel.url {
+            do {
+                try content.write(to: dest, atomically: true, encoding: .utf8)
+                restrictedConfigDownloaded = true
+                ToastCenter.shared.success("OCI 配置文件已保存 (config)")
+            } catch {
+                ToastCenter.shared.error("保存配置文件失败: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func copyRestrictedConfig() {
+        guard let content = restrictedBackupData?.configSnippet, !content.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(content, forType: .string)
+        restrictedConfigCopied = true
+        ToastCenter.shared.success("OCI Config 已复制到剪贴板")
+    }
+
+    func copyText(_ text: String, toast: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        ToastCenter.shared.success(toast)
+    }
+
+    func startRestrictedApiSwitch(_ item: TenantItem) {
+        restrictedPhase = .executing
+        restrictedIsExecuting = true
+        restrictedCurrentStep = 1
+        restrictedSteps[0].status = .running
+        restrictedSteps[0].progressText = "正在创建云端专用组..."
+        restrictedErrorMsg = ""
+
+        Task {
+            do {
+                try await service.streamSSE(
+                    path: "/tenants/restricted-api/switch-stream",
+                    query: ["tenantId": "\(item.id)"]
+                ) { [weak self] event, data in
+                    Task { @MainActor [weak self] in
+                        guard let self = self else { return }
+                        if event == "step" {
+                            guard let rawData = data.data(using: .utf8),
+                                  let obj = try? JSONSerialization.jsonObject(with: rawData) as? [String: Any] else { return }
+                            let type = obj["type"] as? String ?? ""
+                            if type == "step_progress" {
+                                let step = (obj["step"] as? Int) ?? 5
+                                let detail = (obj["detail"] as? String) ?? ""
+                                let idx = step - 1
+                                if idx >= 0 && idx < self.restrictedSteps.count {
+                                    self.restrictedSteps[idx].status = .running
+                                    self.restrictedSteps[idx].progressText = detail
+                                }
+                            } else if type == "step_done" {
+                                let step = (obj["step"] as? Int) ?? 1
+                                let time = (obj["time"] as? String) ?? ""
+                                let idx = step - 1
+                                if idx >= 0 && idx < self.restrictedSteps.count {
+                                    self.restrictedSteps[idx].status = .completed
+                                    self.restrictedSteps[idx].time = time
+                                    self.restrictedSteps[idx].progressText = ""
+                                }
+                                self.restrictedCurrentStep = step
+                                if step < 8 {
+                                    self.restrictedSteps[step].status = .running
+                                    self.restrictedSteps[step].progressText = "正在执行..."
+                                }
+                                if step == 8 {
+                                    self.restrictedIsExecuting = false
+                                    var summary = RestrictedApiTaskSummary()
+                                    summary.domainName = obj["domainName"] as? String
+                                    summary.groupName = obj["groupName"] as? String
+                                    summary.groupId = obj["groupId"] as? String
+                                    summary.policyName = obj["policyName"] as? String
+                                    summary.policyId = obj["policyId"] as? String
+                                    summary.userName = obj["userName"] as? String
+                                    summary.userId = obj["userId"] as? String
+                                    summary.fingerprint = obj["fingerprint"] as? String
+                                    summary.time = time
+                                    self.restrictedTaskSummary = summary
+                                    Task { await self.reload() }
+                                }
+                            }
+                        } else if event == "error" {
+                            self.restrictedIsExecuting = false
+                            if let rawData = data.data(using: .utf8),
+                               let obj = try? JSONSerialization.jsonObject(with: rawData) as? [String: Any],
+                               let msg = obj["message"] as? String {
+                                self.restrictedErrorMsg = msg
+                            } else {
+                                self.restrictedErrorMsg = data.isEmpty ? "切换过程中遇到异常" : data
+                            }
+                            let curIdx = max(0, self.restrictedCurrentStep - 1)
+                            if curIdx < self.restrictedSteps.count {
+                                self.restrictedSteps[curIdx].status = .error
+                                self.restrictedSteps[curIdx].progressText = self.restrictedErrorMsg
+                            }
+                        } else if event == "success" {
+                            self.restrictedIsExecuting = false
+                            Task { await self.reload() }
+                        }
+                    }
+                }
+            } catch {
+                restrictedIsExecuting = false
+                restrictedErrorMsg = error.localizedDescription
+                let curIdx = max(0, restrictedCurrentStep - 1)
+                if curIdx < restrictedSteps.count {
+                    restrictedSteps[curIdx].status = .error
+                    restrictedSteps[curIdx].progressText = error.localizedDescription
+                }
+            }
         }
     }
 

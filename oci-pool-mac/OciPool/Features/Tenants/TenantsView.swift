@@ -975,6 +975,7 @@ enum TenantActionPanel {
                 TenantActionItem(id: "region", title: "租户详情", systemImage: "info.circle", isDanger: false) { model.openRegionList(item) },
                 TenantActionItem(id: "sub", title: "区域订阅", systemImage: "globe", isDanger: false) { model.openRegionSub(item) },
                 TenantActionItem(id: "users", title: "用户管理", systemImage: "person.2", isDanger: false) { model.openUsers(item) },
+                TenantActionItem(id: "restricted", title: "切换为受限 API", systemImage: "shield.checkerboard", isDanger: false, tone: .accent) { model.openRestrictedApi(item) },
                 TenantActionItem(id: "traffic", title: "流量预警", systemImage: "bell", isDanger: false) { model.openTraffic(item) },
                 TenantActionItem(id: "tsearch", title: "流量查询", systemImage: "chart.bar", isDanger: false) { model.openTrafficPage(item) },
                 TenantActionItem(id: "audit", title: "审计日志", systemImage: "doc.text", isDanger: false) { model.openAudit(item) },

@@ -4,6 +4,7 @@ struct SidebarView: View {
     @EnvironmentObject private var navigation: NavigationState
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appearance: AppearanceController
+    @EnvironmentObject private var header: HeaderViewModel
     @Environment(\.colorScheme) private var colorScheme
 
     private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
@@ -417,7 +418,7 @@ struct SidebarView: View {
         }
     }
 
-    // Web sidebar 底部状态:运行中 + 版本
+    // Web sidebar 底部状态:运行中 + 版本 (100% 对齐 Web 端微徽章与点击唤起关于)
     private var statusFooter: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
@@ -426,18 +427,48 @@ struct SidebarView: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(AppTheme.navIcon(dark))
             }
-            if let v = appVersion, !v.isEmpty {
-                Text("v\(v)")
+
+            // 版本行与微徽章 (100% 对齐 Web 端)
+            HStack(spacing: 6) {
+                Text("v\(displayVersion)")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(AppTheme.sidebarText(dark))
+
+                if header.version.needUpdate && !header.version.latestVersion.isEmpty {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(Color(hex: "d97706"))
+                            .frame(width: 4, height: 4)
+                        Text("↑ 新版 v\(header.version.latestVersion.replacingOccurrences(of: "^[vV]-?", with: "", options: .regularExpression))")
+                            .font(.system(size: 9.5, weight: .semibold))
+                            .foregroundColor(Color(hex: "d97706"))
+                    }
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color(hex: "d97706").opacity(0.12))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(Color(hex: "d97706").opacity(0.3), lineWidth: 1)
+                    )
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                header.showAbout = true
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var appVersion: String? {
+    private var displayVersion: String {
+        if !header.version.currentVersion.isEmpty {
+            return header.version.currentVersion.replacingOccurrences(of: "^[vV]-?", with: "", options: .regularExpression)
+        }
         let s = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-        return s?.replacingOccurrences(of: "^[vV]-?", with: "", options: .regularExpression)
+        return s?.replacingOccurrences(of: "^[vV]-?", with: "", options: .regularExpression) ?? "1.1.21"
     }
 
     // Web sidebar 各分部图标色:服务=accent 代理=cyan 资源=violet 系统=orange 工具=info 开发=violet

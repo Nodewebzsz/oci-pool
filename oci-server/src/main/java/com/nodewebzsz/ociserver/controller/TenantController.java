@@ -1447,6 +1447,37 @@ public class TenantController extends BaseController{
     }
 
     /**
+     * 获取原 API 私钥与标准配置（用于前置离线备份）
+     */
+    @GetMapping("/restricted-api/backup-key")
+    @ResponseBody
+    public ResponseEntity<?> getRestrictedApiBackupKey(@RequestParam Long tenantId) {
+        try {
+            Map<String, Object> data = tenantService.getBackupKeyInfo(tenantId);
+            return ResponseEntity.ok(ApiResponse.success(data));
+        } catch (Exception e) {
+            log.error("获取原 API 备份凭证失败, tenantId: {}", tenantId, e);
+            return ResponseEntity.ok(ApiResponse.error("获取原 API 备份凭证失败: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * 一键切换为受限 API（SSE 流式推进 8 步全生命周期）
+     */
+    @GetMapping(value = "/restricted-api/switch-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter switchRestrictedApiStream(@RequestParam Long tenantId) {
+        SseEmitter emitter = new SseEmitter(300000L);
+        emitter.onCompletion(() -> log.info("切换受限 API SSE 连接完成, tenantId: {}", tenantId));
+        emitter.onTimeout(() -> {
+            log.warn("切换受限 API SSE 连接超时, tenantId: {}", tenantId);
+            emitter.complete();
+        });
+        emitter.onError((e) -> log.error("切换受限 API SSE 出错, tenantId: {}", tenantId, e));
+        tenantService.switchRestrictedApiWithSSE(tenantId, emitter);
+        return emitter;
+    }
+
+    /**
      * 查看账号配额（ARM/AMD 总配额与可用配额）
      * 若该租户含子区域，则逐区域返回；否则只返回本租户的配额
      */

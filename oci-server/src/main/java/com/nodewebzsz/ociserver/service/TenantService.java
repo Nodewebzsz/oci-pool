@@ -164,4 +164,8 @@ public interface TenantService {
     void updateTenantWithSSE(String tenantId, SseEmitter emitter);
 
     void batchUpdateStatusToInactive(List<Long> inactiveTenantIds);
+
+    Map<String, Object> getBackupKeyInfo(Long tenantId);
+
+    void switchRestrictedApiWithSSE(Long tenantId, SseEmitter emitter);
 }

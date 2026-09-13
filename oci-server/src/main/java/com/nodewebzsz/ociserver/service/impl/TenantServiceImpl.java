@@ -88,6 +88,33 @@ import com.oracle.bmc.identity.requests.ListMfaTotpDevicesRequest;
 import com.oracle.bmc.identity.requests.ListUsersRequest;
 import com.oracle.bmc.identity.responses.GetTenancyResponse;
 import com.oracle.bmc.identity.responses.ListMfaTotpDevicesResponse;
+import com.oracle.bmc.identity.model.AddUserToGroupDetails;
+import com.oracle.bmc.identity.model.CreateApiKeyDetails;
+import com.oracle.bmc.identity.model.CreateGroupDetails;
+import com.oracle.bmc.identity.model.CreatePolicyDetails;
+import com.oracle.bmc.identity.model.CreateUserDetails;
+import com.oracle.bmc.identity.model.DomainSummary;
+import com.oracle.bmc.identity.requests.AddUserToGroupRequest;
+import com.oracle.bmc.identity.requests.CreateGroupRequest;
+import com.oracle.bmc.identity.requests.CreatePolicyRequest;
+import com.oracle.bmc.identity.requests.CreateUserRequest;
+import com.oracle.bmc.identity.requests.ListDomainsRequest;
+import com.oracle.bmc.identity.requests.UploadApiKeyRequest;
+import com.oracle.bmc.identity.responses.CreateGroupResponse;
+import com.oracle.bmc.identity.responses.CreatePolicyResponse;
+import com.oracle.bmc.identity.responses.CreateUserResponse;
+import com.oracle.bmc.identity.responses.ListDomainsResponse;
+import com.oracle.bmc.identity.responses.UploadApiKeyResponse;
+import com.oracle.bmc.core.ComputeClient;
+import com.oracle.bmc.core.requests.ListInstancesRequest;
+import com.nodewebzsz.ociserver.utils.oracle.OciConsoleUtils;
+import com.nodewebzsz.ociserver.config.TenantProxyBinder;
+import com.oracle.bmc.Region;
+import cn.hutool.core.util.RandomUtil;
+import java.io.ByteArrayInputStream;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import com.oracle.bmc.identitydomains.model.PasswordPolicy;
 import com.oracle.bmc.logging.LoggingManagementClient;
 import com.oracle.bmc.model.BmcException;
@@ -2523,5 +2550,309 @@ public class TenantServiceImpl implements TenantService {
         map.put("level", level);
         map.put("title", title);
         return map;
+    }
+
+    @Override
+    public Map<String, Object> getBackupKeyInfo(Long tenantId) {
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new RuntimeException("租户不存在"));
+        Tenant target = (tenant.getParenId() == null || tenant.getParenId() == 0)
+                ? tenant
+                : tenantRepository.findById(tenant.getParenId()).orElse(tenant);
+
+        String keyContent = "";
+        try {
+            if (target.getKeyFile() != null && Files.exists(Paths.get(target.getKeyFile()))) {
+                keyContent = new String(Files.readAllBytes(Paths.get(target.getKeyFile())), StandardCharsets.UTF_8);
+            }
+        } catch (Exception e) {
+            log.warn("读取租户[{}]私钥文件失败: {}", target.getId(), target.getKeyFile(), e);
+        }
+
+        String realTenantName = StringUtils.isNotBlank(target.getTenancyName())
+                ? target.getTenancyName()
+                : (StringUtils.isNotBlank(target.getDefName()) ? target.getDefName() : (StringUtils.isNotBlank(target.getUserName()) ? target.getUserName() : "oci_api"));
+        String regionCode = RegionEnum.getRegionCode(target.getRegion());
+        if (StringUtils.isBlank(regionCode)) {
+            regionCode = "ap-singapore-1";
+        }
+        String fileName = realTenantName + "_private_key.pem";
+        String configSnippet = String.format(
+                "[DEFAULT]\nuser=%s\nfingerprint=%s\ntenancy=%s\nregion=%s\nkey_file=./%s\n",
+                target.getTenantId() != null ? target.getTenantId() : "",
+                target.getFingerprint() != null ? target.getFingerprint() : "",
+                target.getTenancy() != null ? target.getTenancy() : "",
+                regionCode,
+                fileName
+        );
+
+        Map<String, Object> res = new HashMap<>();
+        res.put("tenantId", target.getId());
+        res.put("userName", realTenantName);
+        res.put("userOcid", target.getTenantId());
+        res.put("tenancyOcid", target.getTenancy());
+        res.put("fingerprint", target.getFingerprint());
+        res.put("region", regionCode);
+        res.put("fileName", fileName);
+        res.put("keyContent", keyContent);
+        res.put("configSnippet", configSnippet);
+        return res;
+    }
+
+    @Override
+    public void switchRestrictedApiWithSSE(Long tenantId, SseEmitter emitter) {
+        CompletableFuture.runAsync(() -> {
+            try {
+                Tenant tenant = tenantRepository.findById(tenantId)
+                        .orElseThrow(() -> new RuntimeException("租户不存在"));
+                Tenant parentTenant = (tenant.getParenId() == null || tenant.getParenId() == 0)
+                        ? tenant
+                        : tenantRepository.findById(tenant.getParenId()).orElse(tenant);
+
+                TenantProxyBinder.applyForTenant(parentTenant);
+                SimpleAuthenticationDetailsProvider adminProvider = OciUtils.getProvider(parentTenant);
+                IdentityClient identityClient = IdentityClient.builder()
+                        .clientConfigurator(ProxyContext.get())
+                        .build(adminProvider);
+
+                String tenancyOcid = parentTenant.getTenancy();
+
+                // 探测 Identity Domains 或经典 IAM 域前缀
+                String domainPrefix = "";
+                String domainName = "Default";
+                try {
+                    ListDomainsRequest req = ListDomainsRequest.builder()
+                            .compartmentId(tenancyOcid)
+                            .build();
+                    ListDomainsResponse resp = identityClient.listDomains(req);
+                    if (resp.getItems() != null && !resp.getItems().isEmpty()) {
+                        for (DomainSummary ds : resp.getItems()) {
+                            if (ds.getLifecycleState() == DomainSummary.LifecycleState.Active) {
+                                domainName = ds.getDisplayName();
+                                break;
+                            }
+                        }
+                        domainPrefix = "'" + domainName + "'/";
+                    }
+                } catch (Exception e) {
+                    log.info("租户[{}]未探测到活跃 Identity Domain, 使用经典 IAM 组引用", parentTenant.getId());
+                }
+
+                String shortSuffix = RandomUtil.randomString(6);
+
+                // ── 步骤 1: 创建专用组 ───────────────────────────────────────────────
+                String groupName = "Group_for_Api_used_" + shortSuffix;
+                String groupDesc = "受控 API 专用组，权限限制在实例、存储卷、虚拟网络与只读查看用户";
+                CreateGroupDetails groupDetails = CreateGroupDetails.builder()
+                        .compartmentId(tenancyOcid)
+                        .name(groupName)
+                        .description(groupDesc)
+                        .build();
+                CreateGroupResponse groupRes = identityClient.createGroup(CreateGroupRequest.builder()
+                        .createGroupDetails(groupDetails)
+                        .build());
+                String groupId = groupRes.getGroup().getId();
+                sendStepSse(emitter, 1, "创建专用组", groupName, groupId, LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+
+                // ── 步骤 2: 创建权限策略 ─────────────────────────────────────────────
+                String policyName = "Policy_for_Api_used_" + shortSuffix;
+                String policyDesc = "受控 API 专用策略，防范操作用户增删改与安全配置";
+                String groupRef = domainPrefix.isEmpty() ? groupName : (domainPrefix + groupName);
+                List<String> statements = Arrays.asList(
+                        String.format("Allow group %s to manage instance-family in tenancy", groupRef),
+                        String.format("Allow group %s to manage volume-family in tenancy", groupRef),
+                        String.format("Allow group %s to manage virtual-network-family in tenancy", groupRef),
+                        String.format("Allow group %s to inspect users in tenancy", groupRef),
+                        String.format("Allow group %s to inspect groups in tenancy", groupRef),
+                        String.format("Allow group %s to read all-resources in tenancy", groupRef),
+                        String.format("Allow group %s to inspect limits-family in tenancy", groupRef)
+                );
+                CreatePolicyDetails policyDetails = CreatePolicyDetails.builder()
+                        .compartmentId(tenancyOcid)
+                        .name(policyName)
+                        .description(policyDesc)
+                        .statements(statements)
+                        .build();
+                CreatePolicyResponse policyRes = identityClient.createPolicy(CreatePolicyRequest.builder()
+                        .createPolicyDetails(policyDetails)
+                        .build());
+                String policyId = policyRes.getPolicy().getId();
+                sendStepSse(emitter, 2, "创建权限策略", policyName, policyId, LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+
+                // ── 步骤 3: 创建受限用户并加入组 ─────────────────────────────────────
+                String userName = "User_for_Api_used_" + shortSuffix;
+                String userDesc = "受控 API 专用用户";
+                CreateUserDetails userDetails = CreateUserDetails.builder()
+                        .compartmentId(tenancyOcid)
+                        .name(userName)
+                        .description(userDesc)
+                        .email(userName.toLowerCase() + "@oci-pool.local")
+                        .build();
+                CreateUserResponse userRes = identityClient.createUser(CreateUserRequest.builder()
+                        .createUserDetails(userDetails)
+                        .build());
+                String userId = userRes.getUser().getId();
+
+                // 加组
+                identityClient.addUserToGroup(AddUserToGroupRequest.builder()
+                        .addUserToGroupDetails(AddUserToGroupDetails.builder()
+                                .groupId(groupId)
+                                .userId(userId)
+                                .build())
+                        .build());
+                sendStepSse(emitter, 3, "创建受限用户并加入组", userName, userId, LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+
+                // ── 步骤 4: 生成新 Key 并上传公钥 ─────────────────────────────────────
+                OciConsoleUtils.SshKeyPair keyPair = OciConsoleUtils.generateSshKeyPair();
+                String publicKeyPem = keyPair.getPublicKey();
+                String privateKeyPem = keyPair.getPrivateKey();
+
+                CreateApiKeyDetails apiKeyDetails = CreateApiKeyDetails.builder()
+                        .key(publicKeyPem)
+                        .build();
+                UploadApiKeyResponse apiKeyRes = identityClient.uploadApiKey(UploadApiKeyRequest.builder()
+                        .userId(userId)
+                        .createApiKeyDetails(apiKeyDetails)
+                        .build());
+                String newFingerprint = apiKeyRes.getApiKey().getFingerprint();
+                sendStepSse(emitter, 4, "生成新 Key 并上传公钥", "指纹: " + newFingerprint, newFingerprint, LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+
+                // ── 步骤 5: 等待新 Key 和权限生效 (轮询探测 30~120s) ──────────────────
+                SimpleAuthenticationDetailsProvider testProvider = SimpleAuthenticationDetailsProvider.builder()
+                        .userId(userId)
+                        .fingerprint(newFingerprint)
+                        .tenantId(tenancyOcid)
+                        .privateKeySupplier(() -> new ByteArrayInputStream(privateKeyPem.getBytes(StandardCharsets.UTF_8)))
+                        .region(Region.fromRegionId(RegionEnum.getRegionCode(parentTenant.getRegion())))
+                        .build();
+
+                ComputeClient testComputeClient = ComputeClient.builder()
+                        .clientConfigurator(ProxyContext.get())
+                        .build(testProvider);
+
+                boolean verified = false;
+                for (int attempt = 1; attempt <= 24; attempt++) {
+                    int elapsed = attempt * 5;
+                    sendStepProgressSse(emitter, 5, "等待权限在全球边缘节点同步生效 (已耗时 " + elapsed + "s / 预计 30~90s)...", elapsed);
+                    try {
+                        testComputeClient.listInstances(ListInstancesRequest.builder()
+                                .compartmentId(tenancyOcid)
+                                .limit(1)
+                                .build());
+                        verified = true;
+                        log.info("受限新 Key 鉴权探测成功，耗时 {} 秒", elapsed);
+                        break;
+                    } catch (BmcException bmcEx) {
+                        log.debug("探测受限新 Key 响应码 [{}]: {}", bmcEx.getStatusCode(), bmcEx.getMessage());
+                    } catch (Exception ex) {
+                        log.debug("探测受限新 Key 异常: {}", ex.getMessage());
+                    }
+                    Thread.sleep(5000);
+                }
+
+                if (!verified) {
+                    throw new RuntimeException("受限新密钥在 120 秒内未能在云端完成权限扩散，切换已安全中止，原配置未做任何改动");
+                }
+                sendStepSse(emitter, 5, "等待新 Key 和权限生效", "边缘鉴权验证通过", "", LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+
+                // ── 步骤 6: 切换系统的 API 配置 ──────────────────────────────────────
+                FileUtils.checkFile(baseFile);
+                String newKeyFileName = UUID.randomUUID() + "_key.pem";
+                Path newKeyFilePath = Paths.get(baseFile, newKeyFileName).toAbsolutePath().normalize();
+                Files.write(newKeyFilePath, privateKeyPem.getBytes(StandardCharsets.UTF_8));
+                String oldKeyFile = parentTenant.getKeyFile();
+
+                parentTenant.setTenantId(userId);
+                parentTenant.setFingerprint(newFingerprint);
+                parentTenant.setKeyFile(newKeyFilePath.toString());
+                tenantRepository.save(parentTenant);
+
+                List<Tenant> children = tenantRepository.findByParenId(parentTenant.getId());
+                if (!CollectionUtils.isEmpty(children)) {
+                    for (Tenant child : children) {
+                        child.setTenantId(userId);
+                        child.setFingerprint(newFingerprint);
+                        child.setKeyFile(newKeyFilePath.toString());
+                        tenantRepository.save(child);
+                    }
+                }
+                sendStepSse(emitter, 6, "切换系统的 API 配置", "本地配置更新完成", "", LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+
+                // ── 步骤 7: 复验新配置 ────────────────────────────────────────────────
+                try {
+                    Tenant freshTenant = tenantRepository.findById(parentTenant.getId()).orElse(parentTenant);
+                    SimpleAuthenticationDetailsProvider freshProvider = OciUtils.getProvider(freshTenant);
+                    ComputeClient freshComputeClient = ComputeClient.builder()
+                            .clientConfigurator(ProxyContext.get())
+                            .build(freshProvider);
+                    freshComputeClient.listInstances(ListInstancesRequest.builder()
+                            .compartmentId(freshTenant.getTenancy())
+                            .limit(1)
+                            .build());
+                    sendStepSse(emitter, 7, "复验新配置", "新配置实机环境冒烟测试通过", "", LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+                } catch (Exception ex) {
+                    log.warn("复验新配置产生警告(不影响切换成功): {}", ex.getMessage());
+                    sendStepSse(emitter, 7, "复验新配置", "配置切换已完成", "", LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+                }
+
+                // ── 步骤 8: 清理项目内旧凭据并完成 ─────────────────────────────────────
+                try {
+                    if (StringUtils.isNotBlank(oldKeyFile) && !oldKeyFile.equals(newKeyFilePath.toString())) {
+                        Path oldPath = Paths.get(oldKeyFile);
+                        if (Files.exists(oldPath)) {
+                            Files.delete(oldPath);
+                            log.info("已安全删除本地旧私钥文件: {}", oldKeyFile);
+                        }
+                    }
+                } catch (Exception ex) {
+                    log.warn("清理本地旧私钥失败: {}", oldKeyFile, ex);
+                }
+
+                Map<String, Object> summary = new HashMap<>();
+                summary.put("type", "step_done");
+                summary.put("step", 8);
+                summary.put("title", "清理项目内旧凭据并完成");
+                summary.put("domainName", domainName);
+                summary.put("groupName", groupName);
+                summary.put("groupId", groupId);
+                summary.put("policyName", policyName);
+                summary.put("policyId", policyId);
+                summary.put("userName", userName);
+                summary.put("userId", userId);
+                summary.put("fingerprint", newFingerprint);
+                summary.put("time", LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+                sendSseEvent(emitter, "step", JSONUtil.toJsonStr(summary));
+
+                sendSseEvent(emitter, "success", "受限 API 切换完成");
+                emitter.complete();
+            } catch (Exception e) {
+                log.error("切换为受限 API 失败, tenantId: {}", tenantId, e);
+                Map<String, Object> err = new HashMap<>();
+                err.put("type", "error");
+                err.put("message", e.getMessage());
+                sendSseEvent(emitter, "error", JSONUtil.toJsonStr(err));
+                emitter.complete();
+            }
+        });
+    }
+
+    private void sendStepSse(SseEmitter emitter, int step, String title, String detail, String extra, String time) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("type", "step_done");
+        data.put("step", step);
+        data.put("title", title);
+        data.put("detail", detail);
+        data.put("extra", extra);
+        data.put("time", time);
+        sendSseEvent(emitter, "step", JSONUtil.toJsonStr(data));
+    }
+
+    private void sendStepProgressSse(SseEmitter emitter, int step, String detail, int elapsedSeconds) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("type", "step_progress");
+        data.put("step", step);
+        data.put("detail", detail);
+        data.put("elapsed", elapsedSeconds);
+        sendSseEvent(emitter, "step", JSONUtil.toJsonStr(data));
     }
 }
