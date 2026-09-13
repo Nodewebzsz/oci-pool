@@ -717,7 +717,7 @@ function NotificationItems({ items, compact = false, onRead }) {
     return <div key={n.id} onClick={() => onRead && !n.read && onRead(n)} style={{ padding: compact ? '12px 22px' : '12px 16px', borderBottom: i < items.length - 1 ? '1px solid var(--border)' : 'none', display: 'flex', gap: 12, alignItems: 'flex-start', cursor: n.read ? 'default' : 'pointer', background: n.read ? 'transparent' : 'oklch(from var(--info) l c h / 0.06)' }}>
       <div style={{ width: 28, height: 28, borderRadius: 7, background: s.soft, color: s.c, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name={s.icon} size={14} /></div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 12.5, fontWeight: n.read ? 500 : 600, color: 'var(--fg-0)' }}>{n.title}</span><span className="mono" style={{ fontSize: 9.5, color: s.c }}>{n.source}</span><div style={{ flex: 1 }} /><span style={{ fontSize: 10.5, color: 'var(--fg-3)', whiteSpace: 'nowrap' }}>{n.time}</span></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 12.5, fontWeight: n.read ? 500 : 600, color: 'var(--fg-0)' }}>{n.title}</span><div style={{ flex: 1 }} /><span style={{ fontSize: 10.5, color: 'var(--fg-3)', whiteSpace: 'nowrap' }}>{n.time}</span></div>
         <div style={{
           fontSize: 11.5, color: 'var(--fg-2)', marginTop: 3, lineHeight: 1.5,
           overflow: 'hidden',
@@ -1319,13 +1319,6 @@ function NotifyHistoryBody({ shell }) {
                     color: 'var(--fg-0)',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   }}>{n.title}</span>
-                  <span className="mono" style={{
-                    fontSize: 9.5, color: s.c,
-                    padding: '1px 5px', borderRadius: 3,
-                    background: s.soft,
-                    textTransform: 'uppercase', letterSpacing: 0.4,
-                    flexShrink: 0,
-                  }}>{n.source}</span>
                   {!n.read && (
                     <span style={{
                       width: 6, height: 6, borderRadius: '50%',
@@ -1521,7 +1514,7 @@ function MessageDetailBody({ item, loading, error }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
-      {/* 顶部紧凑元信息条：时间 + 消息来源 + 版本号徽章 */}
+      {/* 顶部紧凑元信息条：时间 + 版本号徽章 (彻底移除 INNER 冗余技术标签) */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '6px 10px', background: 'var(--bg-2)', borderRadius: 'var(--radius-sm)',
@@ -1531,8 +1524,8 @@ function MessageDetailBody({ item, loading, error }) {
           <Icon name="clock" size={11} />
           <span className="mono">{item?.createTime || item?.time || '—'}</span>
         </div>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          {versionTag && (
+        {versionTag && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <span style={{
               padding: '1px 6px', borderRadius: 3,
               background: 'var(--accent-soft)', color: 'var(--accent)',
@@ -1540,15 +1533,8 @@ function MessageDetailBody({ item, loading, error }) {
             }}>
               {versionTag.startsWith('v') ? versionTag : `v${versionTag}`}
             </span>
-          )}
-          <span style={{
-            padding: '1px 6px', borderRadius: 3,
-            background: 'var(--bg-3)', color: 'var(--fg-2)',
-            fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)',
-          }}>
-            {item?.messageType || item?.source || 'SYSTEM'}
-          </span>
-        </div>
+          </div>
+        )}
       </div>
 
       {/* 消息正文展示区 */}
