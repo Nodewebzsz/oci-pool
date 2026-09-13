@@ -5685,10 +5685,10 @@ function SysVpnProxyPage() {
     bodyRef.current = null;
     const isEdit = !!existing;
     shell.openModal({
-      title: isEdit ? tr('pageMisc.df8e67') : tr('pageMisc.22a2f5'),
-      icon: isEdit ? 'edit' : 'plus',
-      iconColor: 'var(--accent)',
-      size: 'lg',
+      title: isEdit ? '编辑代理配置' : '新增代理配置',
+      icon: 'arrow-left-right',
+      iconColor: 'var(--cyan)',
+      width: 760,
       body: <ProxyFormBody existing={existing || null} parentTenants={parentTenants} bodyRef={bodyRef}
         onSave={({ success, error, message }) => {
           if (success) { shell.closeModal(); loadList(page, perPage); shell.showToast('✓ ' + message, { kind: 'success' }); }
@@ -5696,7 +5696,7 @@ function SysVpnProxyPage() {
         }} />,
       footer: (
         <>
-          <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('common.cancel')}</Button>
+          <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('common.cancel') || '取消'}</Button>
           <Button
             variant="outline"
             size="md"
@@ -5706,7 +5706,7 @@ function SysVpnProxyPage() {
             {tr('proxy.testConn') || '测试连接'}
           </Button>
           <div style={{ flex: 1 }} />
-          <Button variant="primary" size="md" icon="check" onClick={() => bodyRef.current && bodyRef.current.save()}>{tr('pageMisc.be5fbb')}</Button>
+          <Button variant="primary" size="md" icon="check" onClick={() => bodyRef.current && bodyRef.current.save()}>{tr('pageMisc.be5fbb') || '保存'}</Button>
         </>
       ),
     });

@@ -99,7 +99,7 @@ function ToastStack({ toasts }) {
 }
 
 // ─── Modal ───────────────────────────────────────────────────────
-function ModalShell({ title, subtitle, icon, iconColor = 'var(--accent)', size = 'md', height, body, footer, onClose }) {
+function ModalShell({ title, subtitle, icon, iconColor = 'var(--accent)', size = 'md', width, height, body, footer, onClose }) {
   React.useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -107,7 +107,7 @@ function ModalShell({ title, subtitle, icon, iconColor = 'var(--accent)', size =
   }, [onClose]);
 
   const widths = { sm: 420, md: 560, lg: 720, xl: 900 };
-  const w = widths[size] || 560;
+  const w = width || widths[size] || 560;
 
   return (
     <>
