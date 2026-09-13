@@ -72,6 +72,7 @@ private func colHeader(_ title: String, _ width: CGFloat, align: Alignment = .ce
 **规则**：
 - 所有列头默认 `.center`，操作列（如「操作」）也使用 `.center`。
 - 弹性列（`colFlexible`）即使占满剩余宽度，文字也需在列内 `.center` 居中（避免偏左失衡）。
+- Web 端统一 `Table` 组件（`ui.jsx`）表头与数据单元格默认值已改为 `textAlign: c.align || 'center'`（2026-09-13 全站对齐），手写原生表格同样遵循表头/单元格全居中；确需左对齐的列必须显式声明 `align: 'left'`，数字列不再使用右对齐。
 
 ---
 

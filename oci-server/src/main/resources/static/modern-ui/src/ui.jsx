@@ -272,7 +272,7 @@ function Table({ columns, rows = [], onRowClick, density = 'compact', empty, loa
           <tr>
             {columns.map((c, ci) =>
             <th key={c.key || ci} style={{
-              textAlign: c.align || 'left',
+              textAlign: c.align || 'center',
               padding: `9px ${c.thPad || 12}px`,
               fontSize: 11,
               fontWeight: 600,
@@ -331,7 +331,7 @@ function Table({ columns, rows = [], onRowClick, density = 'compact', empty, loa
                 title={((c.tooltip && c.tooltip(r)) || (c.render === undefined ? String(r[c.key] ?? '') : '')) || undefined}
                 style={{
               padding: `${py}px 12px`,
-              textAlign: c.align || 'left',
+              textAlign: c.align || 'center',
               color: 'var(--fg-1)',
               verticalAlign: 'middle',
               whiteSpace: c.wrap ? 'normal' : 'nowrap',

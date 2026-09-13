@@ -492,7 +492,7 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
                   { label: '创建时间', w: 150 },
                 ].map((col, i) => (
                   <th key={i} style={{
-                    textAlign: 'left',
+                    textAlign: 'center',
                     padding: '10px 14px',
                     background: 'var(--bg-2)',
                     color: 'var(--fg-3)',
@@ -507,23 +507,23 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
             </thead>
             <tbody>
               <tr>
-                <td style={{ padding: '12px 14px', color: 'var(--fg-2)' }}>
+                <td style={{ padding: '12px 14px', textAlign: 'center', color: 'var(--fg-2)' }}>
                   <span className="num">{activeRow.seq}</span>
                 </td>
-                <td style={{ padding: '12px 14px' }}>
+                <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                   <span className="mono" style={{
                     padding: '2px 6px', background: 'var(--bg-3)',
                     borderRadius: 3, fontSize: 11, color: 'var(--fg-1)',
                   }}>{masked ? window.maskName(activeRow.name || '') : (activeRow.name || '')}</span>
                 </td>
-                <td style={{ padding: '12px 14px' }}>
+                <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                   {(() => {
                     const alias = activeRow.custom || getTenantAlias(activeRow);
                     if (!alias) return <span style={{ color: 'var(--fg-3)' }}>—</span>;
                     return <span className="mono" style={{ color: 'var(--fg-1)' }}>{alias}</span>;
                   })()}
                 </td>
-                <td style={{ padding: '12px 14px' }}>
+                <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                   {(() => {
                     const runningTasks = bootTasks.filter(t => t.openBootFlag || t.status === 1 || t.status === 'running').length;
                     if (runningTasks > 0) {
@@ -537,14 +537,14 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
                     return <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>无任务</span>;
                   })()}
                 </td>
-                <td style={{ padding: '12px 14px' }}>
+                <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                   {(() => {
                     const r = REGIONS.find(x => x.code === activeRow.region);
                     const cn = r ? (r.simpleName || r.cn) : activeRow.region;
                     return <span style={{ color: 'var(--fg-0)' }}>{cn}</span>;
                   })()}
                 </td>
-                <td style={{ padding: '12px 14px' }}>
+                <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                   {activeRow.isHomeRegion ? (
                     <span style={{
                       display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -555,7 +555,7 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
                     <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>否</span>
                   )}
                 </td>
-                <td style={{ padding: '12px 14px' }}>
+                <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                   {activeRow.syncStatus === 'synced' ? (
                     <span style={{
                       display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -581,7 +581,7 @@ function TenantDetailPage({ density, ctx, navigate, updateDetailCtx }) {
                     }}>未同步</span>
                   )}
                 </td>
-                <td style={{ padding: '12px 14px' }}>
+                <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                   <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>{activeRow.createdAt}</span>
                 </td>
               </tr>

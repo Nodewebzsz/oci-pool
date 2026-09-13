@@ -1691,7 +1691,7 @@ function useTenantDetailDrawer() {
                   <tr>
                     {[tr('tenant.faaadc'), tr('tenant.c46779'), tr('tenant.d7ec2d'), tr('tenant.254f06'), tr('tenant.d3ce40'), tr('tenant.d2ccf9'), tr('tenant.0f19a0'), tr('tenant.eca37c'), tr('tenant.2b6bc0')].map((h, i) => (
                       <th key={i} style={{
-                        textAlign: i === 8 ? 'center' : 'left',
+                        textAlign: 'center',
                         padding: '10px 12px',
                         background: 'var(--bg-2)',
                         color: 'var(--fg-3)',
@@ -1709,19 +1709,19 @@ function useTenantDetailDrawer() {
                     <tr key={i} style={{
                       background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent',
                     }}>
-                      <td style={{ padding: '10px 12px', color: 'var(--fg-2)', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--fg-2)', borderBottom: '1px solid var(--border)' }}>
                         <span className="num">{row.seq}</span>
                       </td>
-                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span className="mono" style={{
                           padding: '2px 6px', background: 'var(--bg-3)',
                           borderRadius: 3, fontSize: 11, color: 'var(--fg-1)',
                         }}>{row.name}</span>
                       </td>
-                      <td style={{ padding: '10px 12px', color: 'var(--fg-0)', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--fg-0)', borderBottom: '1px solid var(--border)' }}>
                         {getTenantName(row)}
                       </td>
-                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         {row.tasks > 0
                           ? <span style={{
                               padding: '1px 8px', background: 'var(--info-soft)', color: 'var(--info)',
@@ -1730,10 +1730,10 @@ function useTenantDetailDrawer() {
                           : <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{tr('tenant.71c10f')}</span>
                         }
                       </td>
-                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <RegionBadge code={row.region} lang={lang} />
                       </td>
-                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         {row.isHomeRegion
                           ? <span style={{
                               display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -1743,7 +1743,7 @@ function useTenantDetailDrawer() {
                           : <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{tr('tenant.c9744f')}</span>
                         }
                       </td>
-                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         {row.syncStatus === 'synced' ? (
                           <span style={{
                             display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -1768,7 +1768,7 @@ function useTenantDetailDrawer() {
                           }}>{tr('tenant.e2c177')}</span>
                         )}
                       </td>
-                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span className="mono" style={{ fontSize: 10.5, color: 'var(--fg-2)' }}>{row.createdAt}</span>
                       </td>
                       <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
@@ -2094,7 +2094,7 @@ function showDiskModal(shell, tenant, row) {
                   { h: '操作', w: 80, align: 'center' },
                 ].map((c, i) =>
                   <th key={i} style={{
-                    textAlign: c.align || 'left', padding: '9px 10px', width: c.w,
+                    textAlign: c.align || 'center', padding: '9px 10px', width: c.w,
                     background: 'var(--bg-2)', color: 'var(--fg-3)',
                     fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
                     borderBottom: '1px solid var(--border)',
@@ -2116,13 +2116,13 @@ function showDiskModal(shell, tenant, row) {
                 <tr key={d.id || i} style={{
                   background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent',
                 }}>
-                  <td style={{ padding: '10px', color: 'var(--fg-0)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '10px', textAlign: 'center', color: 'var(--fg-0)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
                     <span className="mono" style={{ fontSize: 11.5, whiteSpace: 'nowrap' }}>{d.name}</span>
                   </td>
-                  <td style={{ padding: '10px', color: 'var(--fg-1)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '10px', textAlign: 'center', color: 'var(--fg-1)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
                     {d.instanceName ? <span style={{ fontSize: 11.5 }}>{d.instanceName}</span> : <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>未关联实例</span>}
                   </td>
-                  <td style={{ padding: '10px', borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                     <span style={{
                       padding: '1px 6px',
                       background: d.type === 'Boot' ? 'var(--info-soft)' : 'var(--accent-soft)',
@@ -2130,10 +2130,10 @@ function showDiskModal(shell, tenant, row) {
                       borderRadius: 3, fontSize: 10, fontWeight: 600,
                     }}>{d.type}</span>
                   </td>
-                  <td style={{ padding: '10px', color: 'var(--fg-0)', borderBottom: '1px solid var(--border)' }} className="num">
+                  <td style={{ padding: '10px', textAlign: 'center', color: 'var(--fg-0)', borderBottom: '1px solid var(--border)' }} className="num">
                     {d.size} GB
                   </td>
-                  <td style={{ padding: '10px', borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                       <div style={{ position: 'relative', width: 28, height: 28 }}>
                         <svg width={28} height={28} style={{ transform: 'rotate(-90deg)' }}>
@@ -2155,7 +2155,7 @@ function showDiskModal(shell, tenant, row) {
                       <span style={{ fontSize: 10, color: 'var(--fg-3)', fontWeight: 500 }}>VPU</span>
                     </div>
                   </td>
-                  <td style={{ padding: '10px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
                     {d.attached
                       ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--accent)', fontSize: 11, whiteSpace: 'nowrap' }}>
                           <StatusDot status="running" size={5} pulse />{tr('tenant.9817da')}
@@ -2847,7 +2847,7 @@ function showSecurityModal(shell, tenant, row) {
                       { h: tr('tenant.2b6bc0'), w: 190, align: 'center' },
                     ].map((c, i) => (
                       <th key={i} style={{
-                        textAlign: c.align || 'left', padding: '10px 12px', width: c.w,
+                        textAlign: c.align || 'center', padding: '10px 12px', width: c.w,
                         background: 'var(--bg-2)', color: 'var(--fg-3)',
                         fontSize: 10.5, fontWeight: 600,
                         textTransform: 'uppercase', letterSpacing: 0.5,
@@ -2866,10 +2866,10 @@ function showSecurityModal(shell, tenant, row) {
                       <tr key={r.id} style={{
                         background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent',
                       }}>
-                        <td style={{ padding: '10px 12px', color: 'var(--fg-2)', borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--fg-2)', borderBottom: '1px solid var(--border)' }}>
                           <span className="num">{r.id}</span>
                         </td>
-                        <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                           <span style={{
                             display: 'inline-flex', alignItems: 'center', gap: 4,
                             padding: '1px 8px',
@@ -2882,10 +2882,10 @@ function showSecurityModal(shell, tenant, row) {
                             {state.tab === 'ingress' ? tr('tenant.0768a8') : tr('tenant.5148cf')}
                           </span>
                         </td>
-                        <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                           <span className="mono" style={{ fontSize: 11, color: proto.color, fontWeight: 600 }}>{proto.label}</span>
                         </td>
-                        <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                           <span className="mono" style={{ fontSize: 11, color: 'var(--fg-0)' }}>{r.addr}</span>
                         </td>
                         <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
@@ -3106,7 +3106,7 @@ function showResourceModal(shell, tenant, row) {
                     { h: tr('tenant.2b6bc0'), w: 70, align: 'center' },
                   ].map((c, i) => (
                     <th key={i} style={{
-                      textAlign: c.align || 'left',
+                      textAlign: c.align || 'center',
                       padding: '10px 12px',
                       width: c.w,
                       background: 'var(--bg-2)',
@@ -3135,29 +3135,29 @@ function showResourceModal(shell, tenant, row) {
                   <tr key={inst.id} style={{
                     background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent',
                   }}>
-                    <td style={{ padding: '10px 12px', color: 'var(--fg-3)', borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--fg-3)', borderBottom: '1px solid var(--border)' }}>
                       <span className="num">{(state.page - 1) * state.perPage + i + 1}</span>
                     </td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }} title={inst.tenantName || ''}>
+                    <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }} title={inst.tenantName || ''}>
                       <span title={inst.tenantName || ''} className="mono" style={{
                         padding: '2px 6px', background: 'var(--bg-3)',
                         borderRadius: 3, fontSize: 11, color: 'var(--fg-1)',
                         cursor: 'pointer',
                       }}>{state.masked ? window.maskName(inst.tenantName) : (inst.tenantName || '')}</span>
                     </td>
-                    <td style={{ padding: '10px 12px', color: 'var(--fg-0)', borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--fg-0)', borderBottom: '1px solid var(--border)' }}>
                       {regionLabel(inst.region)}
                     </td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         <StatusDot status={inst.status} size={5} pulse={inst.status === 'running'} />
                         <span className="mono" style={{ fontSize: 11.5, color: 'var(--fg-0)' }}>{inst.name || inst.id}</span>
                       </span>
                     </td>
-                    <td style={{ padding: '10px 12px', color: 'var(--fg-1)', borderBottom: '1px solid var(--border)' }} className="mono">
+                    <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--fg-1)', borderBottom: '1px solid var(--border)' }} className="mono">
                       {inst.ocpu != null ? inst.ocpu : '-'}C{inst.memory != null ? inst.memory : '-'}G
                     </td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                       <span style={{
                         padding: '1px 6px',
                         background: 'var(--info-soft)', color: 'var(--info)',
@@ -3165,13 +3165,13 @@ function showResourceModal(shell, tenant, row) {
                         fontFamily: 'var(--font-mono)',
                       }}>{inst.arch || 'AMD'}</span>
                     </td>
-                    <td style={{ padding: '10px 12px', color: 'var(--fg-1)', borderBottom: '1px solid var(--border)' }} className="mono">
+                    <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--fg-1)', borderBottom: '1px solid var(--border)' }} className="mono">
                       {inst.disk != null ? inst.disk : '-'}GB/{inst.vpu != null ? inst.vpu : '-'}
                     </td>
-                    <td style={{ padding: '10px 12px', color: 'var(--fg-1)', borderBottom: '1px solid var(--border)' }} className="mono">
+                    <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--fg-1)', borderBottom: '1px solid var(--border)' }} className="mono">
                       {inst.ip || '-'}
                     </td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                       {inst.ipv6 === 'enabled'
                         ? <span style={{
                             padding: '1px 6px', background: 'var(--accent-soft)', color: 'var(--accent)',
@@ -3180,7 +3180,7 @@ function showResourceModal(shell, tenant, row) {
                         : <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{tr('tenant.463776')}</span>
                       }
                     </td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                       <span className="mono" style={{ fontSize: 10.5, color: 'var(--fg-2)' }}>{inst.createdAt || '-'}</span>
                     </td>
                     <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
@@ -3522,7 +3522,7 @@ function showMysqlModal(shell, tenant, row) {
                 <tr>
                   {cols.map((c, i) => (
                     <th key={i} style={{
-                      textAlign: c.align || 'left', padding: '10px 12px', width: c.w,
+                      textAlign: c.align || 'center', padding: '10px 12px', width: c.w,
                       background: 'var(--bg-2)', color: 'var(--fg-3)',
                       fontSize: 10.5, fontWeight: 600,
                       textTransform: 'uppercase', letterSpacing: 0.5,
@@ -3557,7 +3557,7 @@ function showMysqlModal(shell, tenant, row) {
                       background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent',
                     }}>
                       {/* 名称 · 点击复制 OCID */}
-                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <strong
                           title={inst.dbId ? tr('td.mysql.copyOcid') : ''}
                           onClick={() => copyOcid(inst)}
@@ -3565,11 +3565,11 @@ function showMysqlModal(shell, tenant, row) {
                         >{name}</strong>
                       </td>
                       {/* 版本 */}
-                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span className="mono" style={{ fontSize: 11, color: 'var(--fg-1)' }}>{inst.dbVersion || '-'}</span>
                       </td>
                       {/* 状态 */}
-                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span style={{
                           display: 'inline-flex', alignItems: 'center', gap: 4,
                           padding: '1px 8px', borderRadius: 3, fontSize: 10.5, fontWeight: 500,
@@ -3579,13 +3579,13 @@ function showMysqlModal(shell, tenant, row) {
                         }}>{inst.dbStatus || '-'}</span>
                       </td>
                       {/* 公网/端口 */}
-                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span className="mono" style={{ fontSize: 11, color: inst.dbPublicUrl ? 'var(--info)' : 'var(--fg-3)' }}>
                           {inst.dbPublicUrl || tr('td.mysql.noPublic')} : {inst.dbPort || '3306'}
                         </span>
                       </td>
                       {/* 账密 · 可切换显隐 */}
-                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                           <span className="mono" style={{ fontSize: 11, color: 'var(--fg-1)' }}>{inst.dbName || tr('td.mysql.noUser')}</span>
                           <span style={{ color: 'var(--fg-3)' }}>/</span>
@@ -3605,7 +3605,7 @@ function showMysqlModal(shell, tenant, row) {
                         </span>
                       </td>
                       {/* 规格 */}
-                      <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span style={{ color: 'var(--fg-1)' }}>{inst.shapeName || '-'}</span>
                       </td>
                       {/* 存储 GB */}
@@ -4254,7 +4254,7 @@ function showStorageModal(shell, tenant, row) {
                         { h: tr('tenant.2b6bc0'), w: 130, align: 'center' },
                       ].map((c, i) => (
                         <th key={i} style={{
-                          textAlign: c.align || 'left', padding: '8px 12px', width: c.w,
+                          textAlign: c.align || 'center', padding: '8px 12px', width: c.w,
                           position: 'sticky', top: 0, zIndex: 1,
                           background: 'var(--bg-2)', color: 'var(--fg-3)',
                           fontSize: 10, fontWeight: 600,
@@ -4272,16 +4272,16 @@ function showStorageModal(shell, tenant, row) {
                         <tr key={obj.name} style={{
                           background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent',
                         }}>
-                          <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                               <Icon name={info.icon} size={12} style={{ color: info.color, flexShrink: 0 }} />
                               <span className="mono" style={{ fontSize: 11, color: 'var(--fg-0)' }}>{obj.name}</span>
                             </span>
                           </td>
-                          <td style={{ padding: '8px 12px', color: 'var(--fg-1)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }} className="num">
+                          <td style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--fg-1)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }} className="num">
                             {formatSize(obj.size)}
                           </td>
-                          <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
+                          <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
                             <span className="mono" style={{ fontSize: 10.5, color: 'var(--fg-2)' }}>{formatDate(obj.modified) || '-'}</span>
                           </td>
                           <td style={{ padding: '6px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
@@ -4698,7 +4698,7 @@ function useUserManageModal() {
                           { h: tr('tenant.2b6bc0'), w: 70, align: 'center' },
                         ].map((c, i) => (
                           <th key={i} style={{
-                            textAlign: c.align || 'left', padding: '10px 12px', width: c.w,
+                            textAlign: c.align || 'center', padding: '10px 12px', width: c.w,
                             background: 'var(--bg-2)', color: 'var(--fg-3)',
                             fontSize: 10.5, fontWeight: 600,
                             textTransform: 'uppercase', letterSpacing: 0.5,
@@ -4906,7 +4906,7 @@ function useUserManageModal() {
                           { h: tr('tenant.2b6bc0'), w: 140, align: 'center' },
                         ].map((c, i) => (
                           <th key={i} style={{
-                            textAlign: c.align || 'left', padding: '10px 12px', width: c.w,
+                            textAlign: c.align || 'center', padding: '10px 12px', width: c.w,
                             background: 'var(--bg-2)', color: 'var(--fg-3)',
                             fontSize: 10.5, fontWeight: 600,
                             textTransform: 'uppercase', letterSpacing: 0.5,
@@ -4928,16 +4928,16 @@ function useUserManageModal() {
                         <tr key={email} style={{
                           background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent',
                         }}>
-                          <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                             <span className="num" style={{ color: 'var(--fg-2)' }}>{i + 1}</span>
                           </td>
-                          <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                               <Icon name="mail" size={12} style={{ color: 'var(--info)' }} />
                               <span className="mono" style={{ color: 'var(--fg-0)' }}>{email}</span>
                             </span>
                           </td>
-                          <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                             <span style={{
                               padding: '1px 8px',
                               background: 'var(--accent-soft)',
@@ -5458,7 +5458,7 @@ function useRegionSubscribeModal() {
                       {['区域名称', '区域标识', '主区域', '状态'].map((h, i) => (
                         <th key={i} style={{
                           position: 'sticky', top: 0, zIndex: 1,
-                          textAlign: i === 2 || i === 3 ? 'center' : 'left',
+                          textAlign: 'center',
                           padding: '9px 12px', background: 'var(--bg-2)',
                           color: 'var(--fg-3)', fontSize: 10.5, fontWeight: 600,
                           textTransform: 'uppercase', letterSpacing: 0.5,
@@ -5497,10 +5497,10 @@ function useRegionSubscribeModal() {
                           <tr key={code || i} style={{
                             background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent',
                           }}>
-                            <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                            <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                               <RegionBadge code={code} lang={lang} />
                             </td>
-                            <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                            <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                               <span className="mono" style={{ color: 'var(--accent)', fontSize: 11.5 }}>{code}</span>
                             </td>
                             <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
@@ -6319,7 +6319,7 @@ function useSocialConfigModal() {
                           { h: tr('tenant.2b6bc0'),      w: 100, align: 'center' },
                         ].map((c, i) => (
                           <th key={i} style={{
-                            textAlign: c.align || 'left', padding: '10px 12px', width: c.w,
+                            textAlign: c.align || 'center', padding: '10px 12px', width: c.w,
                             background: 'var(--bg-2)', color: 'var(--fg-3)',
                             fontSize: 10.5, fontWeight: 600,
                             textTransform: 'uppercase', letterSpacing: 0.5,
@@ -6343,16 +6343,16 @@ function useSocialConfigModal() {
                         </tr>
                       ) : state.configs.map((c, i) => (
                         <tr key={c.id} style={{ background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent' }}>
-                          <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                               <Icon name={typeIconMap[c.type] || 'share-2'} size={13} style={{ color: typeColorMap[c.type] || 'var(--fg-1)' }} />
                               <span style={{ fontWeight: 500, color: 'var(--fg-0)' }}>{c.type}</span>
                             </span>
                           </td>
-                          <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                             <span className="mono" style={{ fontSize: 10.5, color: 'var(--fg-2)' }}>{c.clientId}</span>
                           </td>
-                          <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                             <span className="mono" style={{ fontSize: 10.5, color: 'var(--fg-1)' }}>{c.redirect}</span>
                           </td>
                           <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>

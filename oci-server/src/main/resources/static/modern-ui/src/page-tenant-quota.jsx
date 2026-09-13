@@ -463,7 +463,7 @@ function TenantQuotaPage({ density, ctx, navigate }) {
                       }}
                     >
                       {/* 限额名称 */}
-                      <td style={{ padding: '8px 14px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '8px 14px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{
                             width: 6, height: 6, borderRadius: '50%',

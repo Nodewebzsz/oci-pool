@@ -105,10 +105,10 @@ function ProxyPage({ density }) {
     { key: 'endpoint', label: tr('proxy.col.endpoint'),
       render: r => <span className="mono" style={{ color: 'var(--cyan)' }}>{getProxyHost(r)}:{getProxyPort(r)}</span>,
     },
-    { key: 'tenants', label: tr('proxy.col.tenants'), align: 'right',
+    { key: 'tenants', label: tr('proxy.col.tenants'),
       render: r => <span className="num" style={{ color: 'var(--fg-0)', fontWeight: 500 }}>{r.tenants}</span>,
     },
-    { key: 'latency', label: tr('proxy.col.latency'), align: 'right',
+    { key: 'latency', label: tr('proxy.col.latency'),
       render: r => (
         <span className="num" style={{
           color: r.latency == null ? 'var(--fg-3)' : r.latency < 100 ? 'var(--accent)' : r.latency < 200 ? 'var(--orange)' : 'var(--danger)',
@@ -2134,7 +2134,7 @@ function EOManagePage() {
                     { h: tr('dnsp.operation'),   w: 100, align: 'center' },
                   ].map((c, i) => (
                     <th key={i} style={{
-                      textAlign: c.align || 'left', padding: '9px 12px', width: c.w,
+                      textAlign: c.align || 'center', padding: '9px 12px', width: c.w,
                       background: 'var(--bg-2)', color: 'var(--fg-3)',
                       fontSize: 10.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
                       borderBottom: '1px solid var(--border)',
@@ -2173,13 +2173,13 @@ function EOManagePage() {
                         fontSize: 10.5, fontWeight: 700,
                       }}>{r.type}</span>
                     </td>
-                    <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                       <span className="mono" style={{ fontSize: 12, color: 'var(--fg-0)' }}>{r.name}</span>
                     </td>
-                    <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                       <span className="mono" style={{ fontSize: 11.5, color: 'var(--fg-1)' }}>{r.content}</span>
                     </td>
-                    <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                       <span className="num" style={{ fontSize: 11.5, color: 'var(--fg-2)' }}>{r.ttl}s</span>
                     </td>
                     <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
@@ -2227,7 +2227,7 @@ function EOManagePage() {
                     { h: tr('dnsp.operation'),   w: 100, align: 'center' },
                   ].map((c, i) => (
                     <th key={i} style={{
-                      textAlign: c.align || 'left', padding: '9px 12px', width: c.w,
+                      textAlign: c.align || 'center', padding: '9px 12px', width: c.w,
                       background: 'var(--bg-2)', color: 'var(--fg-3)',
                       fontSize: 10.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
                       borderBottom: '1px solid var(--border)',
@@ -2264,7 +2264,7 @@ function EOManagePage() {
                   const st = statusCfg[d.status] || statusCfg.pending;
                   return (
                     <tr key={d.id} style={{ background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent' }}>
-                      <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span className="mono" style={{ fontSize: 12, color: 'var(--fg-0)', fontWeight: 500 }}>{d.domain}</span>
                       </td>
                       <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
@@ -2277,7 +2277,7 @@ function EOManagePage() {
                           <Icon name={st.icon} size={9} />{st.label}
                         </span>
                       </td>
-                      <td style={{ padding: '9px 12px', borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span className="mono" style={{ fontSize: 11.5, color: 'var(--fg-1)' }}>{d.cname}</span>
                       </td>
                       <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
