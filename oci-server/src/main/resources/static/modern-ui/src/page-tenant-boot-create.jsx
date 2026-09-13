@@ -343,8 +343,14 @@
     const subtitleText = realTenantName ? `${realTenantName} · ${activeCityCn}` : '创建开机任务';
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-        {/* ─── 顶部 PageHeader ─── */}
+      <div style={{
+        display: 'flex', flexDirection: 'column',
+        flex: 1, minHeight: 0,
+        overflowY: 'auto',
+        padding: '16px 22px 36px',
+        gap: 14,
+      }}>
+        {/* ─── 顶部 PageHeader (与下方内容严格同轴垂直左对齐) ─── */}
         <PageHeader
           icon="zap"
           iconColor="var(--orange)"
@@ -386,26 +392,22 @@
           }
         />
 
-        {/* ─── 页面主体：滚动卡片网格 ─── */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 22px 32px' }}>
-          <div style={{ maxWidth: 1080, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-            {/* ─── 1. API 开机风控警示横幅 (对齐客户端 apiRiskBanner) ─── */}
-            <div style={{
-              display: 'flex', alignItems: 'flex-start', gap: 12,
-              padding: '12px 16px', borderRadius: 8,
-              background: 'var(--danger-soft)', border: '1px solid oklch(from var(--danger) l c h / 0.3)',
-            }}>
-              <Icon name="alert-triangle" size={16} style={{ color: 'var(--danger)', marginTop: 2, flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--danger)', marginBottom: 2 }}>
-                  Oracle API 开机风控警告
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--fg-1)', lineHeight: 1.55 }}>
-                  Oracle 近期已严厉收紧对通过 API 频繁下发创建实例任务的风控策略。高频（如 10s）自动轮询开机可能触发账号异常或限制。建议合理设置循环时间（推荐 60s 以上），保存前请仔细核对配额与配置。
-                </div>
-              </div>
+        {/* ─── 1. API 开机风控警示横幅 (对齐客户端 apiRiskBanner) ─── */}
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: 12,
+          padding: '12px 16px', borderRadius: 8,
+          background: 'var(--danger-soft)', border: '1px solid oklch(from var(--danger) l c h / 0.3)',
+        }}>
+          <Icon name="alert-triangle" size={16} style={{ color: 'var(--danger)', marginTop: 2, flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--danger)', marginBottom: 2 }}>
+              Oracle API 开机风控警告
             </div>
+            <div style={{ fontSize: 12, color: 'var(--fg-1)', lineHeight: 1.55 }}>
+              Oracle 近期已严厉收紧对通过 API 频繁下发创建实例任务的风控策略。高频（如 10s）自动轮询开机可能触发账号异常或限制。建议合理设置循环时间（推荐 60s 以上），保存前请仔细核对配额与配置。
+            </div>
+          </div>
+        </div>
 
             {/* ─── 2. 上排双卡片：架构与区域 | 规格模板 ─── */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -895,8 +897,6 @@
               </div>
             </div>
 
-          </div>
-        </div>
       </div>
     );
   }
