@@ -144,8 +144,8 @@ thirdApi:
   speedUrl: https://speed.objboy.com/
 
 oci:
-  version: 1.1.18
-  ssh-version: v-1.1.18
+  version: 1.1.19
+  ssh-version: v-1.1.19
 
 ssl:
   staging: false
