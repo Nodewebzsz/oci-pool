@@ -46,7 +46,8 @@ struct TenantBootCreateView: View {
     private var freeTag: Color { AppTheme.sidebarActive }
     private var paidTag: Color { Color(hex: "f78166") }
 
-    @State private var selectedTemplateId: String = "arm-base"
+    @State private var selectedTemplateId: String = "arm-high"
+    @State private var isPasswordMasked = false
 
     private var visibleTemplates: [BootTemplate] {
         bootTemplates.filter { $0.arch == model.bootArchitecture }
@@ -55,7 +56,11 @@ struct TenantBootCreateView: View {
     var body: some View {
         PageScaffold(
             title: "创建开机任务",
-            subtitle: tenant.map { "\($0.displayName) · \($0.region.isEmpty ? "—" : $0.region)" },
+            subtitle: tenant.map {
+                let s = $0.tenantPrimaryName
+                let regCn = RegionCnName.table[$0.region] ?? ($0.region.isEmpty ? "—" : $0.region)
+                return "\(s) · \(regCn)"
+            },
             systemImage: "play.circle.fill",
             toolbar: { toolbar },
             content: {
@@ -160,7 +165,12 @@ struct TenantBootCreateView: View {
             if !model.bootRegionOptions.isEmpty {
                 FormFieldRow(label: "部署区域") {
                     SelectMenu(
-                        options: model.bootRegionOptions.map { SelectOption(id: $0.id, title: $0.label) },
+                        options: model.bootRegionOptions.map { opt in
+                            let s = opt.tenantPrimaryName
+                            let rn = RegionCnName.table[opt.region] ?? opt.region
+                            let suffix = opt.isHomeRegion ? " (主区域)" : ""
+                            return SelectOption(id: opt.id, title: "\(s) · \(rn)\(suffix)")
+                        },
                         selection: Binding(
                             get: { model.bootSelectedRegionTenantId },
                             set: {
@@ -335,10 +345,58 @@ struct TenantBootCreateView: View {
             minHeight: pairMinHeight
         ) {
             FormFieldRow(label: "计算规格") {
-                HStack(spacing: 10) {
-                    numField("OCPU", text: $model.bootOcpu)
-                    numField("内存 (GB)", text: $model.bootMemory)
-                    numField("磁盘 (GB)", text: $model.bootDisk)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
+                        numField("OCPU", text: $model.bootOcpu)
+                        numField("内存 (GB)", text: $model.bootMemory)
+                        numField("磁盘 (GB)", text: $model.bootDisk)
+                    }
+
+                    // ARM 1:6 核心内存比动态防呆守卫条
+                    if model.bootArchitecture == "ARM",
+                       let c = Double(model.bootOcpu), c > 0,
+                       let m = Double(model.bootMemory) {
+                        let ratioOk = (abs((m / c) - 6.0) < 0.1)
+                        HStack(spacing: 6) {
+                            Image(systemName: ratioOk ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(ratioOk ? AppTheme.sidebarActive : AppTheme.orange)
+                            Text(ratioOk
+                                ? "ARM 内存核心比守卫：当前 \(model.bootOcpu)C : \(model.bootMemory)G (1:6) 完美符合 Oracle 官方推荐规则"
+                                : "注意：当前比例为 1:\(String(format: "%.1f", m / c))，Oracle ARM 官方严格推荐 1C:6G 比例"
+                            )
+                            .font(.system(size: 11))
+                            .foregroundColor(ratioOk ? AppTheme.sidebarActive : AppTheme.orange)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill((ratioOk ? AppTheme.sidebarActive : AppTheme.orange).opacity(0.12))
+                        )
+                    }
+
+                    // 免费额度超额告警条
+                    if model.bootArchitecture == "ARM",
+                       let c = Double(model.bootOcpu),
+                       let m = Double(model.bootMemory),
+                       let d = Double(model.bootDisk),
+                       (c > 4 || m > 24 || d > 200) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(AppTheme.orange)
+                            Text("当前规格已超过 Oracle ARM 永久免费上限 (4C 24G 200GB)，可能产生计费")
+                                .font(.system(size: 11))
+                                .foregroundColor(AppTheme.orange)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(AppTheme.orange.opacity(0.12))
+                        )
+                    }
                 }
             }
 
@@ -362,30 +420,44 @@ struct TenantBootCreateView: View {
                 }
             }
 
-            HStack(alignment: .top, spacing: 12) {
-                FormFieldRow(label: "实例数量") {
-                    AppTextField(
-                        text: $model.bootCount,
-                        placeholder: "1",
-                        leadingSystemImage: "number"
+            FormFieldRow(label: "实例数量") {
+                AppTextField(
+                    text: $model.bootCount,
+                    placeholder: "1",
+                    leadingSystemImage: "number"
+                )
+            }
+
+            // 每日抢机时段 (对齐 Web 端场景胶囊 + 实时大白话反馈条)
+            FormFieldRow(label: "每日抢机时段 (可选)") {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        ForEach([
+                            ("全天执行", ""),
+                            ("凌晨 (1-8点)", "1-8"),
+                            ("白天 (9-18点)", "9-18"),
+                            ("夜间 (18-24点)", "18-24")
+                        ], id: \.0) { label, val in
+                            presetChip(label: label, value: val, binding: $model.bootDayGap)
+                        }
+                    }
+
+                    // 实时大白话状态反馈条
+                    HStack(spacing: 6) {
+                        Image(systemName: timeRangeHint.isAllDay ? "clock.fill" : "moon.stars.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(AppTheme.sidebarActive)
+                        Text(timeRangeHint.text)
+                            .font(.system(size: 11))
+                            .foregroundColor(AppTheme.sidebarActive)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(AppTheme.sidebarActive.opacity(0.12))
                     )
                 }
-                .frame(maxWidth: .infinity)
-
-                FormFieldRow(label: "时段限制 (可选)") {
-                    VStack(alignment: .leading, spacing: 6) {
-                        AppTextField(
-                            text: $model.bootDayGap,
-                            placeholder: "如 0-8",
-                            leadingSystemImage: "clock"
-                        )
-                        Text("起始-结束小时，仅该时段内抢机")
-                            .font(.system(size: 11))
-                            .foregroundColor(AppTheme.sidebarText(dark))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .frame(maxWidth: .infinity)
             }
         } footer: {
             Text("可改规格后保存")
@@ -406,16 +478,43 @@ struct TenantBootCreateView: View {
             minHeight: pairMinHeight
         ) {
             FormFieldRow(label: "Root 密码") {
-                HStack(spacing: 8) {
-                    AppTextField(
-                        text: $model.bootRootPassword,
-                        placeholder: "root 登录密码",
-                        leadingSystemImage: "key"
-                    )
-                    AppButton(title: "随机", systemImage: "arrow.clockwise", kind: .secondary) {
-                        model.bootRootPassword = randomPassword()
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        AppTextField(
+                            text: $model.bootRootPassword,
+                            placeholder: "root 登录密码",
+                            secure: isPasswordMasked,
+                            leadingSystemImage: "key"
+                        )
+                        Button(action: { isPasswordMasked.toggle() }) {
+                            Image(systemName: isPasswordMasked ? "eye" : "eye.slash")
+                                .font(.system(size: 12))
+                                .foregroundColor(AppTheme.sidebarText(dark))
+                                .frame(width: 28, height: 28)
+                                .background(RoundedRectangle(cornerRadius: 6).fill(AppInputStyle.fill(dark)))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        AppButton(title: "随机", systemImage: "arrow.clockwise", kind: .secondary) {
+                            model.bootRootPassword = randomPassword()
+                        }
+                    }
+                    // 密码强度条
+                    HStack(spacing: 3) {
+                        ForEach(0..<4) { idx in
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(idx < passwordStrengthScore ? AppTheme.sidebarActive : Color.gray.opacity(0.3))
+                                .frame(height: 3)
+                        }
                     }
                 }
+            }
+
+            FormFieldRow(label: "任务备注") {
+                AppTextField(
+                    text: $model.bootRemark,
+                    placeholder: "如：新加坡-ARM-满血",
+                    leadingSystemImage: "tag"
+                )
             }
 
             FormFieldRow(label: "操作系统") {
@@ -510,7 +609,16 @@ struct TenantBootCreateView: View {
             Text(label)
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundColor(AppTheme.sidebarText(dark))
-            AppTextField(text: text, placeholder: "0")
+            AppTextField(
+                text: Binding(
+                    get: { text.wrappedValue },
+                    set: {
+                        text.wrappedValue = $0
+                        selectedTemplateId = ""
+                    }
+                ),
+                placeholder: "0"
+            )
         }
         .frame(maxWidth: .infinity)
     }
@@ -542,6 +650,34 @@ struct TenantBootCreateView: View {
         model.bootOcpu = tpl.ocpu
         model.bootMemory = tpl.memory
         model.bootDisk = tpl.disk
+        if let t = tenant {
+            model.bootRemark = "\(t.tenantPrimaryName)-\(tpl.id)"
+        }
+    }
+
+    private var timeRangeHint: (isAllDay: Bool, text: String) {
+        let raw = model.bootDayGap.trimmingCharacters(in: .whitespacesAndNewlines)
+        if raw.isEmpty {
+            return (true, "全天 24 小时持续轮询抢机")
+        }
+        let parts = raw.components(separatedBy: "-").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+        if parts.count == 2, parts[0] >= 0, parts[1] <= 24, parts[0] < parts[1] {
+            let sStr = String(format: "%02d:00", parts[0])
+            let eStr = String(format: "%02d:00", parts[1])
+            return (false, "仅在每日 \(sStr) ~ \(eStr) 期间尝试抢机，其余时间自动静默挂起")
+        }
+        return (false, "时段格式需为「起始-结束小时」(如 1-8，不支持跨天)")
+    }
+
+    private var passwordStrengthScore: Int {
+        let pw = model.bootRootPassword
+        if pw.isEmpty { return 0 }
+        var s = 0
+        if pw.count >= 8 { s += 1 }
+        if pw.count >= 12 { s += 1 }
+        if pw.rangeOfCharacter(from: .uppercaseLetters) != nil && pw.rangeOfCharacter(from: .lowercaseLetters) != nil { s += 1 }
+        if pw.rangeOfCharacter(from: .decimalDigits) != nil { s += 1 }
+        return min(4, s)
     }
 
     private func randomPassword() -> String {

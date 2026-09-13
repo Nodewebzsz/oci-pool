@@ -224,6 +224,7 @@ final class TenantsViewModel: ObservableObject {
     @Published var bootSelectedVersion = ""
     @Published var bootImageId = ""
     @Published var bootRootPassword = ""
+    @Published var bootRemark = ""
     @Published var bootRegionOptions: [TenantRegionOption] = []
     @Published var bootSelectedRegionTenantId = ""
 
@@ -1631,14 +1632,15 @@ final class TenantsViewModel: ObservableObject {
 
     func openBoot(_ item: TenantItem) {
         bootArchitecture = "ARM"
-        bootOcpu = "1"; bootMemory = "6"; bootDisk = "50"
+        bootOcpu = "4"; bootMemory = "24"; bootDisk = "50"
         bootLoopTime = "60"; bootCount = "1"; bootDayGap = ""
+        bootRemark = "\(item.tenantPrimaryName)-arm-high"
         bootImages = []; bootOSList = []; bootSelectedOS = ""
         bootVersions = []; bootSelectedVersion = ""; bootImageId = ""
         bootRootPassword = randomPassword()
         bootSelectedRegionTenantId = "\(item.id)"
         bootRegionOptions = [
-            TenantRegionOption(id: "\(item.id)", tenancyName: item.displayName, region: item.region)
+            TenantRegionOption(id: "\(item.id)", tenancyName: item.tenantPrimaryName, region: item.region, isHomeRegion: true)
         ]
         bootPageParent = item
         Task {
@@ -1677,7 +1679,18 @@ final class TenantsViewModel: ObservableObject {
 
     func applyBootOS(_ os: String) {
         bootSelectedOS = os
-        bootVersions = bootImages.filter { $0.operatingSystem == os }
+        // 语义化倒序排列（24.04 > 22.04 > 20.04），新版本优先
+        bootVersions = bootImages.filter { $0.operatingSystem == os }.sorted { a, b in
+            let pa = a.operatingSystemVersion.components(separatedBy: CharacterSet.decimalDigits.inverted).compactMap { Int($0) }
+            let pb = b.operatingSystemVersion.components(separatedBy: CharacterSet.decimalDigits.inverted).compactMap { Int($0) }
+            let len = max(pa.count, pb.count)
+            for i in 0..<len {
+                let va = i < pa.count ? pa[i] : 0
+                let vb = i < pb.count ? pb[i] : 0
+                if va != vb { return va > vb }
+            }
+            return a.operatingSystemVersion > b.operatingSystemVersion
+        }
         if let v = bootVersions.first {
             bootSelectedVersion = v.operatingSystemVersion
             bootImageId = v.imageId
@@ -1714,6 +1727,7 @@ final class TenantsViewModel: ObservableObject {
             "operatingSystem": bootSelectedOS,
             "operatingSystemVersion": bootSelectedVersion,
             "dayGap": bootDayGap,
+            "remark": bootRemark.trimmingCharacters(in: .whitespacesAndNewlines),
             "notifyFlag": "NO",
             "cloudType": "1"
         ]

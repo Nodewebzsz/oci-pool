@@ -177,6 +177,14 @@ struct TenantItem: Decodable, Identifiable, Equatable {
         return String(alias.prefix(14)) + "…"
     }
 
+    /// 租户真实展示名（真实租户名 tenancyName 优先，对齐 TenantRegionOption.tenantPrimaryName）
+    var tenantPrimaryName: String {
+        if !tenancyName.isEmpty && !tenancyName.hasPrefix("ocid1.") { return tenancyName }
+        if !customAlias.isEmpty && !customAlias.hasPrefix("ocid1.") { return customAlias }
+        if !userName.isEmpty && !userName.hasPrefix("ocid1.") { return userName }
+        return String(id)
+    }
+
     /// 编辑弹窗默认值：未设置过自定义名称时输入框默认为空（Web editCustomName 同款逻辑）
     var editNameDefault: String { customAlias }
     /// Web：trial=violet / official=cyan / 其他=orange 软底徽章
