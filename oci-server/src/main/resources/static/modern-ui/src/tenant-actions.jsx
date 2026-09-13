@@ -104,47 +104,200 @@ function useTenantProxyQuickModal() {
       }
     };
     const render = () => {
+      const isCreate = state.mode === 'create';
       shell.openModal({
-        title: tr('tenant.0b8373'),
-        subtitle: tr('tenant.b59d91').replace('{0}',tenantLabel(tenant)),
+        title: tr('tenant.0b8373') || '快速配置代理',
+        subtitle: (tr('tenant.b59d91') || '为租户 {0} 绑定专属网络代理').replace('{0}', tenantLabel(tenant)),
         icon: 'shield', iconColor: 'var(--accent)', size: 'md',
         body: (
-          <div style={{ padding: 8 }}>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-              <Button size="sm" variant={state.mode === 'bind' ? 'primary' : 'outline'} onClick={() => { state.mode = 'bind'; render(); }}>{tr('tenant.657927')}</Button>
-              <Button size="sm" variant={state.mode === 'create' ? 'primary' : 'outline'} onClick={() => { state.mode = 'create'; render(); }}>{tr('tenant.0d1f6f')}</Button>
+          <div style={{ padding: '6px 4px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ fontSize: 11.5, color: 'var(--fg-3)', lineHeight: 1.5 }}>
+              选择已有代理，或直接新建并绑定到该租户（其它租户后续也可共享绑定）。
             </div>
-            {state.mode === 'bind' ? (
-              state.loading ? <div style={{ padding: 20, textAlign: 'center', color: 'var(--fg-3)' }}>{tr('tenant.e9cdf3')}</div> : (
-                <div style={{ display: 'grid', gap: 6 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 9, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer' }}>
-                    <input type="radio" checked={!state.selectedId} onChange={() => { state.selectedId = ''; render(); }} />
-                    <span>{tr('tenant.100392')}</span>
+
+            {/* 模式切换 Tab 胶囊 */}
+            <div style={{ display: 'inline-flex', gap: 6, background: 'var(--bg-2)', padding: 3, borderRadius: 6, border: '1px solid var(--border)', alignSelf: 'flex-start' }}>
+              <button
+                type="button"
+                onClick={() => { state.mode = 'bind'; render(); }}
+                style={{
+                  padding: '4px 12px', borderRadius: 4, fontSize: 11.5, fontWeight: !isCreate ? 600 : 400,
+                  background: !isCreate ? 'var(--accent)' : 'transparent',
+                  color: !isCreate ? '#fff' : 'var(--fg-2)',
+                  border: 'none', cursor: 'pointer', transition: 'all 120ms',
+                }}
+              >
+                {tr('tenant.657927') || '选择已有代理'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { state.mode = 'create'; render(); }}
+                style={{
+                  padding: '4px 12px', borderRadius: 4, fontSize: 11.5, fontWeight: isCreate ? 600 : 400,
+                  background: isCreate ? 'var(--accent)' : 'transparent',
+                  color: isCreate ? '#fff' : 'var(--fg-2)',
+                  border: 'none', cursor: 'pointer', transition: 'all 120ms',
+                }}
+              >
+                {tr('tenant.0d1f6f') || '新建并绑定'}
+              </button>
+            </div>
+
+            {!isCreate ? (
+              state.loading ? (
+                <div style={{ padding: 36, textAlign: 'center', color: 'var(--fg-3)', fontSize: 12 }}>
+                  <Icon name="loader-2" size={18} className="spin" style={{ display: 'block', margin: '0 auto 8px', opacity: 0.6 }} />
+                  {tr('tenant.e9cdf3') || '加载代理列表中…'}
+                </div>
+              ) : (
+                <div style={{
+                  display: 'flex', flexDirection: 'column', gap: 6,
+                  maxHeight: 320, overflowY: 'auto', padding: '2px',
+                }}>
+                  {/* 直连选项 */}
+                  <label style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+                    border: '1px solid ' + (!state.selectedId ? 'var(--accent)' : 'var(--border)'),
+                    background: !state.selectedId ? 'oklch(from var(--accent) l c h / 0.08)' : 'var(--bg-2)',
+                    borderRadius: 'var(--radius)', cursor: 'pointer', transition: 'all 100ms',
+                  }}>
+                    <input
+                      type="radio"
+                      name="proxyQuickSelect"
+                      checked={!state.selectedId}
+                      onChange={() => { state.selectedId = ''; render(); }}
+                      style={{ accentColor: 'var(--accent)', cursor: 'pointer' }}
+                    />
+                    <Icon name="globe" size={14} style={{ color: !state.selectedId ? 'var(--accent)' : 'var(--fg-3)' }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12, fontWeight: !state.selectedId ? 600 : 500, color: !state.selectedId ? 'var(--accent)' : 'var(--fg-0)' }}>
+                        {tr('tenant.100392') || '直连（解绑专属代理，走全局共享池）'}
+                      </div>
+                    </div>
                   </label>
-                  {state.proxies.map(p => (
-                    <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 9, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer' }}>
-                      <input type="radio" checked={String(p.id) === state.selectedId} onChange={() => { state.selectedId = String(p.id); render(); }} />
-                      <span style={{ flex: 1 }}>{p.customName || `${p.proxyType || 'HTTP'} ${p.proxyHost}:${p.proxyPort}`}</span>
-                      <span className="mono" style={{ color: 'var(--fg-3)', fontSize: 10.5 }}>{p.proxyHost}:{p.proxyPort}</span>
-                    </label>
-                  ))}
-                  {!state.proxies.length && <div style={{ color: 'var(--fg-3)', padding: 12 }}>{tr('tenant.8160aa')}</div>}
+
+                  {/* 已有代理选项 */}
+                  {state.proxies.map(p => {
+                    const isSelected = String(p.id) === state.selectedId;
+                    return (
+                      <label key={p.id} style={{
+                        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+                        border: '1px solid ' + (isSelected ? 'var(--accent)' : 'var(--border)'),
+                        background: isSelected ? 'oklch(from var(--accent) l c h / 0.08)' : 'var(--bg-2)',
+                        borderRadius: 'var(--radius)', cursor: 'pointer', transition: 'all 100ms',
+                      }}>
+                        <input
+                          type="radio"
+                          name="proxyQuickSelect"
+                          checked={isSelected}
+                          onChange={() => { state.selectedId = String(p.id); render(); }}
+                          style={{ accentColor: 'var(--accent)', cursor: 'pointer' }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 12, fontWeight: isSelected ? 600 : 500, color: isSelected ? 'var(--accent)' : 'var(--fg-0)' }}>
+                              {p.customName || `代理 #${p.id}`}
+                            </span>
+                            <span className="mono" style={{
+                              fontSize: 9.5, padding: '1px 5px', borderRadius: 3,
+                              background: p.proxyType === 'SOCKS5' ? 'var(--cyan-soft)' : 'var(--info-soft)',
+                              color: p.proxyType === 'SOCKS5' ? 'var(--cyan)' : 'var(--info)',
+                              fontWeight: 600,
+                            }}>
+                              {p.proxyType || 'HTTP'}
+                            </span>
+                          </div>
+                          <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>
+                            {p.proxyHost}:{p.proxyPort}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+
+                  {!state.proxies.length && (
+                    <div style={{
+                      padding: '24px 16px', textAlign: 'center', color: 'var(--fg-3)',
+                      background: 'var(--bg-2)', border: '1px dashed var(--border)', borderRadius: 'var(--radius)',
+                      fontSize: 12,
+                    }}>
+                      <Icon name="inbox" size={20} style={{ display: 'block', margin: '0 auto 6px', opacity: 0.4 }} />
+                      {tr('tenant.8160aa') || '暂无可绑定代理，可切换至「新建并绑定」'}
+                    </div>
+                  )}
                 </div>
               )
             ) : (
-              <div style={{ display: 'grid', gap: 10 }}>
-                <FormRow label={tr('tenant.664795')}><TextInput value={state.customName} onChange={v => { state.customName = v; render(); }} placeholder={tr('tenant.192969')} /></FormRow>
-                <FormRow label={tr('tenant.89acb7')}><CustomDropdown value={state.proxyType} onChange={v => { state.proxyType = v; render(); }} height={32} width="100%"><option value="HTTP">HTTP</option><option value="HTTPS">HTTPS</option><option value="SOCKS5">SOCKS5</option></CustomDropdown></FormRow>
-                <FormRow label={tr('tenant.7c1212')} required><TextInput mono value={state.proxyHost} onChange={v => { state.proxyHost = v; render(); }} placeholder="127.0.0.1" /></FormRow>
-                <FormRow label={tr('tenant.c76cfe')} required><NumberInput value={state.proxyPort} onChange={v => { state.proxyPort = v; render(); }} min={1} max={65535} /></FormRow>
-                <FormRow label={tr('tenant.819767')}><TextInput value={state.proxyUsername} onChange={v => { state.proxyUsername = v; render(); }} placeholder={tr('tenant.c20cba')} /></FormRow>
-                <FormRow label={tr('tenant.a81052')}><TextInput type="password" value={state.proxyPassword} onChange={v => { state.proxyPassword = v; render(); }} placeholder={tr('tenant.c20cba')} /></FormRow>
-                <FormRow label={tr('tenant.ffdf01')}><CustomDropdown value={String(state.forceProxy)} onChange={v => { state.forceProxy = v; render(); }} height={32} width="100%"><option value="0">{tr('tenant.781c06')}</option><option value="1">{tr('tenant.4def0b')}</option></CustomDropdown></FormRow>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <FormRow label={tr('tenant.664795') || "自定义名称"}>
+                  <TextInput value={state.customName} onChange={v => { state.customName = v; render(); }} placeholder={tr('tenant.192969') || "如：专属出口-01"} />
+                </FormRow>
+                <FormRow label={tr('tenant.89acb7') || "代理协议"} required>
+                  <RadioGroup
+                    value={state.proxyType}
+                    onChange={v => { state.proxyType = v; render(); }}
+                    options={[
+                      { value: 'HTTP', label: 'HTTP', icon: 'globe' },
+                      { value: 'HTTPS', label: 'HTTPS', icon: 'shield' },
+                      { value: 'SOCKS5', label: 'SOCKS5', icon: 'shuffle' },
+                    ]}
+                  />
+                </FormRow>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
+                  <FormRow label={tr('tenant.7c1212') || "代理地址"} required>
+                    <TextInput mono value={state.proxyHost} onChange={v => { state.proxyHost = v; render(); }} placeholder="192.168.1.1 / 127.0.0.1" />
+                  </FormRow>
+                  <FormRow label={tr('tenant.c76cfe') || "端口"} required>
+                    <NumberInput value={state.proxyPort} onChange={v => { state.proxyPort = v; render(); }} min={1} max={65535} />
+                  </FormRow>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <FormRow label={tr('tenant.819767') || "用户名"}>
+                    <TextInput mono value={state.proxyUsername} onChange={v => { state.proxyUsername = v; render(); }} placeholder={tr('tenant.c20cba') || "留空表示无鉴权"} />
+                  </FormRow>
+                  <FormRow label={tr('tenant.a81052') || "密码"}>
+                    <TextInput mono type="password" value={state.proxyPassword} onChange={v => { state.proxyPassword = v; render(); }} placeholder={tr('tenant.c20cba') || "留空表示无鉴权"} />
+                  </FormRow>
+                </div>
+                <FormRow label={tr('tenant.ffdf01') || "强制使用代理"}>
+                  <CustomDropdown value={String(state.forceProxy)} onChange={v => { state.forceProxy = v; render(); }} height={32} width="100%">
+                    <option value="0">{tr('tenant.781c06') || "非强制 (可回退直连)"}</option>
+                    <option value="1">{tr('tenant.4def0b') || "强制 (严格走代理)"}</option>
+                  </CustomDropdown>
+                </FormRow>
+
+                {/* 动态盾牌释义横幅 */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '8px 12px', borderRadius: 6,
+                  background: Number(state.forceProxy) === 1 ? 'var(--orange-soft)' : 'var(--accent-soft)',
+                  border: '1px solid ' + (Number(state.forceProxy) === 1 ? 'oklch(from var(--orange) l c h / 0.25)' : 'oklch(from var(--accent) l c h / 0.25)'),
+                  fontSize: 11, color: Number(state.forceProxy) === 1 ? 'var(--orange)' : 'var(--accent)',
+                }}>
+                  <Icon name={Number(state.forceProxy) === 1 ? 'alert-triangle' : 'shield'} size={13} style={{ flexShrink: 0 }} />
+                  <span>
+                    {Number(state.forceProxy) === 1
+                      ? '已开启强制：代理不通时不回退，拒绝向云厂商发起请求'
+                      : '非强制：代理不通时允许系统自动平滑回退直连'}
+                  </span>
+                </div>
               </div>
             )}
           </div>
         ),
-        footer: <><Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('tenant.625fb2')}</Button><Button variant="primary" size="md" icon="save" disabled={state.loading || state.saving} onClick={save}>{tr('tenant.e57de7')}</Button></>,
+        footer: (
+          <>
+            <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('tenant.625fb2') || '取消'}</Button>
+            <div style={{ flex: 1 }} />
+            <Button
+              variant="primary" size="md" icon="check"
+              disabled={state.loading || state.saving || (isCreate && (!state.proxyHost.trim() || !state.proxyPort))}
+              onClick={save}
+            >
+              {isCreate ? '新建并绑定' : (tr('tenant.e57de7') || '保存绑定')}
+            </Button>
+          </>
+        ),
       });
     };
     render();
