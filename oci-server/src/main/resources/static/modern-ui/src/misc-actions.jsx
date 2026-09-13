@@ -2,120 +2,487 @@
 
 // ─── Proxy actions ─────────────────────────────────────────────
 
+function ProxyEditModalBody({ initialData, isNew, onSaved, shell, tr, lang }) {
+  const [state, setState] = React.useState({
+    id: initialData?.id,
+    name: initialData?.name || initialData?.customName || '',
+    type: initialData?.proxyType || initialData?.type || 'SOCKS5',
+    host: initialData?.proxyHost || initialData?.host || '',
+    port: initialData?.proxyPort || initialData?.port || 1080,
+    username: initialData?.proxyUsername || initialData?.username || '',
+    password: initialData?.proxyPassword || '',
+    availableStatus: initialData?.availableStatus == null ? 1 : Number(initialData.availableStatus),
+    forceProxy: initialData?.forceProxy == null ? 0 : Number(initialData.forceProxy),
+    tenants: initialData?.tenantIds || initialData?.tenants || [],
+  });
+
+  const [tenantOptions, setTenantOptions] = React.useState([]);
+  const [loadingTenants, setLoadingTenants] = React.useState(true);
+  const [tenantSearch, setTenantSearch] = React.useState('');
+  const [testing, setTesting] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const pageData = await window.ociApi.getPage('/tenants/list/json', { page: 0, size: 500, cloudType: 1 });
+        if (active) setTenantOptions((pageData.content || []).filter(t => t.isActive !== false));
+      } catch (e) {
+        if (active) setTenantOptions([]);
+      } finally {
+        if (active) setLoadingTenants(false);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
+  const filteredTenants = React.useMemo(() => {
+    if (!tenantSearch.trim()) return tenantOptions;
+    const q = tenantSearch.toLowerCase().trim();
+    return tenantOptions.filter(t => {
+      const label = (getTenantLabel(t, lang) || '').toLowerCase();
+      const name = (t.name || t.tenancyName || '').toLowerCase();
+      const reg = (t.region || '').toLowerCase();
+      return label.includes(q) || name.includes(q) || reg.includes(q);
+    });
+  }, [tenantOptions, tenantSearch, lang]);
+
+  const testConn = async () => {
+    if (testing) return;
+    setTesting(true);
+    try {
+      let result;
+      if (state.id) {
+        result = await window.ociServices.proxy.testConnection({ id: state.id });
+      } else {
+        result = await window.ociServices.proxy.testConnection({
+          proxyType: state.type,
+          proxyHost: state.host.trim(),
+          proxyPort: Number(state.port),
+          proxyUsername: state.username.trim(),
+          proxyPassword: state.password.trim(),
+        });
+      }
+      if (result && result.success === false) throw new Error(result.message || tr('proxy.test.fail') || '连接失败');
+      const connected = result?.data?.connected ?? result?.connected ?? true;
+      shell.showToast(connected ? (tr('proxy.connected') || '代理连接成功') : (tr('proxy.unavailable') || '代理无法连接'), { kind: connected ? 'success' : 'error' });
+      if (onSaved) await onSaved();
+    } catch (e) {
+      shell.showToast(e.message || '测试连接失败', { kind: 'error' });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const save = async () => {
+    if (saving) return;
+    if (!state.name.trim() || !state.host.trim() || !state.port) {
+      shell.showToast('请填写完整的自定义名称、主机地址与端口', { kind: 'warning' });
+      return;
+    }
+    setSaving(true);
+    try {
+      const result = await window.ociServices.proxy.saveOrUpdate({
+        id: isNew ? undefined : state.id,
+        proxyType: state.type,
+        proxyHost: state.host.trim(),
+        proxyPort: Number(state.port),
+        proxyUsername: state.username.trim() || '',
+        proxyPassword: state.password.trim() || undefined,
+        availableStatus: Number(state.availableStatus) === 1 ? 1 : 0,
+        forceProxy: Number(state.forceProxy) === 1 ? 1 : 0,
+        tenantIds: state.tenants || [],
+        customName: state.name.trim(),
+      });
+      if (result && result.success === false) throw new Error(result.message || tr('proxy.save.fail') || '保存失败');
+      shell.closeModal();
+      if (onSaved) await onSaved();
+      shell.showToast(isNew ? (tr('proxy.added') || '代理添加成功').replace('{name}', state.name) : (tr('proxy.updated') || '代理更新成功').replace('{name}', state.name), { kind: 'success' });
+    } catch (e) {
+      shell.showToast(e.message || '保存失败', { kind: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  React.useEffect(() => {
+    window.__proxyModalActions = { testConn, save, disabled: !state.name.trim() || !state.host.trim() || !state.port, testing, saving };
+    return () => { window.__proxyModalActions = null; };
+  }, [state, testing, saving]);
+
+  const toggleTenant = (tid) => {
+    setState(s => {
+      const exists = s.tenants.includes(tid);
+      const next = exists ? s.tenants.filter(x => x !== tid) : [...s.tenants, tid];
+      return { ...s, tenants: next };
+    });
+  };
+
+  const selectAllTenants = () => {
+    setState(s => ({ ...s, tenants: tenantOptions.map(t => t.id) }));
+  };
+
+  const clearAllTenants = () => {
+    setState(s => ({ ...s, tenants: [] }));
+  };
+
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'minmax(0, 1.45fr) 280px',
+      gap: 16,
+      padding: '4px 2px',
+      minHeight: 440,
+    }}>
+      {/* ─── 左侧：代理参数卡片 ─── */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 10,
+        background: 'var(--bg-2)', border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)', padding: '14px 16px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: 7,
+            background: 'var(--cyan-soft)', color: 'var(--cyan)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            <Icon name="server" size={14} />
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-0)' }}>代理参数</div>
+            <div style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>类型、地址、认证与可用状态</div>
+          </div>
+        </div>
+
+        <FormRow label={tr("proxy.name") || "自定义名称"} required>
+          <TextInput
+            value={state.name}
+            onChange={v => setState(s => ({ ...s, name: v }))}
+            placeholder={tr("proxy.namePh") || "如：新加坡备用 SOCKS5"}
+          />
+        </FormRow>
+
+        <FormRow label={tr("proxy.protocol") || "代理类型"} required>
+          <RadioGroup
+            value={state.type}
+            onChange={v => setState(s => ({ ...s, type: v }))}
+            options={[
+              { value: 'SOCKS5', label: 'SOCKS5', icon: 'shuffle' },
+              { value: 'HTTP', label: 'HTTP', icon: 'globe' },
+              { value: 'HTTPS', label: 'HTTPS', icon: 'shield' },
+            ]}
+          />
+        </FormRow>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
+          <FormRow label={tr("proxy.host") || "代理地址"} required>
+            <TextInput
+              mono
+              value={state.host}
+              onChange={v => setState(s => ({ ...s, host: v }))}
+              placeholder="192.168.1.1 / 127.0.0.1"
+            />
+          </FormRow>
+          <FormRow label={tr("proxy.port") || "端口"} required>
+            <NumberInput
+              value={state.port}
+              onChange={v => setState(s => ({ ...s, port: v }))}
+              min={1} max={65535}
+            />
+          </FormRow>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <FormRow label={tr("proxy.usernameOptional") || "用户名"}>
+            <TextInput
+              mono
+              value={state.username}
+              onChange={v => setState(s => ({ ...s, username: v }))}
+              placeholder="留空表示无鉴权"
+            />
+          </FormRow>
+          <FormRow label={tr("proxy.passwordOptional") || "密码"}>
+            <TextInput
+              mono
+              type="password"
+              value={state.password}
+              onChange={v => setState(s => ({ ...s, password: v }))}
+              placeholder="留空表示无鉴权"
+            />
+          </FormRow>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <FormRow label="可用状态" required>
+            <CustomDropdown
+              value={String(state.availableStatus)}
+              onChange={v => setState(s => ({ ...s, availableStatus: Number(v) }))}
+              height={32}
+              width="100%"
+            >
+              <option value="1">启用</option>
+              <option value="0">禁用</option>
+            </CustomDropdown>
+          </FormRow>
+          <FormRow label="强制使用代理" required>
+            <CustomDropdown
+              value={String(state.forceProxy)}
+              onChange={v => setState(s => ({ ...s, forceProxy: Number(v) }))}
+              height={32}
+              width="100%"
+            >
+              <option value="0">否 (可回退直连)</option>
+              <option value="1">是 (严格走代理)</option>
+            </CustomDropdown>
+          </FormRow>
+        </div>
+
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '8px 12px', borderRadius: 6,
+          background: state.forceProxy === 1 ? 'var(--orange-soft)' : 'var(--accent-soft)',
+          border: '1px solid ' + (state.forceProxy === 1 ? 'oklch(from var(--orange) l c h / 0.25)' : 'oklch(from var(--accent) l c h / 0.25)'),
+          fontSize: 11, color: state.forceProxy === 1 ? 'var(--orange)' : 'var(--accent)',
+          marginTop: 2,
+        }}>
+          <Icon name={state.forceProxy === 1 ? 'alert-triangle' : 'shield'} size={13} style={{ flexShrink: 0 }} />
+          <span>
+            {state.forceProxy === 1
+              ? '已开启强制代理：代理链路异常时不回退，直接拒绝云厂商操作'
+              : '非强制代理：代理链路异常或不通时，允许系统平滑回退直连'}
+          </span>
+        </div>
+      </div>
+
+      {/* ─── 右侧：绑定租户专区 ─── */}
+      <div style={{
+        display: 'flex', flexDirection: 'column',
+        background: 'var(--bg-2)', border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)', padding: '14px',
+        minWidth: 0,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: 7,
+            background: 'var(--info-soft)', color: 'var(--info)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            <Icon name="link" size={14} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-0)' }}>绑定租户</div>
+            <div style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>多选；留空为全局共享池</div>
+          </div>
+        </div>
+
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '8px 10px', borderRadius: 6,
+          background: state.tenants.length === 0 ? 'var(--bg-3)' : 'var(--accent-soft)',
+          border: '1px solid ' + (state.tenants.length === 0 ? 'var(--border)' : 'oklch(from var(--accent) l c h / 0.25)'),
+          marginBottom: 10,
+        }}>
+          <Icon
+            name={state.tenants.length === 0 ? "globe" : "users"}
+            size={13}
+            style={{ color: state.tenants.length === 0 ? 'var(--fg-3)' : 'var(--accent)', flexShrink: 0 }}
+          />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 10, color: 'var(--fg-3)', fontWeight: 500 }}>当前归属</div>
+            <div style={{
+              fontSize: 11.5, fontWeight: 600,
+              color: state.tenants.length === 0 ? 'var(--fg-1)' : 'var(--accent)',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {state.tenants.length === 0 ? '全局共享代理池' : `专属代理（已绑定 ${state.tenants.length} 租户）`}
+            </div>
+          </div>
+          {state.tenants.length > 0 && (
+            <button
+              type="button"
+              onClick={clearAllTenants}
+              title="解除全部绑定设为全局共享"
+              style={{
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                fontSize: 10, color: 'var(--fg-3)', textDecoration: 'underline',
+              }}
+            >
+              清空
+            </button>
+          )}
+        </div>
+
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '5px 8px', borderRadius: 6,
+          background: 'var(--bg-1)', border: '1px solid var(--border)',
+          marginBottom: 8,
+        }}>
+          <Icon name="search" size={12} style={{ color: 'var(--fg-3)', flexShrink: 0 }} />
+          <input
+            value={tenantSearch}
+            onChange={e => setTenantSearch(e.target.value)}
+            placeholder="搜索租户名 / 区域..."
+            style={{
+              flex: 1, minWidth: 0, background: 'transparent',
+              border: 'none', outline: 'none',
+              fontSize: 11, color: 'var(--fg-0)',
+              fontFamily: 'inherit',
+            }}
+          />
+          {tenantSearch && (
+            <button
+              type="button"
+              onClick={() => setTenantSearch('')}
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--fg-3)', padding: 0 }}
+            >
+              <Icon name="x" size={11} />
+            </button>
+          )}
+        </div>
+
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          fontSize: 10.5, color: 'var(--fg-3)', marginBottom: 6, padding: '0 2px',
+        }}>
+          <span>共 {filteredTenants.length} 个租户</span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <span
+              onClick={selectAllTenants}
+              style={{ cursor: 'pointer', color: 'var(--accent)' }}
+            >
+              全选
+            </span>
+            <span>·</span>
+            <span
+              onClick={clearAllTenants}
+              style={{ cursor: 'pointer', color: 'var(--fg-3)' }}
+            >
+              重置
+            </span>
+          </div>
+        </div>
+
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          background: 'var(--bg-1)',
+          border: '1px solid var(--border)',
+          borderRadius: 6,
+          padding: '4px',
+          display: 'flex', flexDirection: 'column', gap: 2,
+          minHeight: 180,
+          maxHeight: 250,
+        }}>
+          {loadingTenants ? (
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--fg-3)', fontSize: 11 }}>
+              <Icon name="loader-2" size={14} className="spin" style={{ display: 'block', margin: '0 auto 6px', opacity: 0.5 }} />
+              加载租户…
+            </div>
+          ) : filteredTenants.length === 0 ? (
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--fg-3)', fontSize: 11 }}>
+              无匹配租户
+            </div>
+          ) : (
+            filteredTenants.map(t => {
+              const checked = state.tenants.includes(t.id);
+              const label = getTenantLabel(t, lang);
+              return (
+                <label
+                  key={t.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '6px 8px', borderRadius: 4,
+                    cursor: 'pointer',
+                    background: checked ? 'oklch(from var(--accent) l c h / 0.08)' : 'transparent',
+                    border: '1px solid ' + (checked ? 'oklch(from var(--accent) l c h / 0.2)' : 'transparent'),
+                    transition: 'all 80ms',
+                  }}
+                  onMouseEnter={e => { if (!checked) e.currentTarget.style.background = 'var(--bg-2)'; }}
+                  onMouseLeave={e => { if (!checked) e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleTenant(t.id)}
+                    style={{ cursor: 'pointer', accentColor: 'var(--accent)' }}
+                  />
+                  <span style={{
+                    flex: 1, minWidth: 0,
+                    fontSize: 11.5,
+                    fontWeight: checked ? 600 : 400,
+                    color: checked ? 'var(--accent)' : 'var(--fg-0)',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }} title={label}>
+                    {label}
+                  </span>
+                  {t.region && (
+                    <span className="mono" style={{
+                      fontSize: 9, color: 'var(--fg-3)', flexShrink: 0,
+                    }}>
+                      {t.region}
+                    </span>
+                  )}
+                </label>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function useProxyEditModal(onSaved) {
   const shell = useShell();
   const { t: tr, lang } = useT();
   return React.useCallback(async (existing) => {
     const isNew = !existing;
-    const state = existing ? { ...existing, username: existing.proxyUsername || '', password: '', tenants: existing.tenantIds || [], tenantOptions: [], loadingTenants: true } : {
-      name: '', type: 'SOCKS5', host: '', port: 1080,
-      username: '', password: '', tenants: [], tenantOptions: [], loadingTenants: true,
-    };
-    const render = () => {
-      shell.openModal({
-        title: isNew ? tr('proxy.add.title') : tr('proxy.edit.title').replace('{name}', existing.name),
-        subtitle: tr('proxy.subtitle'),
-        icon: 'shuffle',
-        iconColor: 'var(--cyan)',
-        size: 'md',
-        body: (
-          <div style={{ padding: 22 }}>
-            <FormRow label={tr("proxy.name")} required>
-              <TextInput value={state.name} onChange={v => { state.name = v; render(); }} placeholder={tr("proxy.namePh")} />
-            </FormRow>
-
-            <FormRow label={tr("proxy.protocol")}>
-              <RadioGroup
-                value={state.type}
-                onChange={v => { state.type = v; render(); }}
-                options={[
-                  { value: 'SOCKS5', label: 'SOCKS5', icon: 'shuffle' },
-                  { value: 'HTTP', label: 'HTTP', icon: 'globe' },
-                  { value: 'HTTPS', label: 'HTTPS', icon: 'shield' },
-                ]}
-              />
-            </FormRow>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
-              <FormRow label={tr("proxy.host")} required>
-                <TextInput mono value={state.host} onChange={v => { state.host = v; render(); }} placeholder={tr("proxy.hostPh")} />
-              </FormRow>
-              <FormRow label={tr("proxy.port")} required>
-                <NumberInput value={state.port} onChange={v => { state.port = v; render(); }} min={1} max={65535} />
-              </FormRow>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <FormRow label={tr("proxy.usernameOptional")}>
-                <TextInput mono value={state.username} onChange={v => { state.username = v; render(); }} placeholder={tr("proxy.usernamePh")} />
-              </FormRow>
-              <FormRow label={tr("proxy.passwordOptional")}>
-                <TextInput mono value={state.password} onChange={v => { state.password = v; render(); }} placeholder="••••••••" />
-              </FormRow>
-            </div>
-
-            <FormRow label={tr('proxy.bindTenants').replace('{n}', state.tenants.length)} hint={tr('proxy.bindTenantsHint')}>
-              <CheckboxGroup
-                value={state.tenants}
-                onChange={v => { state.tenants = v; render(); }}
-                columns={2}
-                options={state.loadingTenants ? [] : state.tenantOptions.map(t => ({
-                  value: t.id, label: getTenantLabel(t, lang),
-                }))}
-              />
-            </FormRow>
-          </div>
-        ),
-        footer: (
-          <>
-            <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('common.cancel')}</Button>
-            <Button variant="outline" size="md" icon="wifi" disabled={!state.host || !state.id} onClick={async () => {
-              try {
-                const result = await window.ociServices.proxy.testConnection({ id: state.id });
-                if (result && result.success === false) throw new Error(result.message || tr('proxy.test.fail'));
-                const connected = result?.data?.connected ?? result?.connected;
-                shell.showToast(connected ? tr('proxy.connected') : tr('proxy.unavailable'), { kind: connected ? 'success' : 'error' });
-                if (onSaved) await onSaved();
-              } catch (e) { shell.showToast(e.message || tr('proxy.test.fail'), { kind: 'error' }); }
-            }}>{tr('proxy.testConn')}</Button>
-            <Button
-              variant="primary" size="md" icon="check"
-              disabled={!state.name || !state.host || !state.port}
-              onClick={async () => {
-                try {
-                  const result = await window.ociServices.proxy.saveOrUpdate({
-                    id: isNew ? undefined : state.id,
-                    proxyType: state.type,
-                    proxyHost: state.host,
-                    proxyPort: Number(state.port),
-                    proxyUsername: state.username || '',
-                    proxyPassword: state.password || undefined,
-                    availableStatus: state.availableStatus == null ? 1 : Number(state.availableStatus),
-                    forceProxy: state.forceProxy == null ? 0 : Number(state.forceProxy),
-                    tenantIds: state.tenants || [],
-                    customName: state.name,
-                  });
-                  if (result && result.success === false) throw new Error(result.message || tr('proxy.save.fail'));
-                  shell.closeModal();
-                  if (onSaved) await onSaved();
-                  shell.showToast(isNew ? tr('proxy.added').replace('{name}', state.name) : tr('proxy.updated').replace('{name}', state.name), { kind: 'success' });
-                } catch (e) { shell.showToast(e.message || tr('proxy.save.fail'), { kind: 'error' }); }
-              }}
-            >{isNew ? tr('proxy.add') : tr('common.save')}</Button>
-          </>
-        ),
-      });
-    };
-    render();
-    (async () => {
-      try {
-        const pageData = await window.ociApi.getPage('/tenants/list/json', { page: 0, size: 500, cloudType: 1 });
-        state.tenantOptions = (pageData.content || []).filter(t => t.isActive !== false);
-      } catch (e) { state.tenantOptions = []; }
-      state.loadingTenants = false;
-      render();
-    })();
-  }, [shell, onSaved]);
+    shell.openModal({
+      title: isNew ? (tr('proxy.add.title') || '新增代理配置') : (tr('proxy.edit.title') || '编辑代理配置 · {name}').replace('{name}', existing?.customName || existing?.name || ''),
+      subtitle: tr('proxy.subtitle') || '配置云厂商 API 专用的前置网络代理',
+      icon: 'shuffle',
+      iconColor: 'var(--cyan)',
+      size: 'lg',
+      body: (
+        <ProxyEditModalBody
+          initialData={existing}
+          isNew={isNew}
+          onSaved={onSaved}
+          shell={shell}
+          tr={tr}
+          lang={lang}
+        />
+      ),
+      footer: (
+        <>
+          <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('common.cancel') || '取消'}</Button>
+          <Button
+            variant="outline"
+            size="md"
+            icon="wifi"
+            onClick={() => {
+              if (window.__proxyModalActions?.testConn) window.__proxyModalActions.testConn();
+            }}
+          >
+            {tr('proxy.testConn') || '测试连接'}
+          </Button>
+          <div style={{ flex: 1 }} />
+          <Button
+            variant="primary"
+            size="md"
+            icon="check"
+            onClick={() => {
+              if (window.__proxyModalActions?.save) window.__proxyModalActions.save();
+            }}
+          >
+            {isNew ? (tr('proxy.add') || '添加代理') : (tr('common.save') || '保存更改')}
+          </Button>
+        </>
+      ),
+    });
+  }, [shell, tr, lang, onSaved]);
 }
 
 function useProxyTestAllModal(onFinished) {
