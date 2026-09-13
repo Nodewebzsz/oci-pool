@@ -56,12 +56,18 @@
     const shell = useShell();
 
     const tenantDbId = ctx?.tenantId;
+    const initialRegionCode = ctx?.regionCode || ctx?.region || '';
 
-    // 基础租户与区域状态
+    // 基础租户与区域状态 (第一帧立即兜底，确保区域下拉框绝不空白)
     const [tenant, setTenant] = useState(null);
     const [loadingTenant, setLoadingTenant] = useState(true);
-    const [regionOptions, setRegionOptions] = useState([]);
-    const [selectedRegionTenantId, setSelectedRegionTenantId] = useState(tenantDbId ? String(tenantDbId) : '');
+    const [regionOptions, setRegionOptions] = useState(() => {
+      if (tenantDbId) {
+        return [{ id: String(tenantDbId), region: initialRegionCode, isHomeRegion: true }];
+      }
+      return [];
+    });
+    const [selectedRegionTenantId, setSelectedRegionTenantId] = useState(() => String(tenantDbId || ''));
 
     // 配置参数状态
     const [architecture, setArchitecture] = useState('ARM'); // ARM | AMD
@@ -89,7 +95,7 @@
     // 提交锁定状态
     const [saving, setSaving] = useState(false);
 
-    // 1. 初始化拉取租户详情与已订阅多区域列表
+    // 1. 初始化拉取租户真实多区域列表 (严格调取标准的 /tenants/listRegions 接口)
     useEffect(() => {
       let active = true;
       if (!tenantDbId) return;
@@ -97,34 +103,33 @@
       (async () => {
         setLoadingTenant(true);
         try {
-          // 拉取租户基本信息
-          const res = await window.ociApi.request(`/tenants/getTenant/${tenantDbId}`, { method: 'POST' });
-          const t = res?.data || res;
-          if (active && t) {
-            setTenant(t);
-            setRemark(`${t.tenancyName || t.name || 'tenant'}-arm-high`);
-          }
+          const raw = await window.ociApi.request(`/tenants/listRegions?parentId=${encodeURIComponent(tenantDbId)}`);
+          const list = Array.isArray(raw) ? raw : (raw && raw.data ? raw.data : []);
+          if (active && Array.isArray(list) && list.length > 0) {
+            setRegionOptions(list);
+            const root = list.find(r => String(r.id) === String(tenantDbId))
+                      || list.find(r => r.isHomeRegion)
+                      || list[0];
+            setTenant(root);
 
-          // 动态拉取多区域选项
-          const regsRes = await window.ociServices.tenant.listRegions({ parentId: tenantDbId });
-          const regs = regsRes?.data || regsRes || [];
-          if (active) {
-            if (Array.isArray(regs) && regs.length > 0) {
-              setRegionOptions(regs);
-              setSelectedRegionTenantId(String(regs[0].id || tenantDbId));
-            } else if (t) {
-              setRegionOptions([{ id: tenantDbId, tenancyName: t.tenancyName || t.name, region: t.region }]);
+            // 优先选中路由携带的目标区域，否则默认选中 root 区域
+            const targetRegion = list.find(r => r.region === initialRegionCode) || root;
+            if (targetRegion) {
+              setSelectedRegionTenantId(String(targetRegion.id));
             }
+
+            const tName = root.defName || root.tenancyName || root.userName || 'tenant';
+            setRemark(`${tName}-arm-high`);
           }
         } catch (e) {
-          console.warn('拉取租户/区域信息失败:', e);
+          console.warn('拉取租户/多区域信息失败:', e);
         } finally {
           if (active) setLoadingTenant(false);
         }
       })();
 
       return () => { active = false; };
-    }, [tenantDbId]);
+    }, [tenantDbId, initialRegionCode]);
 
     // 2. 真实探测系统镜像 (当租户/区域/架构切换时自动拉取真实可用镜像)
     const activeTenantId = selectedRegionTenantId || tenantDbId;
@@ -291,8 +296,10 @@
       });
     };
 
-    const tenantTitle = tenant?.tenancyName || tenant?.name || `租户 #${tenantDbId}`;
-    const regionName = (tenant?.region && window.REGION_MAP?.[tenant.region]?.simpleName) || tenant?.region || '主区域';
+    const displayName = tenant?.defName || tenant?.tenancyName || tenant?.userName || (tenantDbId ? `租户 #${tenantDbId}` : '');
+    const activeRegCode = (regionOptions.find(r => String(r.id) === String(selectedRegionTenantId))?.region) || tenant?.region || initialRegionCode || '';
+    const cityCn = (window.REGION_MAP && (window.REGION_MAP[activeRegCode]?.simpleName || window.REGION_MAP[activeRegCode]?.cn)) || activeRegCode || '主区域';
+    const subtitleText = displayName ? `${displayName} · ${cityCn}${activeRegCode ? ' (' + activeRegCode + ')' : ''}` : '创建开机任务';
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
@@ -314,7 +321,7 @@
               <span style={{ color: 'var(--fg-0)', fontWeight: 600 }}>创建开机任务</span>
             </div>
           }
-          subtitle={`${tenantTitle} · ${regionName}`}
+          subtitle={subtitleText}
           actions={
             <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
               <Button
@@ -420,20 +427,7 @@
                   </button>
                 </div>
 
-                {/* 目标租户展示 */}
-                <FormRow label="目标租户">
-                  <div style={{
-                    padding: '8px 12px', background: 'var(--bg-2)',
-                    border: '1px solid var(--border)', borderRadius: 6,
-                    display: 'flex', alignItems: 'center', gap: 8, fontSize: 12,
-                  }}>
-                    <Icon name="user" size={13} style={{ color: 'var(--fg-3)' }} />
-                    <span style={{ fontWeight: 600, color: 'var(--fg-0)' }}>{tenantTitle}</span>
-                    <span className="mono" style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>#{tenantDbId}</span>
-                  </div>
-                </FormRow>
-
-                {/* 目标区域选择 (多区域动态拉取联动) */}
+                {/* 部署区域选择 (对齐客户端 archCard，首帧即兜底绝不空白，支持多区域联动) */}
                 <FormRow label="部署目标区域" required hint="支持在主区域及已订阅的所有子区域中开机">
                   <CustomDropdown
                     value={selectedRegionTenantId}
@@ -442,10 +436,12 @@
                     width="100%"
                   >
                     {regionOptions.map(r => {
-                      const cName = (window.REGION_MAP?.[r.region]?.simpleName) || r.region;
+                      const rCode = r.region || initialRegionCode;
+                      const cName = (window.REGION_MAP && (window.REGION_MAP[rCode]?.simpleName || window.REGION_MAP[rCode]?.cn)) || rCode;
+                      const isHome = r.isHomeRegion ? ' (主区域)' : '';
                       return (
                         <option key={r.id} value={String(r.id)}>
-                          {cName} ({r.region}) · {r.tenancyName || tenantTitle}
+                          {cName} · {rCode}{isHome}
                         </option>
                       );
                     })}
