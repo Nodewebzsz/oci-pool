@@ -296,10 +296,15 @@
       });
     };
 
-    const displayName = tenant?.defName || tenant?.tenancyName || tenant?.userName || (tenantDbId ? `租户 #${tenantDbId}` : '');
-    const activeRegCode = (regionOptions.find(r => String(r.id) === String(selectedRegionTenantId))?.region) || tenant?.region || initialRegionCode || '';
-    const cityCn = (window.REGION_MAP && (window.REGION_MAP[activeRegCode]?.simpleName || window.REGION_MAP[activeRegCode]?.cn)) || activeRegCode || '主区域';
-    const subtitleText = displayName ? `${displayName} · ${cityCn}${activeRegCode ? ' (' + activeRegCode + ')' : ''}` : '创建开机任务';
+    // 严格遵循红字批注标准：真实租户名优先 (tenancyName)，去除别名
+    const realTenantName = (tenant?.tenancyName && !tenant.tenancyName.startsWith('ocid1.'))
+      ? tenant.tenancyName
+      : (tenant?.defName || tenant?.userName || (tenantDbId ? `租户 #${tenantDbId}` : ''));
+
+    // 区域规范化展示为单一中文城市名，去除重复括号
+    const activeRegRaw = (regionOptions.find(r => String(r.id) === String(selectedRegionTenantId))?.region) || tenant?.region || initialRegionCode || '';
+    const activeCityCn = (window.REGION_MAP && (window.REGION_MAP[activeRegRaw]?.simpleName || window.REGION_MAP[activeRegRaw]?.cn)) || activeRegRaw || '主区域';
+    const subtitleText = realTenantName ? `${realTenantName} · ${activeCityCn}` : '创建开机任务';
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
@@ -436,12 +441,13 @@
                     width="100%"
                   >
                     {regionOptions.map(r => {
+                      const optTenant = r.tenancyName || tenant?.tenancyName || r.userName || realTenantName;
                       const rCode = r.region || initialRegionCode;
                       const cName = (window.REGION_MAP && (window.REGION_MAP[rCode]?.simpleName || window.REGION_MAP[rCode]?.cn)) || rCode;
                       const isHome = r.isHomeRegion ? ' (主区域)' : '';
                       return (
                         <option key={r.id} value={String(r.id)}>
-                          {cName} · {rCode}{isHome}
+                          {optTenant} · {cName}{isHome}
                         </option>
                       );
                     })}
