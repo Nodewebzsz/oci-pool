@@ -31,6 +31,13 @@ fi
 if [ ! -f "$UNINSTALL" ]; then
   curl -L --fail -sS -o "$UNINSTALL" "$RAW/$UNINSTALL" 2>/dev/null && chmod +x "$UNINSTALL" || true
 fi
+
+# 首次安装自动生成 .env（默认值即可运行；已有 .env 则绝不动用户配置）
+if [ ! -f .env ] && [ -f "$ENV_EXAMPLE" ]; then
+  cp "$ENV_EXAMPLE" .env
+  warn "已从模板生成 .env（默认值即可运行；如需改 OCI_PORT/OCI_WEB_PORT/DB_PASSWORD，编辑 .env 后重跑本脚本）"
+fi
+
 # 读取 .env 里的 OCI_WEB_PORT，供健康检查使用（web 反代为统一入口）
 if [ -f .env ]; then set -a; . ./.env; set +a; fi
 
