@@ -706,6 +706,7 @@ function MetricBox({ label, value, color }) {
 // Body 组件 · 自持 state · 避免 imperative render 导致 input 失焦
 function NotifyHistoryBody({ shell }) {
   const { t: tr } = useT();
+  const openDetail = useMessageDetailModal();
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
@@ -893,7 +894,12 @@ function NotifyHistoryBody({ shell }) {
           const s = styleFor(n.level);
           return (
             <div key={n.id}
-              onClick={() => { if (!n.read) markOne(n); }}
+              onClick={() => {
+                if (!n.read) markOne(n);
+                openDetail(n, (deletedBid) => {
+                  setItems(prev => prev.filter(item => item.id !== deletedBid && item.businessId !== deletedBid));
+                });
+              }}
               style={{
                 padding: '12px 16px',
                 borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : 'none',
@@ -976,10 +982,208 @@ function useNotifyHistoryModal() {
   }, [shell]);
 }
 
+// ─── 消息详情查看弹窗（保持当前主题暗色卡片风格） ─────────────────────────
+function MessageDetailBody({ item, loading, error }) {
+  if (loading) {
+    return (
+      <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--fg-3)', fontSize: 13 }}>
+        <Icon name="loader-2" size={20} className="spin" style={{ display: 'block', margin: '0 auto 10px', opacity: 0.6 }} />
+        <span>加载消息详情…</span>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div style={{ padding: '30px 20px', textAlign: 'center', color: 'var(--danger)', fontSize: 13 }}>
+        {error}
+      </div>
+    );
+  }
+
+  const rawContent = item?.content || item?.desc || '';
+  const firstLineIndex = rawContent.indexOf('\n');
+  let firstLine = '';
+  let otherContent = rawContent;
+
+  if (firstLineIndex !== -1) {
+    firstLine = rawContent.substring(0, firstLineIndex).trim();
+    otherContent = rawContent.substring(firstLineIndex + 1).trim();
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
+      {/* 顶部元信息条：时间 + 消息类型胶囊 */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '8px 12px', background: 'var(--bg-2)', borderRadius: 'var(--radius-sm)',
+        border: '1px solid var(--border)', fontSize: 11.5, color: 'var(--fg-3)',
+      }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <Icon name="clock" size={12} />
+          <span className="mono">{item?.createTime || item?.time || '—'}</span>
+        </div>
+        <div style={{
+          padding: '2px 8px', borderRadius: 4,
+          background: 'var(--bg-3)', color: 'var(--fg-1)',
+          fontSize: 10.5, fontWeight: 600, fontFamily: 'var(--font-mono)',
+        }}>
+          {item?.messageType || item?.source || 'SYSTEM'}
+        </div>
+      </div>
+
+      {/* 消息正文展示区 */}
+      <div style={{
+        background: 'var(--bg-2)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
+        padding: '16px 18px',
+        maxHeight: '50vh',
+        overflowY: 'auto',
+      }}>
+        {firstLine && (
+          <div style={{
+            textAlign: 'center',
+            fontSize: 14, fontWeight: 700,
+            color: 'var(--fg-0)',
+            marginBottom: 14,
+            paddingBottom: 12,
+            borderBottom: '1px dashed var(--border-strong)',
+            lineHeight: 1.5,
+          }}>
+            {firstLine}
+          </div>
+        )}
+        <div style={{
+          fontSize: 12,
+          lineHeight: 1.8,
+          color: 'var(--fg-1)',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-all',
+          fontFamily: 'var(--font-mono), system-ui, sans-serif',
+        }}>
+          {otherContent || '（无具体正文）'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function useMessageDetailModal() {
+  const shell = useShell();
+  const { t: tr } = useT();
+
+  return React.useCallback(async (initialItem, onDeleted) => {
+    let currentItem = { ...initialItem };
+    let isLoading = true;
+    let loadErr = '';
+
+    const bid = currentItem.businessId || currentItem.id;
+
+    const render = () => {
+      const level = currentItem?.level || 'info';
+      const iconColor = level === 'success' ? 'var(--accent)'
+                      : level === 'warning' ? 'var(--orange)'
+                      : level === 'error' ? 'var(--danger)' : 'var(--info)';
+      const icon = level === 'success' ? 'check-circle-2'
+                 : level === 'warning' ? 'alert-triangle'
+                 : level === 'error' ? 'alert-octagon' : 'bell';
+
+      shell.openModal({
+        title: currentItem?.subject || currentItem?.title || tr('notify.detailTitle') || '消息详情',
+        subtitle: currentItem?.time ? `${currentItem.time}` : undefined,
+        icon,
+        iconColor,
+        size: 'md',
+        body: <MessageDetailBody item={currentItem} loading={isLoading} error={loadErr} />,
+        footer: (
+          <>
+            <Button
+              variant="outline"
+              size="md"
+              icon="copy"
+              onClick={() => {
+                const textToCopy = currentItem?.content || currentItem?.desc || '';
+                if (!textToCopy) return;
+                navigator.clipboard?.writeText(textToCopy)
+                  .then(() => shell.showToast(tr('common.copied') || '已复制到剪贴板', { kind: 'success' }))
+                  .catch(() => shell.showToast('复制失败', { kind: 'error' }));
+              }}
+            >
+              {tr('common.copy') || '复制内容'}
+            </Button>
+            {bid && (
+              <Button
+                variant="ghost"
+                size="md"
+                icon="trash-2"
+                style={{ color: 'var(--danger)' }}
+                onClick={() => {
+                  shell.openConfirm({
+                    title: '确认删除此消息？',
+                    message: '删除后该消息将从通知中心彻底移除。',
+                    confirmText: tr('common.delete') || '删除',
+                    danger: true,
+                    onConfirm: async () => {
+                      try {
+                        if (window.ociServices?.notify?.remove) {
+                          await window.ociServices.notify.remove({ businessId: bid });
+                        }
+                        shell.showToast('已删除消息', { kind: 'success' });
+                        shell.closeModal();
+                        if (onDeleted) onDeleted(bid);
+                      } catch (e) {
+                        shell.showToast(e.message || '删除失败', { kind: 'error' });
+                      }
+                    }
+                  });
+                }}
+              >
+                {tr('common.delete') || '删除'}
+              </Button>
+            )}
+            <div style={{ flex: 1 }} />
+            <Button variant="primary" size="md" onClick={shell.closeModal}>
+              {tr('common.close') || '关闭'}
+            </Button>
+          </>
+        ),
+      });
+    };
+
+    render();
+
+    if (bid && window.ociServices?.notify?.get) {
+      try {
+        const res = await window.ociServices.notify.get({ businessId: bid });
+        const data = res?.data || res;
+        if (data && typeof data === 'object') {
+          currentItem = {
+            ...currentItem,
+            ...data,
+            subject: data.subject || currentItem.subject || currentItem.title,
+            content: data.content || currentItem.content || currentItem.desc,
+            createTime: data.createTime ? String(data.createTime).replace('T', ' ') : currentItem.time,
+            messageType: data.messageType || currentItem.messageType || 'SYSTEM',
+            read: true,
+          };
+        }
+      } catch (e) {
+        console.warn('拉取消息详情失败:', e);
+      } finally {
+        isLoading = false;
+        render();
+      }
+    } else {
+      isLoading = false;
+      render();
+    }
+  }, [shell, tr]);
+}
+
 Object.assign(window, {
   useProxyEditModal, useProxyTestAllModal, useProxyTestOneAction,
   useLogDetailDrawer,
   useNotificationPopover, useEngineStatusPopover, useUserMenuPopover,
-  useNotifyHistoryModal,
+  useNotifyHistoryModal, useMessageDetailModal,
   useRegionDetailDrawer,
 });

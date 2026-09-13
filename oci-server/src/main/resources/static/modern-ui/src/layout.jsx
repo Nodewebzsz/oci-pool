@@ -812,6 +812,9 @@ function NotificationsButton() {
   const shell = useShell();
   const { t: tr } = useT();
   const openHistory = useNotifyHistoryModal();
+  const openDetail = typeof useMessageDetailModal === 'function'
+    ? useMessageDetailModal()
+    : (window.useMessageDetailModal ? window.useMessageDetailModal() : null);
   const [open, setOpen] = React.useState(false);
   const [rect, setRect] = React.useState(null);
   const btnRef = React.useRef(null);
@@ -922,17 +925,18 @@ function NotificationsButton() {
     }
   };
 
-  // 点击单条通知
-  const handleItemClick = async (n) => {
-    if (!n.read && n.businessId && window.ociServices?.notify?.get) {
-      try {
-        await window.ociServices.notify.get({ businessId: n.businessId });
+  // 点击单条通知：关闭通知下拉并弹出保持当前暗色主题风格的消息详情 Modal
+  const handleItemClick = (n) => {
+    setOpen(false);
+    if (openDetail) {
+      openDetail(n, (deletedBid) => {
+        setNotifs(prev => prev.filter(item => item.id !== deletedBid && item.businessId !== deletedBid));
+      });
+      if (!n.read) {
         setNotifs(prev => prev.map(item => item.id === n.id ? { ...item, read: true } : item));
         setUnreadCount(prev => Math.max(0, prev - 1));
-      } catch {}
-    }
-    setOpen(false);
-    if (n.desc) {
+      }
+    } else if (n.desc) {
       shell.showToast(n.title + '：' + n.desc, { kind: 'info' });
     }
   };
