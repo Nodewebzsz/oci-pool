@@ -273,7 +273,7 @@ function Table({ columns, rows = [], onRowClick, density = 'compact', empty, loa
             {columns.map((c, ci) =>
             <th key={c.key || ci} style={{
               textAlign: c.align || 'left',
-              padding: `9px 12px`,
+              padding: `9px ${c.thPad || 12}px`,
               fontSize: 11,
               fontWeight: 600,
               color: 'var(--fg-3)',
