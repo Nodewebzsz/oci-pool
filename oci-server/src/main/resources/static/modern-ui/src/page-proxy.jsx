@@ -706,7 +706,6 @@ function ProxyKeyConfigPage() {
 
   React.useEffect(() => {
     let alive = true;
-    setConfigLoading(true);
     setConfigError('');
     window.ociServices.system.domainProviderConfigs().then(result => {
       if (!alive) return;
@@ -852,10 +851,22 @@ function ProxyKeyConfigPage() {
         subtitle={tr('dnsp.subtitle')}
         icon="key"
         iconColor="var(--orange)"
+        actions={configLoading ? (
+          /* 静默后台加载 · 右上角微状态（对齐 UI_STANDARD 1.8：不加全局大遮罩） */
+          <span title={tr('dnsp.loading')}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '5px 12px', borderRadius: 999,
+              background: 'var(--bg-2)', border: '1px solid var(--border)',
+              fontSize: 11.5, color: 'var(--fg-2)', whiteSpace: 'nowrap',
+            }}>
+            <Icon name="loader-2" size={12} className="spin" style={{ opacity: 0.6 }} />
+            {tr('dnsp.loading')}
+          </span>
+        ) : null}
       />
 
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 2 }}>
-        {configLoading && <div style={{ padding: '10px 12px', marginBottom: 10, border: '1px solid var(--border)', borderRadius: 6, color: 'var(--fg-2)', fontSize: 12 }}>{tr('dnsp.loading')}</div>}
         {configError && <div role="alert" style={{ padding: '10px 12px', marginBottom: 10, border: '1px solid var(--danger)', borderRadius: 6, background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: 12 }}>{configError}</div>}
         {/* ─── 域名服务商配置 · 分组容器 ─── */}
         <div style={{
