@@ -108,15 +108,27 @@ jobs:
             RANGE="HEAD"
           fi
           {
-            echo "OCI-Pool $TAG 发布。"
+            echo "## 🚀 版本号 ($TAG)"
             echo ""
-            echo "变更："
             git log --pretty=format:'- %s' "$RANGE" \
               | grep -viE '\[skip ci\]|bump version|chore: bump' \
-              | grep -v '^$' || echo "- 初始发布"
-            echo ""
+              | grep -v '^$' || echo "- 常规更新与优化"
           } > notes.md
           cat notes.md
+
+          {
+            echo "TG_MSG<<EOF"
+            echo "🎉 新版本发布通知"
+            echo ""
+            echo "项目: $GITHUB_REPOSITORY"
+            echo "版本: $TAG"
+            echo ""
+            echo "更新内容:"
+            cat notes.md
+            echo ""
+            echo "发布链接: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -127,3 +139,12 @@ jobs:
             --notes-file notes.md \
             artifacts/server-jar/oci-pool-release.jar \
             artifacts/mac-dmg/*.dmg
+      - name: Send Telegram Release Notification
+        if: success()
+        continue-on-error: true
+        uses: appleboy/telegram-action@v0.1.1
+        with:
+          to: ${{ secrets.TG_RELEASE_CHANNEL_ID || secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TG_RELEASE_BOT_TOKEN || secrets.TELEGRAM_TOKEN }}
+          disable_web_page_preview: false
+          message: ${{ steps.notes.outputs.TG_MSG }}

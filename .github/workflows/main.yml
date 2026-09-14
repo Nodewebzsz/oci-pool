@@ -18,8 +18,8 @@ jobs:
       - name: Send Telegram Message
         uses: appleboy/telegram-action@v0.1.1
         with:
-          to: ${{ secrets.TELEGRAM_TO }}
-          token: ${{ secrets.TELEGRAM_TOKEN }}
+          to: ${{ secrets.TG_RELEASE_CHANNEL_ID || secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TG_RELEASE_BOT_TOKEN || secrets.TELEGRAM_TOKEN }}
           message: |
             🎉 新版本发布通知
             
