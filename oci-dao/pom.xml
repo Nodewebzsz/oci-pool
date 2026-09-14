@@ -14,7 +14,7 @@
 
     <version>0.0.1-SNAPSHOT</version>
     <name>oci-dao</name>
-    <description>oci-dao</description>
+    <description>OCI-Pool Data Access Object Module</description>
 
     <dependencies>
         <dependency>

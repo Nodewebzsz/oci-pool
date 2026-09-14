@@ -14,7 +14,7 @@
 
 	<version>0.0.1-SNAPSHOT</version>
 	<name>oci-ai</name>
-	<description>oci-ai</description>
+	<description>OCI-Pool AI Assistant &amp; Diagnostics Module</description>
 
 	<dependencies>
 

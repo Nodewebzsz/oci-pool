@@ -14,7 +14,7 @@
 
     <version>0.0.1-SNAPSHOT</version>
     <name>oci-monitor</name>
-    <description>oci-monitor</description>
+    <description>OCI-Pool System &amp; Traffic Monitor Module</description>
 
     <dependencies>
 
