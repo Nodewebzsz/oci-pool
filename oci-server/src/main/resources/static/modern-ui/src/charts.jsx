@@ -6,6 +6,7 @@ function CircularGauge({
   value, max = 100, size = 180, thickness = 14,
   color = 'var(--accent)', track = 'var(--bg-3)',
   label, unit = '%', valueSize = 36, showTicks = false,
+  displayValue,
 }) {
   const r = size / 2 - thickness / 2 - 2;
   const cx = size / 2, cy = size / 2;
@@ -13,7 +14,7 @@ function CircularGauge({
   const safeVal = Number(value);
   const pct = Number.isFinite(safeVal) ? Math.min(1, Math.max(0, safeVal / max)) : 0;
   const dash = C * pct;
-  const displayVal = Number.isFinite(safeVal) ? safeVal : '—';
+  const displayVal = displayValue !== undefined ? displayValue : (Number.isFinite(safeVal) ? safeVal : '—');
   return (
     <div style={{ position: 'relative', width: size, height: size, display: 'inline-block' }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)' }}>

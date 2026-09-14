@@ -66,6 +66,15 @@ enum AppAlert {
         return alert.runModal() == .alertSecondButtonReturn
     }
 
+    static func notice(title: String = "提示", message: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "知道了")
+        alert.runModal()
+    }
+
     static func error(title: String = "错误", message: String) {
         let alert = NSAlert()
         alert.messageText = title

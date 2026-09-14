@@ -12,19 +12,66 @@ function buildMonitorState(m, d) {
   const hours = Math.floor((uptimeSec % 86400) / 3600);
   const mins = Math.floor((uptimeSec % 3600) / 60);
   const cpuFreq = mem.cpuFrequency;
+
+  // 方案 A：智能在线时长与圆环进度（不足 1 天显示小时/分钟，圆环平滑反映当前阶段进度）
+  let smartUptimeVal = 0;
+  let smartUptimeUnitKey = 'monitor.sys.days';
+  let smartUptimeMax = 90;
+  let smartUptimeProgress = 0;
+
+  if (days >= 1) {
+    smartUptimeVal = days;
+    smartUptimeUnitKey = 'monitor.sys.days';
+    smartUptimeMax = 90;
+    smartUptimeProgress = Math.min(90, days);
+  } else if (hours >= 1) {
+    smartUptimeVal = hours;
+    smartUptimeUnitKey = 'monitor.sys.hours';
+    smartUptimeMax = 24;
+    smartUptimeProgress = hours;
+  } else {
+    smartUptimeVal = Math.max(1, mins);
+    smartUptimeUnitKey = 'monitor.sys.mins';
+    smartUptimeMax = 60;
+    smartUptimeProgress = Math.max(1, mins);
+  }
+
+  const rawOs = mem.osName || '';
+  const cleanOs = rawOs
+    .replace(/^Linux\s+(?=Ubuntu|Debian|CentOS|Rocky|Alma|Alpine|Fedora|RHEL|Arch)/i, '')
+    .replace(/\s*\([^)]*\)/g, '')
+    .replace(/\s+build\b.*/i, '')
+    .trim();
+  const rawHost = mem.hostname || '';
+  const cleanHost = rawHost.replace(/\.local$/i, '').trim();
+
+  // 运行时间：对齐规范展示（如 16min / 2h 2min / 1d 2h 16min）
+  let uptimeFormatted = '';
+  if (days > 0) {
+    uptimeFormatted = `${days}d ${hours}h ${mins}min`;
+  } else if (hours > 0) {
+    uptimeFormatted = `${hours}h ${mins}min`;
+  } else {
+    uptimeFormatted = `${mins}min`;
+  }
+
   return {
     cpu: { cpuUsage: mem.cpuUsage ?? null, cpuTemperature: mem.cpuTemperature ?? null, cpuPhysicalCount: mem.cpuPhysicalCount, cpuLogicalCount: mem.cpuLogicalCount, cpuModel: mem.cpuModel || '', cpuFrequency: cpuFreq ?? 0, cpuVendor: mem.cpuVendor || '' },
     memory: { memoryUsage: mem.memoryUsage ?? null, totalMemory: mem.totalMemory || 0, availableMemory: mem.availableMemory || 0, usedMemory: mem.usedMemory || 0, swapUsage: mem.swapUsage ?? null, swapTotal: mem.swapTotal || 0, swapUsed: mem.swapUsed || 0 },
     disk: { diskUsage: mem.diskUsage ?? null, diskTotal: mem.diskTotal || 0, diskUsed: mem.diskUsed || 0, diskFree: mem.diskFree || 0 },
     network: { uploadSpeed: mem.uploadSpeed ?? null, downloadSpeed: mem.downloadSpeed ?? null, totalUploadBytes: mem.totalUploadBytes || 0, totalDownloadBytes: mem.totalDownloadBytes || 0 },
-    system: { totalProcesses: mem.totalProcesses, threadCount: mem.threadCount, systemUptime: uptimeSec, osName: mem.osName || '', osArch: mem.osArch || '', hostname: mem.hostname || '' },
+    system: { totalProcesses: mem.totalProcesses, threadCount: mem.threadCount, systemUptime: uptimeSec, osName: cleanOs, osArch: mem.osArch || '', hostname: cleanHost, javaVersion: mem.javaVersion || 'JDK 17' },
     timestamp: String(mem.timestamp || '').replace('T', ' ').slice(0, 19),
     dashboard: { totalApiCalls: dash.totalApiCalls ?? 0, totalBootInstances: dash.totalBootInstances ?? 0, totalAttempts: dash.totalAttempts ?? 0, successfulAttempts: dash.successfulAttempts ?? 0, failCounts: dash.failCounts ?? 0, successRate: dash.successRate ?? 0 },
     _display: {
       memTotalGB: _mbToGB(mem.totalMemory || 0), memUsedGB: _mbToGB(mem.usedMemory || 0), memAvailMB: (mem.availableMemory || 0) + ' MB',
       swapDisplay: (mem.swapUsed || 0) + 'MB / ' + (mem.swapTotal || 0) + 'MB',
       diskTotalGB: _fmtGB(mem.diskTotal || 0), diskUsedGB: _fmtGB(mem.diskUsed || 0), diskFreeGB: _fmtGB(mem.diskFree || 0),
-      uptimeStr: days + 'day ' + hours + 'hour ' + mins + 'min', uptimeDays: days,
+      uptimeStr: uptimeFormatted,
+      smartUptimeVal,
+      smartUptimeUnitKey,
+      smartUptimeMax,
+      smartUptimeProgress,
       cpuFreqDisplay: Number.isFinite(Number(cpuFreq)) && Number(cpuFreq) > 0 ? `${cpuFreq} GHz` : 'N/A',
     },
   };
@@ -141,24 +188,26 @@ function MonitorPage({ density }) {
           </div>
         </Card>
 
-        {/* System · SystemMetrics {totalProcesses, threadCount, systemUptime, osName, osArch, hostname} */}
+        {/* System · SystemMetrics {totalProcesses, threadCount, systemUptime, osName, osArch, hostname, javaVersion} */}
         <Card className="monitor-resource-card" title={tr('monitor.sys.title')} subtitle={<span className="mono" style={{ fontSize: 10 }}>{s.system.hostname}</span>} headerIcon="server" headerIconColor="var(--accent)">
           <div className="monitor-gauge" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4px 0 8px' }}>
             <CircularGauge
-              value={s._display.uptimeDays}
-              max={90}
+              value={s._display.smartUptimeProgress}
+              max={s._display.smartUptimeMax}
               color="var(--accent)"
               size={180}
               thickness={14}
               unit=""
               valueSize={30}
-              label={<span style={{ color: 'var(--fg-3)' }}>{lang === 'zh' ? tr('monitor.sys.days') : 'days'}</span>}
+              displayValue={s._display.smartUptimeVal}
+              label={<span style={{ color: 'var(--fg-3)' }}>{tr(s._display.smartUptimeUnitKey)}</span>}
             />
           </div>
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <SysRow label={tr('monitor.sys.os')}     value={<span style={{ fontSize: 11, color: 'var(--fg-1)', textAlign: 'right', maxWidth: 220, wordBreak: 'break-word' }}>{s.system.osName}</span>} />
+            <SysRow label={tr('monitor.sys.os')}     value={<span className="mono" title={s.system.osName}>{s.system.osName}</span>} />
             <SysRow label={tr('monitor.sys.arch')}   value={<span className="mono">{s.system.osArch}</span>} />
             <SysRow label={tr('monitor.sys.uptime')} value={<span className="mono">{s._display.uptimeStr}</span>} />
+            <SysRow label={tr('monitor.sys.java')}   value={<span className="mono">{s.system.javaVersion}</span>} />
           </div>
         </Card>
       </div>
@@ -235,9 +284,9 @@ function MonitorPage({ density }) {
 
 function SysRow({ label, value }) {
   return (
-    <div className="monitor-system-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+    <div className="monitor-system-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14 }}>
       <span style={{ fontSize: 11.5, color: 'var(--fg-3)', flexShrink: 0 }}>{label}</span>
-      <span style={{ fontSize: 12, color: 'var(--fg-0)', fontWeight: 500, textAlign: 'right', minWidth: 0, overflowWrap: 'anywhere' }}>{value}</span>
+      <span style={{ fontSize: 12, color: 'var(--fg-0)', fontWeight: 500, textAlign: 'right', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
     </div>
   );
 }

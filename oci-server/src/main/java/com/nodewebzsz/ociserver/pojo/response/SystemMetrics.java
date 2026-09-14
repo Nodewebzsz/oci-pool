@@ -49,6 +49,7 @@ public class SystemMetrics {
     private String osName;             // 操作系统名称
     private String osArch;             // 系统架构
     private String hostname;           // 主机名
+    private String javaVersion;        // Java运行时版本
 
     private LocalDateTime timestamp;   // 时间戳
 

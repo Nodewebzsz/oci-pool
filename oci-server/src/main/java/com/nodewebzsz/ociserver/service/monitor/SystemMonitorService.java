@@ -165,13 +165,14 @@ public class SystemMonitorService {
                     .lastDownloadBytes(lastMetrics.getLastDownloadBytes())
                     .lastUpdateTime(lastMetrics.getLastUpdateTime())
 
-                    // 系统信息
+                    // 系统信息（净化 osName 与 hostname，移除冗余 build 编号、发行版代号与 .local 后缀）
                     .totalProcesses(os.getProcessCount())
                     .threadCount(os.getThreadCount())
                     .systemUptime(os.getSystemUptime())
-                    .osName(os.getFamily() + " " + os.getVersionInfo())
+                    .osName(cleanOsName(os.getFamily() + " " + os.getVersionInfo()))
                     .osArch(System.getProperty("os.arch"))
-                    .hostname(os.getNetworkParams().getHostName())
+                    .hostname(os.getNetworkParams().getHostName().replaceAll("(?i)\\.local$", "").trim())
+                    .javaVersion("JDK " + System.getProperty("java.version", "17"))
 
                     .timestamp(LocalDateTime.now())
                     .build();
@@ -233,5 +234,15 @@ public class SystemMonitorService {
 
     public SystemInfoDTO getSystemInfo() {
         return this.systemInfo;
+    }
+
+    private String cleanOsName(Object raw) {
+        if (raw == null) return "Linux";
+        String s = String.valueOf(raw);
+        s = s.replaceAll("(?i)^Linux\\s+(?=Ubuntu|Debian|CentOS|Rocky|Alma|Alpine|Fedora|RHEL|Arch)", "")
+             .replaceAll("\\s*\\([^)]*\\)", "")
+             .replaceAll("(?i)\\s+build\\b.*", "")
+             .trim();
+        return s.isEmpty() ? "Linux" : s;
     }
 }
