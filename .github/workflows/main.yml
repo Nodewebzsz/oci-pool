@@ -32,16 +32,7 @@ jobs:
             echo "⚠️ Telegram to or token is empty, skipping."
             exit 0
           fi
-          MSG="🎉 新版本发布通知
-
-项目: $REPO
-版本: $TAG
-
-更新内容:
-$BODY
-
-发布链接: ${URL}/${REPO}"
-
+          MSG=$(printf "🎉 新版本发布通知\n\n项目: %s\n版本: %s\n\n更新内容:\n%s\n\n发布链接: %s/%s" "$REPO" "$TAG" "$BODY" "$URL" "$REPO")
           echo "Broadcasting notification to $TARGET_TO ..."
           RESP=$(curl -s -X POST "https://api.telegram.org/bot${TARGET_TOKEN}/sendMessage" \
             -d "chat_id=${TARGET_TO}" \
