@@ -158,7 +158,7 @@ OCI_PORT=9860 ./oci-pool.sh start
 
 ### 方式二:Docker Compose 部署(推荐,VPS 公网)
 
-需要 Docker 与 Docker Compose v2。
+需要 Docker 与 Docker Compose v2（全新机器未安装时，`install.sh` 脚本会自动尝试为您安装并启动）。
 
 #### 一键安装(下载脚本)
 
@@ -185,6 +185,7 @@ cp .env.example .env
 | --- | --- | --- |
 | `OCI_PORT` | `9856` | 后端应用对外端口 |
 | `OCI_WEB_PORT` | `9857` | Nginx 统一入口对外端口(浏览器访问入口) |
+| `TZ` | `Asia/Shanghai` | 容器时区（默认北京时间 UTC+8；海外服务器或境外用户可设为 `America/New_York`、`UTC` 等） |
 | `MODERN_UI_ENABLED` | `true` | 是否启用 React Modern UI |
 | `DB_PASSWORD` | 自动生成 24 位强密码 | **核心安全项**：H2 本地数据库密码，保护租户 API 私钥防脱库 |
 

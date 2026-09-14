@@ -13,10 +13,106 @@ COMPOSE_PULL="docker-compose.pull.yml"
 ENV_EXAMPLE=".env.example"
 UNINSTALL="uninstall.sh"
 
+run_cmd() {
+  if [ "$(id -u)" -eq 0 ]; then
+    "$@"
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+  else
+    err "自动安装依赖需要 root 权限，但未检测到 sudo 命令"
+    exit 1
+  fi
+}
+
+ensure_docker() {
+  # 若 Docker 与 Docker Compose v2 均已就绪，直接通过
+  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+    # 若后台服务未运行，尝试拉起
+    if ! docker info >/dev/null 2>&1; then
+      warn "Docker 服务未运行，尝试启动..."
+      run_cmd systemctl start docker >/dev/null 2>&1 || run_cmd service docker start >/dev/null 2>&1 || true
+    fi
+    ok "Docker 及 Docker Compose v2 OK"
+    return
+  fi
+
+  # macOS 环境提示
+  if [ "$(uname -s)" = "Darwin" ]; then
+    command -v docker >/dev/null 2>&1 || { err "macOS 环境请先安装并启动 Docker Desktop（可运行: brew install --cask docker）"; exit 1; }
+    docker compose version >/dev/null 2>&1 || { err "macOS 环境请确保 Docker Desktop 运行中并开启了 Compose 支持"; exit 1; }
+    ok "Docker OK"
+    return
+  fi
+
+  # 检查并安装 curl（用于拉取安装脚本）
+  if ! command -v curl >/dev/null 2>&1; then
+    warn "未检测到 curl，正在自动安装..."
+    if command -v apt-get >/dev/null 2>&1; then
+      run_cmd apt-get update -y && run_cmd apt-get install -y curl
+    elif command -v dnf >/dev/null 2>&1; then
+      run_cmd dnf install -y curl
+    elif command -v yum >/dev/null 2>&1; then
+      run_cmd yum install -y curl
+    elif command -v apk >/dev/null 2>&1; then
+      run_cmd apk add curl
+    else
+      err "缺少 curl 且未能识别包管理器，请先手动安装 curl"
+      exit 1
+    fi
+    ok "curl 已就绪"
+  fi
+
+  # 自动安装 Docker 引擎（官方通用脚本默认包含 docker-compose-plugin）
+  if ! command -v docker >/dev/null 2>&1; then
+    warn "未检测到 Docker，正在通过 Docker 官方脚本自动安装 Docker & Docker Compose v2..."
+    curl -fsSL https://get.docker.com | run_cmd sh
+    run_cmd systemctl enable --now docker >/dev/null 2>&1 || run_cmd service docker start >/dev/null 2>&1 || true
+  fi
+
+  # 确保 Docker 守护进程处于运行状态
+  if ! docker info >/dev/null 2>&1; then
+    warn "启动 Docker 服务..."
+    run_cmd systemctl start docker >/dev/null 2>&1 || run_cmd service docker start >/dev/null 2>&1 || true
+  fi
+
+  # 若已有 Docker 但缺失 Docker Compose v2 插件，进行增量补齐
+  if ! docker compose version >/dev/null 2>&1; then
+    warn "检测到 Docker 已安装但缺少 Docker Compose v2，正在自动安装插件..."
+    INSTALLED_PLUGIN=false
+    if command -v apt-get >/dev/null 2>&1; then
+      run_cmd apt-get update -y >/dev/null 2>&1 || true
+      run_cmd apt-get install -y docker-compose-plugin >/dev/null 2>&1 && INSTALLED_PLUGIN=true || true
+    elif command -v dnf >/dev/null 2>&1; then
+      run_cmd dnf install -y docker-compose-plugin >/dev/null 2>&1 && INSTALLED_PLUGIN=true || true
+    elif command -v yum >/dev/null 2>&1; then
+      run_cmd yum install -y docker-compose-plugin >/dev/null 2>&1 && INSTALLED_PLUGIN=true || true
+    fi
+
+    # 若包管理器未成功安装，下载官方 release standalone binary 到 docker cli-plugins
+    if [ "$INSTALLED_PLUGIN" = false ] || ! docker compose version >/dev/null 2>&1; then
+      ARCH="$(uname -m)"
+      case "$ARCH" in
+        x86_64)          CLI_ARCH="x86_64" ;;
+        aarch64|arm64)   CLI_ARCH="aarch64" ;;
+        armv7l)          CLI_ARCH="armv7" ;;
+        *) err "不支持自动补齐 Docker Compose 的系统架构: $ARCH，请手动安装"; exit 1 ;;
+      esac
+      warn "通过 GitHub Release 官方二进制补齐 Compose 插件 (${CLI_ARCH})..."
+      PLUGIN_DIR="/usr/local/lib/docker/cli-plugins"
+      run_cmd mkdir -p "$PLUGIN_DIR"
+      run_cmd curl -SL --fail "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-${CLI_ARCH}" -o "${PLUGIN_DIR}/docker-compose"
+      run_cmd chmod +x "${PLUGIN_DIR}/docker-compose"
+    fi
+  fi
+
+  # 最终健康验证
+  command -v docker >/dev/null 2>&1 || { err "Docker 安装失败，请检查系统网络或手动安装后重试"; exit 1; }
+  docker compose version >/dev/null 2>&1 || { err "Docker Compose v2 未就绪，请手动检查"; exit 1; }
+  ok "Docker 及 Docker Compose v2 安装并启动成功"
+}
+
 info "OCI Pool Manager · Docker installer"
-command -v docker >/dev/null 2>&1 || { err "Docker not found"; exit 1; }
-docker compose version >/dev/null 2>&1 || { err "docker compose v2 missing"; exit 1; }
-ok "Docker OK"
+ensure_docker
 
 # 脚本被单独下载到空目录时，自动补齐 compose / env 模板
 if [ ! -f "$COMPOSE_PULL" ]; then
