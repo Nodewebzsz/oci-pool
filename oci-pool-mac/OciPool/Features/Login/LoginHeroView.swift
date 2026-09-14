@@ -118,86 +118,68 @@ struct LoginHeroView: View {
         }
     }
 
-    // MARK: - Earth art (middle, fills available space)
+    // MARK: - Global Topology Art (replicates Web AuthHeroArt 1:1)
 
     private var heroArt: some View {
         GeometryReader { geo in
-            let scale = min(geo.size.width, geo.size.height) / viewBox
+            let scale = min(geo.size.width, geo.size.height) / 530.0
             let cx = geo.size.width / 2
             let cy = geo.size.height / 2
 
             ZStack {
-                // ambient glow
+                // 1. HUD 顶部经纬点阵标题
+                Text("OCI-POOL · 45 REGIONS GLOBAL TOPOLOGY")
+                    .font(.system(size: max(8, 9 * scale), weight: .semibold, design: .monospaced))
+                    .foregroundColor(LoginPalette.muted(dark))
+                    .tracking(2.0)
+                    .opacity(0.65)
+                    .position(x: cx, y: cy - 212 * scale)
+
+                // 2. HUD 四角定位准星
+                HudCrosshairs(scale: scale, cx: cx, cy: cy, color: LoginPalette.muted(dark).opacity(0.35))
+
+                // 3. 大气层环境晕光
                 Circle()
-                    .fill(RadialGradient(gradient: Gradient(colors: [accent.opacity(0.32), cyanAccent.opacity(0.12), Color.clear]),
-                                         center: .center, startRadius: 0, endRadius: 280 * scale))
-                    .frame(width: 560 * scale, height: 560 * scale)
+                    .fill(RadialGradient(gradient: Gradient(colors: [accent.opacity(dark ? 0.30 : 0.20), cyanAccent.opacity(0.08), Color.clear]),
+                                         center: .center, startRadius: 0, endRadius: 220 * scale))
+                    .frame(width: 440 * scale, height: 440 * scale)
                     .position(x: cx, y: cy)
-                    .blur(radius: 12)
+                    .blur(radius: 10)
 
-                // grid
-                LoginGridShape()
-                    .stroke(grid, lineWidth: 1)
-                    .frame(width: viewBox * scale, height: viewBox * scale)
+                // 4. 地球轮廓基盘
+                Circle()
+                    .stroke(LinearGradient(gradient: Gradient(colors: [accent.opacity(0.8), cyanAccent.opacity(0.3), accent.opacity(0.1)]),
+                                           startPoint: .topLeading, endPoint: .bottomTrailing),
+                            lineWidth: 1.6)
+                    .frame(width: 400 * scale, height: 400 * scale)
                     .position(x: cx, y: cy)
 
-                // concentric rings; middle dashed and rotating
-                ForEach(0..<3, id: \.self) { i in
-                    let rad: CGFloat = i == 0 ? 210 : (i == 1 ? 160 : 110)
-                    let op = 0.15 + Double(i) * 0.08
-                    Circle()
-                        .stroke(LinearGradient(gradient: Gradient(colors: [accent.opacity(op), cyanAccent.opacity(op * 0.6)]),
-                                               startPoint: .topLeading, endPoint: .bottomTrailing),
-                                style: StrokeStyle(lineWidth: 1.2,
-                                                   dash: i == 1 ? [3, 6] : [],
-                                                   dashPhase: i == 1 ? CGFloat(t * 20) : 0))
-                        .frame(width: rad * 2 * scale, height: rad * 2 * scale)
-                        .position(x: cx, y: cy)
+                // 5. 23.5° 空间物理倾角：外层自转天体环
+                ZStack {
+                    Ellipse()
+                        .stroke(accent.opacity(0.4), style: StrokeStyle(lineWidth: 1.2, dash: [8, 6], dashPhase: CGFloat(t * 12)))
+                        .frame(width: 472 * scale, height: 136 * scale)
+                    Ellipse()
+                        .stroke(cyanAccent.opacity(0.25), style: StrokeStyle(lineWidth: 0.8, dash: [20, 120, 40, 80], dashPhase: CGFloat(-t * 15)))
+                        .frame(width: 496 * scale, height: 144 * scale)
                 }
+                .rotationEffect(.degrees(-22))
+                .position(x: cx, y: cy)
 
-                // data flow lines
-                LoginFlowShape()
-                    .stroke(accent.opacity(0.16),
-                            style: StrokeStyle(lineWidth: 0.8, dash: [2, 3], dashPhase: CGFloat(-t * 20)))
-                    .frame(width: viewBox * scale, height: viewBox * scale)
-                    .position(x: cx, y: cy)
+                // 6. 3D 经纬球体骨架（纬线 + 经线 + 地轴）
+                GlobeWireframe(scale: scale, cx: cx, cy: cy, cyan: cyanAccent)
 
-                // central core
-                Circle().fill(coreFill)
-                    .frame(width: 116 * scale, height: 116 * scale)
-                    .position(x: cx, y: cy)
-                Circle().stroke(accent, lineWidth: 2.2)
-                    .frame(width: 116 * scale, height: 116 * scale)
-                    .position(x: cx, y: cy)
-                Circle().stroke(accent.opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [2, 4]))
-                    .frame(width: 96 * scale, height: 96 * scale)
-                    .position(x: cx, y: cy)
+                // 7. 中心发散的声呐心跳波纹 (Sonar Waves)
+                SonarRippleWaves(scale: scale, cx: cx, cy: cy, t: t, accent: accent, cyan: cyanAccent)
 
-                // 核心品牌云池图标（与 Web PoolBrandMark 1:1 坐标比例）
-                PoolBrandGlyphStroke()
-                    .stroke(accent, style: StrokeStyle(lineWidth: 2 * scale, lineCap: .round, lineJoin: .round))
-                    .frame(width: 54 * scale, height: 54 * scale)
-                    .position(x: cx, y: cy)
-                PoolBrandGlyphDots()
-                    .fill(accent)
-                    .frame(width: 54 * scale, height: 54 * scale)
-                    .position(x: cx, y: cy)
+                // 8. 动态弧线光缆飞线 (Curved Data Beams)
+                CurvedDataBeams(scale: scale, cx: cx, cy: cy, t: t, accent: accent, orange: orangeAccent)
 
-                // 45 region dots
-                ForEach(0..<45, id: \.self) { i in
-                    let ang = CGFloat(i) / 45.0 * .pi * 2
-                    let x = cx + cos(ang) * 210 * scale
-                    let y = cy + sin(ang) * 210 * scale
-                    let hot = i % 5 == 2
-                    let base: Double = hot ? 0.9 : 0.55
-                    let pulse: Double = hot ? (0.9 + 0.35 * sin(t * (2.0 + Double(i % 3)) * 2.0)) : 1.0
-                    let col = hot ? orangeAccent : cyanAccent
-                    let rad = hot ? 4 * scale : 2 * scale
-                    Circle()
-                        .fill(col.opacity(min(1, max(0.3, base * pulse))))
-                        .frame(width: rad * 2, height: rad * 2)
-                        .position(x: x, y: y)
-                }
+                // 9. 真实 OCI 区域节点与微徽章
+                RegionNodesLayer(scale: scale, cx: cx, cy: cy, t: t, accent: accent, cyan: cyanAccent, orange: orangeAccent, dark: dark)
+
+                // 10. 中心 OCI 算力中枢反应堆
+                CentralComputeCore(scale: scale, cx: cx, cy: cy, t: t, accent: accent, cyan: cyanAccent, coreFill: coreFill, dark: dark)
             }
             .frame(width: geo.size.width, height: geo.size.height)
         }
@@ -309,70 +291,308 @@ private struct PoolBrandGlyphDots: Shape {
     }
 }
 
-// Grid helper lines (web coords 0..600)
-private struct LoginGridShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        let s = min(rect.width, rect.height) / 600
-        func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: rect.minX + x * s, y: rect.minY + y * s) }
-        var p = Path()
-        for i in 0..<5 {
-            p.move(to: pt(120, 200 + CGFloat(i) * 25))
-            p.addLine(to: pt(480, 200 + CGFloat(i) * 25))
+// MARK: - HUD Crosshairs
+private struct HudCrosshairs: View {
+    var scale: CGFloat
+    var cx: CGFloat
+    var cy: CGFloat
+    var color: Color
+
+    var body: some View {
+        Path { p in
+            let d: CGFloat = 180 * scale
+            let s: CGFloat = 8 * scale
+            // Top-left
+            p.move(to: CGPoint(x: cx - d, y: cy - d + s))
+            p.addLine(to: CGPoint(x: cx - d, y: cy - d))
+            p.addLine(to: CGPoint(x: cx - d + s, y: cy - d))
+            // Top-right
+            p.move(to: CGPoint(x: cx + d - s, y: cy - d))
+            p.addLine(to: CGPoint(x: cx + d, y: cy - d))
+            p.addLine(to: CGPoint(x: cx + d, y: cy - d + s))
+            // Bottom-left
+            p.move(to: CGPoint(x: cx - d, y: cy + d - s))
+            p.addLine(to: CGPoint(x: cx - d, y: cy + d))
+            p.addLine(to: CGPoint(x: cx - d + s, y: cy + d))
+            // Bottom-right
+            p.move(to: CGPoint(x: cx + d - s, y: cy + d))
+            p.addLine(to: CGPoint(x: cx + d, y: cy + d))
+            p.addLine(to: CGPoint(x: cx + d, y: cy + d - s))
         }
-        for i in 0..<5 {
-            p.move(to: pt(220 + CGFloat(i) * 40, 180))
-            p.addLine(to: pt(220 + CGFloat(i) * 40, 420))
-        }
-        return p
+        .stroke(color, lineWidth: 1)
     }
 }
 
-// 5 data-flow diagonals from outer edge to core (web coords)
-private struct LoginFlowShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        let s = min(rect.width, rect.height) / 600
-        let cx = rect.minX + 300 * s
-        let cy = rect.minY + 300 * s
-        func edge(_ i: Int) -> CGPoint {
-            let ang = CGFloat(i) / 45.0 * .pi * 2
-            return CGPoint(x: cx + cos(ang) * 210 * s, y: cy + sin(ang) * 210 * s)
+// MARK: - Globe Wireframe
+private struct GlobeWireframe: View {
+    var scale: CGFloat
+    var cx: CGFloat
+    var cy: CGFloat
+    var cyan: Color
+
+    var body: some View {
+        ZStack {
+            // 纬线
+            Ellipse()
+                .stroke(cyan.opacity(0.2), style: StrokeStyle(lineWidth: 0.9, dash: [3, 3]))
+                .frame(width: 330 * scale, height: 92 * scale)
+                .position(x: cx, y: cy - 75 * scale)
+            Ellipse()
+                .stroke(cyan.opacity(0.35), lineWidth: 1.2)
+                .frame(width: 400 * scale, height: 116 * scale)
+                .position(x: cx, y: cy)
+            Ellipse()
+                .stroke(cyan.opacity(0.2), style: StrokeStyle(lineWidth: 0.9, dash: [3, 3]))
+                .frame(width: 330 * scale, height: 92 * scale)
+                .position(x: cx, y: cy + 75 * scale)
+
+            // 经线
+            Ellipse()
+                .stroke(cyan.opacity(0.3), lineWidth: 1.0)
+                .frame(width: 130 * scale, height: 400 * scale)
+                .position(x: cx, y: cy)
+            Ellipse()
+                .stroke(cyan.opacity(0.25), style: StrokeStyle(lineWidth: 0.9, dash: [4, 3]))
+                .frame(width: 270 * scale, height: 400 * scale)
+                .position(x: cx, y: cy)
+
+            // 地轴线
+            Path { p in
+                p.move(to: CGPoint(x: cx, y: cy - 205 * scale))
+                p.addLine(to: CGPoint(x: cx, y: cy + 205 * scale))
+            }
+            .stroke(cyan.opacity(0.2), style: StrokeStyle(lineWidth: 0.8, dash: [4, 4]))
         }
-        var p = Path()
-        for i in [0, 9, 18, 27, 36] {
-            p.move(to: edge(i))
-            p.addLine(to: CGPoint(x: cx, y: cy))
-        }
-        return p
     }
 }
 
-// Shield outline centered in the shape frame
-private struct LoginShieldShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        let s = min(rect.width, rect.height) / 30.0
-        let cx = rect.midX
-        let cy = rect.midY
-        var p = Path()
-        p.move(to: CGPoint(x: cx, y: cy - 10 * s))
-        p.addLine(to: CGPoint(x: cx - 8 * s, y: cy - 6 * s))
-        p.addLine(to: CGPoint(x: cx - 8 * s, y: cy))
-        p.addQuadCurve(to: CGPoint(x: cx, y: cy + 10 * s), control: CGPoint(x: cx - 8 * s, y: cy + 8 * s))
-        p.addQuadCurve(to: CGPoint(x: cx + 8 * s, y: cy), control: CGPoint(x: cx + 8 * s, y: cy + 8 * s))
-        p.addLine(to: CGPoint(x: cx + 8 * s, y: cy - 6 * s))
-        p.closeSubpath()
-        return p
+// MARK: - Sonar Ripple Waves
+private struct SonarRippleWaves: View {
+    var scale: CGFloat
+    var cx: CGFloat
+    var cy: CGFloat
+    var t: TimeInterval
+    var accent: Color
+    var cyan: Color
+
+    var body: some View {
+        let p1 = (t.truncatingRemainder(dividingBy: 3.6)) / 3.6
+        let r1 = (50.0 + p1 * 160.0) * scale
+        let op1 = max(0, 0.7 * (1.0 - p1))
+
+        let p2 = ((t + 1.8).truncatingRemainder(dividingBy: 3.6)) / 3.6
+        let r2 = (50.0 + p2 * 160.0) * scale
+        let op2 = max(0, 0.6 * (1.0 - p2))
+
+        return ZStack {
+            Circle()
+                .stroke(accent.opacity(op1), lineWidth: 1.5 * (1.0 - p1 * 0.5))
+                .frame(width: r1 * 2, height: r1 * 2)
+                .position(x: cx, y: cy)
+
+            Circle()
+                .stroke(cyan.opacity(op2), lineWidth: 1.2 * (1.0 - p2 * 0.5))
+                .frame(width: r2 * 2, height: r2 * 2)
+                .position(x: cx, y: cy)
+        }
     }
 }
 
-private struct LoginCheckShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        let s = min(rect.width, rect.height) / 30.0
-        let cx = rect.midX
-        let cy = rect.midY
-        var p = Path()
-        p.move(to: CGPoint(x: cx - 4 * s, y: cy))
-        p.addLine(to: CGPoint(x: cx - 1.5 * s, y: cy + 2.5 * s))
-        p.addLine(to: CGPoint(x: cx + 4.5 * s, y: cy - 2.5 * s))
-        return p
+// MARK: - Curved Data Beams
+private struct CurvedDataBeams: View {
+    var scale: CGFloat
+    var cx: CGFloat
+    var cy: CGFloat
+    var t: TimeInterval
+    var accent: Color
+    var orange: Color
+
+    var body: some View {
+        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: cx + (x - 300) * scale, y: cy + (y - 300) * scale)
+        }
+
+        return ZStack {
+            // 美西 PHX 飞线: (160, 210) -> (260, 290) ctrl (210, 280)
+            Path { path in
+                path.move(to: p(160, 210))
+                path.addQuadCurve(to: p(260, 290), control: p(210, 280))
+            }
+            .stroke(accent.opacity(0.6), style: StrokeStyle(lineWidth: 1.4, dash: [5, 4], dashPhase: CGFloat(-t * 22)))
+
+            // 欧洲 FRA 飞线: (330, 155) -> (300, 260) ctrl (310, 220)
+            Path { path in
+                path.move(to: p(330, 155))
+                path.addQuadCurve(to: p(300, 260), control: p(310, 220))
+            }
+            .stroke(accent.opacity(0.6), style: StrokeStyle(lineWidth: 1.4, dash: [6, 4], dashPhase: CGFloat(-t * 20)))
+
+            // 亚太 NRT 飞线: (425, 210) -> (338, 285) ctrl (370, 240)
+            Path { path in
+                path.move(to: p(425, 210))
+                path.addQuadCurve(to: p(338, 285), control: p(370, 240))
+            }
+            .stroke(orange.opacity(0.7), style: StrokeStyle(lineWidth: 1.5, dash: [5, 3], dashPhase: CGFloat(-t * 26)))
+
+            // 亚太 SIN 飞线: (390, 385) -> (325, 330) ctrl (350, 330)
+            Path { path in
+                path.move(to: p(390, 385))
+                path.addQuadCurve(to: p(325, 330), control: p(350, 330))
+            }
+            .stroke(accent.opacity(0.55), style: StrokeStyle(lineWidth: 1.4, dash: [6, 4], dashPhase: CGFloat(-t * 24)))
+
+            // 南美 GRU 飞线: (180, 375) -> (265, 315) ctrl (230, 330)
+            Path { path in
+                path.move(to: p(180, 375))
+                path.addQuadCurve(to: p(265, 315), control: p(230, 330))
+            }
+            .stroke(accent.opacity(0.45), style: StrokeStyle(lineWidth: 1.3, dash: [5, 5], dashPhase: CGFloat(-t * 20)))
+        }
+    }
+}
+
+// MARK: - Region Nodes Layer
+private struct RegionNodesLayer: View {
+    var scale: CGFloat
+    var cx: CGFloat
+    var cy: CGFloat
+    var t: TimeInterval
+    var accent: Color
+    var cyan: Color
+    var orange: Color
+    var dark: Bool
+
+    // 区域坐标点表 (1:1 对齐 Web)
+    private struct NodeItem {
+        let x: CGFloat
+        let y: CGFloat
+        let code: String
+        let hot: Bool
+        let tagX: CGFloat
+        let tagY: CGFloat
+    }
+
+    private let nodes: [NodeItem] = [
+        NodeItem(x: 160, y: 210, code: "US-PHX", hot: true, tagX: -52, tagY: -10),
+        NodeItem(x: 220, y: 175, code: "US-IAD", hot: false, tagX: -48, tagY: -12),
+        NodeItem(x: 330, y: 155, code: "EU-FRA", hot: true, tagX: 10, tagY: -12),
+        NodeItem(x: 425, y: 210, code: "AP-NRT", hot: true, tagX: 12, tagY: -10),
+        NodeItem(x: 440, y: 310, code: "AP-ICN", hot: false, tagX: 12, tagY: -2),
+        NodeItem(x: 390, y: 385, code: "AP-SIN", hot: true, tagX: 12, tagY: 6),
+        NodeItem(x: 330, y: 415, code: "AP-SYD", hot: false, tagX: 10, tagY: 10),
+        NodeItem(x: 180, y: 375, code: "SA-GRU", hot: false, tagX: -50, tagY: 10),
+        NodeItem(x: 130, y: 310, code: "ME-DXB", hot: true, tagX: -48, tagY: 4),
+        NodeItem(x: 250, y: 250, code: "", hot: false, tagX: 0, tagY: 0),
+        NodeItem(x: 360, y: 260, code: "", hot: false, tagX: 0, tagY: 0),
+        NodeItem(x: 275, y: 345, code: "", hot: false, tagX: 0, tagY: 0),
+        NodeItem(x: 430, y: 260, code: "", hot: false, tagX: 0, tagY: 0),
+        NodeItem(x: 170, y: 270, code: "", hot: false, tagX: 0, tagY: 0)
+    ]
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<nodes.count, id: \.self) { i in
+                let n = nodes[i]
+                let nx = cx + (n.x - 300) * scale
+                let ny = cy + (n.y - 300) * scale
+
+                // 热点水波纹
+                if n.hot {
+                    let pulsePhase = sin(t * 3.0 + Double(i)) * 0.5 + 0.5
+                    let ripR = (6.0 + pulsePhase * 8.0) * scale
+                    Circle()
+                        .stroke(orange.opacity(0.7 * (1.0 - pulsePhase)), lineWidth: 1)
+                        .frame(width: ripR * 2, height: ripR * 2)
+                        .position(x: nx, y: ny)
+                }
+
+                // 节点实体圆
+                Circle()
+                    .fill(n.hot ? orange : cyan)
+                    .frame(width: (n.hot ? 8 : 5.5) * scale, height: (n.hot ? 8 : 5.5) * scale)
+                    .position(x: nx, y: ny)
+
+                // 地标文字微徽章
+                if !n.code.isEmpty {
+                    let tx = nx + n.tagX * scale
+                    let ty = ny + n.tagY * scale
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 3 * scale)
+                            .fill(Color(hex: dark ? "161b22" : "ffffff").opacity(0.85))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 3 * scale)
+                                    .stroke(n.hot ? orange.opacity(0.6) : cyan.opacity(0.5), lineWidth: 0.8)
+                            )
+                            .frame(width: 42 * scale, height: 15 * scale)
+
+                        Text(n.code)
+                            .font(.system(size: 8.5 * scale, weight: .bold, design: .monospaced))
+                            .foregroundColor(n.hot ? orange : LoginPalette.text(dark))
+                    }
+                    .position(x: tx + 21 * scale, y: ty + 7.5 * scale)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Central Compute Core
+private struct CentralComputeCore: View {
+    var scale: CGFloat
+    var cx: CGFloat
+    var cy: CGFloat
+    var t: TimeInterval
+    var accent: Color
+    var cyan: Color
+    var coreFill: Color
+    var dark: Bool
+
+    var body: some View {
+        ZStack {
+            // 外层氛围晕光
+            Circle()
+                .fill(RadialGradient(gradient: Gradient(colors: [accent.opacity(0.35), Color.clear]),
+                                     center: .center, startRadius: 0, endRadius: 65 * scale))
+                .frame(width: 130 * scale, height: 130 * scale)
+                .position(x: cx, y: cy)
+
+            // 外部 HUD 刻度齿轮环 (反向旋转)
+            Circle()
+                .stroke(cyan.opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [3, 4], dashPhase: CGFloat(-t * 15)))
+                .frame(width: 104 * scale, height: 104 * scale)
+                .position(x: cx, y: cy)
+
+            Circle()
+                .stroke(accent.opacity(0.75), style: StrokeStyle(lineWidth: 1.8, dash: [16, 8, 8, 8], dashPhase: CGFloat(t * 18)))
+                .frame(width: 92 * scale, height: 92 * scale)
+                .position(x: cx, y: cy)
+
+            // 磨砂玻璃底盘
+            Circle()
+                .fill(Color(hex: dark ? "161b22" : "f8fafc"))
+                .frame(width: 76 * scale, height: 76 * scale)
+                .position(x: cx, y: cy)
+
+            Circle()
+                .stroke(accent, lineWidth: 1.8)
+                .frame(width: 76 * scale, height: 76 * scale)
+                .position(x: cx, y: cy)
+
+            Circle()
+                .stroke(Color(hex: dark ? "30363d" : "e2e8f0"), lineWidth: 1)
+                .frame(width: 64 * scale, height: 64 * scale)
+                .position(x: cx, y: cy)
+
+            // OCI 云池芯片徽标
+            PoolBrandGlyphStroke()
+                .stroke(accent, style: StrokeStyle(lineWidth: 2 * scale, lineCap: .round, lineJoin: .round))
+                .frame(width: 44 * scale, height: 44 * scale)
+                .position(x: cx, y: cy)
+
+            PoolBrandGlyphDots()
+                .fill(accent)
+                .frame(width: 44 * scale, height: 44 * scale)
+                .position(x: cx, y: cy)
+        }
     }
 }

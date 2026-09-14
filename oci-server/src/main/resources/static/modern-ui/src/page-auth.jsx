@@ -23,99 +23,196 @@ function needsVerification(message) {
 }
 
 // ── Brand hero (SVG · left panel) ────────────────────────────────────────
+
+// 全球算力互联拓扑 (Global Cloud Topology · 深度强化版)
 function AuthHeroArt() {
-  // Renders a stylised OCI-pool visualisation:
-  //  · 45 region dots orbit a central globe (referencing our 45-Oracle-regions data)
-  //  · Concentric rings pulse gently
-  //  · Uses --accent / --cyan / --info so the Tweaks color-picker recolors it live
   return (
-    <svg viewBox="0 0 600 600" width="100%" height="100%" style={{ maxWidth: 480, maxHeight: 480 }}
+    <svg viewBox="0 0 600 600" width="100%" height="100%" style={{ maxWidth: 550, maxHeight: 550 }}
          xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <radialGradient id="hero-glow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%"   stopColor="var(--accent)" stopOpacity="0.5" />
-          <stop offset="60%"  stopColor="var(--cyan)"   stopOpacity="0.15" />
-          <stop offset="100%" stopColor="var(--info)"   stopOpacity="0" />
+        {/* 球体大气层晕光 */}
+        <radialGradient id="topo-atmo" cx="40%" cy="35%" r="65%">
+          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.28" />
+          <stop offset="50%" stopColor="var(--cyan)" stopOpacity="0.10" />
+          <stop offset="85%" stopColor="var(--cyan)" stopOpacity="0.02" />
+          <stop offset="100%" stopColor="transparent" stopOpacity="0" />
         </radialGradient>
-        <linearGradient id="hero-ring" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%"   stopColor="var(--accent)" stopOpacity="0.9" />
-          <stop offset="100%" stopColor="var(--cyan)"   stopOpacity="0.6" />
+        {/* 边缘高光轮廓渐变 */}
+        <linearGradient id="topo-rim" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.8" />
+          <stop offset="50%" stopColor="var(--cyan)" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.1" />
         </linearGradient>
-        <filter id="hero-blur"><feGaussianBlur stdDeviation="12" /></filter>
+        {/* 核心反应堆渐变 */}
+        <radialGradient id="topo-core-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="transparent" stopOpacity="0" />
+        </radialGradient>
+        {/* 光缆流光渐变 */}
+        <linearGradient id="topo-beam-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="var(--orange)" stopOpacity="0.9" />
+          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.2" />
+        </linearGradient>
+        <filter id="topo-blur-sm"><feGaussianBlur stdDeviation="3" /></filter>
+        <filter id="topo-blur-lg"><feGaussianBlur stdDeviation="10" /></filter>
       </defs>
 
-      {/* Ambient glow */}
-      <circle cx="300" cy="300" r="280" fill="url(#hero-glow)" filter="url(#hero-blur)" />
+      {/* 背景 HUD 经纬标星与极简点阵 */}
+      <g stroke="var(--fg-3)" strokeOpacity="0.25" strokeWidth="1">
+        <path d="M 120 120 L 120 128 M 120 120 L 128 120" />
+        <path d="M 480 120 L 480 128 M 480 120 L 472 120" />
+        <path d="M 120 480 L 120 472 M 120 480 L 128 480" />
+        <path d="M 480 480 L 480 472 M 480 480 L 472 480" />
+      </g>
+      <text x="300" y="86" textAnchor="middle" fill="var(--fg-3)" fontSize="10" fontWeight="600"
+            fontFamily="var(--font-mono)" letterSpacing="2.5" opacity="0.6">
+        OCI-POOL · 45 REGIONS GLOBAL TOPOLOGY
+      </text>
 
-      {/* Grid lines (subtle) */}
-      {[0, 1, 2, 3, 4].map(i => (
-        <line key={'h' + i} x1="120" y1={200 + i * 25} x2="480" y2={200 + i * 25}
-              stroke="var(--fg-3)" strokeOpacity="0.08" strokeWidth="1" />
-      ))}
-      {[0, 1, 2, 3, 4].map(i => (
-        <line key={'v' + i} x1={220 + i * 40} y1="180" x2={220 + i * 40} y2="420"
-              stroke="var(--fg-3)" strokeOpacity="0.08" strokeWidth="1" />
-      ))}
+      {/* 球体大气层底衬 */}
+      <circle cx="300" cy="300" r="215" fill="url(#topo-atmo)" filter="url(#topo-blur-lg)" />
+      <circle cx="300" cy="300" r="200" fill="var(--bg-1)" fillOpacity="0.3" stroke="url(#topo-rim)" strokeWidth="1.6" />
 
-      {/* 3 concentric rings */}
-      {[210, 160, 110].map((r, i) => (
-        <circle key={i} cx="300" cy="300" r={r}
-                fill="none" stroke="url(#hero-ring)"
-                strokeOpacity={0.15 + i * 0.08} strokeWidth={1.2}
-                strokeDasharray={i === 1 ? '3 6' : 'none'}>
-          <animateTransform attributeName="transform" type="rotate"
-                            from={`0 300 300`} to={`${i % 2 === 0 ? 360 : -360} 300 300`}
-                            dur={`${18 + i * 6}s`} repeatCount="indefinite" />
-        </circle>
-      ))}
-
-      {/* Central "core" — represents the pool */}
-      <circle cx="300" cy="300" r="52" fill="var(--bg-2)"
-              stroke="var(--accent)" strokeWidth="2" />
-      <circle cx="300" cy="300" r="42" fill="none"
-              stroke="var(--accent)" strokeOpacity="0.4" strokeWidth="1" strokeDasharray="2 4" />
-      {/* Shield mark (matching the sidebar logo) */}
-      <g transform="translate(280,280) scale(1.5)">
-        <path d="M14 4 L6 8 v6 c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10 V8 L14 4 z"
-              fill="var(--accent)" fillOpacity="0.15" stroke="var(--accent)" strokeWidth="1.5" strokeLinejoin="round" />
-        <path d="M10 14 l2 2 4-4" stroke="var(--accent)" strokeWidth="1.8"
-              strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      {/* 23.5° 空间物理倾角：外层自转天体环 */}
+      <g transform="rotate(-22 300 300)">
+        <ellipse cx="300" cy="300" rx="236" ry="68" fill="none" stroke="var(--accent)" strokeWidth="1.2"
+                 strokeOpacity="0.4" strokeDasharray="8 6">
+          <animateTransform attributeName="transform" type="rotate" from="0 300 300" to="360 300 300" dur="30s" repeatCount="indefinite" />
+        </ellipse>
+        <ellipse cx="300" cy="300" rx="248" ry="72" fill="none" stroke="var(--cyan)" strokeWidth="0.8"
+                 strokeOpacity="0.25" strokeDasharray="30 180 60 120">
+          <animateTransform attributeName="transform" type="rotate" from="360 300 300" to="0 300 300" dur="24s" repeatCount="indefinite" />
+        </ellipse>
       </g>
 
-      {/* 45 region dots orbiting outer ring (r=210) */}
-      {Array.from({ length: 45 }, (_, i) => {
-        const angle = (i / 45) * Math.PI * 2;
-        const x = 300 + Math.cos(angle) * 210;
-        const y = 300 + Math.sin(angle) * 210;
-        // Highlight ~1 in 5 dots as "hot regions"
-        const hot = i % 5 === 2;
-        return (
-          <circle key={i} cx={x} cy={y}
-                  r={hot ? 4 : 2}
-                  fill={hot ? 'var(--orange)' : 'var(--cyan)'}
-                  opacity={hot ? 0.9 : 0.55}>
-            {hot && (
-              <animate attributeName="opacity" values="0.9;0.4;0.9"
-                       dur={`${2 + (i % 3)}s`} repeatCount="indefinite" />
+      {/* 3D 经纬球体骨架（增强厚度与景深） */}
+      <g stroke="var(--cyan)" fill="none">
+        {/* 纬线 */}
+        <ellipse cx="300" cy="225" rx="165" ry="46" strokeWidth="0.9" strokeOpacity="0.2" strokeDasharray="3 3" />
+        <ellipse cx="300" cy="300" rx="200" ry="58" strokeWidth="1.2" strokeOpacity="0.35" />
+        <ellipse cx="300" cy="375" rx="165" ry="46" strokeWidth="0.9" strokeOpacity="0.2" strokeDasharray="3 3" />
+        {/* 经线 */}
+        <ellipse cx="300" cy="300" rx="65" ry="200" strokeWidth="1" strokeOpacity="0.3" />
+        <ellipse cx="300" cy="300" rx="135" ry="200" strokeWidth="0.9" strokeOpacity="0.25" strokeDasharray="4 3" />
+        {/* 地轴线 */}
+        <line x1="300" y1="95" x2="300" y2="505" strokeWidth="0.8" strokeOpacity="0.2" strokeDasharray="4 4" />
+      </g>
+
+      {/* 中心发射的向外脉冲声呐波纹 (Sonar Heartbeat Waves) */}
+      <circle cx="300" cy="300" r="50" fill="none" stroke="var(--accent)" strokeWidth="1.5" opacity="0.6">
+        <animate attributeName="r" values="50;210" dur="3.6s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.7;0" dur="3.6s" repeatCount="indefinite" />
+        <animate attributeName="strokeWidth" values="1.8;0.4" dur="3.6s" repeatCount="indefinite" />
+      </circle>
+      <circle cx="300" cy="300" r="50" fill="none" stroke="var(--cyan)" strokeWidth="1.2" opacity="0.6">
+        <animate attributeName="r" values="50;210" begin="1.8s" dur="3.6s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.7;0" begin="1.8s" dur="3.6s" repeatCount="indefinite" />
+        <animate attributeName="strokeWidth" values="1.6;0.4" begin="1.8s" dur="3.6s" repeatCount="indefinite" />
+      </circle>
+
+      {/* 动态弧线光缆 (Curved Data Beams) 汇聚到中心 */}
+      <g stroke="var(--accent)" fill="none">
+        {/* 美西 PHX 飞线 */}
+        <path d="M 160 210 Q 210 280 260 290" strokeWidth="1.4" strokeOpacity="0.6" strokeDasharray="5 4">
+          <animate attributeName="stroke-dashoffset" from="0" to="-28" dur="1.8s" repeatCount="indefinite" />
+        </path>
+        {/* 欧洲 FRA 飞线 */}
+        <path d="M 330 155 Q 310 220 300 260" strokeWidth="1.4" strokeOpacity="0.6" strokeDasharray="6 4">
+          <animate attributeName="stroke-dashoffset" from="0" to="-30" dur="2.2s" repeatCount="indefinite" />
+        </path>
+        {/* 亚太 NRT 飞线 */}
+        <path d="M 425 210 Q 370 240 338 285" strokeWidth="1.5" strokeOpacity="0.7" strokeDasharray="5 3" stroke="var(--orange)">
+          <animate attributeName="stroke-dashoffset" from="0" to="-24" dur="1.6s" repeatCount="indefinite" />
+        </path>
+        {/* 亚太 SIN 飞线 */}
+        <path d="M 390 385 Q 350 330 325 330" strokeWidth="1.4" strokeOpacity="0.55" strokeDasharray="6 4">
+          <animate attributeName="stroke-dashoffset" from="0" to="-30" dur="2s" repeatCount="indefinite" />
+        </path>
+        {/* 南美 GRU 飞线 */}
+        <path d="M 180 375 Q 230 330 265 315" strokeWidth="1.3" strokeOpacity="0.45" strokeDasharray="5 5">
+          <animate attributeName="stroke-dashoffset" from="0" to="-30" dur="2.5s" repeatCount="indefinite" />
+        </path>
+      </g>
+
+      {/* 真实 OCI 区域节点与微型地标徽章 */}
+      {[
+        { x: 160, y: 210, code: 'US-PHX', name: '美西', hot: true, tagX: -54, tagY: -10 },
+        { x: 220, y: 175, code: 'US-IAD', name: '美东', hot: false, tagX: -50, tagY: -12 },
+        { x: 330, y: 155, code: 'EU-FRA', name: '法兰克福', hot: true, tagX: 10, tagY: -12 },
+        { x: 425, y: 210, code: 'AP-NRT', name: '东京', hot: true, tagX: 12, tagY: -10 },
+        { x: 440, y: 310, code: 'AP-ICN', name: '首尔', hot: false, tagX: 12, tagY: -2 },
+        { x: 390, y: 385, code: 'AP-SIN', name: '新加坡', hot: true, tagX: 12, tagY: 6 },
+        { x: 330, y: 415, code: 'AP-SYD', name: '悉尼', hot: false, tagX: 10, tagY: 10 },
+        { x: 180, y: 375, code: 'SA-GRU', name: '圣保罗', hot: false, tagX: -52, tagY: 10 },
+        { x: 130, y: 310, code: 'ME-DXB', name: '迪拜', hot: true, tagX: -50, tagY: 4 },
+        { x: 250, y: 250, code: '', hot: false },
+        { x: 360, y: 260, code: '', hot: false },
+        { x: 275, y: 345, code: '', hot: false },
+        { x: 430, y: 260, code: '', hot: false },
+        { x: 170, y: 270, code: '', hot: false },
+      ].map((pt, idx) => (
+        <g key={idx}>
+          {/* 热点多层波纹 */}
+          {pt.hot && (
+            <>
+              <circle cx={pt.x} cy={pt.y} r="12" fill="none" stroke="var(--orange)" strokeWidth="1" opacity="0.6">
+                <animate attributeName="r" values="5;15;5" dur="2s" repeatCount="indefinite" />
+                <animate attributeName="opacity" values="0.8;0.1;0.8" dur="2s" repeatCount="indefinite" />
+              </circle>
+              <circle cx={pt.x} cy={pt.y} r="6" fill="var(--orange)" fillOpacity="0.25" />
+            </>
+          )}
+
+          {/* 节点实体圆点 */}
+          <circle cx={pt.x} cy={pt.y} r={pt.hot ? 4.5 : 3}
+                  fill={pt.hot ? 'var(--orange)' : 'var(--cyan)'}
+                  stroke="var(--bg-0)" strokeWidth="1.5">
+            {pt.hot && (
+              <animate attributeName="r" values="4;5.5;4" dur="2s" repeatCount="indefinite" />
             )}
           </circle>
-        );
-      })}
 
-      {/* Data flow lines — 5 diagonals from edge dots to core */}
-      {[0, 9, 18, 27, 36].map((i, k) => {
-        const angle = (i / 45) * Math.PI * 2;
-        const x = 300 + Math.cos(angle) * 210;
-        const y = 300 + Math.sin(angle) * 210;
-        return (
-          <line key={k} x1={x} y1={y} x2="300" y2="300"
-                stroke="var(--accent)" strokeOpacity="0.15" strokeWidth="0.8"
-                strokeDasharray="2 3">
-            <animate attributeName="stroke-dashoffset" from="0" to="20"
-                     dur="2s" repeatCount="indefinite" />
-          </line>
-        );
-      })}
+          {/* 核心地标文字微徽章 */}
+          {pt.code && (
+            <g transform={`translate(${pt.x + pt.tagX}, ${pt.y + pt.tagY})`}>
+              <rect width="42" height="15" rx="3" fill="var(--bg-1)" fillOpacity="0.85"
+                    stroke={pt.hot ? 'var(--orange)' : 'var(--cyan)'} strokeWidth="0.8" strokeOpacity="0.6" />
+              <text x="21" y="11" textAnchor="middle"
+                    fill={pt.hot ? 'var(--orange)' : 'var(--fg-1)'}
+                    fontSize="8.5" fontWeight="700" fontFamily="var(--font-mono)">
+                {pt.code}
+              </text>
+            </g>
+          )}
+        </g>
+      ))}
+
+      {/* 中心 OCI 算力中枢反应堆 (Luminous Compute Reactor) */}
+      <g transform="translate(300,300)">
+        {/* 核心外层氛围光晕 */}
+        <circle r="65" fill="url(#topo-core-glow)" filter="url(#topo-blur-sm)" />
+
+        {/* 外部精密 HUD 刻度齿轮环 */}
+        <circle r="52" fill="none" stroke="var(--cyan)" strokeWidth="1" strokeDasharray="3 4" strokeOpacity="0.4">
+          <animateTransform attributeName="transform" type="rotate" from="360" to="0" dur="20s" repeatCount="indefinite" />
+        </circle>
+        <circle r="46" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeDasharray="16 8 8 8" strokeOpacity="0.75">
+          <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="14s" repeatCount="indefinite" />
+        </circle>
+
+        {/* 核心磨砂玻璃底盘 */}
+        <circle r="38" fill="var(--bg-1)" stroke="var(--accent)" strokeWidth="1.8" />
+        <circle r="32" fill="var(--bg-2)" fillOpacity="0.7" stroke="var(--border)" strokeWidth="1" />
+
+        {/* 中心 OCI 云池芯片徽标 */}
+        <g transform="translate(-13,-13) scale(1.1)">
+          <path d="M4 16h16a4 4 0 0 0 0-8 6 6 0 0 0-11.4-1.6A4.5 4.5 0 0 0 4 16z"
+                fill="var(--accent)" fillOpacity="0.18" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="8" cy="16" r="1.4" fill="var(--accent)" />
+          <circle cx="12" cy="16" r="1.4" fill="var(--accent)" />
+          <circle cx="16" cy="16" r="1.4" fill="var(--accent)" />
+        </g>
+      </g>
     </svg>
   );
 }
