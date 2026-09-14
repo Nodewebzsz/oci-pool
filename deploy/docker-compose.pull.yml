@@ -16,6 +16,7 @@ services:
     depends_on: { redis: { condition: service_healthy } }
     ports: ["${OCI_PORT_BIND:-127.0.0.1}:${OCI_PORT:-9856}:9856"]
     environment:
+      TZ: "${TZ:-Asia/Shanghai}"
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: "6379"
       MODERN_UI_ENABLED: "${MODERN_UI_ENABLED:-true}"
@@ -35,6 +36,8 @@ services:
     container_name: oci-pool-web
     restart: unless-stopped
     depends_on: { app: { condition: service_healthy } }
+    environment:
+      TZ: "${TZ:-Asia/Shanghai}"
     ports: ["${OCI_WEB_PORT:-9857}:80"]
     healthcheck: { test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/"], interval: 30s, timeout: 5s, retries: 5, start_period: 10s }
 

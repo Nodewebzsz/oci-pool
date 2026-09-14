@@ -93,6 +93,10 @@ struct TopNavDropdownOverlay: View {
                         },
                         onCloud: { type, _ in
                             closeAll()
+                            if type == 2 {
+                                AppAlert.notice(title: "提示", message: "Google Cloud 模块正在开发中，敬请期待！")
+                                return
+                            }
                             session.setCloudProvider(type)
                             navigation.select(.tenants)
                         },

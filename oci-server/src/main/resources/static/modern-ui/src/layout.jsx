@@ -1633,7 +1633,7 @@ function UserMenuButton() {
 
   const PROVIDERS = [
     { type: 1, name: 'Oracle Cloud', icon: 'cloud' },
-    { type: 2, name: 'Google Cloud', icon: 'globe' },
+    { type: 2, name: 'Google Cloud', icon: 'globe', pending: true },
   ];
   const LEVELS = {
     1: { n: tr('layout.1cc67a'), i: '👤' },
@@ -1734,8 +1734,12 @@ function UserMenuButton() {
     }).catch((e) => shell.showToast(tr('layout.8d6499') + (e.message || e), { kind: 'error' }));
   };
 
-  const handleProvider = (type, name) => {
+  const handleProvider = (type, name, pending) => {
     setOpen(false);
+    if (pending || type === 2) {
+      shell.showToast('⚠️ Google Cloud 模块正在开发中，敬请期待！', { kind: 'warn' });
+      return;
+    }
     if (provider.type === type) return;
     setProvider({ type, name });
     try { localStorage.setItem('selectedCloudProvider', JSON.stringify({ type, name })); } catch (_) {}
@@ -1847,7 +1851,21 @@ function UserMenuButton() {
         <Divider />
         <div style={{ padding: '6px 10px 3px', fontSize: 10.5, color: 'var(--fg-3)', fontWeight: 600, letterSpacing: 0.3 }}>{tr('layout.6669ad')}</div>
         {PROVIDERS.map((p) => (
-          <MenuBtn key={p.type} icon={p.icon} label={p.name} onClick={() => handleProvider(p.type, p.name)} right={provider.type === p.type ? <Icon name="check" size={13} style={{ color: 'var(--accent)' }} /> : null} />
+          <MenuBtn
+            key={p.type}
+            icon={p.icon}
+            label={p.name}
+            onClick={() => handleProvider(p.type, p.name, p.pending)}
+            right={
+              p.pending ? (
+                <span style={{
+                  fontSize: 9.5, fontWeight: 600, padding: '1px 6px',
+                  borderRadius: 3, background: 'var(--bg-3)', color: 'var(--fg-3)',
+                  letterSpacing: 0.3, whiteSpace: 'nowrap',
+                }}>待开发</span>
+              ) : (provider.type === p.type ? <Icon name="check" size={13} style={{ color: 'var(--accent)' }} /> : null)
+            }
+          />
         ))}
         <Divider />
         <MenuBtn icon="info" label={tr('layout.81d9f5')} onClick={handleAbout} />

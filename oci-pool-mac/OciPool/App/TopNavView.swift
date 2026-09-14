@@ -428,7 +428,10 @@ struct UserDropdownPanel: View {
                 menuRow(
                     icon: "globe",
                     title: "Google Cloud",
-                    selected: cloudProvider == 2,
+                    trailing: "待开发",
+                    trailingColor: textMuted,
+                    trailingBg: dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06),
+                    selected: false,
                     action: { onCloud(2, "Google Cloud") }
                 )
                 divider
@@ -500,6 +503,8 @@ struct UserDropdownPanel: View {
         icon: String,
         title: String,
         trailing: String? = nil,
+        trailingColor: Color? = nil,
+        trailingBg: Color? = nil,
         selected: Bool = false,
         danger: Bool = false,
         action: @escaping () -> Void
@@ -517,12 +522,12 @@ struct UserDropdownPanel: View {
                 if let trailing = trailing {
                     Text(trailing)
                         .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                        .foregroundColor(AppTheme.sidebarActive)
+                        .foregroundColor(trailingColor ?? AppTheme.sidebarActive)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(
                             RoundedRectangle(cornerRadius: 3)
-                                .fill(AppTheme.sidebarActive.opacity(0.14))
+                                .fill(trailingBg ?? AppTheme.sidebarActive.opacity(0.14))
                         )
                 } else if selected {
                     Image(systemName: "checkmark")

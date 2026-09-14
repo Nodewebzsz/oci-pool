@@ -215,17 +215,20 @@ struct DashboardView: View {
                 title: "系统信息",
                 subtitle: model.metrics.hostname.isEmpty ? "—" : model.metrics.hostname,
                 gauge: {
+                    let smart = DashboardFormat.smartUptimeInfo(model.metrics.systemUptime)
                     var s = gaugeSpec(color: AppTheme.sidebarActive,
-                                      value: DashboardFormat.uptimeDaysNumber(model.metrics.systemUptime),
-                                      label: "天在线", valueSize: 30)
-                    s.maxValue = 90
+                                      value: smart.progress,
+                                      label: smart.label, valueSize: 30)
+                    s.maxValue = smart.maxVal
                     s.showUnit = false
+                    s.displayValue = smart.valueText
                     return s
                 },
                 rows: [
                     ("操作系统", model.metrics.osName.isEmpty ? "-" : model.metrics.osName),
                     ("系统架构", model.metrics.osArch.isEmpty ? "-" : model.metrics.osArch),
-                    ("运行时间", DashboardFormat.uptime(model.metrics.systemUptime))
+                    ("运行时间", DashboardFormat.uptime(model.metrics.systemUptime)),
+                    ("Java 版本", model.metrics.javaVersion.isEmpty ? "JDK 17" : model.metrics.javaVersion)
                 ]
             )
         }
@@ -287,10 +290,11 @@ struct DashboardView: View {
                             .lineLimit(1)
                         Spacer(minLength: 8)
                         Text(row.1)
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 11.5, weight: .medium))
                             .foregroundColor(mutedRows.contains(idx) ? AppTheme.textTertiary(dark) : AppTheme.navIcon(dark))
                             .multilineTextAlignment(.trailing)
-                            .lineLimit(2)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
                 }
             }
@@ -315,6 +319,7 @@ struct DashboardView: View {
             color: s.color,
             unitLabel: s.showUnit ? s.unitLabel : "",
             belowLabel: s.showUnit ? nil : s.unitLabel,
+            displayText: s.displayValue,
             dark: dark,
             size: 168,
             thickness: 14,
@@ -499,6 +504,7 @@ private struct GaugeSpec {
     var valueSize: CGFloat
     var maxValue: Double = 100
     var showUnit: Bool = true
+    var displayValue: String? = nil
 }
 
 // MARK: - Empty bar chart (web BarChart with no data)
@@ -559,12 +565,17 @@ struct DashboardGauge: View {
     var color: Color = AppTheme.sidebarActive
     var unitLabel: String = "%"
     var belowLabel: String? = nil
+    var displayText: String? = nil
     let dark: Bool
     var size: CGFloat = 180
     var thickness: CGFloat = 14
     var valueSize: CGFloat = 36
 
     private var clamped: Double { Swift.min(maxValue, Swift.max(0, value)) }
+    private var renderedValue: String {
+        if let d = displayText { return d }
+        return "\(Int(clamped.rounded()))"
+    }
 
     var body: some View {
         ZStack {
@@ -577,18 +588,18 @@ struct DashboardGauge: View {
             VStack(spacing: 6) {
                 if belowLabel == nil {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
-                        Text("\(Int(clamped.rounded()))")
+                        Text(renderedValue)
                             .font(.system(size: valueSize, weight: .bold))
                             .foregroundColor(color)
                         Text(unitLabel)
                             .font(.system(size: valueSize * 0.45, weight: .bold))
                             .foregroundColor(color)
                     }
-                                    } else {
-                    Text("\(Int(clamped.rounded()))")
+                } else {
+                    Text(renderedValue)
                         .font(.system(size: valueSize, weight: .bold))
                         .foregroundColor(color)
-                                            Text(belowLabel ?? "")
+                    Text(belowLabel ?? "")
                         .font(.system(size: 11))
                         .foregroundColor(AppTheme.textTertiary(dark))
                 }

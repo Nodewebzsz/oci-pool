@@ -80,6 +80,7 @@ struct SystemMetrics: Decodable, Equatable {
     var osName: String = ""
     var osArch: String = ""
     var hostname: String = ""
+    var javaVersion: String = ""
     var timestamp: String = ""
 
     enum CodingKeys: String, CodingKey {
@@ -87,7 +88,7 @@ struct SystemMetrics: Decodable, Equatable {
         case memoryUsage, totalMemory, availableMemory, usedMemory, swapUsage, swapTotal, swapUsed
         case diskUsage, diskTotal, diskUsed, diskFree
         case uploadSpeed, downloadSpeed, totalUploadBytes, totalDownloadBytes
-        case totalProcesses, threadCount, systemUptime, osName, osArch, hostname, timestamp
+        case totalProcesses, threadCount, systemUptime, osName, osArch, hostname, javaVersion, timestamp
     }
 
     init() {}
@@ -122,9 +123,20 @@ struct SystemMetrics: Decodable, Equatable {
         totalProcesses = Self.i(c, .totalProcesses)
         threadCount = Self.i(c, .threadCount)
         systemUptime = Self.d(c, .systemUptime)
-        osName = (try? c.decode(String.self, forKey: .osName)) ?? ""
+        let rawOs = (try? c.decode(String.self, forKey: .osName)) ?? ""
+        var cleanedOs = rawOs
+            .replacingOccurrences(of: #"(?i)^Linux\s+(?=Ubuntu|Debian|CentOS|Rocky|Alma|Alpine|Fedora|RHEL|Arch)"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"\s*\([^)]*\)"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"(?i)\s+build\b.*"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        osName = cleanedOs
+
         osArch = (try? c.decode(String.self, forKey: .osArch)) ?? ""
-        hostname = (try? c.decode(String.self, forKey: .hostname)) ?? ""
+
+        let rawHost = (try? c.decode(String.self, forKey: .hostname)) ?? ""
+        hostname = rawHost.replacingOccurrences(of: #"(?i)\.local$"#, with: "", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        javaVersion = (try? c.decode(String.self, forKey: .javaVersion)) ?? "JDK 17"
 
         if let s = try? c.decode(String.self, forKey: .timestamp) {
             timestamp = s
@@ -198,6 +210,23 @@ enum DashboardFormat {
 
     static func uptimeDaysNumber(_ seconds: Double) -> Double {
         Double(Int(seconds / 86400))
+    }
+
+    /// 方案 A：智能在线时长指标（数值、标签、最大值、圆环当前进度）
+    static func smartUptimeInfo(_ seconds: Double) -> (valueText: String, label: String, progress: Double, maxVal: Double) {
+        let s = Int(seconds)
+        let days = s / 86400
+        let hours = (s % 86400) / 3600
+        let minutes = (s % 3600) / 60
+
+        if days >= 1 {
+            return ("\(days)", "天在线", Swift.min(90, Double(days)), 90.0)
+        } else if hours >= 1 {
+            return ("\(hours)", "小时在线", Double(hours), 24.0)
+        } else {
+            let m = Swift.max(1, minutes)
+            return ("\(m)", "分钟在线", Double(m), 60.0)
+        }
     }
 }
 
