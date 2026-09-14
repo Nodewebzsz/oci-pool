@@ -21,15 +21,21 @@
 
 ---
 
-## About This Project
+## About This Project & Acknowledgments
 
-This project is a **secondary-development fork** of the open-source project [doubleDimple/oci-start](https://github.com/doubleDimple/oci-start). It keeps the core capabilities of the original project and adds a modern web UI (React) plus usability improvements.
+This project is a **secondary-development fork** based on the excellent open-source project **[doubleDimple/oci-start](https://github.com/doubleDimple/oci-start)**. While retaining the core capabilities of the original project, it brings a modern Web UI (React 18 SPA), native cross-platform desktop clients (macOS / Windows), enterprise-grade security hardening, and operational improvements.
 
-This fork tracks upstream updates, but it is **not guaranteed to be fully feature-synced** with the original project. If you want to experience the **latest features** from the original project, please visit:
+### 🙏 Tribute to the Original Author
 
-> 💡 **Original project**: <https://github.com/doubleDimple/oci-start>
+We would like to express our deepest gratitude and highest respect to the original author **[@doubleDimple](https://github.com/doubleDimple)** and all upstream contributors!
 
-> 📦 **This project Releases**: <https://github.com/Nodewebzsz/oci-pool/releases>
+- 🌟 **Outstanding Foundation**: The original project `oci-start` laid an incredible groundwork with its deep Oracle Cloud (OCI) API integration, robust SDK encapsulation, multi-tenant snatching algorithms, and extensive troubleshooting on cloud infrastructure automation.
+- 🤝 **Carrying Forward Open Source**: Without the author's selfless open-source spirit and visionary architecture, this project (OCI-Pool) would not have been possible. OCI-Pool aims to stand on the shoulders of giants, focusing on modern cross-platform experience, zero-exposure public security, and streamlined DevOps automation.
+- ⭐ **Support the Original Work**: If you find OCI-Pool helpful, **we strongly encourage you to visit the original repository first and star ⭐ the upstream project to honor the original creation!**
+
+> 💡 **Original Project**: <https://github.com/doubleDimple/oci-start>  
+> 📦 **This Project Releases**: <https://github.com/Nodewebzsz/oci-pool/releases>  
+> 📌 *Note: This fork tracks upstream enhancements, but does not guarantee 100% parity due to independent client and UI architectural evolutions. To experience upstream canonical features, please visit the original repository.*
 
 ---
 

@@ -21,15 +21,21 @@
 
 ---
 
-## 关于本项目
+## 关于本项目与致谢
 
-本项目是基于开源项目 [doubleDimple/oci-start](https://github.com/doubleDimple/oci-start) 的**二次开发分支**,在保留原项目核心能力的基础上,提供了现代化的 Web 界面(React)与更多易用性改进。
+本项目是基于开源项目 **[doubleDimple/oci-start](https://github.com/doubleDimple/oci-start)** 的**二次开发分支**。在保留原项目核心能力的基础上，重构提供了现代化的 Web 交互界面（React 18 SPA）、跨平台桌面原生客户端（macOS / Windows）以及更完备的公网生产部署安全加固与易用性改进。
 
-本分支会持续跟踪上游更新,但**不保证与原项目功能完全同步**。如果你想体验原项目的**最新功能**,请前往原项目:
+### 🙏 致敬原作者（Acknowledgments）
 
-> 💡 **原项目**:<https://github.com/doubleDimple/oci-start>
+在此，向原项目作者 **[@doubleDimple](https://github.com/doubleDimple)** 及其团队致以最诚挚的感谢与崇高的开源敬意！
 
-> 📦 **本项目 Releases**:<https://github.com/Nodewebzsz/oci-pool/releases>
+- 🌟 **卓越的基石**：原项目 `oci-start` 在 Oracle Cloud (OCI) API 深度集成、底层 SDK 封装、多租户轮询抢机调度以及复杂网络架构适配上倾注了大量心血，攻克了诸多云平台底层难题，为云上资源自动化运维探索出了一条极具开创性的优秀路径。
+- 🤝 **开源精神的传承**：正是因为原作者无私的代码开源与前瞻性的设计思想，才使得本项目（OCI-Pool）的孵化与演进成为可能。本项目立足于上游坚实的底座，专注在现代化双端体验、公网安全加固与零心智自动化运维上做出探索与延伸。
+- ⭐ **饮水思源**：如果您觉得本项目对您有所帮助，**强烈建议您首先前往原项目仓库为原作者点亮一颗珍贵的 Star ⭐ 支持原创与开源探索者！**
+
+> 💡 **原项目仓库**：<https://github.com/doubleDimple/oci-start>  
+> 📦 **本项目 Releases**：<https://github.com/Nodewebzsz/oci-pool/releases>  
+> 📌 *注：本分支会持续跟踪上游更新，但因前端架构与桌面客户端深度重构，不保证与原项目功能完全同步。若需体验上游纯正原生特性，推荐优先体验原项目。*
 
 ---
 
