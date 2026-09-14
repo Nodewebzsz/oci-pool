@@ -96,55 +96,47 @@ private func drawIcon(into bitmap: NSBitmapImageRep, pixelSize: Int) {
     )
     context.restoreGState()
 
-    // 云轮廓沿用 Web favicon 的视觉比例，并以贝塞尔曲线适配所有图标尺寸。
+    // 科技云朵外轮廓（纯白、上移2px居中）
     let cloud = CGMutablePath()
-    cloud.move(to: point(10, 20.4))
+    cloud.move(to: point(7.5, 23))
     cloud.addCurve(
-        to: point(12.6, 12.9),
-        control1: point(7.2, 19.1),
-        control2: point(8.2, 14.2)
+        to: point(9.7, 14.5),
+        control1: point(6.5, 18.8),
+        control2: point(7.4, 15.8)
     )
     cloud.addCurve(
-        to: point(24.2, 14.1),
-        control1: point(14.4, 7.4),
-        control2: point(22.5, 8.2)
+        to: point(23.5, 16.0),
+        control1: point(12.5, 7.8),
+        control2: point(21.0, 8.2)
     )
     cloud.addCurve(
-        to: point(24.9, 21.4),
-        control1: point(28.6, 14.3),
-        control2: point(29.1, 20.5)
+        to: point(27.0, 23.0),
+        control1: point(26.2, 16.5),
+        control2: point(28.2, 19.8)
     )
-    cloud.addLine(to: point(11.2, 21.4))
+    cloud.addLine(to: point(7.5, 23))
 
-    let ink = color(15, 23, 42)
+    let ink = color(255, 255, 255)
     context.addPath(cloud)
     context.setStrokeColor(ink)
-    context.setLineWidth(max(1, 2 * scale))
+    context.setLineWidth(max(1, 2.2 * scale))
     context.setLineCap(.round)
     context.setLineJoin(.round)
     context.strokePath()
 
-    let nodeRadius = max(0.8, 1.6 * scale)
-    let nodeLineWidth = max(0.8, 1.4 * scale)
-    for nodeX: CGFloat in [13, 18, 23] {
-        context.setStrokeColor(ink)
-        context.setLineWidth(nodeLineWidth)
-        context.setLineCap(.butt)
-        context.move(to: point(nodeX, 23.9))
-        context.addLine(to: point(nodeX, 21.4))
-        context.strokePath()
+    // 居中高能折角闪电核（纯白、上移2px）
+    let bolt = CGMutablePath()
+    bolt.move(to: point(18.5, 11.2))
+    bolt.addLine(to: point(14.2, 16.5))
+    bolt.addLine(to: point(17.5, 16.5))
+    bolt.addLine(to: point(15.8, 21.8))
+    bolt.addLine(to: point(21.8, 15.2))
+    bolt.addLine(to: point(18.2, 15.2))
+    bolt.closeSubpath()
 
-        let center = point(nodeX, 25.5)
-        context.setFillColor(ink)
-        context.fillEllipse(
-            in: CGRect(
-                x: center.x - nodeRadius,
-                y: center.y - nodeRadius,
-                width: nodeRadius * 2,
-                height: nodeRadius * 2
-            )
-        )
-    }
+    context.addPath(bolt)
+    context.setFillColor(ink)
+    context.fillPath()
 
     graphicsContext.flushGraphics()
 }

@@ -38,9 +38,9 @@ guard lowerBackground.greenComponent > 0.60, lowerBackground.blueComponent > 0.5
     fail("图标右下区域不是品牌青色渐变")
 }
 
-let node = color(atX: 13.0 / 36.0, y: 25.5 / 36.0)
-guard node.redComponent < 0.20, node.greenComponent < 0.25, node.blueComponent < 0.30 else {
-    fail("图标缺少深色云池节点")
+let bolt = color(atX: 18.5 / 36.0, y: 16.5 / 36.0)
+guard bolt.redComponent > 0.85, bolt.greenComponent > 0.85, bolt.blueComponent > 0.85 else {
+    fail("图标缺少纯白高能闪电核心")
 }
 
-print("图标品牌色与云池节点检查通过")
+print("图标品牌色与纯白高能闪电核心检查通过")

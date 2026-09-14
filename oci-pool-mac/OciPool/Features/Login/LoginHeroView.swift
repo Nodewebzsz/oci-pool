@@ -225,7 +225,7 @@ struct LoginHeroView: View {
     }
 }
 
-// Mini brand badge (top-left logo) — 与 Web 端 PoolBrandMark 1:1 精确对齐
+// Mini brand badge (top-left logo) — 与 Web 端 PoolBrandMark 1:1 精确对齐（纯白、上移2px居中）
 private struct LoginBrandBadge: View {
     var size: CGFloat = 38
     var accent: Color
@@ -237,22 +237,20 @@ private struct LoginBrandBadge: View {
                 .fill(LinearGradient(gradient: Gradient(colors: [accent, cyan]),
                                      startPoint: .topLeading, endPoint: .bottomTrailing))
                 .frame(width: size, height: size)
-            PoolBrandGlyphStroke()
-                .stroke(Color(hex: "0e2a22"),
-                        style: StrokeStyle(lineWidth: size * (2.0 / 36.0), lineCap: .round, lineJoin: .round))
+            PoolCloudOutlineShape()
+                .stroke(Color.white,
+                        style: StrokeStyle(lineWidth: size * (2.2 / 36.0), lineCap: .round, lineJoin: .round))
                 .frame(width: size, height: size)
-            PoolBrandGlyphDots()
-                .fill(Color(hex: "0e2a22"))
+            PoolLightningBoltShape()
+                .fill(Color.white)
                 .frame(width: size, height: size)
         }
         .frame(width: size, height: size)
     }
 }
 
-// 严格对齐 Web 端 PoolBrandMark SVG（viewBox="0 0 36 36"）
-// <path d="M10 20.4a4.2 4.2 0 0 1 2.6-7.5 6.1 6.1 0 0 1 11.6 1.2 3.7 3.7 0 0 1 .7 7.3H11.2" stroke-width="2" stroke-linecap="round"/>
-// <path d="M13 23.9v-2.5 M18 23.9v-2.5 M23 23.9v-2.5" stroke-width="1.4"/>
-private struct PoolBrandGlyphStroke: Shape {
+// 科技云朵外轮廓（纯白、上移2px居中）
+private struct PoolCloudOutlineShape: Shape {
     func path(in rect: CGRect) -> Path {
         let sx = rect.width / 36.0
         let sy = rect.height / 36.0
@@ -260,33 +258,31 @@ private struct PoolBrandGlyphStroke: Shape {
             CGPoint(x: rect.minX + x * sx, y: rect.minY + y * sy)
         }
         var path = Path()
-        // 1. 云朵外轮廓（Web SVG 精确三段贝塞尔弧）
-        path.move(to: p(10, 20.4))
-        path.addCurve(to: p(12.6, 12.9), control1: p(10, 16.6), control2: p(10.6, 14.5))
-        path.addCurve(to: p(24.2, 14.1), control1: p(14.4, 7.4), control2: p(22.5, 8.2))
-        path.addCurve(to: p(24.9, 21.4), control1: p(28.6, 14.3), control2: p(29.1, 20.5))
-        path.addLine(to: p(11.2, 21.4))
-        // 2. 底部三根连接虚线立柱 (M13 23.9v-2.5 ...)
-        for x: CGFloat in [13.0, 18.0, 23.0] {
-            path.move(to: p(x, 23.9))
-            path.addLine(to: p(x, 21.4))
-        }
+        path.move(to: p(7.5, 23.0))
+        path.addCurve(to: p(9.7, 14.5), control1: p(6.5, 18.8), control2: p(7.4, 15.8))
+        path.addCurve(to: p(23.5, 16.0), control1: p(12.5, 7.8), control2: p(21.0, 8.2))
+        path.addCurve(to: p(27.0, 23.0), control1: p(26.2, 16.5), control2: p(28.2, 19.8))
+        path.addLine(to: p(7.5, 23.0))
         return path
     }
 }
 
-// 底部三个云池节点圆点（Web SVG cx="13/18/23", cy="25.5", r="1.6"）
-private struct PoolBrandGlyphDots: Shape {
+// 居中高能折角闪电核（纯白、上移2px）
+private struct PoolLightningBoltShape: Shape {
     func path(in rect: CGRect) -> Path {
         let sx = rect.width / 36.0
         let sy = rect.height / 36.0
-        var path = Path()
-        let r: CGFloat = 1.6 * min(sx, sy)
-        for x: CGFloat in [13.0, 18.0, 23.0] {
-            let cx = rect.minX + x * sx
-            let cy = rect.minY + 25.5 * sy
-            path.addEllipse(in: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
+        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: rect.minX + x * sx, y: rect.minY + y * sy)
         }
+        var path = Path()
+        path.move(to: p(18.5, 11.2))
+        path.addLine(to: p(14.2, 16.5))
+        path.addLine(to: p(17.5, 16.5))
+        path.addLine(to: p(15.8, 21.8))
+        path.addLine(to: p(21.8, 15.2))
+        path.addLine(to: p(18.2, 15.2))
+        path.closeSubpath()
         return path
     }
 }
@@ -583,13 +579,13 @@ private struct CentralComputeCore: View {
                 .frame(width: 64 * scale, height: 64 * scale)
                 .position(x: cx, y: cy)
 
-            // OCI 云池芯片徽标
-            PoolBrandGlyphStroke()
-                .stroke(accent, style: StrokeStyle(lineWidth: 2 * scale, lineCap: .round, lineJoin: .round))
+            // OCI 云中闪电芯片徽标（尺寸 44）
+            PoolCloudOutlineShape()
+                .stroke(accent, style: StrokeStyle(lineWidth: 2.2 * scale, lineCap: .round, lineJoin: .round))
                 .frame(width: 44 * scale, height: 44 * scale)
                 .position(x: cx, y: cy)
 
-            PoolBrandGlyphDots()
+            PoolLightningBoltShape()
                 .fill(accent)
                 .frame(width: 44 * scale, height: 44 * scale)
                 .position(x: cx, y: cy)

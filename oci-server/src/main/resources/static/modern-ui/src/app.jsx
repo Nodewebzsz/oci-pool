@@ -121,14 +121,10 @@ function BrandLoading() {
             animation: 'ocip-load-drift 5s ease-in-out infinite',
           }}>
             <svg width="50" height="50" viewBox="0 0 36 36" role="img" aria-label={tr('layout.2e9579')}>
-              <path d="M10 20.4a4.2 4.2 0 0 1 2.6-7.5 6.1 6.1 0 0 1 11.6 1.2 3.7 3.7 0 0 1 .7 7.3H11.2"
-                    fill="none" stroke="oklch(0.14 0.02 155)" strokeWidth="2" strokeLinecap="round" />
-              <circle cx="13" cy="25.5" r="1.6" fill="oklch(0.14 0.02 155)" />
-              <circle cx="18" cy="25.5" r="1.6" fill="oklch(0.14 0.02 155)" />
-              <circle cx="23" cy="25.5" r="1.6" fill="oklch(0.14 0.02 155)" />
-              <path d="M13 23.9v-2.5" stroke="oklch(0.14 0.02 155)" strokeWidth="1.4" />
-              <path d="M18 23.9v-2.5" stroke="oklch(0.14 0.02 155)" strokeWidth="1.4" />
-              <path d="M23 23.9v-2.5" stroke="oklch(0.14 0.02 155)" strokeWidth="1.4" />
+              <path d="M7.5 23a4.8 4.8 0 0 1 2.2-8.5 7 7 0 0 1 13.8 1.5 4.8 4.8 0 0 1 3.5 9H7.5z"
+                    fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              <polygon points="18.5,11.2 14.2,16.5 17.5,16.5 15.8,21.8 21.8,15.2 18.2,15.2"
+                       fill="#ffffff" stroke="#ffffff" strokeWidth="0.8" strokeLinejoin="round" />
             </svg>
           </div>
         </div>

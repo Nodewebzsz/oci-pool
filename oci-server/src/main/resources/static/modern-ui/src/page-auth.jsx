@@ -22,6 +22,20 @@ function needsVerification(message) {
   return /验证码|mfa|MFA/i.test(message || '');
 }
 
+// ── Brand Logo: 内嵌高能电光云 (Cloud + Inset Lightning Core · 纯白居中) ─────────────
+function BrandLogoRender({ size = 25, color = '#ffffff' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 36 36" fill="none">
+      {/* 科技云朵外轮廓（纯白、上移2px光学居中） */}
+      <path d="M7.5 23a4.8 4.8 0 0 1 2.2-8.5 7 7 0 0 1 13.8 1.5 4.8 4.8 0 0 1 3.5 9H7.5z"
+            stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      {/* 居中高能折角闪电核（纯白） */}
+      <polygon points="18.5,11.2 14.2,16.5 17.5,16.5 15.8,21.8 21.8,15.2 18.2,15.2"
+               fill={color} stroke={color} strokeWidth="0.8" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 // ── Brand hero (SVG · left panel) ────────────────────────────────────────
 
 // 全球算力互联拓扑 (Global Cloud Topology · 深度强化版)
@@ -204,13 +218,9 @@ function AuthHeroArt() {
         <circle r="38" fill="var(--bg-1)" stroke="var(--accent)" strokeWidth="1.8" />
         <circle r="32" fill="var(--bg-2)" fillOpacity="0.7" stroke="var(--border)" strokeWidth="1" />
 
-        {/* 中心 OCI 云池芯片徽标 */}
-        <g transform="translate(-13,-13) scale(1.1)">
-          <path d="M4 16h16a4 4 0 0 0 0-8 6 6 0 0 0-11.4-1.6A4.5 4.5 0 0 0 4 16z"
-                fill="var(--accent)" fillOpacity="0.18" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx="8" cy="16" r="1.4" fill="var(--accent)" />
-          <circle cx="12" cy="16" r="1.4" fill="var(--accent)" />
-          <circle cx="16" cy="16" r="1.4" fill="var(--accent)" />
+        {/* 中心 OCI 云池芯片徽标（适当放大为 46px） */}
+        <g transform="translate(-23,-23)">
+          <BrandLogoRender size={46} color="var(--accent)" />
         </g>
       </g>
     </svg>
@@ -1075,20 +1085,12 @@ function AuthPage({ onLogin, authView, onAuthViewChange }) {
         {/* Top: mini logo bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative', zIndex: 1 }}>
           <div style={{
-            width: 32, height: 32, borderRadius: 8,
+            width: 36, height: 36, borderRadius: 9,
             background: 'linear-gradient(135deg, var(--accent), var(--cyan))',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 8px color-mix(in oklab, var(--accent) 30%, transparent)',
           }}>
-            <svg width="22" height="22" viewBox="0 0 36 36" role="img" aria-label={tr('auth.brandAria')}>
-              <path d="M10 20.4a4.2 4.2 0 0 1 2.6-7.5 6.1 6.1 0 0 1 11.6 1.2 3.7 3.7 0 0 1 .7 7.3H11.2"
-                    fill="none" stroke="oklch(0.14 0.02 155)" strokeWidth="2" strokeLinecap="round" />
-              <circle cx="13" cy="25.5" r="1.6" fill="oklch(0.14 0.02 155)" />
-              <circle cx="18" cy="25.5" r="1.6" fill="oklch(0.14 0.02 155)" />
-              <circle cx="23" cy="25.5" r="1.6" fill="oklch(0.14 0.02 155)" />
-              <path d="M13 23.9v-2.5" stroke="oklch(0.14 0.02 155)" strokeWidth="1.4" />
-              <path d="M18 23.9v-2.5" stroke="oklch(0.14 0.02 155)" strokeWidth="1.4" />
-              <path d="M23 23.9v-2.5" stroke="oklch(0.14 0.02 155)" strokeWidth="1.4" />
-            </svg>
+            <BrandLogoRender size={25} color="#ffffff" />
           </div>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--fg-0)', letterSpacing: -0.2 }}>{tr('brand.name')}</div>

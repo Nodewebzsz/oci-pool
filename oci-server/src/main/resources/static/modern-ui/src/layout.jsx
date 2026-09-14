@@ -361,7 +361,6 @@ function MenuSearch({ nav, onNavigate, placeholder }) {
 
 
 function PoolBrandMark({ size = 30 }) {
-  const nodeXs = [13, 18, 23];
   return (
     <svg width={size} height={size} viewBox="0 0 36 36" role="img" aria-label={tr('layout.2e9579')}>
       <defs>
@@ -371,15 +370,23 @@ function PoolBrandMark({ size = 30 }) {
         </linearGradient>
       </defs>
       <rect x="1" y="1" width="34" height="34" rx="10" fill="url(#pool-brand-gradient)" />
+      {/* 科技云朵外轮廓（纯白、上移2px居中） */}
       <path
-        d="M10 20.4a4.2 4.2 0 0 1 2.6-7.5 6.1 6.1 0 0 1 11.6 1.2 3.7 3.7 0 0 1 .7 7.3H11.2"
+        d="M7.5 23a4.8 4.8 0 0 1 2.2-8.5 7 7 0 0 1 13.8 1.5 4.8 4.8 0 0 1 3.5 9H7.5z"
         fill="none"
-        stroke="oklch(0.14 0.02 155)"
-        strokeWidth="2"
+        stroke="#ffffff"
+        strokeWidth="2.2"
         strokeLinecap="round"
+        strokeLinejoin="round"
       />
-      {nodeXs.map((x) => <circle key={'node-' + x} cx={x} cy="25.5" r="1.6" fill="oklch(0.14 0.02 155)" />)}
-      {nodeXs.map((x) => <path key={'link-' + x} d={'M' + x + ' 23.9v-2.5'} stroke="oklch(0.14 0.02 155)" strokeWidth="1.4" />)}
+      {/* 居中高能折角闪电核（纯白） */}
+      <polygon
+        points="18.5,11.2 14.2,16.5 17.5,16.5 15.8,21.8 21.8,15.2 18.2,15.2"
+        fill="#ffffff"
+        stroke="#ffffff"
+        strokeWidth="0.8"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -408,12 +415,21 @@ function UserAvatar({ userName, size = 26 }) {
   );
 }
 
-// ─── 关于与版本信息弹窗组件 (100% 对齐客户端图 1 与原版规范) ───────────
-function AboutVersionPanel() {
+// ─── 关于与版本信息弹窗组件 (100% 对齐客户端图 1 与原版规范，即时水合秒开防抖动) ───
+function AboutVersionPanel({ initialInfo = null }) {
   const { t: tr } = useT();
   const shell = useShell();
-  const [info, setInfo] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
+  const [info, setInfo] = React.useState(() => {
+    if (initialInfo) return initialInfo;
+    if (window.__oci_cached_version_info) return window.__oci_cached_version_info;
+    try {
+      const raw = localStorage.getItem('oci_cached_version_info');
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  });
+  const [loading, setLoading] = React.useState(!info);
   const [zoomImg, setZoomImg] = React.useState(null);
   const [copiedUsdt, setCopiedUsdt] = React.useState(false);
   const qrTimestamp = React.useMemo(() => Date.now(), []);
@@ -421,13 +437,19 @@ function AboutVersionPanel() {
   React.useEffect(() => {
     let alive = true;
     window.ociApi.request('/api/version/check')
-      .then((d) => { if (alive) setInfo(d); })
+      .then((d) => {
+        if (alive && d) {
+          window.__oci_cached_version_info = d;
+          try { localStorage.setItem('oci_cached_version_info', JSON.stringify(d)); } catch (_) {}
+          setInfo(d);
+        }
+      })
       .catch((e) => { if (alive) console.warn('version check failed', e); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, []);
 
-  const fmt = (v) => (v && !/^v/i.test(v) ? `v${v}` : (v || tr('layout.7042f5')));
+  const fmt = (v) => (v && !/^v/i.test(v) ? `v${v}` : (v || (loading ? '...' : tr('layout.7042f5'))));
   const cur = fmt(info && info.currentVersion);
   const latest = fmt(info && info.latestVersion);
   const needUpdate = !!(info && info.needUpdate);
@@ -472,15 +494,23 @@ function AboutVersionPanel() {
           </div>
         </div>
 
-        {/* 右侧版本对比卡 + 升级按钮 */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
+        {/* 右侧版本对比卡 + 升级按钮 (锁定高度与对齐，完全杜绝 CLS 布局抖动) */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-end',
+          justifyContent: 'center',
+          gap: 8,
+          minHeight: 84,
+        }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
             background: 'var(--bg-2)',
             border: '1px solid var(--border)',
             borderRadius: 12,
-            padding: '10px 18px'
+            padding: '8px 16px',
+            boxSizing: 'border-box',
           }}>
             {/* 当前版本 */}
             <div style={{ textAlign: 'left' }}>
@@ -489,34 +519,32 @@ function AboutVersionPanel() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span className="mono" style={{ fontSize: 15, fontWeight: 800, color: 'var(--fg-0)' }}>
-                  {loading ? '...' : cur}
+                  {cur}
                 </span>
-                {!loading && (
-                  needUpdate ? (
-                    <span style={{
-                      fontSize: 9.5,
-                      fontWeight: 700,
-                      color: '#b45309',
-                      background: '#fef3c7',
-                      borderRadius: 4,
-                      padding: '1px 5px',
-                      lineHeight: '14px'
-                    }}>
-                      可更新
-                    </span>
-                  ) : (
-                    <span style={{
-                      fontSize: 9.5,
-                      fontWeight: 700,
-                      color: '#15803d',
-                      background: '#dcfce7',
-                      borderRadius: 4,
-                      padding: '1px 5px',
-                      lineHeight: '14px'
-                    }}>
-                      最新
-                    </span>
-                  )
+                {needUpdate ? (
+                  <span style={{
+                    fontSize: 9.5,
+                    fontWeight: 700,
+                    color: '#b45309',
+                    background: '#fef3c7',
+                    borderRadius: 4,
+                    padding: '1px 5px',
+                    lineHeight: '14px'
+                  }}>
+                    可更新
+                  </span>
+                ) : (
+                  <span style={{
+                    fontSize: 9.5,
+                    fontWeight: 700,
+                    color: '#15803d',
+                    background: '#dcfce7',
+                    borderRadius: 4,
+                    padding: '1px 5px',
+                    lineHeight: '14px'
+                  }}>
+                    最新
+                  </span>
                 )}
               </div>
             </div>
@@ -530,13 +558,13 @@ function AboutVersionPanel() {
                 最新版本
               </div>
               <div className="mono" style={{ fontSize: 15, fontWeight: 800, color: needUpdate ? '#dc2626' : 'var(--fg-0)' }}>
-                {loading ? '...' : latest}
+                {latest}
               </div>
             </div>
           </div>
 
-          {/* 发现新版本时的升级按钮 (对齐客户端红色大按钮) */}
-          {!loading && needUpdate && (
+          {/* 发现新版本时的升级按钮 (对齐客户端红色大按钮，无缝直出) */}
+          {needUpdate && (
             <a
               href={info?.downloadUrl || 'https://github.com/Nodewebzsz/oci-pool/releases'}
               target="_blank"
@@ -752,14 +780,15 @@ function AboutVersionPanel() {
   );
 }
 
-function openAboutModal(shell, tr) {
+function openAboutModal(shell, tr, initialInfo = null) {
+  const info = initialInfo || window.__oci_cached_version_info;
   shell.openModal({
     title: tr('layout.81d9f5') || '关于',
     subtitle: 'OCI-POOL',
     icon: 'info',
     iconColor: 'var(--accent)',
     width: 680,
-    body: <AboutVersionPanel />,
+    body: <AboutVersionPanel initialInfo={info} />,
     footer: (
       <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
         <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('layout.b15d91') || '关闭'}</Button>
@@ -799,7 +828,15 @@ function Sidebar({ activePage, onNavigate, collapsed = false, tabletOverlay = fa
   }, [activeSectionId]);
 
   // 侧边栏底部展示后端真实运行版本（支持本地缓存秒出 + 异步静默校准 + 更新微徽章）
-  const [versionInfo, setVersionInfo] = React.useState(null);
+  const [versionInfo, setVersionInfo] = React.useState(() => {
+    if (window.__oci_cached_version_info) return window.__oci_cached_version_info;
+    try {
+      const raw = localStorage.getItem('oci_cached_version_info');
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  });
   const [appVersion, setAppVersion] = React.useState(() => {
     try {
       return localStorage.getItem('oci_cached_app_version') || '';
@@ -811,11 +848,13 @@ function Sidebar({ activePage, onNavigate, collapsed = false, tabletOverlay = fa
   React.useEffect(() => {
     window.ociApi.request('/api/version/check').then((info) => {
       if (info) {
+        window.__oci_cached_version_info = info;
         setVersionInfo(info);
         if (info.currentVersion) {
           setAppVersion(info.currentVersion);
           try {
             localStorage.setItem('oci_cached_app_version', info.currentVersion);
+            localStorage.setItem('oci_cached_version_info', JSON.stringify(info));
           } catch (_) {}
         }
       }
@@ -1028,7 +1067,7 @@ function Sidebar({ activePage, onNavigate, collapsed = false, tabletOverlay = fa
             }}
           >
             <span
-              onClick={() => openAboutModal(shell, tr)}
+              onClick={() => openAboutModal(shell, tr, versionInfo)}
               style={{
                 color: 'var(--fg-3)',
                 cursor: 'pointer',
@@ -1045,7 +1084,7 @@ function Sidebar({ activePage, onNavigate, collapsed = false, tabletOverlay = fa
               <span
                 onClick={(e) => {
                   e.stopPropagation();
-                  openAboutModal(shell, tr);
+                  openAboutModal(shell, tr, versionInfo);
                 }}
                 style={{
                   display: 'inline-flex',
@@ -1706,7 +1745,7 @@ function UserMenuButton() {
 
   const handleAbout = () => {
     setOpen(false);
-    openAboutModal(shell, tr);
+    openAboutModal(shell, tr, window.__oci_cached_version_info);
   };
 
   const handleLogout = () => {

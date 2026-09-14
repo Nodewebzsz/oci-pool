@@ -501,7 +501,7 @@ private struct PulseDot: View {
     }
 }
 
-// Web PoolBrandMark 近似:渐变圆角方块 + 池化节点图形(云环 + 三节点)
+// Web PoolBrandMark: 渐变圆角方块 + 云中高能闪电核（纯白、上移2px）
 private struct SidebarBrandMark: View {
     var size: CGFloat
     var accent: Color
@@ -513,50 +513,50 @@ private struct SidebarBrandMark: View {
                 .fill(LinearGradient(gradient: Gradient(colors: [accent, cyan]),
                                      startPoint: .topLeading, endPoint: .bottomTrailing))
                 .frame(width: size, height: size)
-            PoolBrandGlyphStroke()
-                .stroke(Color(hex: "0e2a22"),
-                        style: StrokeStyle(lineWidth: size * 0.055, lineCap: .round, lineJoin: .round))
-            PoolBrandGlyphDots()
-                .fill(Color(hex: "0e2a22"))
+            PoolCloudOutlineShape()
+                .stroke(Color.white,
+                        style: StrokeStyle(lineWidth: size * (2.2 / 36.0), lineCap: .round, lineJoin: .round))
+            PoolLightningBoltShape()
+                .fill(Color.white)
         }
         .frame(width: size, height: size)
     }
 }
 
-// 与 Web 36x36 viewBox 坐标一致的云环轮廓 + 底部三条短线(仅描边)
-private struct PoolBrandGlyphStroke: Shape {
+// 科技云朵外轮廓（纯白、上移2px居中）
+private struct PoolCloudOutlineShape: Shape {
     func path(in rect: CGRect) -> Path {
-        let sx = rect.width / 36
-        let sy = rect.height / 36
+        let sx = rect.width / 36.0
+        let sy = rect.height / 36.0
         func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
             CGPoint(x: rect.minX + x * sx, y: rect.minY + y * sy)
         }
         var path = Path()
-        path.move(to: p(10, 20.4))
-        path.addCurve(to: p(12.6, 12.9), control1: p(10, 16.6), control2: p(10.6, 14.5))
-        path.addCurve(to: p(24.2, 13.9), control1: p(16.6, 10.2), control2: p(21.4, 10.9))
-        path.addCurve(to: p(24.9, 21.4), control1: p(26.6, 15.8), control2: p(26.2, 18.8))
-        path.addLine(to: p(11.4, 21.4))
-        for x in [13.0, 18.0, 23.0] {
-            path.move(to: p(x, 23.9))
-            path.addLine(to: p(x, 21.4))
-        }
+        path.move(to: p(7.5, 23.0))
+        path.addCurve(to: p(9.7, 14.5), control1: p(6.5, 18.8), control2: p(7.4, 15.8))
+        path.addCurve(to: p(23.5, 16.0), control1: p(12.5, 7.8), control2: p(21.0, 8.2))
+        path.addCurve(to: p(27.0, 23.0), control1: p(26.2, 16.5), control2: p(28.2, 19.8))
+        path.addLine(to: p(7.5, 23.0))
         return path
     }
 }
 
-// 底部三个填充节点圆点
-private struct PoolBrandGlyphDots: Shape {
+// 居中高能折角闪电核（纯白、上移2px）
+private struct PoolLightningBoltShape: Shape {
     func path(in rect: CGRect) -> Path {
-        let sx = rect.width / 36
-        let sy = rect.height / 36
-        var path = Path()
-        for x in [13.0, 18.0, 23.0] {
-            let r = 1.9
-            let cx = rect.minX + x * sx
-            let cy = rect.minY + 25.5 * sy
-            path.addEllipse(in: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
+        let sx = rect.width / 36.0
+        let sy = rect.height / 36.0
+        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: rect.minX + x * sx, y: rect.minY + y * sy)
         }
+        var path = Path()
+        path.move(to: p(18.5, 11.2))
+        path.addLine(to: p(14.2, 16.5))
+        path.addLine(to: p(17.5, 16.5))
+        path.addLine(to: p(15.8, 21.8))
+        path.addLine(to: p(21.8, 15.2))
+        path.addLine(to: p(18.2, 15.2))
+        path.closeSubpath()
         return path
     }
 }
