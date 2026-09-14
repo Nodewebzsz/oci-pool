@@ -5,32 +5,74 @@ on:
   watch:
     types: [started]
   fork:
+  workflow_dispatch:
 
 jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: 发送Telegram通知
-        uses: appleboy/telegram-action@v0.1.1
-        with:
-          to: ${{ secrets.TG_RELEASE_CHANNEL_ID || secrets.TELEGRAM_TO }}
-          token: ${{ secrets.TG_RELEASE_BOT_TOKEN || secrets.TELEGRAM_TOKEN }}
-          format: markdown
-          disable_web_page_preview: false
-          message: |
-            ${{ github.event_name == 'watch' && '🌟 *恭喜！获得新的Star*' || 
-                github.event_name == 'fork' && '🍴 *项目被Fork了*' ||
-                github.event_name == 'issues' && github.event.action == 'opened' && '🐛 *收到新Issue*' ||
-                github.event_name == 'issues' && github.event.action == 'closed' && '✅ *Issue已解决*' ||
-                github.event_name == 'issues' && github.event.action == 'reopened' && '🔄 *Issue被重新打开*' }}
-            
-            📂 *项目：* [`${{ github.repository }}`](${{ github.server_url }}/${{ github.repository }})
-            
-            👤 *操作者：* [${{ github.actor }}](https://github.com/${{ github.actor }})
-            ${{ github.event.issue.title && format('📋 *标题：* {0}', github.event.issue.title) || '' }}
-            ${{ github.event_name == 'watch' && format('⭐ 项目现在有 *{0}* 个Star了！', github.event.repository.stargazers_count) || '' }}
-            ${{ github.event_name == 'fork' && format('🍴 项目现在有 *{0}* 个Fork了！Fork仓库：[{1}]({2})', github.event.repository.forks_count, github.event.forkee.full_name, github.event.forkee.html_url) || '' }}
-            
-            🔗 [${{ github.event_name == 'watch' && '查看项目' || 
-                   github.event_name == 'fork' && '查看Fork' ||
-                   github.event_name == 'issues' && '查看Issue' }}](${{ github.event.forkee.html_url || github.event.issue.html_url || format('{0}/{1}', github.server_url, github.repository) }})
+      - name: 发送Telegram活动通知
+        env:
+          TG_TO: ${{ secrets.TG_RELEASE_CHANNEL_ID }}
+          TG_TOKEN: ${{ secrets.TG_RELEASE_BOT_TOKEN }}
+          FALLBACK_TO: ${{ secrets.TELEGRAM_TO }}
+          FALLBACK_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          ACTOR: ${{ github.actor }}
+          REPO: ${{ github.repository }}
+          SERVER_URL: ${{ github.server_url }}
+          STARS: ${{ github.event.repository.stargazers_count }}
+          FORKS: ${{ github.event.repository.forks_count }}
+          FORK_NAME: ${{ github.event.forkee.full_name }}
+          FORK_URL: ${{ github.event.forkee.html_url }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+        run: |
+          TARGET_TO="${TG_TO:-$FALLBACK_TO}"
+          TARGET_TOKEN="${TG_TOKEN:-$FALLBACK_TOKEN}"
+          if [ -z "$TARGET_TO" ] || [ -z "$TARGET_TOKEN" ]; then
+            echo "⚠️ Telegram to or token is empty, skipping notification."
+            exit 0
+          fi
+
+          TITLE="📢 <b>GitHub 项目动态</b>"
+          EXTRA=""
+          LINK="${SERVER_URL}/${REPO}"
+
+          if [ "$EVENT_NAME" = "watch" ]; then
+            TITLE="🌟 <b>获得新的 Star！</b>"
+            EXTRA="⭐ 项目当前 Star 数：<b>${STARS}</b>"
+          elif [ "$EVENT_NAME" = "fork" ]; then
+            TITLE="🍴 <b>项目被 Fork！</b>"
+            EXTRA="🍴 项目当前 Fork 数：<b>${FORKS}</b>\n🔗 Fork 仓库：<a href=\"${FORK_URL}\">${FORK_NAME}</a>"
+            LINK="${FORK_URL}"
+          elif [ "$EVENT_NAME" = "issues" ]; then
+            if [ "$ACTION" = "opened" ]; then
+              TITLE="🐛 <b>收到新 Issue</b>"
+            elif [ "$ACTION" = "closed" ]; then
+              TITLE="✅ <b>Issue 已解决</b>"
+            else
+              TITLE="🔄 <b>Issue 被重新打开</b>"
+            fi
+            EXTRA="📋 标题：${ISSUE_TITLE}"
+            LINK="${ISSUE_URL}"
+          fi
+
+          MSG=$(printf "%s\n\n📂 <b>项目：</b> <a href=\"%s/%s\">%s</a>\n👤 <b>操作者：</b> <a href=\"https://github.com/%s\">%s</a>\n%s\n\n🔗 <a href=\"%s\">点击查看详情</a>" \
+            "$TITLE" "$SERVER_URL" "$REPO" "$REPO" "$ACTOR" "$ACTOR" "$EXTRA" "$LINK")
+
+          echo "Broadcasting notification to $TARGET_TO ..."
+          RESP=$(curl -s -X POST "https://api.telegram.org/bot${TARGET_TOKEN}/sendMessage" \
+            -d "chat_id=${TARGET_TO}" \
+            -d "parse_mode=HTML" \
+            -d "disable_web_page_preview=false" \
+            --data-urlencode "text=${MSG}")
+          
+          echo "Telegram API Response: $RESP"
+          
+          # 验证响应是否成功
+          if ! echo "$RESP" | grep -q '"ok":true'; then
+            echo "❌ Telegram API 发送失败，请检查机器人权限或群组ID！"
+            exit 1
+          fi
