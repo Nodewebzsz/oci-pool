@@ -35,30 +35,60 @@ This fork tracks upstream updates, but it is **not guaranteed to be fully featur
 
 ## Features
 
-OCI-Pool provides end-to-end lifecycle management for Oracle Cloud instances, covering creation, configuration, monitoring, and termination.
+OCI-Pool delivers comprehensive Oracle Cloud (OCI) resource lifecycle management, automated instance creation/grabbing, and intelligent DevOps capabilities from provisioning to monitoring.
 
-### Instance Management
-- Concurrent boot across multiple APIs and instances
-- Start / stop / sync / terminate operations
-- Real-time traffic monitoring
-- One-click rescue mode
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                             OCI-Pool Feature Matrix                        │
+├───────────────────┬───────────────────┬───────────────────┬────────────────┤
+│ 🚀 Boot & Snatch  │ 🖥️ Lifecycle & Ops│ 🏢 Multi-Tenant   │ 🛡️ Security    │
+│ • Full Workbench  │ • Start/Stop/Sync │ • Unified Tenants │ • 100% Local DB│
+│ • ARM 1:6 Ratio   │ • VNC/CloudShell  │ • Quota & Cost    │ • TOTP MFA Auth│
+│ • Schedule Pill   │ • Rescue Mode     │ • Region Latency  │ • Adaptive 2FA │
+│ • Smart Backoff   │ • IPv4/IPv6 Dual  │ • Restricted API  │ • Proxy Pool   │
+├───────────────────┴───────────────────┴───────────────────┴────────────────┤
+│ 📢 Ecosystem & Notifications          🤖 AI Assistant     💻 Modern Client │
+│ • TG/DingTalk/Bark/Email/Webhook      • OCI Diagnostics   • React 18 SPA   │
+│ • Cloudflare/EdgeOne DNS Auto-Bind    • Tuning Tips       • macOS/Win Apps │
+└────────────────────────────────────────────────────────────────────────────┘
+```
 
-### Network & Storage
-- Create secondary VNICs with a single click
-- Boot volume rename and VPU adjustment
-- Toggle between IPv4 and IPv6
-- Automatic IP quality detection and switching
+### 1. ⚡ Dedicated Boot Workbench & Auto-Grabbing Engine
+- **Dedicated Boot Workbench** (`/tenants/:id/boot-create`): Multi-region linking, real-time image availability probing with semantic descending version sort, read-only OCID with one-click copy.
+- **Always-Free Guardrails**: Built-in ARM 1:6 golden ratio validation (1 OCPU : 6GB RAM), free-tier usage warning, and risk confirmation dialog to prevent accidental charges.
+- **Scenario Schedule Selector**: Quick-choice schedule pills (24/7, daytime only, night stealth, etc.) with interlocking dropdowns and real-time human-readable feedback.
+- **Automated Snatching Engine**: Multi-tenant, multi-region, and multi-shape asynchronous concurrent polling with smart capacity backoff.
 
-### Account & Security
-- Multi-tenant API management
-- Region subscription and switching
-- Visual security rule management
-- Admin user lookup and creation
+### 2. 🖥️ Full Lifecycle Instance Operations
+- **Lifecycle Control**: Instant launch, start, stop, restart, terminate, and batch asynchronous status synchronization.
+- **Native VNC / CloudShell**: Integrated WebSocket dynamic port relay (`websockify`) to connect directly to the remote terminal without requiring a public IP.
+- **Disaster Recovery**: One-click system Rescue Mode with network boot support and offline disk inspection.
+- **Elastic Networking**: One-click secondary VNIC attachment, IPv4 / IPv6 dual-stack switching, and built-in IP quality detection (fraud score, streaming unlock, purity) with auto-replacement.
+- **Storage & Object Storage**: Online boot volume expansion and elastic VPU performance tuning, plus OCI Object Storage file management.
 
-### System
-- API private keys stored locally in H2 database — **never uploaded**
-- Telegram bot used only for snatch notifications; no account data retained
-- Clean web-based dashboard for all operations
+### 3. 🏢 Multi-Tenant Hub & Resource Analytics
+- **Unified Multi-Tenant Hub**: Centralized API credential management with custom aliases, health detection, and grouping tags.
+- **Quota & Cost Insights**: Real-time tenant quota probing, visual ARM/AMD free-tier breakdown, and historical cost/billing forecast (Cost & Usage).
+- **Region Management & Speed Test**: One-click subscription to new regions, live availability inspection, latency comparison, and optimal routing.
+- **Security & Permissions**: One-click switch to Restricted API mode, API key rotation and certificate re-binding, visual security lists, and admin user delegation.
+
+### 4. 🛡️ Enterprise Security & Privacy
+- **100% Localized Storage**: Tenant private keys and credentials are encrypted in the local H2 database — **never uploaded to external servers**.
+- **Adaptive Multi-Factor Authentication (MFA)**: Supports Google Authenticator (TOTP 6-digit codes) and adaptive 2FA message verification (Telegram, DingTalk, Bark).
+- **Proxy Pool Protection**: Configurable HTTP / SOCKS5 proxy pool with health checking to isolate OCI API requests and avoid rate limits.
+
+### 5. 📢 Omnichannel Notifications & Integrations
+- **Instant Alerts**: Telegram Bot, DingTalk, Bark (iOS), WeChat Work, SMTP Email, and custom Webhooks for snatch results, node events, and quota alarms.
+- **Automated DNS Binding**: Seamless integration with Cloudflare and Tencent Cloud EdgeOne to automatically update A / AAAA DNS records upon instance creation.
+- **OpenAPI**: Standardized APIs for external automation and CI/CD integration.
+
+### 6. 🤖 Built-in AI Assistant
+- **AI Chat Hub**: Integrated LLM chat center supporting OpenAI, Claude, DeepSeek, and more.
+- **OCI Diagnostics**: Automated diagnosis for common OCI errors (e.g. `Out of host capacity`, API rate limits, fingerprint mismatches).
+
+### 7. 💻 Modern Multi-Platform Architecture
+- **Modern Web SPA**: React 18 frontend with dark/light themes and full keyboard shortcuts.
+- **Native Desktop Clients (macOS / Windows)**: Dedicated client applications aligned 100% with the web workbench, featuring background system tray execution.
 
 ---
 
@@ -99,6 +129,16 @@ Once running, open `http://your-ip:9856` and register an admin account. The defa
 ```bash
 OCI_PORT=9860 ./install.sh
 ```
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `OCI_PORT` | `9856` | Backend application port |
+| `OCI_WEB_PORT` | `9857` | Nginx unified entry port (browser access) |
+| `MODERN_UI_ENABLED` | `true` | Enable React Modern UI |
+| `DB_PASSWORD` | Auto-generated (24 chars) | **Critical Security**: H2 local database password protecting tenant API private keys |
+
+> 🔒 **Security Notice (DB_PASSWORD)**:
+> OCI-Pool stores API credentials locally in an H2 database and never uploads them. Fresh installations via `install.sh` automatically generate a strong 24-character alphanumeric password in `.env`. If deploying manually, **it is strongly recommended to set a high-strength password** to prevent offline database dumps if the VPS host is compromised.
 
 Container operations:
 

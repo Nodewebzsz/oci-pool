@@ -358,19 +358,9 @@ function LoginView({ state, dispatch, tr, onLoginSuccess }) {
         {tr('auth.login.submit')}
       </AuthButton>
 
-      <div style={{ marginTop: 14, textAlign: 'center', fontSize: 12, color: 'var(--fg-2)' }}>
-        {tr('auth.no.account')}{' '}
-        <button type="button"
-          onClick={() => dispatch({ type: 'goto', view: 'register' })}
-          style={{ background: 'none', border: 'none', color: 'var(--accent)',
-                   cursor: 'pointer', fontWeight: 600, padding: 0, fontSize: 12 }}>
-          {tr('auth.go.register')}
-        </button>
-      </div>
-
-      {/* Demo hint */}
+      {/* Initial admin notice */}
       <div style={{
-        marginTop: 22, padding: '10px 12px',
+        marginTop: 18, padding: '10px 12px',
         background: 'var(--info-soft)', border: '1px dashed var(--info)',
         borderRadius: 6, fontSize: 11, color: 'var(--fg-1)',
         display: 'flex', gap: 8, alignItems: 'center', lineHeight: 1.5,

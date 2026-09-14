@@ -93,7 +93,6 @@ public class SaTokenConfig implements WebMvcConfigurer {
                         "/api/config/mfa-enabled",
                         "/api/config/turnstile",
                         "/api/config/message-enabled",
-                        "/api/memos/**",
                         "/api/metrics/reportMetrics",
                         "/api/send-verification-code",
                         "/api/monitor/download",

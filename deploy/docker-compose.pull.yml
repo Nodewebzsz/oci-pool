@@ -14,12 +14,14 @@ services:
     container_name: oci-pool-modern
     restart: unless-stopped
     depends_on: { redis: { condition: service_healthy } }
-    ports: ["${OCI_PORT:-9856}:9856"]
+    ports: ["${OCI_PORT_BIND:-127.0.0.1}:${OCI_PORT:-9856}:9856"]
     environment:
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: "6379"
       MODERN_UI_ENABLED: "${MODERN_UI_ENABLED:-true}"
       DB_PASSWORD: "${DB_PASSWORD:-}"
+      ADMIN_USERNAME: "${ADMIN_USERNAME:-admin}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
     volumes:
       - ./data:/oci-pool/data
       - ./logs:/oci-pool/logs

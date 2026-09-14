@@ -813,7 +813,7 @@ const I18N = {
     'auth.go.login':            '返回登录',
     'auth.or.continue':         '或使用以下方式',
     'auth.demo.hint':           '演示账号:',
-    'auth.login.notice':        '使用您首次注册的管理员账号登录',
+    'auth.login.notice':        '使用您首次部署时的管理员账号登录，登录后请立即前往系统管理--安全管理修改用户名密码',
 
     'auth.pw.veryWeak': '弱',
     'auth.pw.weak': '一般',
@@ -3980,7 +3980,7 @@ const I18N = {
     'auth.go.login':            'Back to sign in',
     'auth.or.continue':         'or continue with',
     'auth.demo.hint':           'Demo credentials:',
-    'auth.login.notice':        'Sign in with your first registered admin account',
+    'auth.login.notice':        'Sign in with the admin account from initial deployment. Please go to System Settings > Security Settings to change your username and password after login.',
 
     'auth.pw.veryWeak': 'Very weak',
     'auth.pw.weak': 'Weak',

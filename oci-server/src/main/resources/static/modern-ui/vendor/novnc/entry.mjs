@@ -7,12 +7,14 @@ import RFB from './core/rfb.js';
 // Nginx 反代 /websockify/{port}。这与原 console_terminal.ftl 完全一致。
 function buildVncUrl(info) {
   const port = info && (info.websockifyPort || (info.raw && info.raw.websockifyPort));
+  const token = info && (info.vncToken || (info.raw && info.raw.vncToken));
+  const query = token ? `?token=${encodeURIComponent(token)}` : '';
   if (port) {
     if (window.location.protocol === 'https:') {
-      return `wss://${window.location.host}/websockify/${port}`;
+      return `wss://${window.location.host}/websockify/${port}${query}`;
     }
     const host = window.location.host.split(':')[0];
-    return `ws://${host}:${port}/`;
+    return `ws://${host}:${port}/${query}`;
   }
   return (info && info.vncUrl) || '';
 }

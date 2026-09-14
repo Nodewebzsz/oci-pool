@@ -63,12 +63,39 @@ public class Init implements CommandLineRunner {
     @Value("${oci.ssh-version}")
     private String sshVersion;
 
+    @Resource
+    private com.nodewebzsz.ociserver.service.login.LoginUserService loginUserService;
+
+    @Value("${ADMIN_USERNAME:admin}")
+    private String adminUsername;
+
+    @Value("${ADMIN_PASSWORD:}")
+    private String adminPassword;
+
     @Override
     public void run(String... args) throws Exception {
         //disableTurnstileIfLocalBypass();
+        initAdminUser();
         checkAppVersion();
         initDeviceRegistration();
         checkAndLogTurnstileBypass();
+    }
+
+    /**
+     * 首次部署时若传入了 ADMIN_PASSWORD，自动在数据库中预置初始管理员账号，杜绝公网抢注
+     */
+    private void initAdminUser() {
+        try {
+            if (org.springframework.util.StringUtils.hasText(adminPassword) && loginUserService.isFirstTimeDeployment()) {
+                String targetUsername = org.springframework.util.StringUtils.hasText(adminUsername) ? adminUsername : "admin";
+                loginUserService.registerFirstUser(targetUsername, adminPassword);
+                log.info("===================================================================");
+                log.info("✓ 首次部署自动初始化管理员账号成功: {}", targetUsername);
+                log.info("===================================================================");
+            }
+        } catch (Exception e) {
+            log.error("首次部署自动初始化管理员失败: {}", e.getMessage());
+        }
     }
 
     /**

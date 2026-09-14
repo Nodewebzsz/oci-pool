@@ -44,7 +44,7 @@ targets:
         CFBundleDisplayName: OCI-POOL
         CFBundleIdentifier: com.nodewebzsz.ocipool
         CFBundleVersion: "28"
-        CFBundleShortVersionString: "1.0.11"
+        CFBundleShortVersionString: "1.1.21"
         NSPrincipalClass: NSApplication
         NSHighResolutionCapable: true
         LSMinimumSystemVersion: "11.0"

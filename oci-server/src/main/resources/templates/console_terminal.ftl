@@ -499,10 +499,11 @@
 
                 if (data.websockifyPort) {
                     websockifyPort = data.websockifyPort;
+                    let vncToken = data.vncToken || '';
                     console.log('websockify端口:', websockifyPort);
 
                     setTimeout(() => {
-                        connectToVncWebSocket(websockifyPort);
+                        connectToVncWebSocket(websockifyPort, vncToken);
                     }, 1500);
                 } else {
                     updateStatusText(i18n.vnc_connAlreadySummary);
@@ -552,19 +553,20 @@
         };
     }
 
-    function connectToVncWebSocket(port) {
+    function connectToVncWebSocket(port, token) {
         try {
             console.log('开始连接到websockify代理端口:', port);
 
             let protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
             let host = window.location.host;
+            let tokenQuery = token ? '?token=' + encodeURIComponent(token) : '';
             let wsUrl;
 
             if (protocol === 'ws://') {
                 var hostIp = host.split(':')[0];
-                wsUrl = protocol + hostIp + ':' + port + '/';
+                wsUrl = protocol + hostIp + ':' + port + '/' + tokenQuery;
             } else {
-                wsUrl = protocol + host + '/websockify/' + port;
+                wsUrl = protocol + host + '/websockify/' + port + tokenQuery;
             }
 
             console.log('连接VNC WebSocket URL:', wsUrl);

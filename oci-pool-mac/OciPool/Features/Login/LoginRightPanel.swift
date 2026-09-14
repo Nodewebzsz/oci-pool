@@ -482,20 +482,6 @@ struct LoginRightPanel: View {
 
             loginPrimaryButton
 
-            HStack(spacing: 4) {
-                Text(model.locale == .enUS ? "No account yet?" : "还没有账号?")
-                    .font(.system(size: 12))
-                    .foregroundColor(LoginPalette.muted(dark))
-                Button(action: { withAnimation(.easeInOut(duration: 0.18)) { model.tab = .register; model.errorText = nil } }) {
-                    Text(model.locale == .enUS ? "Sign up now" : "立即注册")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(LoginPalette.primary(dark))
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.top, 14)
-
             adminNotice
                 .padding(.top, 18)
 
@@ -807,7 +793,7 @@ struct LoginRightPanel: View {
             Image(systemName: "info.circle")
                 .font(.system(size: 13))
                 .foregroundColor(infoColor)
-            Text(model.locale == .enUS ? "Sign in with the admin account you created on first run" : "使用您首次注册的管理员账号登录")
+            Text(model.locale == .enUS ? "Sign in with the admin account from initial deployment. Please go to System Settings > Security Settings to change your username and password after login." : "使用您首次部署时的管理员账号登录，登录后请立即前往系统管理--安全管理修改用户名密码")
                 .font(.system(size: 11))
                 .foregroundColor(LoginPalette.text(dark))
                 .lineSpacing(1.5)

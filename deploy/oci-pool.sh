@@ -110,6 +110,15 @@ resolve_jar() {
 is_running() { [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE" 2>/dev/null)" >/dev/null 2>&1; }
 
 load_env() {
+  if [ ! -f "$APP_ROOT/.env" ] && [ -f "$APP_ROOT/.env.example" ]; then
+    cp "$APP_ROOT/.env.example" "$APP_ROOT/.env"
+    if [ ! -f "$DATA_DIR/vps_db.mv.db" ]; then
+      local rand_pass; rand_pass=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 24 || openssl rand -hex 12 2>/dev/null || true)
+      [ -n "$rand_pass" ] && sed -i.bak "s|^DB_PASSWORD=.*|DB_PASSWORD=${rand_pass}|" "$APP_ROOT/.env" 2>/dev/null && rm -f "$APP_ROOT/.env.bak" || true
+      local admin_pass; admin_pass=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 16 || openssl rand -hex 8 2>/dev/null || true)
+      [ -n "$admin_pass" ] && sed -i.bak "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${admin_pass}|" "$APP_ROOT/.env" 2>/dev/null && rm -f "$APP_ROOT/.env.bak" || true
+    fi
+  fi
   if [ -f "$APP_ROOT/.env" ]; then
     set -a; . "$APP_ROOT/.env"; set +a
   fi
@@ -129,11 +138,31 @@ cmd_start() {
       -Duser.timezone=Asia/Shanghai \
       -Dspring.profiles.active=release \
       -Dserver.port="$PORT" \
+      -DDB_PASSWORD="${DB_PASSWORD:-}" \
+      -DADMIN_USERNAME="${ADMIN_USERNAME:-admin}" \
+      -DADMIN_PASSWORD="${ADMIN_PASSWORD:-}" \
       -jar "$JAR_TO_RUN" > "$LOG_DIR/console.log" 2>&1 & echo $! > "$PID_FILE" )
   ok "已启动（pid $(cat "$PID_FILE")）· http://localhost:$PORT"
   info "等待健康检查（最多 60s）..."
   for i in $(seq 1 20); do
-    curl -sf "http://127.0.0.1:$PORT/actuator/health" >/dev/null 2>&1 && { ok "healthy"; return; }
+    if curl -sf "http://127.0.0.1:$PORT/actuator/health" >/dev/null 2>&1; then
+      ok "healthy"
+      echo ""
+      echo -e "${G}===================================================================${N}"
+      echo -e "${G}🎉 OCI-Pool 启动成功！请妥善保存您的初始管理凭据：${N}"
+      echo -e "${G}===================================================================${N}"
+      echo -e "  管理入口:   ${C}http://localhost:${PORT}/${N}"
+      echo -e "  管理员账号: ${Y}${ADMIN_USERNAME:-admin}${N}"
+      if [ -n "${ADMIN_PASSWORD:-}" ]; then
+        echo -e "  初始强密码: ${Y}${ADMIN_PASSWORD}${N}"
+        echo -e "  ${Y}⚠️  安全提示: 初始密码已加密存入数据库，首次登录后请前往「系统设置」及时修改密码！${N}"
+      else
+        echo -e "  初始密码:   [已保留数据库中原密码]"
+      fi
+      echo -e "${G}===================================================================${N}"
+      echo ""
+      return
+    fi
     sleep 3
   done
   warn "健康检查超时，请查看日志: $LOG_DIR/console.log"

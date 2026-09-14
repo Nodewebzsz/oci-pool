@@ -93,6 +93,7 @@ function VncConsoleModal({ inst, onClose }) {
   const [errMsg, setErrMsg] = React.useState('');
   const [vncUrl, setVncUrl] = React.useState('');
   const [wsPort, setWsPort] = React.useState('');
+  const [wsToken, setWsToken] = React.useState('');
   const [rfbReady, setRfbReady] = React.useState(!!(window.OCiVnc && window.OCiVnc.RFB)); // noVNC 模块装载
   const boxRef = React.useRef(null);                     // 文本日志区
   const vncHostRef = React.useRef(null);                 // noVNC 渲染挂载点
@@ -173,6 +174,7 @@ function VncConsoleModal({ inst, onClose }) {
           if (j.type === 'vnc_ready') {
             const readyUrl = j.vncUrl || '';
             const readyPort = j.websockifyPort || '';
+            const readyToken = j.vncToken || '';
             // 后端在 websockify 启动失败时仍会发送 vnc_ready，但不会提供
             // vncUrl/websockifyPort；此时不能把界面标记为“已就绪”。
             if (!readyUrl && !readyPort) {
@@ -182,6 +184,7 @@ function VncConsoleModal({ inst, onClose }) {
             }
             setVncUrl(readyUrl);
             setWsPort(readyPort);
+            setWsToken(readyToken);
             setState('running');
             push(tr('inst.a9645a').replace('{0}',readyPort || '-'));
             return;
@@ -235,7 +238,7 @@ function VncConsoleModal({ inst, onClose }) {
     if (state !== 'running' || !rfbReady || !vncHostRef.current) return;
     const RFB = window.OCiVnc && window.OCiVnc.RFB;
     if (!RFB) return;
-    const url = window.OCiVnc.buildVncUrl({ websockifyPort: wsPort, vncUrl });
+    const url = window.OCiVnc.buildVncUrl({ websockifyPort: wsPort, vncUrl, vncToken: wsToken });
     if (!url) return;
 
     if (rfbRef.current) { try { rfbRef.current.disconnect(); } catch {} rfbRef.current = null; }

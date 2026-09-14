@@ -442,6 +442,7 @@ public sealed class InstanceConsoleView : UserControl
         _websockifyPort = port;
 
         var serverVncUrl = JsonUtil.Str(obj, "vncUrl");
+        var serverVncToken = JsonUtil.Str(obj, "vncToken");
         var serverMsg = JsonUtil.Str(obj, "message");
 
         if ((port is null or 0)
@@ -464,16 +465,17 @@ public sealed class InstanceConsoleView : UserControl
 
         var portCap = port;
         var urlCap = serverVncUrl;
+        var tokenCap = serverVncToken;
         _ = Dispatcher.InvokeAsync(async () =>
         {
             await Task.Delay(800).ConfigureAwait(true);
             if (!_connected) return;
-            ApplyVncUrl(portCap, urlCap);
+            ApplyVncUrl(portCap, urlCap, tokenCap);
         });
     }
 
     /// <summary>与 Web console_terminal.ftl / Mac applyVncURL 一致.</summary>
-    private void ApplyVncUrl(int? port, string serverVncUrl)
+    private void ApplyVncUrl(int? port, string serverVncUrl, string? vncToken = null)
     {
         var baseUrl = AppSession.Normalize(AppSession.Shared.ServerUrl).TrimEnd('/');
         var isHttps = baseUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
@@ -501,7 +503,8 @@ public sealed class InstanceConsoleView : UserControl
                 return;
             }
             var hostPart = u.IsDefaultPort ? u.Host : $"{u.Host}:{u.Port}";
-            var wsUrl = $"wss://{hostPart}/websockify/{port}";
+            var tokenQuery = string.IsNullOrEmpty(vncToken) ? "" : $"?token={vncToken}";
+            var wsUrl = $"wss://{hostPart}/websockify/{port}{tokenQuery}";
             SetVncUrl(wsUrl, null);
             return;
         }

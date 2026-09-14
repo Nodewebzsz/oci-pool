@@ -21,6 +21,11 @@ if [ ! -f "$COMPOSE_PULL" ]; then
   curl -L --fail -sS -o "$COMPOSE_PULL" "$RAW/$COMPOSE_PULL"
   ok "已下载 $COMPOSE_PULL"
 fi
+
+# 确保存在 docker-compose.yml 快捷软链接
+if [ -L "docker-compose.yml" ] || [ ! -f "docker-compose.yml" ]; then
+  ln -sf "$COMPOSE_PULL" docker-compose.yml 2>/dev/null || true
+fi
 # 读取 .env 里的 OCI_WEB_PORT，供健康检查使用（web 反代为统一入口）
 if [ -f .env ]; then set -a; . ./.env; set +a; fi
 

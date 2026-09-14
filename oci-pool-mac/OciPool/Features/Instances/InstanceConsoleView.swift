@@ -371,6 +371,7 @@ final class InstanceConsoleViewModel: ObservableObject {
 
             let serverVncUrl = InstanceJSON.string(obj["vncUrl"])
             let serverMsg = InstanceJSON.string(obj["message"])
+            let serverVncToken = InstanceJSON.string(obj["vncToken"])
             let resolvedPort = port
 
             // 无 websockify 端口时不要假装画面可用
@@ -400,10 +401,11 @@ final class InstanceConsoleViewModel: ObservableObject {
             // 对齐 Web：稍等 websockify 完全监听后再连 RFB；用 Task 保证 MainActor 不丢调用
             let portCap = resolvedPort
             let urlCap = serverVncUrl
+            let tokenCap = serverVncToken
             Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: 800_000_000)
                 guard let self = self, self.isConnected else { return }
-                self.applyVncURL(port: portCap, serverVncUrl: urlCap)
+                self.applyVncURL(port: portCap, serverVncUrl: urlCap, vncToken: tokenCap)
             }
         case "output":
             let line = InstanceJSON.string(obj["data"])
@@ -440,7 +442,7 @@ final class InstanceConsoleViewModel: ObservableObject {
     }
 
     /// 与 Web `connectToVncWebSocket` 一致的 URL 规则
-    private func applyVncURL(port: Int?, serverVncUrl: String) {
+    private func applyVncURL(port: Int?, serverVncUrl: String, vncToken: String = "") {
         var base = session.serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
         if base.hasSuffix("/") { base = String(base.dropLast()) }
         let isHTTPS = base.lowercased().hasPrefix("https")
@@ -474,7 +476,8 @@ final class InstanceConsoleViewModel: ObservableObject {
             } else {
                 hostPart = host
             }
-            let wsUrl = "wss://\(hostPart)/websockify/\(port)"
+            let tokenQuery = vncToken.isEmpty ? "" : "?token=\(vncToken)"
+            let wsUrl = "wss://\(hostPart)/websockify/\(port)\(tokenQuery)"
             vncWsURL = wsUrl
             statusText = "正在连接画面…"
             appendLog("🔗 VNC WS: \(wsUrl)")

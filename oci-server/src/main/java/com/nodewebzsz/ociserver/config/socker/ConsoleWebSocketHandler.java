@@ -33,6 +33,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
+import java.util.UUID;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
@@ -655,16 +656,18 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
             int websockifyPort = websockifyService.startWebsockifyProxy(sessionId, vncPort);
 
             if (websockifyPort > 0) {
+                String vncToken = UUID.randomUUID().toString().replace("-", "");
                 response.put("websockifyPort", websockifyPort);
-                // 客户端用公网 IP + websockify 端口（HTTP 直连）；HTTPS 走 /websockify/{port}
-                response.put("vncUrl", String.format("ws://%s:%d/", serverIp, websockifyPort));
+                response.put("vncToken", vncToken);
+                // 客户端用公网 IP + websockify 端口（HTTP 直连）；HTTPS 走 /websockify/{port}?token=xxx
+                response.put("vncUrl", String.format("ws://%s:%d/?token=%s", serverIp, websockifyPort, vncToken));
                 response.put("message", String.format("SSH隧道已建立，websockify代理端口: %d", websockifyPort));
 
                 sendMessage(webSocketSession, String.format(
                         "✅ websockify 已启动: %s:%d → 127.0.0.1:%d\r\n",
                         serverIp, websockifyPort, vncPort));
-                sendMessage(webSocketSession, "   HTTP: ws://" + serverIp + ":" + websockifyPort + "/\r\n");
-                sendMessage(webSocketSession, "   HTTPS 反代: wss://host/websockify/" + websockifyPort + "\r\n");
+                sendMessage(webSocketSession, "   HTTP: ws://" + serverIp + ":" + websockifyPort + "/?token=" + vncToken + "\r\n");
+                sendMessage(webSocketSession, "   HTTPS 反代: wss://host/websockify/" + websockifyPort + "?token=" + vncToken + "\r\n");
             } else {
                 // 本地转发仅绑 127.0.0.1，外网 VNC 客户端无法直连；明确告知
                 response.put("vncUrl", "");
