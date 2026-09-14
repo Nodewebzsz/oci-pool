@@ -16,17 +16,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Send Telegram Message
-        uses: appleboy/telegram-action@v0.1.1
-        with:
-          to: ${{ secrets.TG_RELEASE_CHANNEL_ID || secrets.TELEGRAM_TO }}
-          token: ${{ secrets.TG_RELEASE_BOT_TOKEN || secrets.TELEGRAM_TOKEN }}
-          message: |
-            🎉 新版本发布通知
-            
-            项目: ${{ github.repository }}
-            版本: ${{ github.ref_name }}
-            
-            更新内容:
-            ${{ github.event.release.body }}
-            
-            发布链接: ${{ github.event.release.html_url || github.server_url }}/${{ github.repository }}
+        env:
+          TG_TO: ${{ secrets.TG_RELEASE_CHANNEL_ID }}
+          TG_TOKEN: ${{ secrets.TG_RELEASE_BOT_TOKEN }}
+          FALLBACK_TO: ${{ secrets.TELEGRAM_TO }}
+          FALLBACK_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          BODY: ${{ github.event.release.body }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+          URL: ${{ github.event.release.html_url || github.server_url }}
+        run: |
+          TARGET_TO="${TG_TO:-$FALLBACK_TO}"
+          TARGET_TOKEN="${TG_TOKEN:-$FALLBACK_TOKEN}"
+          if [ -z "$TARGET_TO" ] || [ -z "$TARGET_TOKEN" ]; then
+            echo "⚠️ Telegram to or token is empty, skipping."
+            exit 0
+          fi
+          MSG="🎉 新版本发布通知
+
+项目: $REPO
+版本: $TAG
+
+更新内容:
+$BODY
+
+发布链接: ${URL}/${REPO}"
+
+          echo "Broadcasting notification to $TARGET_TO ..."
+          RESP=$(curl -s -X POST "https://api.telegram.org/bot${TARGET_TOKEN}/sendMessage" \
+            -d "chat_id=${TARGET_TO}" \
+            --data-urlencode "text=${MSG}")
+          echo "Telegram API Response: $RESP"
