@@ -110,25 +110,11 @@ jobs:
           {
             echo "## 🚀 版本号 ($TAG)"
             echo ""
-            git log --pretty=format:'- %s' "$RANGE" \
-              | grep -viE '\[skip ci\]|bump version|chore: bump' \
+            git log --no-merges --pretty=format:'- %s' "$RANGE" \
+              | grep -viE '\[skip ci\]|bump version|chore: bump|^-\s*merge\b|merge branch|merge remote-tracking' \
               | grep -v '^$' || echo "- 常规更新与优化"
           } > notes.md
           cat notes.md
-
-          {
-            echo "TG_MSG<<EOF"
-            echo "🎉 新版本发布通知"
-            echo ""
-            echo "项目: $GITHUB_REPOSITORY"
-            echo "版本: $TAG"
-            echo ""
-            echo "更新内容:"
-            cat notes.md
-            echo ""
-            echo "发布链接: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
