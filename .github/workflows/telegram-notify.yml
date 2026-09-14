@@ -13,8 +13,8 @@ jobs:
       - name: 发送Telegram通知
         uses: appleboy/telegram-action@v0.1.1
         with:
-          to: ${{ secrets.MY_OCI_POOL_GROUP_ID }}
-          token: ${{ secrets.MY_OCI_POOL_GROUP_MANAGER_BOT_TOKEN }}
+          to: ${{ secrets.TG_RELEASE_CHANNEL_ID || secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TG_RELEASE_BOT_TOKEN || secrets.TELEGRAM_TOKEN }}
           format: markdown
           disable_web_page_preview: false
           message: |
