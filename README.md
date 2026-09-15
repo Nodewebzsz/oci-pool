@@ -367,13 +367,15 @@ location ~ ^/websockify/(\d+)$ {
 
 ---
 
-## Star 趋势
+## Star History
 
-<div align="center">
-
-[![Star History Chart](https://star-history.dera.page/svg?repos=Nodewebzsz/oci-pool&type=Date)](https://star-history.dera.page/#Nodewebzsz/oci-pool&type=Date)
-
-</div>
+<a href="https://www.star-history.com/?repos=nodewebzsz%2Foci-pool&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=nodewebzsz/oci-pool&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=nodewebzsz/oci-pool&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=nodewebzsz/oci-pool&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ---
 
