@@ -226,13 +226,15 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
      * 探测连通性并落库 availableStatus：1=通，0=不通
      */
     private Map<String, Object> probeAndPersist(VpnProxyRecord record) {
-        boolean connected = false;
+        SocksProxyUtils.ProxyCheckResult checkResult;
         try {
-            connected = SocksProxyUtils.isProxyAvailable(record);
+            checkResult = SocksProxyUtils.checkProxyWithDetail(record);
         } catch (Exception e) {
             log.warn("代理连通测试异常 id={} {}:{} -> {}",
                     record.getId(), record.getProxyHost(), record.getProxyPort(), e.getMessage());
+            checkResult = new SocksProxyUtils.ProxyCheckResult(false, "测试异常: " + e.getMessage());
         }
+        boolean connected = checkResult.isConnected();
         record.setAvailableStatus(connected ? 1 : 0);
         // 若归属地为空，尝试解析并补齐
         if (record.getLocation() == null || record.getLocation().trim().isEmpty() || "未知位置".equals(record.getLocation())) {
@@ -252,6 +254,10 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
         data.put("proxyPort", record.getProxyPort());
         data.put("proxyType", record.getProxyType());
         data.put("location", record.getLocation());
+        data.put("message", checkResult.getMessage());
+        if (checkResult.getLatencyMs() != null) {
+            data.put("latency", checkResult.getLatencyMs());
+        }
         return data;
     }
 

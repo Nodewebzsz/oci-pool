@@ -119,7 +119,9 @@ public class VpnProxyRecordController extends BaseController{
             }
             java.util.Map<String, Object> data = vpnProxyRecordService.testConnection(request.getId());
             boolean connected = Boolean.TRUE.equals(data.get("connected"));
-            return ApiResponse.success(connected ? "代理连通" : "代理不通", data);
+            String detailMsg = (String) data.get("message");
+            String summary = connected ? "代理连通" : (detailMsg != null ? detailMsg : "代理不通");
+            return ApiResponse.success(summary, data);
         } catch (Exception e) {
             log.error("测试代理连通失败", e);
             return ApiResponse.error("测试代理连通失败: " + e.getMessage());

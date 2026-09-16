@@ -5716,7 +5716,8 @@ function SysVpnProxyPage() {
       const connected = !!payload.connected;
       const status = payload.availableStatus != null ? Number(payload.availableStatus) : (connected ? 1 : 0);
       setProxies(prev => prev.map(x => x.id === p.id ? { ...x, availableStatus: status } : x));
-      shell.showToast(connected ? tr('pageMisc.d2b3fc') : tr('pageMisc.645aa5'), { kind: connected ? 'success' : 'error' });
+      const toastMsg = res.message || (connected ? tr('pageMisc.d2b3fc') : tr('pageMisc.645aa5'));
+      shell.showToast(toastMsg, { kind: connected ? 'success' : 'error' });
     } catch (e) {
       shell.showToast(e.message || tr('pageMisc.9710d9'), { kind: 'error' });
     } finally {
