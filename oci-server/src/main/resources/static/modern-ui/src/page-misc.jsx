@@ -5715,7 +5715,8 @@ function SysVpnProxyPage() {
       const payload = (res && res.data) || {};
       const connected = !!payload.connected;
       const status = payload.availableStatus != null ? Number(payload.availableStatus) : (connected ? 1 : 0);
-      setProxies(prev => prev.map(x => x.id === p.id ? { ...x, availableStatus: status } : x));
+      const newLoc = payload.location;
+      setProxies(prev => prev.map(x => x.id === p.id ? { ...x, availableStatus: status, ...(newLoc ? { location: newLoc } : {}) } : x));
       const toastMsg = res.message || (connected ? tr('pageMisc.d2b3fc') : tr('pageMisc.645aa5'));
       shell.showToast(toastMsg, { kind: connected ? 'success' : 'error' });
     } catch (e) {
@@ -5915,7 +5916,15 @@ function SysVpnProxyPage() {
                         <span className="num mono" style={{ fontSize: 11.5, color: 'var(--fg-1)' }}>{p.proxyPort}</span>
                       </td>
                       <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-                        {p.location ? (
+                        {testingAll || testingId === p.id ? (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            fontSize: 11, color: 'var(--fg-3)',
+                          }}>
+                            <Icon name="loader-2" size={12} className="spin" style={{ color: 'var(--accent)' }} />
+                            <span>探测中…</span>
+                          </span>
+                        ) : p.location ? (
                           <span style={{
                             display: 'inline-flex', alignItems: 'center', gap: 4,
                             fontSize: 11.5, color: 'var(--fg-1)',

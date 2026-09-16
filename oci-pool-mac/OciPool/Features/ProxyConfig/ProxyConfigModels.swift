@@ -64,6 +64,7 @@ struct ProxyTestResult: Equatable {
     var connected: Bool = false
     var availableStatus: Int = 0
     var message: String = ""
+    var location: String? = nil
 }
 
 struct ProxyTestAllResult: Equatable {
@@ -231,6 +232,9 @@ enum ProxyConfigJSON {
         r.connected = bool(payload["connected"])
         r.availableStatus = int(payload["availableStatus"], fallback: r.connected ? 1 : 0)
         r.message = str(root["message"])
+        if let loc = payload["location"] as? String, !loc.isEmpty {
+            r.location = loc
+        }
         return r
     }
 
@@ -252,6 +256,12 @@ enum ProxyConfigJSON {
             var r = ProxyTestResult()
             r.id = int64(d["id"])
             r.connected = bool(d["connected"])
+            r.availableStatus = int(d["availableStatus"], fallback: r.connected ? 1 : 0)
+            r.message = str(d["message"])
+            if let loc = d["location"] as? String, !loc.isEmpty {
+                r.location = loc
+            }
+            return r
             r.availableStatus = int(d["availableStatus"], fallback: r.connected ? 1 : 0)
             return r
         }

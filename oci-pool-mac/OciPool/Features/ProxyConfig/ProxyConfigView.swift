@@ -126,7 +126,7 @@ struct ProxyConfigView: View {
             cell(item.proxyType, width: 64, weight: .semibold)
             cell(item.proxyHost, width: nil)
             cell("\(item.proxyPort)", width: 56)
-            cell(item.location.isEmpty ? "—" : item.location, width: 100)
+            locationCell(item)
             cell(item.proxyUsername.isEmpty ? "—" : item.proxyUsername, width: 88)
             passwordCell(item)
             cell(item.tenantLabel, width: 110)
@@ -254,6 +254,35 @@ struct ProxyConfigView: View {
             .buttonStyle(PlainButtonStyle())
             .help(revealed ? "隐藏密码" : "显示密码")
         )
+    }
+
+    private func locationCell(_ item: VpnProxyItem) -> some View {
+        HStack(spacing: 4) {
+            if item.isTesting {
+                ProgressView()
+                    .scaleEffect(0.65)
+                    .frame(width: 14, height: 14)
+                Text("探测中…")
+                    .font(.system(size: 11))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .lineLimit(1)
+            } else if !item.location.isEmpty {
+                Image(systemName: "mappin.and.ellipse")
+                    .font(.system(size: 10))
+                    .foregroundColor(AppTheme.sidebarActive)
+                Text(item.location)
+                    .font(.system(size: 11.5))
+                    .foregroundColor(dark ? Color.white.opacity(0.88) : Color(hex: "1e2f42"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            } else {
+                Text("—")
+                    .font(.system(size: 12))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+            }
+        }
+        .frame(width: 100, alignment: .center)
+        .help(item.isTesting ? "正在通过代理探测真实出口归属地…" : (item.location.isEmpty ? "未解析" : item.location))
     }
 
     private func cell(_ text: String, width: CGFloat?, weight: Font.Weight = .regular) -> some View {
