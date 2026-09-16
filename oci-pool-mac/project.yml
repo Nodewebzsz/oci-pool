@@ -21,8 +21,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nodewebzsz.ocipool
-        MARKETING_VERSION: "1.1.36"
-        CURRENT_PROJECT_VERSION: "29"
+        MARKETING_VERSION: "1.1.37"
+        CURRENT_PROJECT_VERSION: "30"
         SWIFT_VERSION: "5.5"
         MACOSX_DEPLOYMENT_TARGET: "11.0"
         ENABLE_HARDENED_RUNTIME: YES
@@ -43,8 +43,8 @@ targets:
         CFBundleName: OciPool
         CFBundleDisplayName: OCI-POOL
         CFBundleIdentifier: com.nodewebzsz.ocipool
-        CFBundleVersion: "29"
-        CFBundleShortVersionString: "1.1.36"
+        CFBundleVersion: "30"
+        CFBundleShortVersionString: "1.1.37"
         NSPrincipalClass: NSApplication
         NSHighResolutionCapable: true
         LSMinimumSystemVersion: "11.0"

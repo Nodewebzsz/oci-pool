@@ -199,7 +199,11 @@ final class ProxyConfigViewModel: ObservableObject {
         do {
             let result = try await service.testConnection(id: id)
             applyTestResult(result)
-            ToastCenter.shared.success(result.connected ? "代理连通" : "代理不通")
+            if result.connected {
+                ToastCenter.shared.success(result.message.isEmpty ? "代理连通" : result.message)
+            } else {
+                ToastCenter.shared.error(result.message.isEmpty ? "代理不通" : result.message)
+            }
         } catch {
             setTesting(id: id, testing: false)
             ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
