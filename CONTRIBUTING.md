@@ -88,6 +88,26 @@ docs: update deployment guide
 
 ---
 
+## 统一「代码提交与发布」标准 SOP
+
+当开发完成需要发布上线时，统一执行以下固化标准流程：
+
+```mermaid
+flowchart TD
+    A[1. dev 分支代码提交] --> B[2. 推送 origin dev]
+    B --> C[3. 切换 master 并合并 dev --no-ff]
+    C --> D[4. 推送 origin master 触发 CI/CD 自动部署]
+    D --> E[5. 切回 dev 保持开发态]
+```
+
+1. **第 1 步（本地提交）**：在 `dev` 分支完成代码变动审查并执行 `git commit`；
+2. **第 2 步（同步 dev 远程）**：`git push origin dev` 确保开发分支远程备份；
+3. **第 3 步（合并 master）**：切换到 `master` 并执行 `git merge dev --no-ff -m "Merge branch 'dev'"`；
+4. **第 4 步（触发线上部署）**：`git push origin master`，触发主分支 CI/CD 自动化构建发布流程；
+5. **第 5 步（切回开发态）**：切回 `dev` 分支（并同步主干），保证后续新需求继续在 `dev` 上推进。
+
+---
+
 ## 提交 Pull Request
 
 ### 1. 推送分支
