@@ -1,8 +1,11 @@
 package com.nodewebzsz.ociserver.controller.login;
 
+import com.nodewebzsz.ocicommon.utils.IpUtils;
+import com.nodewebzsz.ociserver.config.exception.RateLimitException;
 import com.nodewebzsz.ociserver.controller.BaseController;
 import com.nodewebzsz.ocicommon.param.ApiResponse;
 import com.nodewebzsz.ociserver.service.VerifyService;
+import com.nodewebzsz.ociserver.service.login.AuthSecurityService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -23,12 +26,19 @@ public class PasswordResetController  extends BaseController {
     @Resource
     private VerifyService verifyService;
 
+    @Resource
+    private AuthSecurityService authSecurityService;
+
     /**
      * 发送重置验证码
      */
     @PostMapping("/send-reset-code")
     public ApiResponse sendResetCode(@RequestBody Map<String, String> request, HttpServletRequest  httpServletRequest) {
         try {
+            // 前置客户端 IP 60秒限流检查，防止高频刷验证码/告警轰炸
+            String clientIp = IpUtils.getClientIpAddress(httpServletRequest);
+            authSecurityService.checkAndRecordSendRateLimit(clientIp);
+
             String username = request.get("username");
             if (username == null || username.trim().isEmpty()) {
                 return ApiResponse.error("用户名不能为空");
@@ -37,6 +47,8 @@ public class PasswordResetController  extends BaseController {
             verifyService.sendVerificationCodeForPasswordReset(username,httpServletRequest);
             return ApiResponse.success("验证码已发送到您的通知终端");
 
+        } catch (RateLimitException e) {
+            return ApiResponse.error(e.getMessage());
         } catch (IllegalStateException e) {
             return ApiResponse.error(e.getMessage());
         } catch (Exception e) {

@@ -1,12 +1,14 @@
 package com.nodewebzsz.ociserver.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.nodewebzsz.ocicommon.utils.IpUtils;
 import com.nodewebzsz.ocicommon.utils.RsaUtils;
 import com.nodewebzsz.ociserver.controller.BaseController.MessageResolver;
 import com.nodewebzsz.ociserver.pojo.request.MfaConfig;
 import com.nodewebzsz.ociserver.pojo.request.TurnstileConfig;
 import com.nodewebzsz.ociserver.service.VerifyService;
 import com.nodewebzsz.ociserver.service.impl.system.SystemConfigService;
+import com.nodewebzsz.ociserver.service.login.AuthSecurityService;
 import com.nodewebzsz.ociserver.service.login.LoginUserService;
 import com.nodewebzsz.ociserver.service.mfa.OTPService;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +46,9 @@ public class LoginController {
 
     @Resource
     private LoginUserService loginUserService;
+
+    @Resource
+    private AuthSecurityService authSecurityService;
 
     @Resource
     private SystemConfigService systemConfigService;
@@ -111,14 +116,28 @@ public class LoginController {
         boolean isAjax = "XMLHttpRequest".equals(xRequestedWith) || (accept != null && accept.contains("application/json"));
         boolean mobile = isMobileRequest(request);
 
+        String clientIp = IpUtils.getClientIpAddress(request);
+
         try {
+            // 检查 IP / 用户名 是否处于锁定状态
+            authSecurityService.checkLoginLock(clientIp, username);
+
             if (!StringUtils.hasText(username) || !StringUtils.hasText(password)) {
                 redirectError(response, request, isAjax, mobile, "用户名或密码不能为空");
                 return;
             }
 
             // 验证用户名密码
-            com.nodewebzsz.dao.entity.LoginUser user = loginUserService.validateCredentials(username, password);
+            com.nodewebzsz.dao.entity.LoginUser user;
+            try {
+                user = loginUserService.validateCredentials(username, password);
+            } catch (Exception e) {
+                // 密码错误记录惩罚，满5次触发15分钟锁定
+                String failMsg = authSecurityService.recordLoginFailure(clientIp, username);
+                log.warn("用户 [{}] IP [{}] 登录失败：{}", username, clientIp, failMsg);
+                redirectError(response, request, isAjax, mobile, failMsg);
+                return;
+            }
 
             // 验证额外因子（MFA / 消息验证码）
             String factorError = validateAdditionalFactors(request, username);
@@ -126,6 +145,9 @@ public class LoginController {
                 redirectError(response, request, isAjax, mobile, factorError);
                 return;
             }
+
+            // 登录成功，清除失败计数与锁定状态
+            authSecurityService.clearLoginFailure(clientIp, username);
 
             // 登录成功，写入 Sa-Token session
             StpUtil.login(user.getUsername(), rememberMe);
@@ -145,6 +167,9 @@ public class LoginController {
             } else {
                 response.sendRedirect(targetUrl);
             }
+        } catch (IllegalStateException e) {
+            log.warn("用户 [{}] IP [{}] 登录被安全拦截：{}", username, clientIp, e.getMessage());
+            redirectError(response, request, isAjax, mobile, e.getMessage());
         } catch (Exception e) {
             log.warn("用户 [{}] 登录失败：{}", username, e.getMessage());
             redirectError(response, request, isAjax, mobile, e.getMessage());
