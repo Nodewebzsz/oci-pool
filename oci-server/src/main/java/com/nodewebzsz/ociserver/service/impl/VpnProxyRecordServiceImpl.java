@@ -118,7 +118,7 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
             record.setLocation(StringUtils.trimToNull(request.getLocation()));
         }
         if (record.getLocation() == null && record.getProxyHost() != null) {
-            record.setLocation(resolveLocation(record.getProxyHost()));
+            record.setLocation(resolveLocation(record.getProxyHost(), record.getCustomName(), record.getProxyUsername()));
         }
         record.setUpdateTime(now);
 
@@ -236,8 +236,11 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
         }
         boolean connected = checkResult.isConnected();
         record.setAvailableStatus(connected ? 1 : 0);
-        // 若归属地为空，尝试解析并补齐
-        if (record.getLocation() == null || record.getLocation().trim().isEmpty() || "未知位置".equals(record.getLocation())) {
+        // 若连通探测成功并识别到了真实公网出口归属地（方案 A），优先落库真实出口归属地
+        if (connected && checkResult.getExitLocation() != null && !checkResult.getExitLocation().trim().isEmpty()) {
+            record.setLocation(checkResult.getExitLocation().trim());
+        } else if (record.getLocation() == null || record.getLocation().trim().isEmpty() || "未知位置".equals(record.getLocation())) {
+            // 回退：若没有识别到出口，则由代理主机或特征解析
             String loc = resolveLocation(record.getProxyHost());
             if (loc != null) {
                 record.setLocation(loc);
@@ -354,7 +357,7 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
             }
             // 自动为存量缺失 location 的代理填充归属地
             if (r.getLocation() == null || r.getLocation().trim().isEmpty() || "未知位置".equals(r.getLocation())) {
-                String loc = resolveLocation(r.getProxyHost());
+                String loc = resolveLocation(r.getProxyHost(), r.getCustomName(), r.getProxyUsername());
                 if (loc != null) {
                     r.setLocation(loc);
                     try {
@@ -367,7 +370,19 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
 
     /**
      * 自动解析代理地址的归属地（国家/省/市）
+     * 1. 优先根据自定义名称（如 de/uk/jp/us）或用户名中的国家/地区标识快速推断
+     * 2. 其次通过 GeoLite2 查询代理入口 IP 归属地
      */
+    private String resolveLocation(String proxyHost, String customName, String proxyUsername) {
+        // 先检查自定义名称或用户名中的国家标识（针对 kookeey 等动态住宅代理）
+        String byHints = inferLocationFromHints(customName, proxyUsername);
+        if (byHints != null) {
+            return byHints;
+        }
+
+        return resolveLocation(proxyHost);
+    }
+
     private String resolveLocation(String proxyHost) {
         if (proxyHost == null || proxyHost.trim().isEmpty()) {
             return null;
@@ -383,6 +398,57 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
             }
         } catch (Exception e) {
             log.debug("解析代理归属地异常 host={}: {}", proxyHost, e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * 从自定义名称（如 "de" / "uk" / "德国01"）或代理用户名（如包含 -country-de / -zone-gb 等）推断国家
+     */
+    private String inferLocationFromHints(String customName, String proxyUsername) {
+        String target = "";
+        if (customName != null && !customName.trim().isEmpty()) {
+            target += " " + customName.trim().toLowerCase() + " ";
+        }
+        if (proxyUsername != null && !proxyUsername.trim().isEmpty()) {
+            target += " " + proxyUsername.trim().toLowerCase() + " ";
+        }
+        if (target.isEmpty()) {
+            return null;
+        }
+
+        if (target.matches(".*[\\-_\\s]de[\\-_\\s].*") || target.contains("德国") || target.contains("germany")) {
+            return "德国";
+        }
+        if (target.matches(".*[\\-_\\s]uk[\\-_\\s].*") || target.matches(".*[\\-_\\s]gb[\\-_\\s].*") || target.contains("英国") || target.contains("britain")) {
+            return "英国";
+        }
+        if (target.matches(".*[\\-_\\s]jp[\\-_\\s].*") || target.contains("日本") || target.contains("japan") || target.contains("tokyo")) {
+            return "日本";
+        }
+        if (target.matches(".*[\\-_\\s]sg[\\-_\\s].*") || target.contains("新加坡") || target.contains("singapore")) {
+            return "新加坡";
+        }
+        if (target.matches(".*[\\-_\\s]kr[\\-_\\s].*") || target.contains("韩国") || target.contains("korea") || target.contains("seoul")) {
+            return "韩国";
+        }
+        if (target.matches(".*[\\-_\\s]hk[\\-_\\s].*") || target.contains("香港") || target.contains("hong kong")) {
+            return "中国·香港";
+        }
+        if (target.matches(".*[\\-_\\s]tw[\\-_\\s].*") || target.contains("台湾") || target.contains("taiwan")) {
+            return "中国·台湾";
+        }
+        if (target.matches(".*[\\-_\\s]fr[\\-_\\s].*") || target.contains("法国") || target.contains("france")) {
+            return "法国";
+        }
+        if (target.matches(".*[\\-_\\s]us[\\-_\\s].*") || target.matches(".*[\\-_\\s]usa[\\-_\\s].*") || target.contains("美国") || target.contains("america")) {
+            return "美国";
+        }
+        if (target.matches(".*[\\-_\\s]au[\\-_\\s].*") || target.contains("澳大利亚") || target.contains("australia")) {
+            return "澳大利亚";
+        }
+        if (target.matches(".*[\\-_\\s]ca[\\-_\\s].*") || target.contains("加拿大") || target.contains("canada")) {
+            return "加拿大";
         }
         return null;
     }
