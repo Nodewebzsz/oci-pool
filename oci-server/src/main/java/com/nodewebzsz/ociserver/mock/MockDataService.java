@@ -340,10 +340,10 @@ public class MockDataService {
     public List<Map<String, Object>> proxyList() {
         List<Map<String, Object>> list = new ArrayList<>();
         String[][] seeds = {
-            {"HTTP", "203.0.113.10", "8080", "proxy-01", "1", "0"},
-            {"SOCKS5", "198.51.100.20", "1080", "proxy-02", "1", "1"},
-            {"HTTPS", "192.0.2.30", "8443", "proxy-03", "1", "0"},
-            {"HTTP", "203.0.113.40", "3128", "proxy-04", "0", "1"},
+            {"HTTP", "203.0.113.10", "8080", "proxy-01", "1", "0", "日本·东京"},
+            {"SOCKS5", "198.51.100.20", "1080", "proxy-02", "1", "1", "美国·圣何塞"},
+            {"HTTPS", "192.0.2.30", "8443", "proxy-03", "1", "0", "中国·香港"},
+            {"HTTP", "203.0.113.40", "3128", "proxy-04", "0", "1", "新加坡"},
         };
         long seq = 101;
         for (String[] s : seeds) {
@@ -355,6 +355,7 @@ public class MockDataService {
             m.put("customName", s[3]);
             m.put("availableStatus", Integer.parseInt(s[4]));
             m.put("forceProxy", Integer.parseInt(s[5]));
+            m.put("location", s[6]);
             m.put("tenantName", "phoenix");
             m.put("tenantId", 100L);
             list.add(m);

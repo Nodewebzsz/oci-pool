@@ -9,6 +9,7 @@ import com.nodewebzsz.dao.repository.VpnProxyTenantBindRepository;
 import com.nodewebzsz.ociserver.pojo.request.VpnProxyRecordRequest;
 import com.nodewebzsz.ociserver.service.VpnProxyRecordService;
 import com.nodewebzsz.ociserver.utils.PageUtils;
+import com.nodewebzsz.ociserver.utils.PingUtil;
 import com.nodewebzsz.ociserver.utils.SocksProxyUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -111,6 +112,13 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
         if (request.getCustomName() != null) {
             String cn = StringUtils.trimToNull(request.getCustomName());
             record.setCustomName(cn);
+        }
+        // 代理归属地：优先采用显式指定的归属地；若未传且主机有效则自动解析
+        if (request.getLocation() != null) {
+            record.setLocation(StringUtils.trimToNull(request.getLocation()));
+        }
+        if (record.getLocation() == null && record.getProxyHost() != null) {
+            record.setLocation(resolveLocation(record.getProxyHost()));
         }
         record.setUpdateTime(now);
 
@@ -226,6 +234,13 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
                     record.getId(), record.getProxyHost(), record.getProxyPort(), e.getMessage());
         }
         record.setAvailableStatus(connected ? 1 : 0);
+        // 若归属地为空，尝试解析并补齐
+        if (record.getLocation() == null || record.getLocation().trim().isEmpty() || "未知位置".equals(record.getLocation())) {
+            String loc = resolveLocation(record.getProxyHost());
+            if (loc != null) {
+                record.setLocation(loc);
+            }
+        }
         record.setUpdateTime(LocalDateTime.now());
         vpnProxyRecordRepository.save(record);
 
@@ -236,6 +251,7 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
         data.put("proxyHost", record.getProxyHost());
         data.put("proxyPort", record.getProxyPort());
         data.put("proxyType", record.getProxyType());
+        data.put("location", record.getLocation());
         return data;
     }
 
@@ -330,7 +346,39 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
                 }
                 r.setTenantName(String.join(", ", names));
             }
+            // 自动为存量缺失 location 的代理填充归属地
+            if (r.getLocation() == null || r.getLocation().trim().isEmpty() || "未知位置".equals(r.getLocation())) {
+                String loc = resolveLocation(r.getProxyHost());
+                if (loc != null) {
+                    r.setLocation(loc);
+                    try {
+                        vpnProxyRecordRepository.save(r);
+                    } catch (Exception ignored) {}
+                }
+            }
         }
+    }
+
+    /**
+     * 自动解析代理地址的归属地（国家/省/市）
+     */
+    private String resolveLocation(String proxyHost) {
+        if (proxyHost == null || proxyHost.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            String loc = PingUtil.getFormattedGeoInfo(proxyHost.trim());
+            if (loc != null && !loc.trim().isEmpty()) {
+                return loc.trim();
+            }
+            String raw = PingUtil.getGeoInfoByIP(proxyHost.trim());
+            if (raw != null && !raw.trim().isEmpty() && !"未知位置".equals(raw)) {
+                return raw.trim();
+            }
+        } catch (Exception e) {
+            log.debug("解析代理归属地异常 host={}: {}", proxyHost, e.getMessage());
+        }
+        return null;
     }
 
     private Map<Long, String> loadTenantNames(Set<Long> tenantIds) {

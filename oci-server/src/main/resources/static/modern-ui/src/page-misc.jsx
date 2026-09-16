@@ -5229,6 +5229,7 @@ function ProxyFormBody({ existing, parentTenants = [], bodyRef, onSave }) {
   const [form, setForm] = React.useState(() => ({
     id: existing && existing.id != null ? existing.id : null,
     customName: (existing && existing.customName) || '',
+    location: (existing && existing.location) || '',
     proxyType: (existing && existing.proxyType) || 'HTTP',
     proxyHost: (existing && existing.proxyHost) || '',
     proxyPort: existing && existing.proxyPort != null ? Number(existing.proxyPort) : 8080,
@@ -5321,6 +5322,7 @@ function ProxyFormBody({ existing, parentTenants = [], bodyRef, onSave }) {
       availableStatus: Number(form.availableStatus),
       forceProxy: Number(form.forceProxy),
       customName: form.customName.trim(),
+      location: form.location.trim() || null,
       tenantIds: tenantIds,
       tenantId: tenantIds.length ? tenantIds[0] : null,
     };
@@ -5411,6 +5413,15 @@ function ProxyFormBody({ existing, parentTenants = [], bodyRef, onSave }) {
             />
           </FormRow>
         </div>
+
+        <FormRow label="代理归属地" hint="留空将由系统根据主机地址自动离线解析">
+          <TextInput
+            icon="map-pin"
+            value={form.location}
+            onChange={v => set('location', v)}
+            placeholder="自动解析（例如：日本·东京），亦可手动指定"
+          />
+        </FormRow>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <FormRow label="用户名">
@@ -5833,7 +5844,7 @@ function SysVpnProxyPage() {
           {loading ? (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--fg-2)' }}>{tr('pageMisc.c6c150')}</div>
           ) : (
-            <table style={{ width: '100%', minWidth: 1100, borderCollapse: 'separate', borderSpacing: 0, fontSize: 12 }}>
+            <table style={{ width: '100%', minWidth: 1200, borderCollapse: 'separate', borderSpacing: 0, fontSize: 12 }}>
               <thead>
                 <tr>
                   {[
@@ -5841,6 +5852,7 @@ function SysVpnProxyPage() {
                     { h: tr('pageMisc.226b09'), w: 80, align: 'center' },
                     { h: 'URL', w: 160 },
                     { h: tr('pageMisc.c76cfe'), w: 70, align: 'center' },
+                    { h: tr('pageMisc.proxyLocation') || '代理归属地', w: 140, align: 'center' },
                     { h: tr('pageMisc.819767'), w: 110 },
                     { h: tr('pageMisc.a81052'), w: 90 },
                     { h: tr('pageMisc.4787d6'), w: 160 },
@@ -5860,14 +5872,14 @@ function SysVpnProxyPage() {
               </thead>
               <tbody style={{ opacity: (loading && proxies.length > 0) ? 0.6 : 1, transition: 'opacity 120ms' }}>
                 {(loading || !hasLoadedOnce) && proxies.length === 0 ? (
-                  <tr><td colSpan={10} style={{ padding: 48, textAlign: 'center', color: 'var(--fg-3)' }}>
+                  <tr><td colSpan={11} style={{ padding: 48, textAlign: 'center', color: 'var(--fg-3)' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
                       <Icon name="loader-2" size={18} className="spin" style={{ opacity: 0.6 }} />
                       <span style={{ fontSize: 13 }}>加载中…</span>
                     </div>
                   </td></tr>
                 ) : proxies.length === 0 ? (
-                  <tr><td colSpan={10} style={{ padding: 0 }}>
+                  <tr><td colSpan={11} style={{ padding: 0 }}>
                     <EmptyState
                       icon="shield"
                       title="暂无代理配置"
@@ -5900,6 +5912,19 @@ function SysVpnProxyPage() {
                       </td>
                       <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span className="num mono" style={{ fontSize: 11.5, color: 'var(--fg-1)' }}>{p.proxyPort}</span>
+                      </td>
+                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
+                        {p.location ? (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            fontSize: 11.5, color: 'var(--fg-1)',
+                          }}>
+                            <Icon name="map-pin" size={11} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                            <span>{p.location}</span>
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>—</span>
+                        )}
                       </td>
                       <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>{p.proxyUsername || '—'}</span>

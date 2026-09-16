@@ -17,6 +17,7 @@ function ProxyPage({ density }) {
     type: p.proxyType || 'HTTP',
     host: p.proxyHost || '',
     port: p.proxyPort ?? '',
+    location: p.location || '',
     tenants: Array.isArray(p.tenantIds) ? p.tenantIds.length : (p.tenantId == null ? 0 : 1),
     status: Number(p.availableStatus) === 1 ? 'healthy' : 'error',
     latency: null,
@@ -104,6 +105,14 @@ function ProxyPage({ density }) {
     },
     { key: 'endpoint', label: tr('proxy.col.endpoint'),
       render: r => <span className="mono" style={{ color: 'var(--cyan)' }}>{getProxyHost(r)}:{getProxyPort(r)}</span>,
+    },
+    { key: 'location', label: tr('pageMisc.proxyLocation') || '代理归属地',
+      render: r => r.location ? (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--fg-1)', fontSize: 11.5 }}>
+          <Icon name="map-pin" size={11} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+          <span>{r.location}</span>
+        </span>
+      ) : <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>—</span>,
     },
     { key: 'tenants', label: tr('proxy.col.tenants'),
       render: r => <span className="num" style={{ color: 'var(--fg-0)', fontWeight: 500 }}>{r.tenants}</span>,

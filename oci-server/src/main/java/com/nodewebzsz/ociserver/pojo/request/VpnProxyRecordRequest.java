@@ -62,4 +62,9 @@ public class VpnProxyRecordRequest extends BaseRequest{
      * 自定义名称（可选，可空）
      */
     private String customName;
+
+    /**
+     * 代理归属地（可选）
+     */
+    private String location;
 }

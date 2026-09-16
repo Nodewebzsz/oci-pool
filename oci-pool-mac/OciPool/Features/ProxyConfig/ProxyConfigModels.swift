@@ -19,6 +19,8 @@ struct VpnProxyItem: Identifiable, Equatable {
     var tenantName: String = ""
     /// 自定义名称（可选）
     var customName: String = ""
+    /// 代理归属地（国家/省市，由 proxyHost 自动解析或连通测试时识别）
+    var location: String = ""
     /// Client-side: row is currently being probed.
     var isTesting: Bool = false
 
@@ -162,6 +164,7 @@ enum ProxyConfigJSON {
         item.tenantId = tid > 0 ? tid : nil
         item.tenantName = str(d["tenantName"])
         item.customName = str(d["customName"])
+        item.location = str(d["location"])
         // tenantIds: 数组 或 兼容单值
         if let arr = d["tenantIds"] as? [Any] {
             item.tenantIds = arr.compactMap { v -> Int64? in

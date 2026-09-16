@@ -248,6 +248,49 @@ public class PingUtil {
         }
     }
 
+    /**
+     * 根据 IP 或主机域名获取格式化的地理位置（例如：中国·北京、日本·东京、美国·旧金山）
+     * @param hostOrIp IP地址或域名
+     * @return 格式化地理位置字符串，无法识别返回 null
+     */
+    public static String getFormattedGeoInfo(String hostOrIp) {
+        try {
+            if (hostOrIp == null || hostOrIp.trim().isEmpty()) return null;
+            if (isPrivateIP(hostOrIp)) return "内网地址";
+
+            DatabaseReader reader = getGeoReader();
+            if (reader == null) return null;
+
+            InetAddress ipAddress = InetAddress.getByName(hostOrIp.trim());
+            CityResponse response = reader.city(ipAddress);
+            if (response == null) return null;
+
+            String country = response.getCountry() != null ? response.getCountry().getNames().getOrDefault("zh-CN", response.getCountry().getName()) : null;
+            String province = response.getMostSpecificSubdivision() != null ? response.getMostSpecificSubdivision().getNames().getOrDefault("zh-CN", response.getMostSpecificSubdivision().getName()) : null;
+            String city = response.getCity() != null ? response.getCity().getNames().getOrDefault("zh-CN", response.getCity().getName()) : null;
+
+            if (country == null && province == null && city == null) {
+                return null;
+            }
+
+            StringBuilder sb = new StringBuilder();
+            if (country != null && !country.isEmpty()) {
+                sb.append(country);
+            }
+            if (province != null && !province.isEmpty() && !province.equals(country)) {
+                if (sb.length() > 0) sb.append("·");
+                sb.append(province);
+            }
+            if (city != null && !city.isEmpty() && !city.equals(province) && !city.equals(country)) {
+                if (sb.length() > 0) sb.append("·");
+                sb.append(city);
+            }
+            return sb.length() > 0 ? sb.toString() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
 
 
     public static boolean isPrivateIP(String ip) {
