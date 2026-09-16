@@ -87,6 +87,12 @@ public class VpnProxyRecord {
     private String customName;
 
     /**
+     * 代理归属地（国家/省市，由 proxyHost 自动解析或连通测试时识别）
+     */
+    @Column(name = "location", length = 128)
+    private String location;
+
+    /**
      * 绑定租户展示名（非持久化，列表接口填充；多租户时逗号拼接）
      */
     @Transient

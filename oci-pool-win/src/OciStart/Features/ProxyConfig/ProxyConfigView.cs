@@ -14,6 +14,7 @@ public sealed class ProxyRow
     public string Type { get; set; } = "";
     public string Host { get; set; } = "";
     public string Port { get; set; } = "";
+    public string Location { get; set; } = "";
     public string Status { get; set; } = "";
     public string Force { get; set; } = "";
 }
@@ -51,6 +52,7 @@ public sealed class ProxyConfigView : UserControl
         _grid.Columns.Add(ListPageHelper.Col("类型", nameof(ProxyRow.Type), 80));
         _grid.Columns.Add(ListPageHelper.Col("地址", nameof(ProxyRow.Host), 140));
         _grid.Columns.Add(ListPageHelper.Col("端口", nameof(ProxyRow.Port), 70));
+        _grid.Columns.Add(ListPageHelper.Col("归属地", nameof(ProxyRow.Location), 110));
         _grid.Columns.Add(ListPageHelper.Col("状态", nameof(ProxyRow.Status), 80));
         _grid.Columns.Add(ListPageHelper.Col("强制", nameof(ProxyRow.Force), 60));
         _grid.SelectionChanged += (_, _) =>
@@ -134,6 +136,7 @@ public sealed class ProxyConfigView : UserControl
                 Type = JsonPage.Pick(m, "proxyType", "type"),
                 Host = JsonPage.Pick(m, "proxyHost", "host"),
                 Port = JsonPage.Pick(m, "proxyPort", "port"),
+                Location = JsonPage.Pick(m, "location"),
                 Status = JsonPage.Pick(m, "availableStatus", "status"),
                 Force = JsonPage.Pick(m, "forceProxy")
             }).ToList();
