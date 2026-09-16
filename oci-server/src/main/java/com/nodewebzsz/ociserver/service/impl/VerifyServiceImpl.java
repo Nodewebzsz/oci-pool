@@ -12,6 +12,7 @@ import com.nodewebzsz.ociserver.pojo.request.BarkConfig;
 import com.nodewebzsz.ociserver.pojo.request.FeishuConfig;
 import com.nodewebzsz.ociserver.pojo.request.MfaConfig;
 import com.nodewebzsz.ociserver.pojo.request.MfaConfigRequest;
+import com.nodewebzsz.ociserver.service.login.AuthSecurityService;
 import com.nodewebzsz.ociserver.service.login.LoginUserService;
 import com.nodewebzsz.ociserver.service.message.factory.MessageFactory;
 import com.nodewebzsz.ociserver.pojo.request.DingTalkConfig;
@@ -86,6 +87,9 @@ public class VerifyServiceImpl implements VerifyService {
 
     @Resource
     private LoginUserService loginUserService;
+
+    @Resource
+    private AuthSecurityService authSecurityService;
 
     @PostConstruct
     public void init() {
@@ -179,8 +183,7 @@ public class VerifyServiceImpl implements VerifyService {
         Optional<LoginUser> loginUserOptional = loginUserRepository.findByUsername(username);
         if (!loginUserOptional.isPresent()) {
             final String clientIpAddress = getClientIpAddress(request).replace('.', '_');
-            sendToActiveChannels(String.format(MESSAGE_MALICIOUS_LOGIN_TEMPLATE_V_2,
-                    getCurrentPublicIpAndAddress(request), username, clientIpAddress, clientIpAddress));
+            sendMaliciousLoginAlertIfAllowed(request, username, clientIpAddress);
             throw new IllegalStateException("用户名或密码错误");
         }
         LoginUser loginUser = loginUserOptional.get();
@@ -277,6 +280,21 @@ public class VerifyServiceImpl implements VerifyService {
         }
     }
 
+    /**
+     * 具备10分钟全局收敛静默的安全告警推送
+     */
+    private void sendMaliciousLoginAlertIfAllowed(HttpServletRequest request, String username, String clientIpAddress) {
+        if (!authSecurityService.shouldSendAlert("malicious_login")) {
+            int suppressed = authSecurityService.getSuppressedAlertCount("malicious_login");
+            log.info("【安全防御】异常登录告警处于10分钟冷却期内，已自动静默收敛(已累计拦截{}次)，不重复推送 Bark/TG。用户: {}, IP: {}",
+                    suppressed, username, getClientIpAddress(request));
+            return;
+        }
+        String alertMsg = String.format(MESSAGE_MALICIOUS_LOGIN_TEMPLATE_V_2,
+                getCurrentPublicIpAndAddress(request), username, clientIpAddress, clientIpAddress);
+        sendToActiveChannels(alertMsg);
+    }
+
     @Override
     public void checkCodeForLogin(String userName, String verificationCode) {
         // 从Guava Cache中获取验证码
@@ -284,14 +302,23 @@ public class VerifyServiceImpl implements VerifyService {
         String savedCode = verificationCodeCache.getIfPresent(cacheKey);
 
         if (savedCode == null) {
-            throw new IllegalStateException("验证码已过期，请重新获取");
+            throw new IllegalStateException("验证码已过期或不存在，请重新获取");
         }
 
         if (!savedCode.equals(verificationCode)) {
-            throw new IllegalStateException("验证码错误");
+            boolean melted = authSecurityService.recordVerifyCodeFailure("login", userName);
+            if (melted) {
+                // 输错满 5 次：立即销毁作废
+                verificationCodeCache.invalidate(cacheKey);
+                authSecurityService.clearVerifyCodeFailure("login", userName);
+                throw new IllegalStateException("验证码已连续错误 5 次已作废失效，请重新获取");
+            }
+            int remaining = authSecurityService.getVerifyCodeRemainingAttempts("login", userName);
+            throw new IllegalStateException("验证码错误，还可尝试 " + remaining + " 次");
         }
-        // 验证通过后立即删除验证码
+        // 验证通过后立即删除验证码并清理失败计数
         verificationCodeCache.invalidate(cacheKey);
+        authSecurityService.clearVerifyCodeFailure("login", userName);
     }
 
     /**
@@ -303,8 +330,7 @@ public class VerifyServiceImpl implements VerifyService {
         Optional<LoginUser> loginUserOptional = loginUserRepository.findByUsername(username);
         if (!loginUserOptional.isPresent()) {
             final String clientIpAddress = getClientIpAddress(request).replace('.', '_');
-            messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplateText(String.format(MESSAGE_MALICIOUS_LOGIN_TEMPLATE_V_2,
-                    getCurrentPublicIpAndAddress(request), username,clientIpAddress,clientIpAddress));
+            sendMaliciousLoginAlertIfAllowed(request, username, clientIpAddress);
             throw new IllegalStateException("用户名或密码错误");
         }
 
@@ -349,8 +375,7 @@ public class VerifyServiceImpl implements VerifyService {
         Optional<LoginUser> loginUserOptional = loginUserRepository.findByUsername(username);
         if (!loginUserOptional.isPresent()) {
             final String clientIpAddress = getClientIpAddress(request).replace('.', '_');
-            messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplateText(String.format(MESSAGE_MALICIOUS_LOGIN_TEMPLATE_V_2,
-                    getCurrentPublicIpAndAddress(request), username,clientIpAddress,clientIpAddress));
+            sendMaliciousLoginAlertIfAllowed(request, username, clientIpAddress);
             throw new IllegalStateException("用户名或密码错误");
         }
 
@@ -359,15 +384,24 @@ public class VerifyServiceImpl implements VerifyService {
         String savedCode = verificationCodeCache.getIfPresent(cacheKey);
 
         if (savedCode == null) {
-            throw new IllegalStateException("验证码已过期或不存在");
+            throw new IllegalStateException("验证码已过期或不存在，请重新获取");
         }
 
         if (!savedCode.equals(verificationCode)) {
-            throw new IllegalStateException("验证码错误");
+            boolean melted = authSecurityService.recordVerifyCodeFailure("reset", username);
+            if (melted) {
+                // 输错满 5 次：立即销毁作废
+                verificationCodeCache.invalidate(cacheKey);
+                authSecurityService.clearVerifyCodeFailure("reset", username);
+                throw new IllegalStateException("验证码已连续错误 5 次已作废失效，请重新获取");
+            }
+            int remaining = authSecurityService.getVerifyCodeRemainingAttempts("reset", username);
+            throw new IllegalStateException("验证码错误，还可尝试 " + remaining + " 次");
         }
 
-        // 3. 验证成功，删除验证码，生成重置token
+        // 3. 验证成功，删除验证码，生成重置token，清理错误计数
         verificationCodeCache.invalidate(cacheKey);
+        authSecurityService.clearVerifyCodeFailure("reset", username);
 
         String resetToken = generateResetToken();
         String tokenKey = RESET_TOKEN_PREFIX + resetToken;

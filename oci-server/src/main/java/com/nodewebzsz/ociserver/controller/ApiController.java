@@ -14,6 +14,7 @@ import com.nodewebzsz.ocicommon.param.ApiResponse;
 import com.nodewebzsz.ociserver.service.MetricsService;
 import com.nodewebzsz.ociserver.service.VerifyService;
 import com.nodewebzsz.ociserver.service.impl.system.SystemConfigService;
+import com.nodewebzsz.ociserver.service.login.AuthSecurityService;
 import com.nodewebzsz.ociserver.service.mfa.OTPService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -52,6 +53,9 @@ public class ApiController  extends BaseController{
 
     @Resource
     private VerifyService verifyService;
+
+    @Resource
+    private AuthSecurityService authSecurityService;
 
     @Resource
     OTPService otpService;
@@ -166,6 +170,10 @@ public class ApiController  extends BaseController{
     @PostMapping("/send-verification-code")
     public ResponseEntity<String> sendVerificationCode(@RequestBody @Valid UsernameRequest request, HttpServletRequest  httpServletRequest) {
         try {
+            // 前置客户端 IP 60秒限流检查，防止高频刷验证码/告警轰炸
+            String clientIp = IpUtils.getClientIpAddress(httpServletRequest);
+            authSecurityService.checkAndRecordSendRateLimit(clientIp);
+
             verifyService.sendVerificationCodeForLogin(request.getUsername(),httpServletRequest);
             return ResponseEntity.ok().build();
         } catch (RateLimitException e) {
