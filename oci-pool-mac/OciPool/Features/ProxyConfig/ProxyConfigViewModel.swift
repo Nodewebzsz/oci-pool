@@ -271,6 +271,9 @@ final class ProxyConfigViewModel: ObservableObject {
         if let idx = items.firstIndex(where: { $0.id == result.id }) {
             items[idx].isTesting = false
             items[idx].availableStatus = result.availableStatus
+            if let loc = result.location, !loc.isEmpty {
+                items[idx].location = loc
+            }
         }
     }
 
