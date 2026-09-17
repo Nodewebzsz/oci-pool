@@ -1,4 +1,4 @@
-// Dependency-free hash router for the Modern UI.
+// HTML5 History router for the Modern UI (No '#' in URL).
 // Exposes window.ociRouter in the browser and module.exports for Node tests.
 (function () {
   'use strict';
@@ -92,9 +92,43 @@
   }
 
   function read() {
-    var hash = (g.location && g.location.hash) || '';
-    var noPound = hash.replace(/^#/, '');
-    var base = noPound || '/monitor';
+    var loc = g.location || {};
+    var pathname = loc.pathname || '';
+    var search = loc.search || '';
+    var hash = loc.hash || '';
+
+    // 自愈清洗：如果 search 只是孤立的 '?'，通过 replaceState 清除地址栏末尾的问号
+    if (search === '?') {
+      search = '';
+      try {
+        if (g.history && typeof g.history.replaceState === 'function') {
+          g.history.replaceState(null, '', pathname || '/monitor');
+        }
+      } catch (e) {}
+    } else if (search && search.charAt(0) !== '?') {
+      search = '?' + search;
+    }
+
+    // 平滑自愈兼容：如果检测到 URL 中带有旧版 Hash 路由（如 /#/tenants 或 #/monitor）
+    if (hash && (hash.indexOf('#/') === 0 || hash.indexOf('#') === 0)) {
+      var noPound = hash.replace(/^#/, '');
+      if (noPound) {
+        try {
+          if (g.history && typeof g.history.replaceState === 'function') {
+            g.history.replaceState(null, '', noPound);
+          }
+        } catch (e) {}
+        try {
+          var u = new URL(noPound, 'http://router.local');
+          pathname = u.pathname;
+          search = u.search || '';
+        } catch (e) {
+          pathname = noPound;
+        }
+      }
+    }
+
+    var base = (pathname === '' || pathname === '/' || pathname === '/index') ? '/monitor' : (pathname + search);
     var url;
     try { url = new URL(base, 'http://router.local'); } catch (e) {
       return { page: 'monitor', params: {}, query: {}, href: '/monitor' };
@@ -149,11 +183,22 @@
   function go(page, ctx, opts) {
     opts = opts || {};
     var h = href(page, ctx);
-    var target = '#' + h;
     var method = opts.replace ? 'replaceState' : 'pushState';
-    try { if (g.history && typeof g.history[method] === 'function') g.history[method](null, '', target); } catch (e) {}
-    if (g.location) {
-      if (g.location.hash !== target) g.location.hash = h;
+    try {
+      if (g.history && typeof g.history[method] === 'function') {
+        g.history[method](null, '', h);
+      }
+    } catch (e) {}
+
+    // 仅在 Node 测试模拟环境中更新 mock location 对象；
+    // 严禁在真实浏览器中向 window.location 属性直接赋值（向 location.search 赋值空字符串会导致浏览器导航至带'?'的URL并触发整页刷新）
+    if (typeof window === 'undefined' && g.location && typeof g.location === 'object') {
+      try {
+        var parsed = new URL(h, 'http://router.local');
+        g.location.pathname = parsed.pathname;
+        g.location.search = parsed.search || '';
+        g.location.hash = '';
+      } catch (e) {}
     }
     emit();
   }
@@ -162,6 +207,33 @@
   if (typeof window !== 'undefined') {
     window.addEventListener('popstate', onHistoryChange);
     window.addEventListener('hashchange', onHistoryChange);
+
+    // 全局内部链接自动转 History 路由，防浏览器重新刷新整页
+    if (typeof document !== 'undefined') {
+      document.addEventListener('click', function (e) {
+        var el = e.target;
+        while (el && el.tagName !== 'A') {
+          el = el.parentElement;
+        }
+        if (!el) return;
+        var h = el.getAttribute('href');
+        if (!h || h.startsWith('http://') || h.startsWith('https://') || h.startsWith('//') || h.startsWith('javascript:') || el.target === '_blank') {
+          return;
+        }
+        if (h.startsWith('#/')) {
+          e.preventDefault();
+          var clean = h.replace(/^#/, '');
+          try { g.history.pushState(null, '', clean); } catch (err) {}
+          emit();
+          return;
+        }
+        if (h.startsWith('/')) {
+          e.preventDefault();
+          try { g.history.pushState(null, '', h); } catch (err) {}
+          emit();
+        }
+      });
+    }
   }
 
   var api = { read: read, href: href, go: go, subscribe: subscribe };

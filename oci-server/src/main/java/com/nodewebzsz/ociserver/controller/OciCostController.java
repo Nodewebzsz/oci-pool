@@ -47,7 +47,7 @@ public class OciCostController extends BaseController{
                             Model model) {
         model.addAttribute("tenantId", tenantId);
         model.addAttribute("activePage", "api-management");
-        return "oci_cost";
+        return "redirect:/tenants";
 
     }
 

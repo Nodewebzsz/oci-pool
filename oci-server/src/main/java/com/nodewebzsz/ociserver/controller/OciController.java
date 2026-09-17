@@ -98,7 +98,7 @@ public class OciController  extends BaseController{
         if (tenantId != null) {
             model.addAttribute("selectedInstanceId", tenantId);
         }
-        return "oci_machine_list";
+        return "redirect:/instances";
 
     }
 
@@ -242,7 +242,7 @@ public class OciController  extends BaseController{
         // 设置侧边栏激活菜单
         model.addAttribute("activePage", "api-management");
 
-        return "ssh_terminal";
+        return "redirect:/instances";
     }
     /**
     * @Description: 实例救援页面
@@ -268,7 +268,7 @@ public class OciController  extends BaseController{
         // 设置侧边栏激活菜单
         model.addAttribute("activePage", "api-management");
 
-        return "sys_help";
+        return "redirect:/instances";
     }
 
     @GetMapping("/metricsPage")
@@ -276,7 +276,7 @@ public class OciController  extends BaseController{
         List<ServerMetricsDTO> servers = metricsService.getAllServerMetrics();
         model.addAttribute("servers", servers);
         model.addAttribute("activePage", "api-metricsPage");
-        return "metrics_page2";
+        return "redirect:/monitor";
     }
 
     @GetMapping("/changeIp")

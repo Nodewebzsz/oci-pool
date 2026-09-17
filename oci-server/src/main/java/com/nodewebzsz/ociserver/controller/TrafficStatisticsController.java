@@ -48,7 +48,7 @@ public class TrafficStatisticsController  extends BaseController{
         if (tenantId != null && !tenantId.isEmpty()) {
             model.addAttribute("tenantId", tenantId);
         }
-        return "oci_monitor";
+        return "redirect:/monitor";
     }
 
     /**

@@ -9,18 +9,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
- * Serves the React-based Modern UI (single-page app) at the root path.
+ * Serves the React-based Modern UI (single-page app) with HTML5 History routing.
  *
- * <p>Activated by default. Disable and fall back to the original Freemarker
- * dashboard by setting {@code modern-ui.enabled=false} in application.yml.
- *
- * <p>The SPA files live at {@code classpath:/static/modern-ui/index.html}.
- * All /modern-ui/** requests are served automatically as static assets by
- * Spring Boot's default resource handler — no controller work needed.
- *
- * <p><b>sa-token whitelist</b>: {@link com.nodewebzsz.ociserver.config.SaTokenConfig}
- * has been patched to include {@code /} and {@code /modern-ui/**} in the
- * excludePathPatterns list, so the SPA can be reached without a login.
+ * <p>All user-facing page routes (without `#`) are forwarded to the SPA entry point,
+ * allowing browser refreshes and direct URL navigation without 404s.
  */
 @Controller
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -30,9 +22,41 @@ public class ModernUiController {
     @Value("${modern-ui.entry:/modern-ui/index.html}")
     private String entry;
 
-    @GetMapping("/")
-    public String spaRoot() { return "forward:" + entry; }
+    @GetMapping({
+            "/",
+            "/index",
+            "/login",
+            "/register",
+            "/forgot-password",
+            "/monitor",
+            "/tenants",
+            "/tenants/{tenantDbId:[0-9]+}",
+            "/tenants/{tenantDbId:[0-9]+}/**",
+            "/instances",
+            "/grab",
+            "/regions",
+            "/boot-logs",
+            "/mail",
+            "/object-storage",
+            "/ai",
+            "/link-test",
+            "/proxy",
+            "/proxy/**",
+            "/developer",
+            "/developer/**",
+            "/tools",
+            "/tools/**",
+            "/resources",
+            "/resources/**",
+            "/system",
+            "/system/**"
+    })
+    public String spaRoot() {
+        return "forward:" + entry;
+    }
 
     @RequestMapping({"/app", "/app/**"})
-    public String spaAppRoot() { return "forward:" + entry; }
+    public String spaAppRoot() {
+        return "forward:" + entry;
+    }
 }

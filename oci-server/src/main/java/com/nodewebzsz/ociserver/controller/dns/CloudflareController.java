@@ -94,7 +94,7 @@ public class CloudflareController  extends BaseController {
         model.addAttribute("selectedZoneId", zoneId);
         model.addAttribute("activePage", "cloudflare-servers");
 
-        return "/cf_manage";
+        return "redirect:/proxy/cloudflare";
     }
 
     /**

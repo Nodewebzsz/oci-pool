@@ -56,7 +56,7 @@ public class CloudShellController  extends BaseController{
     public String showConsoleTerminal(Model model) {
         // 设置侧边栏激活菜单
         model.addAttribute("activePage", "api-ociBootList");
-        return "console_terminal";
+        return "redirect:/instances";
     }
 
     /**
@@ -88,7 +88,7 @@ public class CloudShellController  extends BaseController{
             // 设置侧边栏激活菜单
             model.addAttribute("activePage", "api-ociBootList");
 
-            return "console_terminal";
+            return "redirect:/instances";
 
         } catch (NumberFormatException e) {
             log.error("无效的实例ID格式: {}", instanceId);

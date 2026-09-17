@@ -86,7 +86,7 @@ public class OpenBootController  extends BaseController{
 
         // PC端：返回原有模板
         model.addAttribute("activePage", "api-fullBootList");
-        return "full_machine_list";
+        return "redirect:/grab";
 
     }
 

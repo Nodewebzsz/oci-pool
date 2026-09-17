@@ -94,6 +94,6 @@ public class ArmResourcesController  extends BaseController{
     @GetMapping("/list")
     public String listUsers(Model model) {
         model.addAttribute("activePage", "api-records");
-        return "arm_records";
+        return "redirect:/regions";
     }
 }

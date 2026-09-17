@@ -44,7 +44,7 @@ public class SshController extends BaseController{
     @RequestMapping("/terminal")
     public String terminal(HttpServletRequest request, Model model){
         model.addAttribute("activePage", "ssh-terminal");
-        return "ssh_terminal";
+        return "redirect:/instances";
     }
 
 

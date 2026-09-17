@@ -37,7 +37,7 @@ public class LogController  extends BaseController{
             model.addAttribute("error", "无法读取日志文件");
         }
         model.addAttribute("activePage", "api-logs");
-        return "sys_log";
+        return "redirect:/system/logs";
     }
 
     @GetMapping("/openLogs")
@@ -49,7 +49,7 @@ public class LogController  extends BaseController{
             model.addAttribute("error", "无法读取日志文件");
         }
         model.addAttribute("activePage", "api-openLog");
-        return "open_boot_log";
+        return "redirect:/boot-logs";
     }
 
     /**

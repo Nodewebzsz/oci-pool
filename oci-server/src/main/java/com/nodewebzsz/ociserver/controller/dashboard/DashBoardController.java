@@ -45,7 +45,7 @@ public class DashBoardController extends BaseController {
     @RequestMapping("/boot/dashboard")
     public String dashboard(Model model){
         model.addAttribute("activePage", "api-dashboard");
-        return "dashboard";
+        return "redirect:/monitor";
     }
 
     @GetMapping("/boot/dashboard-stats")

@@ -68,7 +68,7 @@ public class OciObjectStorageController extends BaseController {
     @GetMapping("/page")
     public String page(Model model) {
         model.addAttribute("activePage", "oci-object-storage");
-        return "oci_object_storage";
+        return "redirect:/object-storage";
     }
 
     /**

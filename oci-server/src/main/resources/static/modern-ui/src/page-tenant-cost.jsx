@@ -202,11 +202,12 @@ function TenantCostPage({ density, ctx, navigate }) {
           </div>
           <div style={{ minWidth: 0 }}>
             {/* 面包屑导航：字号严格统一为 16px，通过颜色与字重清晰区分层级 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, lineHeight: 1.25 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, lineHeight: 1.25 }}>
               <span
                 onClick={() => navigate('tenants')}
                 style={{
                   color: 'var(--fg-2)',
+                  fontSize: 16,
                   fontWeight: 500,
                   cursor: 'pointer',
                   transition: 'color 120ms',
@@ -216,11 +217,12 @@ function TenantCostPage({ density, ctx, navigate }) {
               >
                 {tr('app.f0f7e8')}
               </span>
-              <span style={{ color: 'var(--fg-3)', fontSize: 14, fontWeight: 400, opacity: 0.8 }}>/</span>
+              <span style={{ color: 'var(--fg-3)', fontSize: 13, fontWeight: 400, opacity: 0.7 }}>/</span>
               <span style={{
                 color: 'var(--fg-0)',
+                fontSize: 15,
                 fontWeight: 600,
-                letterSpacing: -0.2,
+                letterSpacing: 0,
               }}>
                 费用统计
               </span>

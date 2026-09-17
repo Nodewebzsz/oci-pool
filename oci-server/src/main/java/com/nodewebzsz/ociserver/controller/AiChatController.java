@@ -64,12 +64,12 @@ public class AiChatController  extends BaseController{
 
             log.info("显示AI对话页面 - 租户ID: {}", tenantId);
 
-            return "chat";
+            return "redirect:/tools/ai-chat";
 
         } catch (Exception e) {
             log.error("显示AI对话页面时发生错误: {}", e.getMessage(), e);
             model.addAttribute("error", "加载AI对话页面时发生错误: " + e.getMessage());
-            return "error";
+            return "redirect:/tools/ai-chat";
         }
     }
 

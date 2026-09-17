@@ -47,7 +47,7 @@ public class VpnProxyRecordController extends BaseController{
         model.addAttribute("totalPages", 0);
         model.addAttribute("totalElements", 0);
         model.addAttribute("activePage", "vpnProxy-management");
-        return "vpn_proxy";
+        return "redirect:/system/proxy";
     }
 
 
