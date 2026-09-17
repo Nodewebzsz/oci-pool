@@ -65,44 +65,6 @@ public class LoginController {
     @Resource
     private MessageSource messageSource;
 
-    @RequestMapping(value = "/login", method = RequestMethod.GET)
-    public String login(Model model, HttpServletRequest request) {
-        Locale locale = LocaleContextHolder.getLocale();
-        model.addAttribute("msg", new MessageResolver(messageSource, locale));
-        model.addAttribute("currentLocale", locale.toString());
-        model.addAttribute("siteLogoName", systemConfigService.getSiteLogoName());
-        HttpSession session = request.getSession();
-        String publicKey = null;
-        try {
-            String existingPrivateKey = (String) session.getAttribute(RSA_PRIVATE_KEY);
-            if (existingPrivateKey == null) {
-                KeyPair keyPair = RsaUtils.generateKeyPair();
-                publicKey = RsaUtils.getPublicKeyString(keyPair);
-                String privateKey = RsaUtils.getPrivateKeyString(keyPair);
-                session.setAttribute(RSA_PRIVATE_KEY, privateKey);
-                session.setAttribute(RSA_PUBLIC_KEY, publicKey);
-            } else {
-                publicKey = (String) session.getAttribute(RSA_PUBLIC_KEY);
-            }
-            model.addAttribute("publicKey", publicKey);
-        } catch (IllegalStateException e) {
-            log.debug("login session 已失效，RSA 写入跳过: {}", e.getMessage());
-        } catch (Exception e) {
-            log.error("生成RSA密钥对失败", e);
-        }
-        model.addAttribute("allowRegister", !loginUserService.existsAnyUser());
-        model.addAttribute("githubEnabled", systemConfigService.getGithubConfig().isEnabled());
-        model.addAttribute("googleEnabled", systemConfigService.getGoogleConfig().isEnabled());
-
-        TurnstileConfig turnstileConfig = systemConfigService.getTurnstileConfig();
-        model.addAttribute("turnstileEnabled", turnstileConfig.isEnabled());
-        model.addAttribute("turnstileSiteKey", turnstileConfig.getSiteKey());
-
-        if (isMobileRequest(request)) {
-            return "mobile/login";
-        }
-        return "login_user";
-    }
 
     @RequestMapping(value = "/perform_login", method = RequestMethod.POST)
     public void performLogin(HttpServletRequest request, HttpServletResponse response) throws IOException {
@@ -160,7 +122,7 @@ public class LoginController {
                 session.removeAttribute(RSA_PUBLIC_KEY);
             }
 
-            String targetUrl = mobile ? "/m/tenants" : "/index";
+            String targetUrl = "/";
             if (isAjax) {
                 response.setContentType("application/json;charset=utf-8");
                 response.getWriter().write("{\"success\":true,\"redirectUrl\":\"" + targetUrl + "\"}");
@@ -239,7 +201,7 @@ public class LoginController {
             response.setContentType("application/json;charset=utf-8");
             response.getWriter().write("{\"success\":true}");
         } else {
-            response.sendRedirect(mobile ? "/m/login" : "/login");
+            response.sendRedirect("/login");
         }
     }
 

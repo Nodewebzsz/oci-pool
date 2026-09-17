@@ -71,7 +71,7 @@ public class OTPController  extends BaseController {
             model.addAttribute("otpKeys", otpKeys);
         }
         model.addAttribute("activePage", "api-mfa");
-        return "mfa";
+        return "redirect:/tools/mfa-backup";
     }
 
     // 移动端 MFA 页面
@@ -83,7 +83,7 @@ public class OTPController  extends BaseController {
         }
         model.addAttribute("activePage", "mfa");
         model.addAttribute("currentUsername", UserContext.getUsername());
-        return "mobile/mfa";
+        return "redirect:/tools/mfa-backup";
     }
 
     /**

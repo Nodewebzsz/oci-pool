@@ -11,7 +11,18 @@ const router = require(ROUTER_PATH);
 // Fresh browser-ish location/history for every assertion.
 function setHash(hash) {
   let calls = [];
-  globalThis.location = { hash, _setHash(v) { this.hash = v; } };
+  globalThis.location = { hash, pathname: '', search: '', _setHash(v) { this.hash = v; } };
+  globalThis.history = {
+    pushState: (a, b, c) => calls.push(['push', c]),
+    replaceState: (a, b, c) => calls.push(['replace', c]),
+  };
+  globalThis.__routerCalls = calls;
+}
+
+function setPath(pathname, search = '') {
+  let calls = [];
+  const s = search ? (search.startsWith('?') ? search : '?' + search) : '';
+  globalThis.location = { hash: '', pathname, search: s };
   globalThis.history = {
     pushState: (a, b, c) => calls.push(['push', c]),
     replaceState: (a, b, c) => calls.push(['replace', c]),
@@ -104,13 +115,13 @@ test('non-numeric tenantDbId and unknown routes fall back to monitor', () => {
   setHash('#/monitor'); assert.equal(router.read().invalid, undefined);
 });
 
-test('go pushes state, syncs location.hash, and notifies subscribers', () => {
+test('go pushes state and notifies subscribers without hash', () => {
   setHash('');
   const seen = [];
   const un = router.subscribe(s => seen.push(s.page));
   router.go('tenant-detail', { tenantDbId: '9', tab: 'users' });
-  assert.deepEqual(globalThis.__routerCalls, [['push', '#/tenants/9?tab=users']]);
-  assert.equal(globalThis.location.hash, '/tenants/9?tab=users');
+  assert.deepEqual(globalThis.__routerCalls, [['push', '/tenants/9?tab=users']]);
+  assert.equal(globalThis.location.pathname, '/tenants/9');
   assert.deepEqual(seen, ['tenant-detail']);
   un();
   router.go('monitor');
@@ -120,11 +131,35 @@ test('go pushes state, syncs location.hash, and notifies subscribers', () => {
 test('go with replace uses replaceState', () => {
   setHash('#/grab');
   router.go('monitor', {}, { replace: true });
-  assert.deepEqual(globalThis.__routerCalls, [['replace', '#/monitor']]);
+  assert.deepEqual(globalThis.__routerCalls, [['replace', '/monitor']]);
 });
 
 test('subscribe returns an unsubscribe function', () => {
   setHash('#/monitor');
   const un = router.subscribe(() => {});
   assert.equal(typeof un, 'function');
+});
+
+test('pure HTML5 History path without any hash reads correctly', () => {
+  setPath('/tenants', 'page=2&size=20');
+  const state = router.read();
+  assert.equal(state.page, 'tenants');
+  assert.equal(state.query.page, '2');
+  assert.equal(state.query.size, '20');
+
+  setPath('/monitor');
+  assert.equal(router.read().page, 'monitor');
+
+  setPath('/tenants/42/grab', 'page=1');
+  const grabState = router.read();
+  assert.equal(grabState.page, 'tenant-grab');
+  assert.equal(grabState.params.tenantDbId, '42');
+});
+
+test('trailing question mark is cleaned up via replaceState', () => {
+  setPath('/monitor', '?');
+  const state = router.read();
+  assert.equal(state.page, 'monitor');
+  assert.deepEqual(state.query, {});
+  assert.deepEqual(globalThis.__routerCalls, [['replace', '/monitor']]);
 });

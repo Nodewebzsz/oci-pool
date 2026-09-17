@@ -43,7 +43,7 @@ public class MigrationController extends BaseController{
                             Model model) {
         model.addAttribute("activePage", "api-migPage");
 
-        return "migration";
+        return "redirect:/tools/migration";
 
     }
 

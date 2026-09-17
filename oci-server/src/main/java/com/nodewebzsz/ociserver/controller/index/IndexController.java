@@ -64,24 +64,10 @@ public class IndexController  extends BaseController {
 
 
     @GetMapping("/main")
-    public String mainLayout(@RequestParam(required = false) String path,
-                             @RequestParam(required = false) String active,
-                             Model model) {
-        model.addAttribute("initialPath", path != null ? path : "/boot/dashboard");
-        model.addAttribute("activePage", active != null ? active : "api-dashboard");
-        return "layout";
+    public String mainLayout() {
+        return "redirect:/";
     }
 
-    /**
-     * 租户列表
-     */
-    @GetMapping("/index")
-    public String listUsers(HttpServletRequest request,
-                            Model model) {
-
-        model.addAttribute("cloudType", CloudTypeEnum.ORACLE_CLOUD.getType());
-        return "index";
-    }
 
     //异步获取面板开机统计
     @GetMapping("/bootOpenCount")
@@ -108,7 +94,7 @@ public class IndexController  extends BaseController {
     @GetMapping("/about/author")
     public String aboutAuthor(Model model) {
         model.addAttribute("activePage", "about-author");
-        return "common/version_info";
+        return "redirect:/monitor";
     }
 
 

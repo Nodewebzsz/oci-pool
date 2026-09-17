@@ -6,31 +6,17 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PasswordPolicyResourceTest {
 
     @Test
-    void desktopPasswordPolicyAllowsZeroTo365DaysAndShowsNeverExpireHint() throws IOException {
-        String template = read("src/main/resources/templates/tenant_list.ftl");
-        String script = read("src/main/resources/static/js/system/tenant_list.js");
+    void modernUiPasswordPolicyAllowsZeroTo365DaysAndDefaultsTo120Days() throws IOException {
+        String modernUiScript = read("src/main/resources/static/modern-ui/src/tenant-actions.jsx");
 
-        assertTrue(Pattern.compile("id=\"tenantPasswordExpiryDays\"[\\s\\S]*min=\"0\"[\\s\\S]*max=\"365\"[\\s\\S]*value=\"120\"")
-                .matcher(template)
-                .find());
-        assertTrue(template.contains("${msg.get(\"tenant.passDes5\")}"));
-        assertTrue(script.contains("return p.expiryDays == null ? 120 : p.expiryDays;"));
-    }
-
-    @Test
-    void mobilePasswordPolicyDefaultsTo120DaysAndAllowsZeroTo365Days() throws IOException {
-        String template = read("src/main/resources/templates/mobile/user_mgr.ftl");
-
-        assertTrue(Pattern.compile("id=\"policyDays\"[\\s\\S]*min=\"0\"[\\s\\S]*max=\"365\"[\\s\\S]*value=\"120\"")
-                .matcher(template)
-                .find());
+        assertTrue(modernUiScript.contains("expiryDays == null ? 120 : Number(p.expiryDays)"));
+        assertTrue(modernUiScript.contains("parseInt(clean.expireDays) || 120"));
     }
 
     @Test

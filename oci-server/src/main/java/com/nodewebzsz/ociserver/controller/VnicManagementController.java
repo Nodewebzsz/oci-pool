@@ -75,12 +75,12 @@ public class VnicManagementController  extends BaseController{
             model.addAttribute("primaryVnic", new VnicCreationResult());
             model.addAttribute("secondaryVnics", java.util.Collections.emptyList());
 
-            return "oci_network_manage";
+            return "redirect:/instances";
 
         } catch (Exception e) {
             log.error("显示VNIC管理页面失败: " + e.getMessage(), e);
             model.addAttribute("error", "加载页面失败: " + e.getMessage());
-            return "error";
+            return "redirect:/instances";
         }
     }
 

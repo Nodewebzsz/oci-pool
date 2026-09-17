@@ -11,6 +11,6 @@ public class DelayTestController extends BaseController {
     @GetMapping("/delayTest")
     public String showChatPage(Model model){
         model.addAttribute("activePage", "api-delayTest");
-        return "speed_test";
+        return "redirect:/link-test";
     }
 }

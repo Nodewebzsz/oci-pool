@@ -51,7 +51,7 @@ public class OciInstanceDetailController  extends BaseController{
         model.addAttribute("activePage", "api-management");
         model.addAttribute("tenantId", tenantId);
 
-        return "oci_instance_detail";
+        return "redirect:/instances";
     }
 
 

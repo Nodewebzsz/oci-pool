@@ -69,7 +69,7 @@ public class NginxController extends BaseController {
                                  HttpServletRequest request,
                                  Model model) {
         model.addAttribute("activePage", "nginx-management");
-        return "nginx_config";
+        return "redirect:/tools/notifications";
     }
 
     // =================== 反向代理配置API ===================

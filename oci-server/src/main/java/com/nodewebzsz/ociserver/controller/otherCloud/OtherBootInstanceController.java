@@ -181,11 +181,11 @@ public class OtherBootInstanceController  extends BaseController {
             //api-ociBootList
             model.addAttribute("activePage", "api-ociBootList");
 
-            return "other_instance_list";
+            return "redirect:/instances";
         } catch (Exception e) {
             log.error("获取实例列表失败", e);
             model.addAttribute("error", "获取实例列表失败：" + e.getMessage());
-            return "error";
+            return "redirect:/instances";
         }
     }
 

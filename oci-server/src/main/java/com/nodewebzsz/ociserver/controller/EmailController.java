@@ -54,7 +54,7 @@ public class EmailController extends BaseController{
     @GetMapping("/management")
     public String listUsers(HttpServletRequest request, Model model) {
         model.addAttribute("activePage", "oci-email-management");
-        return "email";
+        return "redirect:/mail";
     }
 
     /**

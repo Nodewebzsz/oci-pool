@@ -182,7 +182,7 @@ public class TenantController extends BaseController{
             model.addAttribute("error", "加载数据失败，请稍后重试");
         }
         model.addAttribute("activePage", "api-management");
-        return "tenant_list";
+        return "redirect:/tenants";
 
     }
 
@@ -232,7 +232,7 @@ public class TenantController extends BaseController{
             model.addAttribute("tenantId", String.valueOf(tenantId));
         }
         model.addAttribute("activePage", "api-management");
-        return "tenant_region_list";
+        return "redirect:/regions";
     }
 
     /**
@@ -268,7 +268,7 @@ public class TenantController extends BaseController{
         model.addAttribute("tenantId", String.valueOf(tenantId));
         model.addAttribute("tenant", tenant);
         model.addAttribute("activePage", "api-management");
-        return "region_sub";
+        return "redirect:/regions";
     }
 
     @GetMapping("/subscribed-regions-data")
@@ -500,7 +500,7 @@ public class TenantController extends BaseController{
     public String addSpeedPage(Model model) {
         model.addAttribute("tenant", new Tenant());
         model.addAttribute("activePage", "api-management");
-        return "tenant_speed_add";
+        return "redirect:/tenants";
     }
 
     /**
@@ -510,7 +510,7 @@ public class TenantController extends BaseController{
     public String addBootPage(Model model,@RequestParam("tenantId") Long id,HttpServletRequest request) {
         model.addAttribute("tenantId", id);
         model.addAttribute("activePage", "api-management");
-        return "add_boot";
+        return "redirect:/grab";
 
     }
 
@@ -522,7 +522,7 @@ public class TenantController extends BaseController{
         model.addAttribute("tenantId", id);
         model.addAttribute("activePage", "api-management");
 
-        return "gcp_add_boot";
+        return "redirect:/grab";
 
     }
 
@@ -648,11 +648,7 @@ public class TenantController extends BaseController{
         model.addAttribute("currentPage", 0);
         model.addAttribute("totalPages", bootPage.getTotalPages());
         model.addAttribute("activePage", "api-fullBootList");
-        if (isMobileRequest( request)){
-            return "mobile/full_machine_list";
-        }else{
-            return "full_machine_list";
-        }
+        return "redirect:/instances";
 
     }
 

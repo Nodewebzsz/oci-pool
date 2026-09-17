@@ -141,7 +141,7 @@ public class EdgeOneController  extends BaseController {
             model.addAttribute("error", "加载页面失败: " + e.getMessage());
         }
 
-        return "eo_manage";
+        return "redirect:/proxy/edgeone";
     }
 
     /**

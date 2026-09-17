@@ -60,7 +60,7 @@ public class VpsController extends BaseController{
             model.addAttribute("selectedInstanceId", tenantId);
         }
 
-        return "vps_list";
+        return "redirect:/instances";
     }
 
     /**

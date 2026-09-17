@@ -6,6 +6,7 @@ import cn.dev33.satoken.spring.SaTokenContextForSpring;
 import cn.dev33.satoken.stp.StpUtil;
 
 import com.nodewebzsz.ociserver.config.filter.RsaDecryptionFilter;
+import com.nodewebzsz.ociserver.controller.ModernUiController;
 import com.nodewebzsz.ociserver.service.impl.system.SystemConfigService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -55,6 +57,14 @@ public class SaTokenConfig implements WebMvcConfigurer {
         registry.addInterceptor(new HandlerInterceptor() {
             @Override
             public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws IOException {
+                // Modern UI SPA 页面控制器放行（由前端进行登录态检测并保留原 URL）
+                if (handler instanceof HandlerMethod) {
+                    HandlerMethod hm = (HandlerMethod) handler;
+                    if (ModernUiController.class.equals(hm.getBeanType())) {
+                        return true;
+                    }
+                }
+
                 try {
                     StpUtil.checkLogin();
                     return true;
@@ -77,6 +87,8 @@ public class SaTokenConfig implements WebMvcConfigurer {
                 .addPathPatterns("/**")
                 .excludePathPatterns(
                         "/login",
+                        "/register",
+                        "/forgot-password",
                         "/perform_login",
                         "/perform_logout",
                         "/api/version/check",
@@ -110,6 +122,8 @@ public class SaTokenConfig implements WebMvcConfigurer {
                         "/swagger-resources/**",
                         "/webjars/**",
                         "/oci-pool/open-api/**",
+                        "/favicon.ico",
+                        "/favicon.svg",
                         "/error"
                 );
     }

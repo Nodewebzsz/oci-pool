@@ -111,7 +111,7 @@ public class SystemSettingsController  extends BaseController{
         model.addAttribute("channelNotifyEnabled", systemConfigService.getChannelNotifyEnabled());
 
         model.addAttribute("activePage", "api-settings");
-        return "system_settings";
+        return "redirect:/system/security";
     }
 
     @GetMapping("/notifySettings")
@@ -149,7 +149,7 @@ public class SystemSettingsController  extends BaseController{
         model.addAttribute("proxyConfig", proxyConfig);
 
         model.addAttribute("activePage", "api-notifySettings");
-        return "notification_settings";
+        return "redirect:/tools/notifications";
     }
 
     @GetMapping("/ipSettings")
@@ -171,13 +171,13 @@ public class SystemSettingsController  extends BaseController{
         model.addAttribute("mobileConfig", mobileConfig);
 
         model.addAttribute("activePage", "ip-settings");
-        return "ip_settings";
+        return "redirect:/system/ip-quality";
     }
 
     @GetMapping("/ai/models")
     public String aiModels(Model model) {
         model.addAttribute("activePage", "ai-models");
-        return "ai_model_config";
+        return "redirect:/ai";
     }
 
 
@@ -195,7 +195,7 @@ public class SystemSettingsController  extends BaseController{
         model.addAttribute("edgeOneConfig", edgeOneConfig);
 
         model.addAttribute("activePage", "domain-settings");
-        return "domain_settings";
+        return "redirect:/proxy/keys";
     }
 
     /**
@@ -215,7 +215,7 @@ public class SystemSettingsController  extends BaseController{
         model.addAttribute("tokenStatus", tokenStatus);
 
         model.addAttribute("activePage", "api-tokens");
-        return "api_token_config";
+        return "redirect:/developer/tokens";
     }
 
     @PostMapping("/vps/saveConfig")
@@ -247,7 +247,7 @@ public class SystemSettingsController  extends BaseController{
         model.addAttribute("currentUsername", UserContext.getUsername());
         model.addAttribute("activePage", "api-memPage");
 
-        return "memo";
+        return "redirect:/tools/memos";
     }
 
     //重新注册机器人
