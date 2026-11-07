@@ -267,7 +267,12 @@ public class MockDataService {
         for (String[] s : seeds) {
             Date login = new Date(t - 24L * 3600 * 1000);
             Date created = new Date(t - 30L * 24 * 3600 * 1000);
-            list.add(new UserRes(s[0], s[1], s[2], s[3], s[4], login, created, s[5]));
+            UserRes user = new UserRes(s[0], s[1], s[2], s[3], s[4], login, created, s[5]);
+            user.setActive("ACTIVE".equalsIgnoreCase(s[2]));
+            user.setCanManage(true);
+            user.setCanResetPassword(true);
+            user.setCanDelete(true);
+            list.add(user);
         }
         return list;
     }

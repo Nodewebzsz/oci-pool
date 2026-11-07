@@ -25,6 +25,14 @@ final class TenantsViewModel: ObservableObject {
     @Published var addKeyFileURL: URL?
     @Published var addParsedCount = 0
     @Published var formError: String?
+    @Published var addImportRestrictedMode = false
+    @Published var editingManagedTenant: TenantItem? = nil
+    @Published var permCatalog: [OciPermissionItem] = OciPermissionCatalogData.fallbackItems
+    @Published var selectedPermissions: [String] = OciPermissionCatalogData.defaultOpsCodes
+    @Published var managedUserName: String = "oci-pool-operator"
+    @Published var scopeAllUsers: Bool = true
+    @Published var scopeResetUsersText: String = ""
+    @Published var scopeManageGroupsText: String = ""
 
     // Generic edit
     @Published var editText = ""
@@ -510,7 +518,69 @@ final class TenantsViewModel: ObservableObject {
 
     // MARK: - Restricted API (切换为受限 API)
 
+    func loadPermissionCatalog() {
+        Task {
+            do {
+                let items = try await service.permissionCatalog()
+                permCatalog = items
+                selectedPermissions = OciPermissionCatalogData.normalize(selectedPermissions, catalog: items)
+            } catch {
+                permCatalog = OciPermissionCatalogData.fallbackItems
+            }
+        }
+    }
+
+    func togglePermission(_ code: String, checked: Bool) {
+        selectedPermissions = OciPermissionCatalogData.toggle(
+            current: selectedPermissions,
+            code: code,
+            checked: checked,
+            catalog: permCatalog
+        )
+    }
+
+    func applyPermissionPreset(_ codes: [String]) {
+        selectedPermissions = OciPermissionCatalogData.normalize(codes, catalog: permCatalog)
+    }
+
+    func buildPermissionsJSON() -> String {
+        let norm = OciPermissionCatalogData.normalize(selectedPermissions, catalog: permCatalog)
+        if let data = try? JSONSerialization.data(withJSONObject: norm),
+           let str = String(data: data, encoding: .utf8) {
+            return str
+        }
+        return "[\"BASIC_READ\"]"
+    }
+
+    func buildAccountScopeJSON() -> String {
+        let selectedSet = Set(selectedPermissions)
+        let needsReset = selectedSet.contains("USER_PASSWORD_RESET")
+        let needsManage = selectedSet.contains("DOMAIN_USER_MANAGE")
+        if !needsReset && !needsManage {
+            return "{\"allUsers\":false,\"passwordResetUserIds\":[],\"userManagementGroupIds\":[]}"
+        }
+        let splitList: (String) -> [String] = { raw in
+            raw.components(separatedBy: CharacterSet(charactersIn: ",;，；\n\r\t "))
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+        }
+        let obj: [String: Any] = [
+            "allUsers": scopeAllUsers,
+            "passwordResetUserIds": (!scopeAllUsers && needsReset) ? splitList(scopeResetUsersText) : [],
+            "userManagementGroupIds": (!scopeAllUsers && needsManage) ? splitList(scopeManageGroupsText) : []
+        ]
+        if let data = try? JSONSerialization.data(withJSONObject: obj),
+           let str = String(data: data, encoding: .utf8) {
+            return str
+        }
+        return "{\"allUsers\":true,\"passwordResetUserIds\":[],\"userManagementGroupIds\":[]}"
+    }
+
     func openRestrictedApi(_ item: TenantItem) {
+        if item.isManaged {
+            openEditManagedPermissions(item)
+            return
+        }
         restrictedPhase = .backup
         restrictedLoadingBackup = true
         restrictedBackupData = nil
@@ -524,6 +594,12 @@ final class TenantsViewModel: ObservableObject {
         restrictedTaskSummary = nil
         restrictedErrorMsg = ""
         restrictedIsExecuting = false
+        managedUserName = item.managedUserName.isEmpty ? "oci-pool-operator" : item.managedUserName
+        selectedPermissions = OciPermissionCatalogData.normalize(OciPermissionCatalogData.defaultOpsCodes, catalog: permCatalog)
+        scopeAllUsers = true
+        scopeResetUsersText = ""
+        scopeManageGroupsText = ""
+        loadPermissionCatalog()
 
         activeSheet = .restrictedApi(item)
 
@@ -598,12 +674,22 @@ final class TenantsViewModel: ObservableObject {
         restrictedSteps[0].status = .running
         restrictedSteps[0].progressText = "正在创建云端专用组..."
         restrictedErrorMsg = ""
+        let normPerms = buildPermissionsJSON()
+        let opUser = managedUserName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "oci-pool-operator"
+            : managedUserName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let scopeJson = buildAccountScopeJSON()
 
         Task {
             do {
                 try await service.streamSSE(
                     path: "/tenants/restricted-api/switch-stream",
-                    query: ["tenantId": "\(item.id)"]
+                    query: [
+                        "tenantId": "\(item.id)",
+                        "managedUserName": opUser,
+                        "permissions": normPerms,
+                        "accountScope": scopeJson
+                    ]
                 ) { [weak self] event, data in
                     Task { @MainActor [weak self] in
                         guard let self = self else { return }
@@ -724,7 +810,46 @@ final class TenantsViewModel: ObservableObject {
     // MARK: - Add tenant
 
     func openAdd() {
+        editingManagedTenant = nil
+        addImportRestrictedMode = false
+        managedUserName = "oci-pool-operator"
+        selectedPermissions = OciPermissionCatalogData.normalize(OciPermissionCatalogData.defaultOpsCodes, catalog: permCatalog)
+        scopeAllUsers = true
+        scopeResetUsersText = ""
+        scopeManageGroupsText = ""
         resetAdd()
+        loadPermissionCatalog()
+        activeSheet = .add
+    }
+
+    func openEditManagedPermissions(_ item: TenantItem) {
+        resetAdd()
+        editingManagedTenant = item
+        addImportRestrictedMode = true
+        addTenancy = item.tenancy
+        addRegion = item.region
+        addUserName = item.customAlias.isEmpty ? item.displayName : item.customAlias
+        managedUserName = item.managedUserName.isEmpty ? "oci-pool-operator" : item.managedUserName
+        if let data = item.permissionsJson.data(using: .utf8),
+           let arr = try? JSONSerialization.jsonObject(with: data) as? [String],
+           !arr.isEmpty {
+            selectedPermissions = OciPermissionCatalogData.normalize(arr, catalog: permCatalog)
+        } else {
+            selectedPermissions = OciPermissionCatalogData.normalize(OciPermissionCatalogData.defaultOpsCodes, catalog: permCatalog)
+        }
+        if let data = item.accountScopeJson.data(using: .utf8),
+           let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            scopeAllUsers = (obj["allUsers"] as? Bool) ?? true
+            let resetIds = (obj["passwordResetUserIds"] as? [String]) ?? []
+            let groupIds = (obj["userManagementGroupIds"] as? [String]) ?? []
+            scopeResetUsersText = resetIds.joined(separator: "\n")
+            scopeManageGroupsText = groupIds.joined(separator: "\n")
+        } else {
+            scopeAllUsers = true
+            scopeResetUsersText = ""
+            scopeManageGroupsText = ""
+        }
+        loadPermissionCatalog()
         activeSheet = .add
     }
 
@@ -902,21 +1027,47 @@ final class TenantsViewModel: ObservableObject {
             formError = "请选择私钥文件"
             return
         }
+        let isRestricted = addImportRestrictedMode
+        let normPerms = buildPermissionsJSON()
+        let opUser = managedUserName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "oci-pool-operator"
+            : managedUserName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let scopeJson = buildAccountScopeJSON()
         Task {
             await LoadingHUD.shared.during {
                 do {
-                    try await service.saveTenant(fields: [
-                        "userName": userName,
-                        "tenantId": tenantId,
-                        "fingerprint": fingerprint,
-                        "tenancy": tenancy,
-                        "region": region,
-                        "cloudType": "\(max(1, session.cloudProvider))",
-                        "status": "0"
-                    ], keyFileURL: keyURL)
-                    activeSheet = nil
-                    pageState.page = 0
-                    ToastCenter.shared.show("✓ 租户导入成功", style: .info)
+                    if isRestricted {
+                        let msg = try await service.saveRestrictedTenant(fields: [
+                            "userName": userName,
+                            "tenantId": tenantId,
+                            "fingerprint": fingerprint,
+                            "tenancy": tenancy,
+                            "region": region,
+                            "cloudType": "\(max(1, session.cloudProvider))",
+                            "status": "0",
+                            "managedUserName": opUser,
+                            "permissions": normPerms,
+                            "accountScope": scopeJson
+                        ], keyFileURL: keyURL)
+                        activeSheet = nil
+                        editingManagedTenant = nil
+                        pageState.page = 0
+                        ToastCenter.shared.show("✓ \(msg)", style: .info)
+                    } else {
+                        try await service.saveTenant(fields: [
+                            "userName": userName,
+                            "tenantId": tenantId,
+                            "fingerprint": fingerprint,
+                            "tenancy": tenancy,
+                            "region": region,
+                            "cloudType": "\(max(1, session.cloudProvider))",
+                            "status": "0"
+                        ], keyFileURL: keyURL)
+                        activeSheet = nil
+                        editingManagedTenant = nil
+                        pageState.page = 0
+                        ToastCenter.shared.show("✓ 租户导入成功", style: .info)
+                    }
                     await reload()
                 } catch {
                     formError = error.localizedDescription
@@ -1033,6 +1184,23 @@ final class TenantsViewModel: ObservableObject {
                 do {
                     try await service.deleteUser(tenantId: item.id, userId: user.id)
                     users = try await service.listUsers(tenantId: item.id)
+                } catch {
+                    ToastCenter.shared.error(error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    func toggleUserState(for item: TenantItem, user: TenantOracleUser) {
+        let targetActive = !user.isDomainActive
+        let actionText = targetActive ? "激活" : "冻结"
+        guard AppAlert.confirm(title: "\(actionText)用户", message: "确定\(actionText)用户 \(user.username)？") else { return }
+        Task {
+            await LoadingHUD.shared.during {
+                do {
+                    try await service.updateUserState(tenantId: item.id, userId: user.id, active: targetActive)
+                    users = try await service.listUsers(tenantId: item.id)
+                    ToastCenter.shared.success("已\(actionText)用户 \(user.username)")
                 } catch {
                     ToastCenter.shared.error(error.localizedDescription)
                 }

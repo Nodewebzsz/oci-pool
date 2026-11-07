@@ -283,7 +283,11 @@ function TenantsPage({ density }) {
         return;
       case 'region-subscribe': return regionSubscribe(tenant);
       case 'user-manage':      return userManage(tenant);
-      case 'switch-restricted-api': return switchRestrictedApi(tenant, loadTenants);
+      case 'switch-restricted-api':
+        if (tenant?._ui?.isManaged || tenant?.permissionMode) {
+          return apiImport(tenant);
+        }
+        return switchRestrictedApi(tenant, loadTenants);
       case 'traffic-alert':    return trafficAlert(tenant);
       case 'traffic-query':
         // 跳转到独立的实例流量监控大盘页面（对齐客户端整页模式）
@@ -355,22 +359,46 @@ function TenantsPage({ density }) {
         ><Icon name="shield" size={15} /></button>
       );
     } },
-    { key: 'name', label: tr('tenants.col.name'), width: 110,
+    { key: 'name', label: tr('tenants.col.name'), width: 155,
       tooltip: r => r._ui.name || '',
       render: r => (
-        <span
-          title={r._ui.name || ''}
-          className="mono"
-          style={{
-            padding: '2px 6px', background: 'var(--bg-3)', borderRadius: 4,
-            fontSize: 11, color: 'var(--fg-1)', fontWeight: 500,
-            display: 'inline-block', maxWidth: 96,
-            overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'middle',
-            cursor: 'pointer',
-          }}
-        >
-          {masked ? window.maskName(r._ui.name) : r._ui.name}
-        </span>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, maxWidth: '100%' }}>
+          <span
+            title={r._ui.name || ''}
+            className="mono"
+            style={{
+              padding: '2px 6px', background: 'var(--bg-3)', borderRadius: 4,
+              fontSize: 11, color: 'var(--fg-1)', fontWeight: 500,
+              display: 'inline-block', maxWidth: (r._ui?.isManaged || r.permissionMode) ? 84 : 110,
+              overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'middle',
+              cursor: 'pointer',
+            }}
+          >
+            {masked ? window.maskName(r._ui.name) : r._ui.name}
+          </span>
+          {(r._ui?.isManaged || r.permissionMode) && (
+            <button
+              type="button"
+              title={`受限 API (${r._ui?.managedUserName || r.managedUserName || 'managed-v1'}) · 点击调整权限`}
+              onClick={e => { e.stopPropagation(); apiImport(r); }}
+              style={{
+                padding: '1px 5px',
+                borderRadius: 4,
+                fontSize: 10,
+                fontWeight: 600,
+                background: 'var(--accent-soft)',
+                color: 'var(--accent)',
+                border: '1px solid var(--accent)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                lineHeight: '15px',
+              }}
+            >
+              受限
+            </button>
+          )}
+        </div>
       ),
     },
     { key: 'custom', label: tr('tenants.col.custom'),
@@ -649,11 +677,12 @@ function TenantsPage({ density }) {
 // The 14-item action grid — same look as before, now dispatches real actions.
 // 租户 14 项操作菜单 · 使用统一的 <RowActionMenu>(见 shell.jsx)
 function TenantActionMenu({ tenant, anchorEl, onClose, onAction }) {
+  const isManaged = Boolean(tenant?._ui?.isManaged || tenant?.permissionMode);
   const items = [
     { id: 'add-boot',         label: tr('tenants.menu.addBoot'), icon: 'plus'        },
     { id: 'tenant-detail',    label: tr('tenants.menu.detail'), icon: 'info'        },
     { id: 'user-manage',      label: tr('tenants.menu.userManage'), icon: 'users'       },
-    { id: 'switch-restricted-api', label: tr('tenants.menu.switchRestrictedApi') || '切换为受限 API', icon: 'shield-check', color: 'var(--accent)' },
+    { id: 'switch-restricted-api', label: isManaged ? '自定义受限权限' : (tr('tenants.menu.switchRestrictedApi') || '切换为受限 API'), icon: 'shield-check', color: 'var(--accent)' },
     { id: 'traffic-query',    label: tr('tenants.menu.trafficQuery'), icon: 'bar-chart-3' },
     { id: 'cost',             label: tr('tenants.menu.cost'), icon: 'info'        },
     { id: 'mail',             label: tr('tenants.menu.mail'), icon: 'mail'        },

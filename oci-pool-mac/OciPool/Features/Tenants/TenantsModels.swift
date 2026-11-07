@@ -69,6 +69,10 @@ struct TenantItem: Decodable, Identifiable, Equatable {
     var apiSynced: Bool = false
     var supportAI: Int = 0
     var createdAt: String = ""
+    var permissionMode: String = ""
+    var permissionsJson: String = ""
+    var managedUserName: String = ""
+    var accountScopeJson: String = ""
     var children: [TenantItem] = []
     var registerDetail: TenantRegisterDetail?
 
@@ -82,6 +86,7 @@ struct TenantItem: Decodable, Identifiable, Equatable {
         case hasChildren, openBootFlag, proxyBound, proxyForce
         case isActive, active, apiSynced
         case supportAI, createdAt, createdAtStr
+        case permissionMode, permissionsJson, managedUserName, accountScopeJson
         case children, registerDetail
     }
 
@@ -118,6 +123,10 @@ struct TenantItem: Decodable, Identifiable, Equatable {
         supportAI = Self.int(c, .supportAI) ?? 0
         createdAt = Self.str(c, .createdAtStr)
         if createdAt.isEmpty { createdAt = Self.time(c, .createdAt) ?? "" }
+        permissionMode = Self.str(c, .permissionMode)
+        permissionsJson = Self.str(c, .permissionsJson)
+        managedUserName = Self.str(c, .managedUserName)
+        accountScopeJson = Self.str(c, .accountScopeJson)
         children = (try? c.decode([TenantItem].self, forKey: .children)) ?? []
         registerDetail = try? c.decode(TenantRegisterDetail.self, forKey: .registerDetail)
     }
@@ -142,6 +151,9 @@ struct TenantItem: Decodable, Identifiable, Equatable {
     }
 
     var isTransferred: Bool { transferStatus == 1 }
+    var isManaged: Bool {
+        !permissionMode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     /// 区域中文名：code → RegionCnName；未知则返回原始 code（对齐 Web REGION_MAP 回落）
     var regionNameText: String {
@@ -273,10 +285,15 @@ struct TenantOracleUser: Decodable, Identifiable, Equatable {
     var domain: String = ""
     var lastSuccessfulLoginTime: String = ""
     var timeCreated: String = ""
+    var active: Bool? = nil
+    var canManage: Bool = false
+    var canResetPassword: Bool = true
+    var canDelete: Bool = true
 
     enum CodingKeys: String, CodingKey {
         case id, username, lifecycleState, userId, email, domain
         case lastSuccessfulLoginTime, timeCreated
+        case active, canManage, canResetPassword, canDelete
     }
 
     init(from decoder: Decoder) throws {
@@ -289,6 +306,15 @@ struct TenantOracleUser: Decodable, Identifiable, Equatable {
         domain = (try? c.decode(String.self, forKey: .domain)) ?? ""
         lastSuccessfulLoginTime = Self.anyTime(c, .lastSuccessfulLoginTime)
         timeCreated = Self.anyTime(c, .timeCreated)
+        active = try? c.decode(Bool.self, forKey: .active)
+        canManage = (try? c.decode(Bool.self, forKey: .canManage)) ?? false
+        canResetPassword = (try? c.decode(Bool.self, forKey: .canResetPassword)) ?? true
+        canDelete = (try? c.decode(Bool.self, forKey: .canDelete)) ?? true
+    }
+
+    var isDomainActive: Bool {
+        if let a = active { return a }
+        return lifecycleState.uppercased() == "ACTIVE" || lifecycleState == "有效"
     }
 
     private static func anyTime(_ c: KeyedDecodingContainer<CodingKeys>, _ k: CodingKeys) -> String {
@@ -1385,5 +1411,136 @@ enum TenantKnownRegions {
         let cn = RegionCnName.table[code] ?? code
         let title = "\(flag) \(cn) (\(code))"
         return SelectOption(id: code, title: title)
+    }
+}
+
+// MARK: - OCI Custom Permission Catalog
+
+struct OciPermissionItem: Codable, Identifiable, Equatable {
+    var code: String
+    var label: String
+    var group: String
+    var defaultEnabled: Bool = false
+    var required: Bool = false
+    var supported: Bool = true
+    var reason: String = ""
+    var dependencies: [String] = []
+
+    var id: String { code }
+
+    enum CodingKeys: String, CodingKey {
+        case code, label, group, defaultEnabled, required, supported, reason, dependencies
+    }
+
+    init(
+        code: String,
+        label: String,
+        group: String,
+        defaultEnabled: Bool = false,
+        required: Bool = false,
+        supported: Bool = true,
+        reason: String = "",
+        dependencies: [String] = []
+    ) {
+        self.code = code
+        self.label = label
+        self.group = group
+        self.defaultEnabled = defaultEnabled
+        self.required = required
+        self.supported = supported
+        self.reason = reason
+        self.dependencies = dependencies
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        code = (try? c.decode(String.self, forKey: .code)) ?? ""
+        label = (try? c.decode(String.self, forKey: .label)) ?? code
+        group = (try? c.decode(String.self, forKey: .group)) ?? "basic"
+        defaultEnabled = (try? c.decode(Bool.self, forKey: .defaultEnabled)) ?? false
+        required = (try? c.decode(Bool.self, forKey: .required)) ?? false
+        supported = (try? c.decode(Bool.self, forKey: .supported)) ?? true
+        reason = (try? c.decode(String.self, forKey: .reason)) ?? ""
+        dependencies = (try? c.decode([String].self, forKey: .dependencies)) ?? []
+    }
+}
+
+struct OciPermissionGroup: Identifiable, Equatable {
+    let key: String
+    let title: String
+    var id: String { key }
+}
+
+enum OciPermissionCatalogData {
+    static let groups: [OciPermissionGroup] = [
+        OciPermissionGroup(key: "basic", title: "基础权限"),
+        OciPermissionGroup(key: "compute", title: "实例管理"),
+        OciPermissionGroup(key: "storage", title: "存储卷管理"),
+        OciPermissionGroup(key: "network", title: "网络与区域"),
+        OciPermissionGroup(key: "observability", title: "账单、流量与审计"),
+        OciPermissionGroup(key: "database", title: "数据库管理"),
+        OciPermissionGroup(key: "account", title: "账号、用户组与身份域")
+    ]
+
+    static let fallbackItems: [OciPermissionItem] = [
+        OciPermissionItem(code: "BASIC_READ", label: "基础资源查询", group: "basic", defaultEnabled: true, required: true, reason: "查询区域、区间、实例、镜像、网络及存储卷；不包含账号列表。"),
+        OciPermissionItem(code: "INSTANCE_POWER", label: "实例开机、关机与重启", group: "compute", defaultEnabled: true, reason: "", dependencies: ["BASIC_READ"]),
+        OciPermissionItem(code: "INSTANCE_CREATE", label: "创建实例与抢机", group: "compute", defaultEnabled: true, reason: "使用已有子网创建实例。自动新建网络、修改路由和安全规则需另选网络管理。", dependencies: ["BASIC_READ"]),
+        OciPermissionItem(code: "INSTANCE_DELETE", label: "删除实例", group: "compute", reason: "允许终止实例。OCI 终止接口也可连带删除该实例的启动卷。", dependencies: ["BASIC_READ"]),
+        OciPermissionItem(code: "INSTANCE_UPDATE", label: "修改实例配置", group: "compute", reason: "允许修改规格、名称和实例元数据。", dependencies: ["BASIC_READ"]),
+        OciPermissionItem(code: "INSTANCE_REINSTALL", label: "重装与控制台连接", group: "compute", reason: "允许建立实例控制台连接；需同时授权实例开关机。", dependencies: ["BASIC_READ", "INSTANCE_POWER"]),
+        OciPermissionItem(code: "BOOT_VOLUME_DELETE", label: "独立删除启动卷", group: "storage", reason: "控制 DeleteBootVolume；不限制终止实例接口连带删除启动卷的行为。", dependencies: ["BASIC_READ"]),
+        OciPermissionItem(code: "BLOCK_VOLUME_DELETE", label: "删除块存储卷", group: "storage", reason: "", dependencies: ["BASIC_READ"]),
+        OciPermissionItem(code: "VOLUME_MANAGE", label: "创建、调整、挂载及备份存储卷", group: "storage", reason: "包含创建卷备份；不包含删除启动卷、块存储卷或卷备份。", dependencies: ["BASIC_READ"]),
+        OciPermissionItem(code: "NETWORK_MANAGE", label: "网络与安全规则管理", group: "network", reason: "允许网络初始化、网卡及公网 IP 管理、安全规则和路由修改。", dependencies: ["BASIC_READ"]),
+        OciPermissionItem(code: "REGION_SUBSCRIBE", label: "订阅区域", group: "network", reason: "", dependencies: ["BASIC_READ"]),
+        OciPermissionItem(code: "COST_READ", label: "账单与费用查询", group: "observability", defaultEnabled: true, reason: "", dependencies: ["BASIC_READ"]),
+        OciPermissionItem(code: "TRAFFIC_READ", label: "流量与监控查询", group: "observability", defaultEnabled: true, reason: "", dependencies: ["BASIC_READ"]),
+        OciPermissionItem(code: "AUDIT_READ", label: "审计日志查询", group: "observability", reason: "", dependencies: ["BASIC_READ"]),
+        OciPermissionItem(code: "MYSQL_READ", label: "MySQL 查询", group: "database", reason: "", dependencies: ["BASIC_READ"]),
+        OciPermissionItem(code: "MYSQL_MANAGE", label: "MySQL 创建、修改及删除", group: "database", reason: "新建网络和公网负载均衡还需单独授权网络管理。", dependencies: ["BASIC_READ", "MYSQL_READ"]),
+        OciPermissionItem(code: "USER_READ", label: "查询账号与用户组", group: "account", reason: "", dependencies: ["BASIC_READ"]),
+        OciPermissionItem(code: "USER_CREATE", label: "创建普通用户", group: "account", reason: "仅创建用户，不设置控制台密码、不加入用户组。", dependencies: ["BASIC_READ", "USER_READ"]),
+        OciPermissionItem(code: "USER_DELETE", label: "删除用户", group: "account", reason: "允许删除租户用户，请谨慎授权。", dependencies: ["BASIC_READ", "USER_READ"]),
+        OciPermissionItem(code: "USER_PASSWORD_RESET", label: "重置指定用户密码", group: "account", reason: "为指定的用户或全部用户授权密码重置。", dependencies: ["BASIC_READ", "USER_READ"]),
+        OciPermissionItem(code: "DOMAIN_USER_MANAGE", label: "指定用户组内的账号管理", group: "account", reason: "授予身份域 User Manager 角色：启用、禁用、编辑、删除用户及重置密码。", dependencies: ["BASIC_READ", "USER_READ"]),
+        OciPermissionItem(code: "DOMAIN_SECURITY_MANAGE", label: "身份域安全设置与应用管理", group: "account", reason: "授予 Security Administrator 角色，含通知邮箱、MFA、社交登录、密码策略管理。", dependencies: ["BASIC_READ", "USER_READ"])
+    ]
+
+    static let recommendedCodes: [String] = ["BASIC_READ", "INSTANCE_POWER", "INSTANCE_CREATE", "COST_READ", "TRAFFIC_READ"]
+    static let defaultOpsCodes: [String] = ["BASIC_READ", "INSTANCE_POWER", "INSTANCE_CREATE", "INSTANCE_DELETE", "INSTANCE_UPDATE", "INSTANCE_REINSTALL", "VOLUME_MANAGE", "NETWORK_MANAGE", "COST_READ", "TRAFFIC_READ", "USER_READ"]
+    static let readOnlyCodes: [String] = ["BASIC_READ"]
+
+    static func normalize(_ codes: [String], catalog: [OciPermissionItem] = fallbackItems) -> [String] {
+        let byCode = Dictionary(uniqueKeysWithValues: catalog.map { ($0.code, $0) })
+        var set = Set<String>(["BASIC_READ"])
+        func addWithDeps(_ code: String) {
+            guard let item = byCode[code], item.supported else { return }
+            if set.contains(code) { return }
+            set.insert(code)
+            for dep in item.dependencies {
+                addWithDeps(dep)
+            }
+        }
+        for code in codes { addWithDeps(code) }
+        return catalog.map(\.code).filter { set.contains($0) }
+    }
+
+    static func toggle(current: [String], code: String, checked: Bool, catalog: [OciPermissionItem] = fallbackItems) -> [String] {
+        if code == "BASIC_READ" { return normalize(current, catalog: catalog) }
+        var set = Set(current)
+        if checked {
+            set.insert(code)
+            return normalize(Array(set), catalog: catalog)
+        } else {
+            func removeCascade(_ target: String) {
+                set.remove(target)
+                for item in catalog where item.dependencies.contains(target) && set.contains(item.code) {
+                    removeCascade(item.code)
+                }
+            }
+            removeCascade(code)
+            return normalize(Array(set), catalog: catalog)
+        }
     }
 }

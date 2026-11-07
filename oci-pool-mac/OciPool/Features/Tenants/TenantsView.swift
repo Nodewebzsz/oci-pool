@@ -425,18 +425,39 @@ struct TenantsView: View {
 
     private func nameCell(_ item: TenantItem, width: CGFloat) -> some View {
         let shown = !model.namesHidden
-        return Button(action: { model.namesHidden.toggle() }) {
-            Text(shown ? item.displayName : item.maskedName)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
-                // 始终单行；展开时靠加宽名称列完整显示，禁止换行
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(width: width, alignment: .center)
-                .frame(height: 28, alignment: .center)
+        return HStack(spacing: 4) {
+            Button(action: { model.namesHidden.toggle() }) {
+                Text(shown ? item.displayName : item.maskedName)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .help(item.displayName)
+
+            if item.isManaged {
+                Button(action: { model.openEditManagedPermissions(item) }) {
+                    Text("受限")
+                        .font(.system(size: 9.5, weight: .bold))
+                        .foregroundColor(Color(hex: "10b981"))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color(hex: "10b981").opacity(0.14))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(Color(hex: "10b981").opacity(0.38), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(PlainButtonStyle())
+                .help("已开启自定义受限 API（点击修改权限）")
+            }
         }
-        .buttonStyle(PlainButtonStyle())
-        .help(item.displayName)
+        .frame(width: width, alignment: .center)
+        .frame(height: 28, alignment: .center)
     }
 
     private func defNameCell(_ item: TenantItem, width: CGFloat) -> some View {
@@ -615,7 +636,8 @@ private struct TenantColWidths {
 // MARK: - AppKit ellipsis + 窗内浮层（绝不使用 NSPopover，保证在应用窗口内）
 
 private enum TenantActionMenuLayout {
-    static let width: CGFloat = 280
+    static let width: CGFloat = 304
+    static let shadowBleed: CGFloat = 24
     static let vPad: CGFloat = 8
     static let titleH: CGFloat = 20
     static let gridGap: CGFloat = 1
@@ -631,15 +653,20 @@ private enum TenantActionMenuLayout {
         return 24 + 18 + 8 + CGFloat(rows) * 30 + CGFloat(max(0, rows - 1)) * 6
     }
 
-    /// 在屏幕坐标系内计算面板 frame，严格夹紧不越界。
+    /// 在屏幕坐标系内计算面板 frame（已外扩 shadowBleed 透明出血区，消除圆角外阴影截断尖角）。
     static func screenFrame(button: NSView, actionCount: Int, fittingHeight: CGFloat? = nil) -> NSRect {
         guard let window = button.window else { return .zero }
-        let ideal = fittingHeight ?? idealHeight(actionCount: actionCount)
+        let cardIdeal: CGFloat
+        if let fh = fittingHeight {
+            cardIdeal = max(minHeight, fh - shadowBleed * 2)
+        } else {
+            cardIdeal = idealHeight(actionCount: actionCount)
+        }
         let btnWin = button.convert(button.bounds, to: nil)
         let btnScreen = window.convertToScreen(btnWin)
         let screen = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
 
-        let h = min(ideal, screen.height - margin * 2)
+        let h = min(cardIdeal, screen.height - margin * 2)
 
         // 对齐实例/Web：菜单右缘对齐按钮右缘；下方 6px 缝隙；下方放不下翻到上方。
         var x = btnScreen.maxX - width
@@ -659,7 +686,12 @@ private enum TenantActionMenuLayout {
         y = max(screen.minY + margin, y)
         if y + h > screen.maxY - margin { y = screen.maxY - margin - h }
 
-        return NSRect(x: x, y: y, width: width, height: h)
+        return NSRect(
+            x: x - shadowBleed,
+            y: y - shadowBleed,
+            width: width + shadowBleed * 2,
+            height: h + shadowBleed * 2
+        )
     }
 }
 
@@ -786,22 +818,13 @@ final class TenantActionMenuPresenter {
 
         let host = NSHostingView(rootView: root)
         host.wantsLayer = true
-        if let layer = host.layer {
-            layer.cornerRadius = 12
-            layer.masksToBounds = false
-            layer.borderWidth = 1
-            layer.borderColor = (dark
-                ? NSColor(calibratedWhite: 1, alpha: 0.12)
-                : NSColor(calibratedWhite: 0, alpha: 0.10)).cgColor
-            layer.shadowColor = NSColor.black.cgColor
-            layer.shadowOpacity = Float(dark ? 0.45 : 0.18)
-            layer.shadowRadius = 14
-            layer.shadowOffset = CGSize(width: 0, height: -3)
-        }
+        host.layer?.backgroundColor = NSColor.clear.cgColor
 
         // 使用视图的真实自适应高度计算精确屏幕 Frame
         let fittingH = host.fittingSize.height
-        let exactHeight = fittingH > 30 ? fittingH : TenantActionMenuLayout.idealHeight(actionCount: actions.count)
+        let exactHeight = fittingH > (30 + TenantActionMenuLayout.shadowBleed * 2)
+            ? fittingH
+            : (TenantActionMenuLayout.idealHeight(actionCount: actions.count) + TenantActionMenuLayout.shadowBleed * 2)
         let screenFrame = TenantActionMenuLayout.screenFrame(
             button: button,
             actionCount: actions.count,
@@ -810,7 +833,7 @@ final class TenantActionMenuPresenter {
 
         let panel = NSPanel(
             contentRect: screenFrame,
-            styleMask: [.nonactivatingPanel, .fullSizeContentView],
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
@@ -842,7 +865,11 @@ final class TenantActionMenuPresenter {
                 let btnScreenRect = btnWin.convertToScreen(btnWinFrame)
                 if btnScreenRect.contains(mouseLoc) { return event }
             }
-            if !panel.frame.contains(mouseLoc) {
+            let cardRect = panel.frame.insetBy(
+                dx: TenantActionMenuLayout.shadowBleed,
+                dy: TenantActionMenuLayout.shadowBleed
+            )
+            if !cardRect.contains(mouseLoc) {
                 DispatchQueue.main.async { self.dismiss() }
             }
             return event
@@ -975,7 +1002,7 @@ enum TenantActionPanel {
                 TenantActionItem(id: "region", title: "租户详情", systemImage: "info.circle", isDanger: false) { model.openRegionList(item) },
                 TenantActionItem(id: "sub", title: "区域订阅", systemImage: "globe", isDanger: false) { model.openRegionSub(item) },
                 TenantActionItem(id: "users", title: "用户管理", systemImage: "person.2", isDanger: false) { model.openUsers(item) },
-                TenantActionItem(id: "restricted", title: "切换为受限 API", systemImage: "shield.checkerboard", isDanger: false, tone: .accent) { model.openRestrictedApi(item) },
+                TenantActionItem(id: "restricted", title: item.isManaged ? "自定义受限权限" : "切换为受限 API", systemImage: "shield.checkerboard", isDanger: false, tone: .accent) { model.openRestrictedApi(item) },
                 TenantActionItem(id: "traffic", title: "流量预警", systemImage: "bell", isDanger: false) { model.openTraffic(item) },
                 TenantActionItem(id: "tsearch", title: "流量查询", systemImage: "chart.bar", isDanger: false) { model.openTrafficPage(item) },
                 TenantActionItem(id: "audit", title: "审计日志", systemImage: "doc.text", isDanger: false) { model.openAudit(item) },
@@ -1089,8 +1116,17 @@ struct TenantActionMenuContent: View {
         }
         .padding(12)
         .frame(width: TenantActionMenuLayout.width, alignment: .topLeading)
-        .background(AppTheme.pageBg(dark))
-        .cornerRadius(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(AppTheme.pageBg(dark))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(dark ? Color.white.opacity(0.12) : Color.black.opacity(0.10), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(dark ? 0.45 : 0.14), radius: 12, x: 0, y: 4)
+        .padding(TenantActionMenuLayout.shadowBleed)
     }
 
     private var actionGrid: some View {

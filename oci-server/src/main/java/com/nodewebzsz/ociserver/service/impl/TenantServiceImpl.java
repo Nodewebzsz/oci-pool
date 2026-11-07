@@ -40,6 +40,14 @@ import com.nodewebzsz.ociserver.pojo.enums.MessageEnum;
 import com.nodewebzsz.ociserver.pojo.request.AuditLogRequest;
 import com.nodewebzsz.ociserver.pojo.request.DeleteOciUserRequest;
 import com.nodewebzsz.ociserver.pojo.request.ResetOciPassRequest;
+import com.nodewebzsz.ociserver.pojo.request.UpdateOciUserStateRequest;
+import com.nodewebzsz.ociserver.service.permissions.AccountPermissionScope;
+import com.nodewebzsz.ociserver.service.permissions.ManagedAccountAccessService;
+import com.nodewebzsz.ociserver.service.permissions.ManagedDomainRoleService;
+import com.nodewebzsz.ociserver.service.permissions.ManagedTenantImportService;
+import com.nodewebzsz.ociserver.service.permissions.OciPermissionCatalog;
+import com.nodewebzsz.ociserver.service.permissions.OciPermissionDeniedException;
+import com.nodewebzsz.ociserver.service.permissions.OciPermissions;
 import com.nodewebzsz.ociserver.pojo.response.PasswordPolicyDetail;
 import com.nodewebzsz.ociserver.pojo.response.ResetOciPassResponse;
 import com.nodewebzsz.ociserver.service.DbConfigService;
@@ -146,7 +154,9 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -180,6 +190,12 @@ public class TenantServiceImpl implements TenantService {
 
     @Resource
     private TenantRepository tenantRepository;
+
+    @Resource
+    private ManagedTenantImportService managedTenantImportService;
+
+    @Resource
+    private ManagedDomainRoleService managedDomainRoleService;
 
     @Resource
     private com.nodewebzsz.ociserver.mock.MockDataService mockDataService;
@@ -288,7 +304,7 @@ public class TenantServiceImpl implements TenantService {
                 parent.setIdStr(parent.getId().toString());
                 String regionName = RegionEnum.getNameByCode(parent.getRegion());
                 parent.setRegion(regionName);
-                Optional<RegisterDetail> byTenantId = registerDetailRepository.findByTenantId(parent.getTenantId());
+                Optional<RegisterDetail> byTenantId = registerDetailRepository.findForTenant(parent.getId(), parent.getTenantId());
                 if (byTenantId.isPresent()){
                     RegisterDetail registerDetail = byTenantId.get();
                     parent.setRegisterDetail(registerDetail);
@@ -473,7 +489,7 @@ public class TenantServiceImpl implements TenantService {
         parent.setIdStr(parent.getId().toString());
         String regionName = RegionEnum.getNameByCode(parent.getRegion());
         parent.setRegion(regionName);
-        Optional<RegisterDetail> byTenantId = registerDetailRepository.findByTenantId(parent.getTenantId());
+        Optional<RegisterDetail> byTenantId = registerDetailRepository.findForTenant(parent.getId(), parent.getTenantId());
         if (byTenantId.isPresent()){
             RegisterDetail registerDetail = byTenantId.get();
             parent.setRegisterDetail(registerDetail);
@@ -530,6 +546,23 @@ public class TenantServiceImpl implements TenantService {
     @Override
     public void saveTenant(Tenant tenant, MultipartFile keyFile) throws IOException {
         int cloudType = tenant.getCloudType();
+        if (CloudTypeEnum.ORACLE_CLOUD.getType() == cloudType) {
+            if (tenantRepository.findByTenantId(tenant.getTenantId()).stream()
+                    .anyMatch(OciPermissions::isManaged)) {
+                throw new IllegalArgumentException("该用户已作为受限 API 导入，请通过租户列表更新其授权");
+            }
+            // Direct import retains the supplied identity; it never provisions or changes OCI users.
+            // Do not accept client-supplied managed metadata through this legacy model-binding endpoint.
+            tenant.setPermissionMode(null);
+            tenant.setPermissionsJson(null);
+            tenant.setManagedUserName(null);
+            tenant.setManagedGroupId(null);
+            tenant.setManagedPolicyId(null);
+            tenant.setAccountScopeJson(null);
+            tenant.setManagedDomainId(null);
+            tenant.setManagedDomainUrl(null);
+            tenant.setManagedDomainGrantsJson(null);
+        }
         if (keyFile != null && !keyFile.isEmpty()) {
             String fileName = LocalDateTime.now() + "_" + keyFile.getOriginalFilename();
             FileUtils.checkFile(baseFile);
@@ -797,6 +830,9 @@ public class TenantServiceImpl implements TenantService {
         List<Tenant> tenants = new ArrayList<>();
         Tenant tenant = getById(Long.valueOf(tenantId));
         if (tenant != null){
+            if (OciPermissions.isManaged(tenant)) {
+                return managedTenantImportService.refreshRegions(tenant);
+            }
             try {
                 // 关键保护：删除前暂存该租户已有的真实租户名与自定义名称，防止重新入库时被抹除为 OCID
                 String oldTenancyName = tenant.getTenancyName();
@@ -960,33 +996,79 @@ public class TenantServiceImpl implements TenantService {
     @Override
     public ApiResponse resetPassword(ResetOciPassRequest request) {
         String userId = request.getUserId();
+        Tenant tenant = tenantRepository.findById(Long.valueOf(request.getTenantId()))
+                .orElseThrow(() -> new IllegalArgumentException("租户不存在"));
+        ManagedAccountAccessService.requireUserAction(tenant, "USER_PASSWORD_RESET", userId);
         try {
-            Tenant tenant = tenantRepository.findById(Long.valueOf(request.getTenantId())).get();
-            ResetOciPassResponse resetOciPassResponse = SignOnPolicyUtils.resetPass(tenant,userId);
+            ResetOciPassResponse resetOciPassResponse;
+            if (ManagedAccountAccessService.useDomainUserManager(tenant, "USER_PASSWORD_RESET", userId)) {
+                try (com.oracle.bmc.identitydomains.IdentityDomainsClient domains =
+                             ManagedAccountAccessService.openDomainClient(tenant)) {
+                    com.oracle.bmc.identitydomains.model.User user =
+                            ManagedAccountAccessService.resolveDomainUser(domains, tenant, userId);
+                    domains.putUserPasswordResetter(
+                            com.oracle.bmc.identitydomains.requests.PutUserPasswordResetterRequest.builder()
+                                    .userPasswordResetterId(user.getId())
+                                    .userPasswordResetter(com.oracle.bmc.identitydomains.model.UserPasswordResetter.builder()
+                                            .schemas(Collections.singletonList("urn:ietf:params:scim:schemas:oracle:idcs:UserPasswordResetter"))
+                                            .bypassNotification(false).build()).build());
+                    resetOciPassResponse = new ResetOciPassResponse();
+                    resetOciPassResponse.setSuccess(true);
+                    resetOciPassResponse.setEmailSent(true);
+                    resetOciPassResponse.setResetTime(com.nodewebzsz.ocicommon.utils.DateTimeUtils.formatDate(new Date()));
+                    resetOciPassResponse.setMessage("密码重置请求已完成，请用户查收身份域发送的重置邮件");
+                }
+            } else {
+                resetOciPassResponse = SignOnPolicyUtils.resetPass(tenant, userId);
+            }
             resetOciPassResponse.setLoginUser(request.getUserName());
             if (StringUtils.isNotBlank(resetOciPassResponse.getTemporaryPassword())) {
                 // 重置成功，发送通知
-                messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplate(String.
-                        format(MESSAGE_CONSOLE_PASSWORD_RESET_WITH_PASSWORD_TEMPLATE,
-                                tenant.getUserName(),
-                                request.getUserName(),
-                                resetOciPassResponse.getTemporaryPassword(),
-                                resetOciPassResponse.getResetTime()
-                        ));
-                return ApiResponse.success(resetOciPassResponse);
-
-            } else if ("IDENTITY_DOMAIN_USER".equals(resetOciPassResponse.getResetTime())) {
-                return ApiResponse.error("该用户属于身份域，请在OCI控制台的身份域中手动重置密码");
-
-            } else if ("PERMISSION_DENIED".equals(resetOciPassResponse.getResetTime())) {
-                return ApiResponse.error("权限不足，无法重置该用户的密码");
-
-            } else {
-                return ApiResponse.error("密码重置失败，请检查用户状态");
+                try {
+                    messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplate(
+                            "控制台密码重置成功，用户：" + request.getUserName()
+                                    + "。请在本次操作结果中查看临时密码。");
+                } catch (Exception notificationError) {
+                    log.warn("密码重置已完成，但发送结果通知失败");
+                }
             }
+            return ApiResponse.success(resetOciPassResponse);
+        } catch (OciPermissionDeniedException e) {
+            throw e;
+        } catch (com.oracle.bmc.model.BmcException e) {
+            log.warn("OCI 密码重置失败，HTTP状态：{}", e.getStatusCode());
+            return ApiResponse.error("密码重置未完成：OCI 拒绝请求或目标用户不可用（HTTP " + e.getStatusCode() + "）");
         } catch (Exception e) {
-            log.error("重置密码失败: {}", e.getMessage(), e);
-            return ApiResponse.error("密码重置失败：" + e.getMessage());
+            log.warn("密码重置未完成");
+            return ApiResponse.error("密码重置未完成，请检查用户状态及身份域配置");
+        }
+    }
+
+    @Override
+    public ApiResponse updateUserState(UpdateOciUserStateRequest request) {
+        if (request.getActive() == null) throw new IllegalArgumentException("必须明确指定启用或禁用");
+        Tenant tenant = tenantRepository.findById(Long.valueOf(request.getTenantId()))
+                .orElseThrow(() -> new IllegalArgumentException("租户不存在"));
+        ManagedAccountAccessService.requireUserAction(tenant, "DOMAIN_USER_MANAGE", request.getUserId());
+        try (com.oracle.bmc.identitydomains.IdentityDomainsClient domains =
+                     ManagedAccountAccessService.openDomainClient(tenant)) {
+            com.oracle.bmc.identitydomains.model.User user =
+                    ManagedAccountAccessService.resolveDomainUser(domains, tenant, request.getUserId());
+            domains.putUserStatusChanger(com.oracle.bmc.identitydomains.requests.PutUserStatusChangerRequest.builder()
+                    .userStatusChangerId(user.getId())
+                    .userStatusChanger(com.oracle.bmc.identitydomains.model.UserStatusChanger.builder()
+                            .schemas(Collections.singletonList("urn:ietf:params:scim:schemas:oracle:idcs:UserStatusChanger"))
+                            .active(request.getActive()).build()).build());
+            Map<String, Object> result = new HashMap<>();
+            result.put("userId", request.getUserId());
+            result.put("active", request.getActive());
+            result.put("message", request.getActive() ? "用户已启用" : "用户已禁用");
+            return ApiResponse.success(result);
+        } catch (OciPermissionDeniedException e) {
+            throw e;
+        } catch (com.oracle.bmc.model.BmcException e) {
+            log.warn("OCI 用户状态修改失败，HTTP状态：{}", e.getStatusCode());
+            return ApiResponse.error("用户状态未修改：OCI 拒绝请求或目标用户不可用（HTTP " + e.getStatusCode() + "）");
         }
     }
 
@@ -1070,13 +1152,33 @@ public class TenantServiceImpl implements TenantService {
     @Override
     public ApiResponse deleteUser(DeleteOciUserRequest request) {
         String userId = request.getUserId();
+        Tenant tenant = tenantRepository.findById(Long.valueOf(request.getTenantId()))
+                .orElseThrow(() -> new IllegalArgumentException("租户不存在"));
+        ManagedAccountAccessService.requireUserAction(tenant, "USER_DELETE", userId);
         try {
-            Tenant tenant = tenantRepository.findById(Long.valueOf(request.getTenantId())).get();
+            if (ManagedAccountAccessService.useDomainUserManager(tenant, "USER_DELETE", userId)) {
+                try (com.oracle.bmc.identitydomains.IdentityDomainsClient domains =
+                             ManagedAccountAccessService.openDomainClient(tenant)) {
+                    com.oracle.bmc.identitydomains.model.User user =
+                            ManagedAccountAccessService.resolveDomainUser(domains, tenant, userId);
+                    domains.deleteUser(com.oracle.bmc.identitydomains.requests.DeleteUserRequest.builder()
+                            .userId(user.getId()).build());
+                }
+                return ApiResponse.success("删除用户成功");
+            }
+            if (OciPermissions.isManaged(tenant)) {
+                try (IdentityClient identity = IdentityClient.builder()
+                        .clientConfigurator(ProxyContext.get()).build(getProvider(tenant))) {
+                    identity.deleteUser(com.oracle.bmc.identity.requests.DeleteUserRequest.builder()
+                            .userId(userId).build());
+                }
+                return ApiResponse.success("删除用户成功");
+            }
             SignOnPolicyUtils.deleteUser(tenant,userId);
             return ApiResponse.success("删除用户成功");
         } catch (Exception e) {
-            log.error("重置密码失败: {}", e.getMessage(), e);
-            return ApiResponse.error("密码重置失败：" + e.getMessage());
+            log.warn("删除用户失败");
+            return ApiResponse.error("删除用户失败，请检查目标用户、用户组和 OCI 权限");
         }
     }
 
@@ -1284,6 +1386,7 @@ public class TenantServiceImpl implements TenantService {
                 tenantData.put("id", tenant.getId());
                 tenantData.put("tenant_id", tenant.getTenantId());
                 tenantData.put("user_name", tenant.getUserName());
+                putManagedPermissions(tenantData, tenant);
                 tenantData.put("fingerprint", tenant.getFingerprint());
                 tenantData.put("tenancy", tenant.getTenancy());
                 tenantData.put("region", RegionEnum.getRegionCode(tenant.getRegion()));
@@ -1325,6 +1428,7 @@ public class TenantServiceImpl implements TenantService {
                         childData.put("id", child.getId());
                         childData.put("tenant_id", child.getTenantId());
                         childData.put("user_name", child.getUserName());
+                        putManagedPermissions(childData, child);
                         childData.put("fingerprint", child.getFingerprint());
                         childData.put("tenancy", child.getTenancy());
                         childData.put("region", RegionEnum.getRegionCode(child.getRegion()));
@@ -1656,6 +1760,15 @@ public class TenantServiceImpl implements TenantService {
         tenant.setRegionEn(getStringValue(record, "region_en"));
         tenant.setIdStr(getStringValue(record, "id_str"));
         tenant.setEmailAddress(getStringValue(record, "email_address"));
+        tenant.setPermissionMode(getStringValue(record, "permission_mode"));
+        tenant.setPermissionsJson(getStringValue(record, "permissions_json"));
+        tenant.setManagedUserName(getStringValue(record, "managed_user_name"));
+        tenant.setManagedGroupId(getStringValue(record, "managed_group_id"));
+        tenant.setManagedPolicyId(getStringValue(record, "managed_policy_id"));
+        tenant.setAccountScopeJson(getStringValue(record, "account_scope_json"));
+        tenant.setManagedDomainId(getStringValue(record, "managed_domain_id"));
+        tenant.setManagedDomainUrl(getStringValue(record, "managed_domain_url"));
+        tenant.setManagedDomainGrantsJson(getStringValue(record, "managed_domain_grants_json"));
 
         // 处理创建时间
         String createdAtStr = getStringValue(record, "created_at");
@@ -1741,6 +1854,18 @@ public class TenantServiceImpl implements TenantService {
     private String getStringValue(Map<String, Object> record, String key) {
         Object value = record.get(key);
         return value != null ? value.toString().trim() : null;
+    }
+
+    private void putManagedPermissions(Map<String, Object> record, Tenant tenant) {
+        record.put("permission_mode", tenant.getPermissionMode());
+        record.put("permissions_json", tenant.getPermissionsJson());
+        record.put("managed_user_name", tenant.getManagedUserName());
+        record.put("managed_group_id", tenant.getManagedGroupId());
+        record.put("managed_policy_id", tenant.getManagedPolicyId());
+        record.put("account_scope_json", tenant.getAccountScopeJson());
+        record.put("managed_domain_id", tenant.getManagedDomainId());
+        record.put("managed_domain_url", tenant.getManagedDomainUrl());
+        record.put("managed_domain_grants_json", tenant.getManagedDomainGrantsJson());
     }
 
     /**
@@ -2096,7 +2221,7 @@ public class TenantServiceImpl implements TenantService {
                 String regionName = RegionEnum.getNameByCode(parent.getRegion());
                 parent.setRegion(regionName);
                 parent.setIdStr(String.valueOf(parent.getId()));
-                Optional<RegisterDetail> byTenantId = registerDetailRepository.findByTenantId(parent.getTenantId());
+                Optional<RegisterDetail> byTenantId = registerDetailRepository.findForTenant(parent.getId(), parent.getTenantId());
                 if (byTenantId.isPresent()){
                     RegisterDetail registerDetail = byTenantId.get();
                     parent.setRegisterDetail(registerDetail);
@@ -2229,6 +2354,11 @@ public class TenantServiceImpl implements TenantService {
         Map<String, RegisterDetail> registerDetailMap = registerDetails.stream()
                 .collect(Collectors.toMap(RegisterDetail::getTenantId, detail -> detail, (existing, replacement) -> existing));
 
+        List<Long> localIds = content.stream().map(Tenant::getId).collect(Collectors.toList());
+        Map<Long, RegisterDetail> localRegisterDetails = registerDetailRepository.findByTenantPrvIdIn(localIds).stream()
+                .collect(Collectors.toMap(RegisterDetail::getTenantPrvId, detail -> detail,
+                        (a, b) -> a.getId() >= b.getId() ? a : b));
+
         for (Tenant tenant : content) {
             // 自定义/显示名：优先云租户配置里的自定义名，否则回落到租户名（对齐 Web getTenantAlias）
             Optional<CloudTenancy> cloudTenancyOptional = cloudTenancyRepository.findByTenancyNameAndCloudTypeAndType(tenant.getTenancy(), tenant.getCloudType(), 1);
@@ -2238,7 +2368,8 @@ public class TenantServiceImpl implements TenantService {
                 tenant.setDefName(StringUtils.isNotBlank(tenant.getTenancyName()) ? tenant.getTenancyName() : tenant.getUserName());
             }
 
-            RegisterDetail registerDetail = registerDetailMap.get(tenant.getTenantId());
+            RegisterDetail registerDetail = localRegisterDetails.getOrDefault(tenant.getId(),
+                    registerDetailMap.get(tenant.getTenantId()));
 
             if (registerDetail != null) {
                 tenant.setRegisterDetail(registerDetail);
@@ -2501,8 +2632,10 @@ public class TenantServiceImpl implements TenantService {
                     sendSseEvent(emitter, "progress", "开始更新租户[" + tenant.getUserName() + "]区域:["+tenant.getRegion()+"]实例资源...");
                     self.syncOci(tenant.getId());
                     //更新数据库信息
-                    sendSseEvent(emitter, "progress", "开始更新租户[" + tenant.getUserName() + "]区域:["+tenant.getRegion()+"]数据库资源...");
-                    dbConfigService.syncMysqlFromCloud(tenant.getId());
+                    if (OciPermissions.allows(tenant, "MYSQL_READ")) {
+                        sendSseEvent(emitter, "progress", "开始更新租户[" + tenant.getUserName() + "]区域:["+tenant.getRegion()+"]数据库资源...");
+                        dbConfigService.syncMysqlFromCloud(tenant.getId());
+                    }
                 }
                 sendSseEvent(emitter, "success", "更新完成");
                 emitter.complete();
@@ -2601,6 +2734,11 @@ public class TenantServiceImpl implements TenantService {
 
     @Override
     public void switchRestrictedApiWithSSE(Long tenantId, SseEmitter emitter) {
+        switchRestrictedApiWithSSE(tenantId, null, null, null, emitter);
+    }
+
+    @Override
+    public void switchRestrictedApiWithSSE(Long tenantId, String managedUserNameParam, String permissionsJson, String accountScopeJson, SseEmitter emitter) {
         CompletableFuture.runAsync(() -> {
             try {
                 Tenant tenant = tenantRepository.findById(tenantId)
@@ -2608,6 +2746,21 @@ public class TenantServiceImpl implements TenantService {
                 Tenant parentTenant = (tenant.getParenId() == null || tenant.getParenId() == 0)
                         ? tenant
                         : tenantRepository.findById(tenant.getParenId()).orElse(tenant);
+
+                Set<String> selected;
+                if (StringUtils.isNotBlank(permissionsJson)) {
+                    selected = OciPermissionCatalog.normalize(OciPermissionCatalog.parse(permissionsJson));
+                } else {
+                    selected = OciPermissionCatalog.normalize(new HashSet<>(Arrays.asList(
+                            "BASIC_READ", "INSTANCE_POWER", "INSTANCE_CREATE", "INSTANCE_DELETE",
+                            "INSTANCE_UPDATE", "INSTANCE_REINSTALL", "VOLUME_MANAGE", "NETWORK_MANAGE",
+                            "COST_READ", "TRAFFIC_READ", "USER_READ"
+                    )));
+                }
+                if (selected.isEmpty()) {
+                    selected = Collections.singleton("BASIC_READ");
+                }
+                AccountPermissionScope scope = AccountPermissionScope.forSelection(accountScopeJson, selected);
 
                 TenantProxyBinder.applyForTenant(parentTenant);
                 SimpleAuthenticationDetailsProvider adminProvider = OciUtils.getProvider(parentTenant);
@@ -2620,6 +2773,7 @@ public class TenantServiceImpl implements TenantService {
                 // 探测 Identity Domains 或经典 IAM 域前缀
                 String domainPrefix = "";
                 String domainName = "Default";
+                DomainSummary activeDomain = null;
                 try {
                     ListDomainsRequest req = ListDomainsRequest.builder()
                             .compartmentId(tenancyOcid)
@@ -2628,6 +2782,7 @@ public class TenantServiceImpl implements TenantService {
                     if (resp.getItems() != null && !resp.getItems().isEmpty()) {
                         for (DomainSummary ds : resp.getItems()) {
                             if (ds.getLifecycleState() == DomainSummary.LifecycleState.Active) {
+                                activeDomain = ds;
                                 domainName = ds.getDisplayName();
                                 break;
                             }
@@ -2642,7 +2797,7 @@ public class TenantServiceImpl implements TenantService {
 
                 // ── 步骤 1: 创建专用组 ───────────────────────────────────────────────
                 String groupName = "Group_for_Api_used_" + shortSuffix;
-                String groupDesc = "受控 API 专用组，权限限制在实例、存储卷、虚拟网络与只读查看用户";
+                String groupDesc = "受控 API 专用组（自定义最小权限集合）";
                 CreateGroupDetails groupDetails = CreateGroupDetails.builder()
                         .compartmentId(tenancyOcid)
                         .name(groupName)
@@ -2657,16 +2812,7 @@ public class TenantServiceImpl implements TenantService {
                 // ── 步骤 2: 创建权限策略 ─────────────────────────────────────────────
                 String policyName = "Policy_for_Api_used_" + shortSuffix;
                 String policyDesc = "受控 API 专用策略，防范操作用户增删改与安全配置";
-                String groupRef = domainPrefix.isEmpty() ? groupName : (domainPrefix + groupName);
-                List<String> statements = Arrays.asList(
-                        String.format("Allow group %s to manage instance-family in tenancy", groupRef),
-                        String.format("Allow group %s to manage volume-family in tenancy", groupRef),
-                        String.format("Allow group %s to manage virtual-network-family in tenancy", groupRef),
-                        String.format("Allow group %s to inspect users in tenancy", groupRef),
-                        String.format("Allow group %s to inspect groups in tenancy", groupRef),
-                        String.format("Allow group %s to read all-resources in tenancy", groupRef),
-                        String.format("Allow group %s to inspect limits-family in tenancy", groupRef)
-                );
+                List<String> statements = OciPermissionCatalog.statements(groupId, selected, scope);
                 CreatePolicyDetails policyDetails = CreatePolicyDetails.builder()
                         .compartmentId(tenancyOcid)
                         .name(policyName)
@@ -2680,7 +2826,10 @@ public class TenantServiceImpl implements TenantService {
                 sendStepSse(emitter, 2, "创建权限策略", policyName, policyId, LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
 
                 // ── 步骤 3: 创建受限用户并加入组 ─────────────────────────────────────
-                String userName = "User_for_Api_used_" + shortSuffix;
+                String requestedUserName = StringUtils.isNotBlank(managedUserNameParam)
+                        ? managedUserNameParam.trim()
+                        : ("User_for_Api_used_" + shortSuffix);
+                String userName = requestedUserName;
                 String userDesc = "受控 API 专用用户";
                 CreateUserDetails userDetails = CreateUserDetails.builder()
                         .compartmentId(tenancyOcid)
@@ -2700,6 +2849,19 @@ public class TenantServiceImpl implements TenantService {
                                 .userId(userId)
                                 .build())
                         .build());
+
+                String domainId = activeDomain != null ? activeDomain.getId() : null;
+                String domainUrl = activeDomain != null ? activeDomain.getUrl() : null;
+                String domainGrantsJson = "[]";
+                boolean securityManagement = selected.contains("DOMAIN_SECURITY_MANAGE");
+                boolean userManagement = selected.contains("DOMAIN_USER_MANAGE");
+                if (activeDomain != null && (securityManagement || userManagement)) {
+                    ManagedDomainRoleService.Result domainResult = managedDomainRoleService.reconcile(
+                            adminProvider, activeDomain, tenancyOcid, userId, groupId,
+                            shortSuffix.toLowerCase(Locale.ROOT), securityManagement, userManagement,
+                            scope.isAllUsers(), scope.getUserManagementGroupIds());
+                    domainGrantsJson = com.alibaba.fastjson2.JSON.toJSONString(domainResult.getGrants());
+                }
                 sendStepSse(emitter, 3, "创建受限用户并加入组", userName, userId, LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
 
                 // ── 步骤 4: 生成新 Key 并上传公钥 ─────────────────────────────────────
@@ -2765,6 +2927,15 @@ public class TenantServiceImpl implements TenantService {
                 parentTenant.setTenantId(userId);
                 parentTenant.setFingerprint(newFingerprint);
                 parentTenant.setKeyFile(newKeyFilePath.toString());
+                parentTenant.setPermissionMode(OciPermissions.MODE);
+                parentTenant.setPermissionsJson(OciPermissionCatalog.serialize(selected));
+                parentTenant.setManagedUserName(userName);
+                parentTenant.setManagedGroupId(groupId);
+                parentTenant.setManagedPolicyId(policyId);
+                parentTenant.setAccountScopeJson(scope.toJson());
+                parentTenant.setManagedDomainId(domainId);
+                parentTenant.setManagedDomainUrl(domainUrl);
+                parentTenant.setManagedDomainGrantsJson(domainGrantsJson);
                 tenantRepository.save(parentTenant);
 
                 List<Tenant> children = tenantRepository.findByParenId(parentTenant.getId());
@@ -2773,6 +2944,15 @@ public class TenantServiceImpl implements TenantService {
                         child.setTenantId(userId);
                         child.setFingerprint(newFingerprint);
                         child.setKeyFile(newKeyFilePath.toString());
+                        child.setPermissionMode(OciPermissions.MODE);
+                        child.setPermissionsJson(OciPermissionCatalog.serialize(selected));
+                        child.setManagedUserName(userName);
+                        child.setManagedGroupId(groupId);
+                        child.setManagedPolicyId(policyId);
+                        child.setAccountScopeJson(scope.toJson());
+                        child.setManagedDomainId(domainId);
+                        child.setManagedDomainUrl(domainUrl);
+                        child.setManagedDomainGrantsJson(domainGrantsJson);
                         tenantRepository.save(child);
                     }
                 }
@@ -2820,6 +3000,9 @@ public class TenantServiceImpl implements TenantService {
                 summary.put("userName", userName);
                 summary.put("userId", userId);
                 summary.put("fingerprint", newFingerprint);
+                summary.put("permissionMode", OciPermissions.MODE);
+                summary.put("permissions", selected);
+                summary.put("managedUserName", userName);
                 summary.put("time", LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
                 sendSseEvent(emitter, "step", JSONUtil.toJsonStr(summary));
 

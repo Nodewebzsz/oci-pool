@@ -30,6 +30,10 @@
     const fallbackAliases = [source.userName, source.idStr, source.tenantId]
       .filter(value => value !== null && value !== undefined && value !== '');
     const alias = fallbackAliases.includes(rawAlias) ? '' : rawAlias;
+    const permissionMode = source.permissionMode ?? source.permission_mode ?? '';
+    const permissionsJson = source.permissionsJson ?? source.permissions_json ?? '';
+    const managedUserName = source.managedUserName ?? source.managed_user_name ?? '';
+    const accountScopeJson = source.accountScopeJson ?? source.account_scope_json ?? '';
 
     return {
       ...source,
@@ -47,6 +51,11 @@
         isActive: isActive,
         status: isActive === true ? 'active' : (isActive === false ? 'inactive' : 'unknown'),
         createdAt: source.createdAtStr ?? source.createdAt ?? '',
+        permissionMode: String(permissionMode || ''),
+        permissionsJson: permissionsJson || '',
+        managedUserName: String(managedUserName || ''),
+        accountScopeJson: accountScopeJson || '',
+        isManaged: Boolean(permissionMode),
       },
     };
   }

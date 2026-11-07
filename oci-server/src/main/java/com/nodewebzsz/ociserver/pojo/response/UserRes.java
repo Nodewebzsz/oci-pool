@@ -29,4 +29,20 @@ public class UserRes {
     private Date timeCreated;
 
     private String domain;
+    private Boolean active;
+    private boolean canManage;
+    private boolean canResetPassword;
+    private boolean canDelete;
+
+    public UserRes(String id, String username, String lifecycleState, String userId, String email,
+                   Date lastSuccessfulLoginTime, Date timeCreated, String domain) {
+        this.id = id;
+        this.username = username;
+        this.lifecycleState = lifecycleState;
+        this.userId = userId;
+        this.email = email;
+        this.lastSuccessfulLoginTime = lastSuccessfulLoginTime;
+        this.timeCreated = timeCreated;
+        this.domain = domain;
+    }
 }

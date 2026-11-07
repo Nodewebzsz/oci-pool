@@ -111,15 +111,78 @@ struct TenantSheetHost: View {
 
     /// 对齐 Web 端「API 导入租户」弹窗与「API 配置快速导入」卡片
     private var addSheet: some View {
-        chrome(title: "API 导入租户", systemImage: "bolt.fill", width: 560, height: 680, footer: {
+        let isEditManaged = model.editingManagedTenant != nil
+        let sheetTitle = isEditManaged
+            ? "修改受限 API 权限 · \(model.editingManagedTenant?.displayName ?? "")"
+            : (model.addImportRestrictedMode ? "受限权限导入租户" : "API 导入租户")
+        let surface2 = AppSheetSurface.surface2(dark)
+        return chrome(title: sheetTitle, systemImage: "bolt.fill", width: 620, height: 740, footer: {
             HStack(spacing: 10) {
                 AppButton(title: "取消", kind: .secondary) { presentationMode.wrappedValue.dismiss() }
-                AppButton(title: "确定导入", systemImage: "checkmark", kind: .primary) { model.submitAdd() }
+                AppButton(
+                    title: model.addImportRestrictedMode
+                        ? (isEditManaged ? "应用新受限权限" : "创建受限 API 并导入")
+                        : "确定导入",
+                    systemImage: "checkmark",
+                    kind: .primary
+                ) { model.submitAdd() }
             }
         }) {
             VStack(alignment: .leading, spacing: 14) {
                 if let err = model.formError, !err.isEmpty {
                     errorBanner(err)
+                }
+
+                // ─── 导入模式切换（完整 API 导入 / 受限权限导入） ───
+                HStack(spacing: 8) {
+                    Button(action: {
+                        model.editingManagedTenant = nil
+                        model.addImportRestrictedMode = false
+                    }) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "key.fill")
+                                .font(.system(size: 11))
+                            Text("完整 API 导入")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .foregroundColor(!model.addImportRestrictedMode ? .white : primaryText)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(!model.addImportRestrictedMode ? AppTheme.sidebarActive : surface2)
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+
+                    Button(action: {
+                        model.addImportRestrictedMode = true
+                    }) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "shield.checkerboard")
+                                .font(.system(size: 11))
+                            Text(isEditManaged ? "修改受限权限（需管理员凭据）" : "受限权限导入（推荐）")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .foregroundColor(model.addImportRestrictedMode ? .white : primaryText)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(model.addImportRestrictedMode ? AppTheme.sidebarActive : surface2)
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+                .padding(4)
+                .background(RoundedRectangle(cornerRadius: 8).fill(surface2))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(border, lineWidth: 1))
+
+                if model.addImportRestrictedMode {
+                    Text("提供一次临时管理员 API 凭据，系统将在云端创建或更新受限用户、组与最小权限策略，完成后仅在本地保存受限用户凭据。")
+                        .font(.system(size: 11.5))
+                        .foregroundColor(mutedText)
+                        .lineSpacing(2)
                 }
 
                 // ─── 顶部：API 配置快速导入卡片（完全对齐 Web 端） ───
@@ -238,8 +301,164 @@ struct TenantSheetHost: View {
                 FormFieldRow(label: "Private Key (PEM)", required: true) {
                     keyFileRow
                 }
+
+                if model.addImportRestrictedMode {
+                    permissionSelectorCard
+                }
             }
         }
+    }
+
+    /// 22 项 7 组自定义受限权限选择器卡片（供 API 导入与一键切换受限 API 共用）
+    @ViewBuilder
+    private var permissionSelectorCard: some View {
+        let surface = AppSheetSurface.surface(dark)
+        let surface2 = AppSheetSurface.surface2(dark)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "shield.lefthalf.filled")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppTheme.sidebarActive)
+                Text("受限账号权限自定义（已选 \(model.selectedPermissions.count) / \(model.permCatalog.count) 项）")
+                    .font(.system(size: 12.5, weight: .bold))
+                    .foregroundColor(primaryText)
+                    .lineLimit(1)
+                Spacer()
+                HStack(spacing: 5) {
+                    AppButton(title: "推荐精简", kind: .secondary) {
+                        model.applyPermissionPreset(OciPermissionCatalogData.recommendedCodes)
+                    }
+                    AppButton(title: "日常运维", kind: .secondary) {
+                        model.applyPermissionPreset(OciPermissionCatalogData.defaultOpsCodes)
+                    }
+                    AppButton(title: "仅只读", kind: .secondary) {
+                        model.applyPermissionPreset(OciPermissionCatalogData.readOnlyCodes)
+                    }
+                    AppButton(title: "全选", kind: .secondary) {
+                        model.applyPermissionPreset(model.permCatalog.map(\.code))
+                    }
+                }
+                .fixedSize(horizontal: true, vertical: false)
+            }
+
+            FormFieldRow(label: "OCI 专用受限用户名", required: false) {
+                AppTextField(text: $model.managedUserName, placeholder: "默认 oci-pool-operator")
+            }
+
+            ForEach(OciPermissionCatalogData.groups) { grp in
+                permissionGroupSection(grp)
+            }
+
+            if model.selectedPermissions.contains("USER_PASSWORD_RESET") || model.selectedPermissions.contains("DOMAIN_USER_MANAGE") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("账户操作范围 (Account Scope)")
+                        .font(.system(size: 11.5, weight: .bold))
+                        .foregroundColor(primaryText)
+
+                    Button(action: { model.scopeAllUsers.toggle() }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: model.scopeAllUsers ? "checkmark.square.fill" : "square")
+                                .font(.system(size: 13))
+                                .foregroundColor(model.scopeAllUsers ? AppTheme.sidebarActive : mutedText)
+                            Text("允许操作租户内全部 IAM 用户（取消勾选可限定指定用户 OCID）")
+                                .font(.system(size: 11.5))
+                                .foregroundColor(primaryText)
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
+
+                    if !model.scopeAllUsers && model.selectedPermissions.contains("USER_PASSWORD_RESET") {
+                        FormFieldRow(label: "允许重置密码的目标用户 OCID（逗号或换行分隔，必填）", required: true) {
+                            AppTextField(text: $model.scopeResetUsersText, placeholder: "ocid1.user.oc1..aaaa, ocid1.user.oc1..bbbb")
+                        }
+                    }
+
+                    if !model.scopeAllUsers && model.selectedPermissions.contains("DOMAIN_USER_MANAGE") {
+                        FormFieldRow(label: "允许管理的目标用户组 OCID（逗号或换行分隔，必填）", required: true) {
+                            AppTextField(text: $model.scopeManageGroupsText, placeholder: "ocid1.group.oc1..aaaa")
+                        }
+                    }
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 7).fill(surface))
+                .overlay(RoundedRectangle(cornerRadius: 7).stroke(border, lineWidth: 1))
+            }
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 8).fill(surface2))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(border, lineWidth: 1))
+    }
+
+    @ViewBuilder
+    private func permissionGroupSection(_ grp: OciPermissionGroup) -> some View {
+        let groupItems = model.permCatalog.filter { $0.group == grp.key }
+        if !groupItems.isEmpty {
+            let surface = AppSheetSurface.surface(dark)
+            let selectedCount = groupItems.filter { model.selectedPermissions.contains($0.code) }.count
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(grp.title)
+                        .font(.system(size: 11.5, weight: .bold))
+                        .foregroundColor(primaryText)
+                    Spacer()
+                    Text("\(selectedCount)/\(groupItems.count)")
+                        .font(.system(size: 10.5, design: .monospaced))
+                        .foregroundColor(mutedText)
+                }
+
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 6) {
+                    ForEach(groupItems) { item in
+                        permissionItemButton(item)
+                    }
+                }
+            }
+            .padding(9)
+            .background(RoundedRectangle(cornerRadius: 7).fill(surface))
+            .overlay(RoundedRectangle(cornerRadius: 7).stroke(border, lineWidth: 1))
+        }
+    }
+
+    private func permissionItemButton(_ item: OciPermissionItem) -> some View {
+        let checked = model.selectedPermissions.contains(item.code)
+        let surface2 = AppSheetSurface.surface2(dark)
+        let fillBg = checked ? AppTheme.sidebarActive.opacity(dark ? 0.14 : 0.08) : surface2
+        let strokeColor = checked ? AppTheme.sidebarActive.opacity(0.45) : border
+        return Button(action: {
+            if !item.required {
+                model.togglePermission(item.code, checked: !checked)
+            }
+        }) {
+            HStack(alignment: .top, spacing: 6) {
+                Image(systemName: checked ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 13))
+                    .foregroundColor(checked ? AppTheme.sidebarActive : mutedText)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Text(item.label)
+                            .font(.system(size: 11.5, weight: checked ? .semibold : .regular))
+                            .foregroundColor(primaryText)
+                            .lineLimit(1)
+                        if item.required {
+                            Text("必选")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(AppTheme.sidebarActive)
+                        }
+                    }
+                    if !item.reason.isEmpty {
+                        Text(item.reason)
+                            .font(.system(size: 10))
+                            .foregroundColor(mutedText)
+                            .lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(7)
+            .background(RoundedRectangle(cornerRadius: 6).fill(fillBg))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(strokeColor, lineWidth: 1))
+        }
+        .buttonStyle(PlainButtonStyle())
+        .help(item.reason)
     }
 
     /// Web: `editCustomNameModal` / 编辑成本
@@ -537,6 +756,12 @@ struct TenantSheetHost: View {
                                 username: u.username,
                                 isActive: isActive,
                                 appearance: appearance,
+                                canManage: u.canManage,
+                                canResetPassword: u.canResetPassword,
+                                canDelete: u.canDelete,
+                                onToggleState: {
+                                    model.toggleUserState(for: t, user: u)
+                                },
                                 onResetPassword: {
                                     model.resetUserPassword(for: t, user: u)
                                 },
@@ -3911,6 +4136,9 @@ struct TenantSheetHost: View {
                             RoundedRectangle(cornerRadius: 8)
                                 .stroke(border, lineWidth: 1)
                         )
+
+                        // 自定义受限权限选择器
+                        permissionSelectorCard
                     }
                 }
 
@@ -4127,6 +4355,10 @@ struct UserActionMoreButton: NSViewRepresentable {
     let username: String
     let isActive: Bool
     let appearance: AppearanceController
+    var canManage: Bool = false
+    var canResetPassword: Bool = true
+    var canDelete: Bool = true
+    var onToggleState: (() -> Void)? = nil
     let onResetPassword: () -> Void
     let onDelete: () -> Void
 
@@ -4136,6 +4368,10 @@ struct UserActionMoreButton: NSViewRepresentable {
             isActive: isActive,
             appearance: appearance,
             dark: dark,
+            canManage: canManage,
+            canResetPassword: canResetPassword,
+            canDelete: canDelete,
+            onToggleState: onToggleState,
             onResetPassword: onResetPassword,
             onDelete: onDelete
         )
@@ -4175,6 +4411,10 @@ struct UserActionMoreButton: NSViewRepresentable {
         context.coordinator.isActive = isActive
         context.coordinator.appearance = appearance
         context.coordinator.dark = dark
+        context.coordinator.canManage = canManage
+        context.coordinator.canResetPassword = canResetPassword
+        context.coordinator.canDelete = canDelete
+        context.coordinator.onToggleState = onToggleState
         context.coordinator.onResetPassword = onResetPassword
         context.coordinator.onDelete = onDelete
         nsView.contentTintColor = dark
@@ -4195,6 +4435,10 @@ struct UserActionMoreButton: NSViewRepresentable {
         var isActive: Bool
         var appearance: AppearanceController
         var dark: Bool
+        var canManage: Bool
+        var canResetPassword: Bool
+        var canDelete: Bool
+        var onToggleState: (() -> Void)?
         var onResetPassword: () -> Void
         var onDelete: () -> Void
 
@@ -4203,6 +4447,10 @@ struct UserActionMoreButton: NSViewRepresentable {
             isActive: Bool,
             appearance: AppearanceController,
             dark: Bool,
+            canManage: Bool,
+            canResetPassword: Bool,
+            canDelete: Bool,
+            onToggleState: (() -> Void)?,
             onResetPassword: @escaping () -> Void,
             onDelete: @escaping () -> Void
         ) {
@@ -4210,6 +4458,10 @@ struct UserActionMoreButton: NSViewRepresentable {
             self.isActive = isActive
             self.appearance = appearance
             self.dark = dark
+            self.canManage = canManage
+            self.canResetPassword = canResetPassword
+            self.canDelete = canDelete
+            self.onToggleState = onToggleState
             self.onResetPassword = onResetPassword
             self.onDelete = onDelete
         }
@@ -4219,19 +4471,34 @@ struct UserActionMoreButton: NSViewRepresentable {
             let act = isActive
             let d = dark
             let ap = appearance
+            let toggleCb = onToggleState
             let resetCb = onResetPassword
             let deleteCb = onDelete
 
             guard sender.window != nil else { return }
 
-            let actions = [
-                TenantActionItem(id: "reset", title: "重置密码", systemImage: "key", isDanger: false, tone: .default) {
+            var actions: [TenantActionItem] = []
+            if canManage, let toggleCb = toggleCb {
+                actions.append(TenantActionItem(
+                    id: "state",
+                    title: act ? "冻结用户" : "激活用户",
+                    systemImage: act ? "pause.circle" : "checkmark.circle",
+                    isDanger: false,
+                    tone: .default
+                ) {
+                    toggleCb()
+                })
+            }
+            if canResetPassword {
+                actions.append(TenantActionItem(id: "reset", title: "重置密码", systemImage: "key", isDanger: false, tone: .default) {
                     resetCb()
-                },
-                TenantActionItem(id: "delete", title: "删除用户", systemImage: "trash", isDanger: true, tone: .danger) {
+                })
+            }
+            if canDelete {
+                actions.append(TenantActionItem(id: "delete", title: "删除用户", systemImage: "trash", isDanger: true, tone: .danger) {
                     deleteCb()
-                }
-            ]
+                })
+            }
 
             DispatchQueue.main.async {
                 TenantActionMenuPresenter.shared.present(

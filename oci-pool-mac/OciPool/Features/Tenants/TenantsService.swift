@@ -94,6 +94,39 @@ struct TenantsService {
         try throwIfApiFailed(raw)
     }
 
+    func permissionCatalog() async throws -> [OciPermissionItem] {
+        let url = try client.makeURL(baseURL, path: "/tenants/permissions/catalog")
+        let raw = try await client.getJSON(url)
+        if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
+           let dataArr = obj["data"] as? [[String: Any]],
+           let arrData = try? JSONSerialization.data(withJSONObject: dataArr),
+           let items = try? JSONDecoder().decode([OciPermissionItem].self, from: arrData),
+           !items.isEmpty {
+            return items
+        }
+        return OciPermissionCatalogData.fallbackItems
+    }
+
+    func saveRestrictedTenant(fields: [String: String], keyFileURL: URL) async throws -> String {
+        let url = try client.makeURL(baseURL, path: "/tenants/restricted/save")
+        let raw = try await client.postMultipart(url, fields: fields, fileFieldName: "keyFileStr", fileURL: keyFileURL)
+        if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any] {
+            let ok = (obj["success"] as? Bool) ?? false
+            if !ok {
+                let msg = (obj["message"] as? String) ?? "受限权限配置失败"
+                throw APIError.serverMessage(msg)
+            }
+            if let data = obj["data"] as? [String: Any], let msg = data["message"] as? String, !msg.isEmpty {
+                return msg
+            }
+            if let msg = obj["message"] as? String, !msg.isEmpty {
+                return msg
+            }
+        }
+        try throwIfApiFailed(raw)
+        return "受限权限配置成功"
+    }
+
     // MARK: - Users
 
     func listUsers(tenantId: Int64) async throws -> [TenantOracleUser] {
@@ -128,6 +161,16 @@ struct TenantsService {
     func deleteUser(tenantId: Int64, userId: String) async throws {
         let url = try client.makeURL(baseURL, path: "/tenants/oracle-users/deleteUser")
         let raw = try await client.postJSON(url, body: ["tenantId": "\(tenantId)", "userId": userId])
+        try throwIfApiFailed(raw)
+    }
+
+    func updateUserState(tenantId: Int64, userId: String, active: Bool) async throws {
+        let url = try client.makeURL(baseURL, path: "/tenants/oracle-users/state")
+        let raw = try await client.postJSON(url, body: [
+            "tenantId": "\(tenantId)",
+            "userId": userId,
+            "active": active
+        ])
         try throwIfApiFailed(raw)
     }
 
