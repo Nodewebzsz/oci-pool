@@ -289,11 +289,13 @@ struct TopNavView: View {
                         RoundedRectangle(cornerRadius: 5)
                             .stroke(chrome.open == .notifications ? AppTheme.orange : AppTheme.border(dark), lineWidth: 1)
                     )
-                Circle()
-                    .fill(AppTheme.orange)
-                    .frame(width: 7, height: 7)
-                    .padding(.top, 4)
-                    .padding(.trailing, 5)
+                if header.unreadCount > 0 {
+                    Circle()
+                        .fill(AppTheme.orange)
+                        .frame(width: 7, height: 7)
+                        .padding(.top, 4)
+                        .padding(.trailing, 5)
+                }
             }
             .frame(width: 30, height: 30)
         }

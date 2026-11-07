@@ -39,6 +39,7 @@ import com.nodewebzsz.ociserver.service.BootInstanceService;
 import com.nodewebzsz.ociserver.service.SecurityRuleService;
 import com.nodewebzsz.ociserver.service.TenantService;
 import com.nodewebzsz.ociserver.service.TrafficAlertService;
+import com.nodewebzsz.ociserver.service.permissions.OciPermissionDeniedException;
 import com.nodewebzsz.ociserver.utils.PageUtils;
 import com.nodewebzsz.ociserver.utils.oracle.MFAUtils;
 import com.nodewebzsz.ociserver.utils.oracle.OciLimitsUtils;
@@ -541,6 +542,8 @@ public class TenantController extends BaseController{
     public ApiResponse saveBootInstance(@ModelAttribute BootInstance bootInstance) {
         try {
             bootInstanceService.saveBootInstance(bootInstance);
+        } catch (OciPermissionDeniedException e) {
+            throw e;
         } catch (Exception e) {
             return OciExceptionFactory.buildException(e);
         }
@@ -726,6 +729,8 @@ public class TenantController extends BaseController{
         try {
             securityRuleService.deleteSecurityRule(id);
             return ResponseEntity.ok().build();
+        } catch (OciPermissionDeniedException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to delete security rule", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

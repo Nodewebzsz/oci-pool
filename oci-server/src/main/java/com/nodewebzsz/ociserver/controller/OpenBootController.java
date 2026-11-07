@@ -10,6 +10,7 @@ import com.nodewebzsz.ociserver.pojo.response.DashboardStats;
 import com.nodewebzsz.ociserver.service.BootInstanceService;
 import com.nodewebzsz.ociserver.service.BootTotalInstanceService;
 import com.nodewebzsz.ociserver.config.task.StartBootInstanceTask;
+import com.nodewebzsz.ociserver.service.permissions.OciPermissionDeniedException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.domain.Page;
@@ -273,7 +274,11 @@ public class OpenBootController  extends BaseController{
             if (all.size() > 0){
                 for (BootInstance bootInstance : all) {
                     if (bootInstance.getStatus() == 0) {
-                        bootInstanceService.startInstance(bootInstance);
+                        try {
+                            bootInstanceService.startInstance(bootInstance);
+                        } catch (OciPermissionDeniedException ex) {
+                            log.warn("跳过无实例创建权限的开机任务[{}]: {}", bootInstance.getId(), ex.getMessage());
+                        }
                     }
                 }
             }

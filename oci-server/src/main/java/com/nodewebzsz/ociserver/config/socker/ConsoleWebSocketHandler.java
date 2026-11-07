@@ -8,6 +8,7 @@ import com.nodewebzsz.dao.repository.TenantRepository;
 import com.nodewebzsz.ociserver.config.socket.WebsockifyConfig;
 import com.nodewebzsz.ociserver.service.oracle.OciNetBootService;
 import com.nodewebzsz.ociserver.service.oracle.OracleInstanceService;
+import com.nodewebzsz.ociserver.service.permissions.OciPermissions;
 import com.nodewebzsz.ociserver.utils.oracle.OciConsoleUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jcraft.jsch.Session;
@@ -175,8 +176,13 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
 
             // 1. 获取实例和租户信息
             InstanceDetails instanceDetails = oracleInstanceService.getInstanceById(Long.valueOf(instanceDetailsId));
+            if (instanceDetails == null) {
+                sendError(webSocketSession, "未找到实例信息");
+                return;
+            }
             String instanceId = instanceDetails.getInstanceId();
-            Optional<Tenant> tenantOpt = tenantRepository.findById(tenantId);
+            Long effectiveTenantId = instanceDetails.getTenantId() > 0 ? instanceDetails.getTenantId() : tenantId;
+            Optional<Tenant> tenantOpt = tenantRepository.findById(effectiveTenantId);
 
             if (!tenantOpt.isPresent()) {
                 sendError(webSocketSession, "未找到租户信息");
@@ -184,6 +190,7 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
             }
 
             Tenant tenant = tenantOpt.get();
+            OciPermissions.require(tenant, "INSTANCE_REINSTALL");
 
             // 2. 获取或创建控制台连接
             sendMessage(webSocketSession, "🔍 检查控制台连接...\r\n");
@@ -1091,14 +1098,21 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
 
             // 2. 获取实例和租户信息
             InstanceDetails instanceDetails = oracleInstanceService.getInstanceById(Long.valueOf(instanceDetailsId));
+            if (instanceDetails == null) {
+                sendError(webSocketSession, "未找到实例信息");
+                return;
+            }
             String instanceId = instanceDetails.getInstanceId();
-            Optional<Tenant> tenantOpt = tenantRepository.findById(tenantId);
+            Long effectiveTenantId = instanceDetails.getTenantId() > 0 ? instanceDetails.getTenantId() : tenantId;
+            Optional<Tenant> tenantOpt = tenantRepository.findById(effectiveTenantId);
 
             if (!tenantOpt.isPresent()) {
                 sendError(webSocketSession, "未找到租户信息");
                 return;
             }
             Tenant tenant = tenantOpt.get();
+            OciPermissions.require(tenant, "INSTANCE_REINSTALL");
+            OciPermissions.require(tenant, "INSTANCE_POWER");
 
             sendMessage(webSocketSession, "🔍 正在准备底层串口控制台通道...\r\n");
 

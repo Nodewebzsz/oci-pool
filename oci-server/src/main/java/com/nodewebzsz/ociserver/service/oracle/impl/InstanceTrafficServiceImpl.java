@@ -10,6 +10,7 @@ import com.nodewebzsz.ocicommon.enums.RegionEnum;
 import com.nodewebzsz.ocicommon.enums.oci.TrafficPeriod;
 import com.nodewebzsz.ociserver.service.oracle.InstanceTrafficService;
 import com.nodewebzsz.ociserver.service.oracle.OracleInstanceService;
+import com.nodewebzsz.ociserver.service.permissions.OciPermissions;
 import com.nodewebzsz.ociserver.pojo.response.InstanceTrafficVO;
 import com.nodewebzsz.ociserver.pojo.response.ThresholdSettingDTO;
 import com.nodewebzsz.ociserver.utils.oracle.OciUtils;
@@ -82,7 +83,14 @@ public class InstanceTrafficServiceImpl implements InstanceTrafficService {
                 trafficList = instanceTrafficRepository.findByTenancyAndStatsDate(tenantIdProvider, today);
             }
         } else {
-            trafficList = instanceTrafficRepository.findByStatsDate(today);
+            Set<String> allowedTenancies = tenantRepository.findAll().stream()
+                    .filter(t -> OciPermissions.allows(t, "TRAFFIC_READ"))
+                    .map(Tenant::getTenancy)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            trafficList = instanceTrafficRepository.findByStatsDate(today).stream()
+                    .filter(item -> item.getTenancy() == null || allowedTenancies.contains(item.getTenancy()))
+                    .collect(Collectors.toList());
         }
 
         List<InstanceTrafficVO> collect = trafficList.stream()
@@ -114,7 +122,14 @@ public class InstanceTrafficServiceImpl implements InstanceTrafficService {
                         tenancy, startDate, endDate);
             }
         } else {
-            trafficData = instanceTrafficRepository.findByStatsDateBetween(startDate, endDate);
+            Set<String> allowedTenancies = tenantRepository.findAll().stream()
+                    .filter(t -> OciPermissions.allows(t, "TRAFFIC_READ"))
+                    .map(Tenant::getTenancy)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            trafficData = instanceTrafficRepository.findByStatsDateBetween(startDate, endDate).stream()
+                    .filter(item -> item.getTenancy() == null || allowedTenancies.contains(item.getTenancy()))
+                    .collect(Collectors.toList());
         }
 
         // 修改: 先按照日期分组，再计算每天的总流量

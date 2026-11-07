@@ -198,10 +198,20 @@ final class BackendController: ObservableObject {
     /// Prefer `~/.ocipool/server.jar` (optional override), then bundled `server.jar`.
     private func resolveServerJar() -> URL? {
         let upgraded = appDataDir().appendingPathComponent("server.jar")
+        let bundled = Bundle.main.url(forResource: "server", withExtension: "jar")
         if FileManager.default.fileExists(atPath: upgraded.path) {
+            if let bundled = bundled,
+               let upAttr = try? FileManager.default.attributesOfItem(atPath: upgraded.path),
+               let bAttr = try? FileManager.default.attributesOfItem(atPath: bundled.path),
+               let upDate = upAttr[.modificationDate] as? Date,
+               let bDate = bAttr[.modificationDate] as? Date,
+               bDate > upDate {
+                try? FileManager.default.removeItem(at: upgraded)
+                try? FileManager.default.copyItem(at: bundled, to: upgraded)
+            }
             return upgraded
         }
-        return Bundle.main.url(forResource: "server", withExtension: "jar")
+        return bundled
     }
 
     /// Kill java processes locking a file (e.g. vps_db.mv.db) if cmdline looks like our server.jar.

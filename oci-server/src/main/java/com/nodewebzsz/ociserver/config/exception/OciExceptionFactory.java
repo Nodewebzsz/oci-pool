@@ -1,6 +1,7 @@
 package com.nodewebzsz.ociserver.config.exception;
 
 import com.nodewebzsz.ocicommon.param.ApiResponse;
+import com.nodewebzsz.ociserver.service.permissions.OciPermissionDeniedException;
 import com.oracle.bmc.model.BmcException;
 import lombok.extern.slf4j.Slf4j;
 
@@ -20,6 +21,9 @@ public class OciExceptionFactory {
     }
 
     public static ApiResponse buildException(Exception e) {
+        if (e instanceof OciPermissionDeniedException) {
+            throw (OciPermissionDeniedException) e;
+        }
         if (e instanceof BmcException){
             BmcException error = (BmcException) e;
             if (error.getStatusCode() == 401 && error.getMessage().contains(NOT_AUTH.getErrorType())){

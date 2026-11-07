@@ -1293,6 +1293,7 @@ function renderOciPermissionSelector(permState, onUpdate) {
   const selectedSet = new Set(permState.selectedPermissions || ['BASIC_READ']);
   const needsReset = selectedSet.has('USER_PASSWORD_RESET');
   const needsManage = selectedSet.has('DOMAIN_USER_MANAGE');
+  const showDetails = Boolean(permState.showPermissionDetails);
 
   const applyPreset = (codes) => {
     permState.selectedPermissions = normalizeOciPermissions(codes, catalog);
@@ -1314,7 +1315,7 @@ function renderOciPermissionSelector(permState, onUpdate) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <Icon name="shield-check" size={15} style={{ color: 'var(--accent)' }} />
           <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--fg-0)' }}>
-            受限 API 专用用户与权限自定义
+            受限账号权限
           </span>
           <span style={{
             padding: '1px 7px',
@@ -1329,23 +1330,23 @@ function renderOciPermissionSelector(permState, onUpdate) {
         </div>
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
           <Button size="xs" variant="outline" onClick={() => applyPreset(catalog.filter(i => i.defaultEnabled).map(i => i.code))}>
-            推荐精简 (5项)
+            推荐精简
           </Button>
           <Button size="xs" variant="outline" onClick={() => applyPreset(DEFAULT_OPS_PERMISSIONS)}>
-            日常运维 (11项)
+            日常运维
           </Button>
           <Button size="xs" variant="outline" onClick={() => applyPreset(['BASIC_READ'])}>
-            仅只读 (1项)
+            仅只读
           </Button>
           <Button size="xs" variant="outline" onClick={() => applyPreset(catalog.map(i => i.code))}>
-            全选 ({catalog.length}项)
+            全选
           </Button>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '96px 1fr auto', alignItems: 'center', gap: 10 }}>
         <span style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--fg-1)' }}>
-          OCI 专用用户名 <span style={{ color: 'var(--danger)' }}>*</span>
+          专用用户名 <span style={{ color: 'var(--danger)' }}>*</span>
         </span>
         <TextInput
           mono
@@ -1353,80 +1354,130 @@ function renderOciPermissionSelector(permState, onUpdate) {
           onChange={v => { permState.managedUserName = v; onUpdate(); }}
           placeholder="oci-pool-operator"
         />
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={() => {
+            permState.showPermissionDetails = !showDetails;
+            onUpdate();
+          }}
+        >
+          {showDetails ? '收起明细 ▴' : '展开明细 ▾'}
+        </Button>
       </div>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(235px, 1fr))',
-        gap: 8,
-        maxHeight: 280,
-        overflowY: 'auto',
-        paddingRight: 2,
-      }}>
-        {OCI_PERMISSION_GROUPS.map(grp => {
-          const items = catalog.filter(item => item.group === grp.key);
-          if (!items.length) return null;
-          const checkedCount = items.filter(item => selectedSet.has(item.code)).length;
-          return (
-            <div
-              key={grp.key}
-              style={{
-                background: 'var(--bg-1)',
-                border: '1px solid var(--border)',
-                borderRadius: 6,
-                padding: '8px 10px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 5,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--fg-0)' }}>{grp.title}</span>
-                <span style={{ fontSize: 10, color: 'var(--fg-3)' }}>{checkedCount}/{items.length}</span>
+      {!showDetails ? (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+          gap: 6,
+        }}>
+          {OCI_PERMISSION_GROUPS.map(grp => {
+            const items = catalog.filter(item => item.group === grp.key);
+            if (!items.length) return null;
+            const checkedCount = items.filter(item => selectedSet.has(item.code)).length;
+            const hasSelected = checkedCount > 0;
+            return (
+              <div
+                key={grp.key}
+                onClick={() => {
+                  permState.showPermissionDetails = true;
+                  onUpdate();
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '5px 8px',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  background: hasSelected ? 'var(--accent-soft)' : 'var(--bg-1)',
+                  border: `1px solid ${hasSelected ? 'var(--accent)' : 'var(--border)'}`,
+                  fontSize: 11,
+                }}
+              >
+                <span style={{ color: hasSelected ? 'var(--fg-0)' : 'var(--fg-2)', fontWeight: 500 }}>{grp.title}</span>
+                <span className="mono" style={{ fontSize: 10.5, fontWeight: 600, color: hasSelected ? 'var(--accent)' : 'var(--fg-3)' }}>
+                  {checkedCount}/{items.length}
+                </span>
               </div>
-              {items.map(item => {
-                const checked = selectedSet.has(item.code);
-                const locked = Boolean(item.required || item.code === 'BASIC_READ');
-                return (
-                  <label
-                    key={item.code}
-                    title={item.reason || item.label}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: 6,
-                      fontSize: 11,
-                      color: checked ? 'var(--fg-0)' : 'var(--fg-2)',
-                      cursor: locked ? 'default' : 'pointer',
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      disabled={locked}
-                      onChange={e => {
-                        permState.selectedPermissions = toggleOciPermission(
-                          permState.selectedPermissions,
-                          item.code,
-                          e.target.checked,
-                          catalog
-                        );
-                        onUpdate();
+            );
+          })}
+        </div>
+      ) : (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(235px, 1fr))',
+          gap: 8,
+          maxHeight: 280,
+          overflowY: 'auto',
+          paddingRight: 2,
+        }}>
+          {OCI_PERMISSION_GROUPS.map(grp => {
+            const items = catalog.filter(item => item.group === grp.key);
+            if (!items.length) return null;
+            const checkedCount = items.filter(item => selectedSet.has(item.code)).length;
+            return (
+              <div
+                key={grp.key}
+                style={{
+                  background: 'var(--bg-1)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 6,
+                  padding: '8px 10px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 5,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--fg-0)' }}>{grp.title}</span>
+                  <span style={{ fontSize: 10, color: 'var(--fg-3)' }}>{checkedCount}/{items.length}</span>
+                </div>
+                {items.map(item => {
+                  const checked = selectedSet.has(item.code);
+                  const locked = Boolean(item.required || item.code === 'BASIC_READ');
+                  return (
+                    <label
+                      key={item.code}
+                      title={item.reason || item.label}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 6,
+                        fontSize: 11,
+                        color: checked ? 'var(--fg-0)' : 'var(--fg-2)',
+                        cursor: locked ? 'default' : 'pointer',
+                        lineHeight: 1.4,
                       }}
-                      style={{ marginTop: 2 }}
-                    />
-                    <span style={{ flex: 1 }}>
-                      <span>{item.label}</span>
-                      {locked && <span style={{ marginLeft: 4, fontSize: 9.5, color: 'var(--accent)' }}>(必选)</span>}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={locked}
+                        onChange={e => {
+                          permState.selectedPermissions = toggleOciPermission(
+                            permState.selectedPermissions,
+                            item.code,
+                            e.target.checked,
+                            catalog
+                          );
+                          onUpdate();
+                        }}
+                        style={{ marginTop: 2 }}
+                      />
+                      <span style={{ flex: 1 }}>
+                        <span>{item.label}</span>
+                        {locked && <span style={{ marginLeft: 4, fontSize: 9.5, color: 'var(--accent)' }}>(必选)</span>}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {(needsReset || needsManage) && (
         <div style={{
@@ -2031,7 +2082,7 @@ function useApiImportModal() {
 
                 // 真实后端导入:POST /tenants/import → tenantService.importData(List<Map>)
                 // 后端 createTenantFromRecord 读取: id/tenant_id/user_name/fingerprint/tenancy/region/cloud_type/key_file_content/tenancy_name
-                // · user_name 必须保留完整 user OCID(OCI API 认证依赖,不能改成可读名)。
+                // · tenant_id 必须为完整 user OCID (ocid1.user...)，tenancy 为 tenancy OCID (ocid1.tenancy...)。
                 // · 显示名放 tenancy_name(alias / profile 名),前端 getTenantName 优先取 tenancyName。
                 // · 缺 id 会被跳过;id 用 tenancy OCID 的稳定哈希生成,使同租户重复导入幂等(后端 findById 命中即跳过)。
                 const customName = state.alias.trim();
@@ -2039,8 +2090,8 @@ function useApiImportModal() {
                 const id = (hashed % 900000000) + 100000000;
                 const payload = [{
                   id,
-                  tenant_id: state.tenancy,
-                  user_name: state.user,
+                  tenant_id: state.user,
+                  user_name: customName || state.region || 'oci-tenant',
                   fingerprint: state.fingerprint,
                   tenancy: state.tenancy,
                   region: state.region,
@@ -2152,18 +2203,27 @@ function useImportTenantsModal() {
                 // 映射到后端 createTenantFromRecord 需要的字段;缺 id 的用 tenancy OCID 稳定哈希补,
                 // 避免 Date.now() 导致的重复导入不幂等。
                 const payload = records.map((r, i) => {
-                  const tenancyOcid = r.tenant_id || r.tenancy || r.tenancyOcid || '';
+                  const rawTenantId = String(r.tenant_id || '').trim();
+                  const rawUserName = String(r.user_name || r.user || '').trim();
+                  const tenancyOcid = r.tenancy || r.tenancyOcid || (rawTenantId.startsWith('ocid1.tenancy.') ? rawTenantId : '');
+                  const userOcid = rawTenantId.startsWith('ocid1.user.')
+                    ? rawTenantId
+                    : (rawUserName.startsWith('ocid1.user.') ? rawUserName : (rawTenantId || rawUserName));
+                  const displayName = !rawUserName.startsWith('ocid1.user.') && rawUserName
+                    ? rawUserName
+                    : (r.tenancy_name || r.alias || r.name || (tenancyOcid ? `oci-${tenancyOcid.slice(-6)}` : 'oci-tenant'));
                   const hashed = String(tenancyOcid || (r.id || i)).split('').reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7);
                   const stableId = r.id || ((hashed % 900000000) + 100000000);
                   return {
+                    ...r,
                     id: stableId,
-                    tenant_id: tenancyOcid,
-                    user_name: r.user_name || r.user || '',
+                    tenant_id: userOcid,
+                    user_name: displayName,
                     fingerprint: r.fingerprint || '',
                     tenancy: tenancyOcid,
                     region: r.region || '',
                     cloud_type: r.cloud_type || r.cloudType || 1,
-                    tenancy_name: r.tenancy_name || r.alias || r.name || (tenancyOcid ? `oci-${tenancyOcid.slice(-6)}` : ''),
+                    tenancy_name: r.tenancy_name || r.alias || r.name || displayName,
                     key_file_content: r.key_file_content || r.privateKey || r.private_key || '',
                   };
                 });
@@ -8143,7 +8203,7 @@ function useRestrictedApiModal() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, marginLeft: 26, fontSize: 11.5, color: 'var(--fg-3)' }}>
                   <span>{regCn || '—'}</span>
-                  {regCode && <span className="mono" style={{ opacity: 0.85 }}>· {regCode}</span>}
+                  {regCode && regCode !== regCn && <span className="mono" style={{ opacity: 0.85 }}>· {regCode}</span>}
                   {isHome && (
                     <span style={{
                       fontSize: 10,
@@ -8159,46 +8219,43 @@ function useRestrictedApiModal() {
                   )}
                 </div>
               </div>
-              <span style={{
-                padding: '3px 10px',
-                background: 'var(--bg-3)',
-                borderRadius: 999,
-                fontSize: 11,
-                color: 'var(--fg-2)',
-                fontWeight: 600,
-                border: '1px solid var(--border)',
-                flexShrink: 0
-              }}>
-                Default
-              </span>
-            </div>
-
-            {/* 状态徽章条 (对齐 IMG_0749.JPG) */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-              {isCompleted && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                {isCompleted && (
+                  <span style={{
+                    padding: '3px 9px',
+                    borderRadius: 999,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    background: 'var(--accent-soft)',
+                    color: 'var(--accent)',
+                    border: '1px solid var(--accent)'
+                  }}>
+                    新 API 已启用
+                  </span>
+                )}
                 <span style={{
-                  padding: '2px 8px',
+                  padding: '3px 9px',
                   borderRadius: 999,
                   fontSize: 11,
-                  fontWeight: 600,
-                  background: 'var(--accent-soft)',
-                  color: 'var(--accent)',
-                  border: '1px solid var(--accent)'
+                  fontWeight: 500,
+                  background: 'var(--bg-2)',
+                  color: 'var(--fg-2)',
+                  border: '1px solid var(--border)'
                 }}>
-                  新 API 已启用
+                  不撤销云端原 Key
                 </span>
-              )}
-              <span style={{
-                padding: '2px 8px',
-                borderRadius: 999,
-                fontSize: 11,
-                fontWeight: 500,
-                background: 'var(--bg-2)',
-                color: 'var(--fg-2)',
-                border: '1px solid var(--border)'
-              }}>
-                不撤销 OCI 云端原 Key
-              </span>
+                <span style={{
+                  padding: '3px 10px',
+                  background: 'var(--bg-3)',
+                  borderRadius: 999,
+                  fontSize: 11,
+                  color: 'var(--fg-2)',
+                  fontWeight: 600,
+                  border: '1px solid var(--border)',
+                }}>
+                  Default
+                </span>
+              </div>
             </div>
 
             {/* 阶段 1: 前置安全备份 */}

@@ -44,6 +44,7 @@ import com.nodewebzsz.ociserver.pojo.request.UpdateOciUserStateRequest;
 import com.nodewebzsz.ociserver.service.permissions.AccountPermissionScope;
 import com.nodewebzsz.ociserver.service.permissions.ManagedAccountAccessService;
 import com.nodewebzsz.ociserver.service.permissions.ManagedDomainRoleService;
+import com.nodewebzsz.ociserver.service.permissions.ManagedOciIdentityProvisioner;
 import com.nodewebzsz.ociserver.service.permissions.ManagedTenantImportService;
 import com.nodewebzsz.ociserver.service.permissions.OciPermissionCatalog;
 import com.nodewebzsz.ociserver.service.permissions.OciPermissionDeniedException;
@@ -196,6 +197,12 @@ public class TenantServiceImpl implements TenantService {
 
     @Resource
     private ManagedDomainRoleService managedDomainRoleService;
+
+    @Resource
+    private ManagedOciIdentityProvisioner managedIdentityProvisioner;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.nodewebzsz.ociai.utils.OciAiClientManager aiClientManager;
 
     @Resource
     private com.nodewebzsz.ociserver.mock.MockDataService mockDataService;
@@ -1743,8 +1750,17 @@ public class TenantServiceImpl implements TenantService {
 
         // 设置所有字段（除了主键ID）
         tenant.setId(getLongValue(record, "id"));
-        tenant.setTenantId(getStringValue(record, "tenant_id"));
-        tenant.setUserName(getStringValue(record, "user_name"));
+        String rawTenantId = getStringValue(record, "tenant_id");
+        String rawUserName = getStringValue(record, "user_name");
+        String rawTenancyName = getStringValue(record, "tenancy_name");
+        if (rawTenantId != null && rawTenantId.startsWith("ocid1.tenancy.")
+                && rawUserName != null && rawUserName.startsWith("ocid1.user.")) {
+            tenant.setTenantId(rawUserName);
+            tenant.setUserName(StringUtils.isNotBlank(rawTenancyName) ? rawTenancyName : rawUserName);
+        } else {
+            tenant.setTenantId(rawTenantId);
+            tenant.setUserName(rawUserName);
+        }
         tenant.setFingerprint(getStringValue(record, "fingerprint"));
         tenant.setTenancy(getStringValue(record, "tenancy"));
         tenant.setRegion(getStringValue(record, "region"));
@@ -2760,131 +2776,84 @@ public class TenantServiceImpl implements TenantService {
                 if (selected.isEmpty()) {
                     selected = Collections.singleton("BASIC_READ");
                 }
+                final Set<String> finalSelected = selected;
                 AccountPermissionScope scope = AccountPermissionScope.forSelection(accountScopeJson, selected);
 
                 TenantProxyBinder.applyForTenant(parentTenant);
                 SimpleAuthenticationDetailsProvider adminProvider = OciUtils.getProvider(parentTenant);
-                IdentityClient identityClient = IdentityClient.builder()
-                        .clientConfigurator(ProxyContext.get())
-                        .build(adminProvider);
-
                 String tenancyOcid = parentTenant.getTenancy();
-
-                // 探测 Identity Domains 或经典 IAM 域前缀
-                String domainPrefix = "";
-                String domainName = "Default";
-                DomainSummary activeDomain = null;
-                try {
-                    ListDomainsRequest req = ListDomainsRequest.builder()
-                            .compartmentId(tenancyOcid)
-                            .build();
-                    ListDomainsResponse resp = identityClient.listDomains(req);
-                    if (resp.getItems() != null && !resp.getItems().isEmpty()) {
-                        for (DomainSummary ds : resp.getItems()) {
-                            if (ds.getLifecycleState() == DomainSummary.LifecycleState.Active) {
-                                activeDomain = ds;
-                                domainName = ds.getDisplayName();
-                                break;
-                            }
-                        }
-                        domainPrefix = "'" + domainName + "'/";
-                    }
-                } catch (Exception e) {
-                    log.info("租户[{}]未探测到活跃 Identity Domain, 使用经典 IAM 组引用", parentTenant.getId());
-                }
-
-                String shortSuffix = RandomUtil.randomString(6);
-
-                // ── 步骤 1: 创建专用组 ───────────────────────────────────────────────
-                String groupName = "Group_for_Api_used_" + shortSuffix;
-                String groupDesc = "受控 API 专用组（自定义最小权限集合）";
-                CreateGroupDetails groupDetails = CreateGroupDetails.builder()
-                        .compartmentId(tenancyOcid)
-                        .name(groupName)
-                        .description(groupDesc)
-                        .build();
-                CreateGroupResponse groupRes = identityClient.createGroup(CreateGroupRequest.builder()
-                        .createGroupDetails(groupDetails)
-                        .build());
-                String groupId = groupRes.getGroup().getId();
-                sendStepSse(emitter, 1, "创建专用组", groupName, groupId, LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
-
-                // ── 步骤 2: 创建权限策略 ─────────────────────────────────────────────
-                String policyName = "Policy_for_Api_used_" + shortSuffix;
-                String policyDesc = "受控 API 专用策略，防范操作用户增删改与安全配置";
-                List<String> statements = OciPermissionCatalog.statements(groupId, selected, scope);
-                CreatePolicyDetails policyDetails = CreatePolicyDetails.builder()
-                        .compartmentId(tenancyOcid)
-                        .name(policyName)
-                        .description(policyDesc)
-                        .statements(statements)
-                        .build();
-                CreatePolicyResponse policyRes = identityClient.createPolicy(CreatePolicyRequest.builder()
-                        .createPolicyDetails(policyDetails)
-                        .build());
-                String policyId = policyRes.getPolicy().getId();
-                sendStepSse(emitter, 2, "创建权限策略", policyName, policyId, LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
-
-                // ── 步骤 3: 创建受限用户并加入组 ─────────────────────────────────────
                 String requestedUserName = StringUtils.isNotBlank(managedUserNameParam)
                         ? managedUserNameParam.trim()
-                        : ("User_for_Api_used_" + shortSuffix);
-                String userName = requestedUserName;
-                String userDesc = "受控 API 专用用户";
-                CreateUserDetails userDetails = CreateUserDetails.builder()
-                        .compartmentId(tenancyOcid)
-                        .name(userName)
-                        .description(userDesc)
-                        .email(userName.toLowerCase() + "@oci-pool.local")
-                        .build();
-                CreateUserResponse userRes = identityClient.createUser(CreateUserRequest.builder()
-                        .createUserDetails(userDetails)
-                        .build());
-                String userId = userRes.getUser().getId();
+                        : "oci-pool-operator";
 
-                // 加组
-                identityClient.addUserToGroup(AddUserToGroupRequest.builder()
-                        .addUserToGroupDetails(AddUserToGroupDetails.builder()
-                                .groupId(groupId)
-                                .userId(userId)
-                                .build())
-                        .build());
-
-                String domainId = activeDomain != null ? activeDomain.getId() : null;
-                String domainUrl = activeDomain != null ? activeDomain.getUrl() : null;
-                String domainGrantsJson = "[]";
-                boolean securityManagement = selected.contains("DOMAIN_SECURITY_MANAGE");
-                boolean userManagement = selected.contains("DOMAIN_USER_MANAGE");
-                if (activeDomain != null && (securityManagement || userManagement)) {
-                    ManagedDomainRoleService.Result domainResult = managedDomainRoleService.reconcile(
-                            adminProvider, activeDomain, tenancyOcid, userId, groupId,
-                            shortSuffix.toLowerCase(Locale.ROOT), securityManagement, userManagement,
-                            scope.isAllUsers(), scope.getUserManagementGroupIds());
-                    domainGrantsJson = com.alibaba.fastjson2.JSON.toJSONString(domainResult.getGrants());
+                ManagedOciIdentityProvisioner.ExistingIdentity previous = new ManagedOciIdentityProvisioner.ExistingIdentity();
+                if (OciPermissions.isManaged(parentTenant) && requestedUserName.equalsIgnoreCase(parentTenant.getManagedUserName())) {
+                    previous.setUserId(parentTenant.getTenantId());
+                    previous.setGroupId(parentTenant.getManagedGroupId());
+                    previous.setPolicyId(parentTenant.getManagedPolicyId());
+                    previous.setDomainId(parentTenant.getManagedDomainId());
+                    previous.setFingerprint(parentTenant.getFingerprint());
                 }
-                sendStepSse(emitter, 3, "创建受限用户并加入组", userName, userId, LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
 
-                // ── 步骤 4: 生成新 Key 并上传公钥 ─────────────────────────────────────
-                OciConsoleUtils.SshKeyPair keyPair = OciConsoleUtils.generateSshKeyPair();
-                String publicKeyPem = keyPair.getPublicKey();
-                String privateKeyPem = keyPair.getPrivateKey();
+                // ── 步骤 1~4: 统一委托给 ManagedOciIdentityProvisioner 幂等编排 ──
+                ManagedOciIdentityProvisioner.Result provResult = managedIdentityProvisioner.provision(
+                        adminProvider,
+                        tenancyOcid,
+                        parentTenant.getTenantId(),
+                        requestedUserName,
+                        gid -> OciPermissionCatalog.statements(gid, finalSelected, scope),
+                        previous,
+                        selected,
+                        scope,
+                        new ManagedOciIdentityProvisioner.ProgressListener() {
+                            @Override
+                            public void onGroupReady(String gName, String gId) {
+                                sendStepSse(emitter, 1, "创建专用组", gName, gId, LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+                            }
 
-                CreateApiKeyDetails apiKeyDetails = CreateApiKeyDetails.builder()
-                        .key(publicKeyPem)
-                        .build();
-                UploadApiKeyResponse apiKeyRes = identityClient.uploadApiKey(UploadApiKeyRequest.builder()
-                        .userId(userId)
-                        .createApiKeyDetails(apiKeyDetails)
-                        .build());
-                String newFingerprint = apiKeyRes.getApiKey().getFingerprint();
-                sendStepSse(emitter, 4, "生成新 Key 并上传公钥", "指纹: " + newFingerprint, newFingerprint, LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+                            @Override
+                            public void onPolicyReady(String pName, String pId) {
+                                sendStepSse(emitter, 2, "创建权限策略", pName, pId, LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+                            }
+
+                            @Override
+                            public void onUserReady(String uName, String uId) {
+                                sendStepSse(emitter, 3, "创建受限用户并加入组", uName, uId, LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+                            }
+
+                            @Override
+                            public void onKeyReady(String fp) {
+                                sendStepSse(emitter, 4, "生成新 Key 并上传公钥", "指纹: " + fp, fp, LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+                            }
+                        }
+                );
+
+                String domainName = StringUtils.defaultIfBlank(provResult.getDomainName(), "Default");
+                String groupName = provResult.getGroupName();
+                String groupId = provResult.getGroupId();
+                String policyName = provResult.getPolicyName();
+                String policyId = provResult.getPolicyId();
+                String userName = requestedUserName;
+                String userId = provResult.getTargetUserId();
+                String newFingerprint = provResult.getFingerprint();
+                String domainId = provResult.getDomainId();
+                String domainUrl = provResult.getDomainUrl();
+                String domainGrantsJson = provResult.getDomainGrantsJson();
+                byte[] newKeyBytes = provResult.getPrivateKeyPem();
+                if (newKeyBytes == null && StringUtils.isNotBlank(parentTenant.getKeyFile()) && Files.isRegularFile(Paths.get(parentTenant.getKeyFile()))) {
+                    newKeyBytes = Files.readAllBytes(Paths.get(parentTenant.getKeyFile()));
+                }
+                if (newKeyBytes == null) {
+                    throw new RuntimeException("未获取到受限用户私钥数据");
+                }
+                final byte[] testKeyBytes = newKeyBytes;
 
                 // ── 步骤 5: 等待新 Key 和权限生效 (轮询探测 30~120s) ──────────────────
                 SimpleAuthenticationDetailsProvider testProvider = SimpleAuthenticationDetailsProvider.builder()
                         .userId(userId)
                         .fingerprint(newFingerprint)
                         .tenantId(tenancyOcid)
-                        .privateKeySupplier(() -> new ByteArrayInputStream(privateKeyPem.getBytes(StandardCharsets.UTF_8)))
+                        .privateKeySupplier(() -> new ByteArrayInputStream(testKeyBytes))
                         .region(Region.fromRegionId(RegionEnum.getRegionCode(parentTenant.getRegion())))
                         .build();
 
@@ -2918,10 +2887,16 @@ public class TenantServiceImpl implements TenantService {
                 sendStepSse(emitter, 5, "等待新 Key 和权限生效", "边缘鉴权验证通过", "", LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
 
                 // ── 步骤 6: 切换系统的 API 配置 ──────────────────────────────────────
-                FileUtils.checkFile(baseFile);
-                String newKeyFileName = UUID.randomUUID() + "_key.pem";
-                Path newKeyFilePath = Paths.get(baseFile, newKeyFileName).toAbsolutePath().normalize();
-                Files.write(newKeyFilePath, privateKeyPem.getBytes(StandardCharsets.UTF_8));
+                Path managedDir = Paths.get(baseFile).toAbsolutePath().normalize().resolve("managed-oci");
+                Files.createDirectories(managedDir);
+                byte[] identityDigest = java.security.MessageDigest.getInstance("SHA-256")
+                        .digest((tenancyOcid + "\n" + userName.toLowerCase(Locale.ROOT)).getBytes(StandardCharsets.UTF_8));
+                StringBuilder identityHex = new StringBuilder();
+                for (byte b : identityDigest) {
+                    identityHex.append(String.format(Locale.ROOT, "%02x", b & 0xff));
+                }
+                Path newKeyFilePath = managedDir.resolve(identityHex + ".pem");
+                Files.write(newKeyFilePath, testKeyBytes);
                 String oldKeyFile = parentTenant.getKeyFile();
 
                 parentTenant.setTenantId(userId);
@@ -2937,6 +2912,9 @@ public class TenantServiceImpl implements TenantService {
                 parentTenant.setManagedDomainUrl(domainUrl);
                 parentTenant.setManagedDomainGrantsJson(domainGrantsJson);
                 tenantRepository.save(parentTenant);
+                if (aiClientManager != null) {
+                    aiClientManager.removeClient(parentTenant);
+                }
 
                 List<Tenant> children = tenantRepository.findByParenId(parentTenant.getId());
                 if (!CollectionUtils.isEmpty(children)) {
@@ -2954,6 +2932,9 @@ public class TenantServiceImpl implements TenantService {
                         child.setManagedDomainUrl(domainUrl);
                         child.setManagedDomainGrantsJson(domainGrantsJson);
                         tenantRepository.save(child);
+                        if (aiClientManager != null) {
+                            aiClientManager.removeClient(child);
+                        }
                     }
                 }
                 sendStepSse(emitter, 6, "切换系统的 API 配置", "本地配置更新完成", "", LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")));
