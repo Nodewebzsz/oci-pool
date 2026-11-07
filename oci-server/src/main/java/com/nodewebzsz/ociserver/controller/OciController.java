@@ -21,6 +21,7 @@ import com.nodewebzsz.ocicommon.param.ApiResponse;
 import com.nodewebzsz.ociserver.pojo.response.InstanceDetailsRes;
 import com.nodewebzsz.ociserver.service.MetricsService;
 import com.nodewebzsz.ociserver.service.VerifyService;
+import com.nodewebzsz.ociserver.service.permissions.OciPermissionDeniedException;
 import com.oracle.bmc.core.ComputeClient;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -315,6 +316,8 @@ public class OciController  extends BaseController{
             Map<String, String> details = new HashMap<>();
             details.put("ipv6Address", ipv6Address);
             result.put("details", details);
+        } catch (OciPermissionDeniedException e) {
+            throw e;
         } catch (Exception e) {
             result.put("status", "error");
             result.put("message", "IPv6开启失败: " + e.getMessage());
@@ -340,6 +343,8 @@ public class OciController  extends BaseController{
             response.put("success", true);
             response.put("message", "验证码已发送");
             return ResponseEntity.ok(response);
+        } catch (OciPermissionDeniedException e) {
+            throw e;
         } catch (Exception e) {
             log.error("发送验证码失败", e);
             response.put("success", false);
@@ -377,6 +382,8 @@ public class OciController  extends BaseController{
 
             return ResponseEntity.ok(response);
 
+        } catch (OciPermissionDeniedException e) {
+            throw e;
         } catch (IllegalArgumentException | IllegalStateException e) {
             log.warn("终止实例参数验证失败: {}", e.getMessage());
             response.put("success", false);
@@ -419,6 +426,8 @@ public class OciController  extends BaseController{
             );
 
             return ResponseEntity.ok(ApiResponse.success("实例配置更新成功"));
+        } catch (OciPermissionDeniedException e) {
+            throw e;
         } catch (IllegalArgumentException e) {
             log.error("Invalid request parameters", e);
             return ResponseEntity.badRequest()
@@ -459,6 +468,8 @@ public class OciController  extends BaseController{
                 response.put("success", false);
                 response.put("message", "实例名称更新失败");
             }
+        } catch (OciPermissionDeniedException e) {
+            throw e;
         } catch (Exception e) {
             log.error("更新实例名称时发生错误", e);
             response.put("success", false);
@@ -498,6 +509,8 @@ public class OciController  extends BaseController{
 
             }
 
+        } catch (OciPermissionDeniedException e) {
+            throw e;
         } catch (Exception e) {
             log.error("更新引导卷失败", e);
             return ResponseEntity.internalServerError()
@@ -551,6 +564,8 @@ public class OciController  extends BaseController{
                 result.put("success", false);
                 result.put("message", "实例启动失败");
             }
+        } catch (OciPermissionDeniedException e) {
+            throw e;
         } catch (Exception e) {
             log.error("启动实例失败", e);
             result.put("success", false);
@@ -590,6 +605,8 @@ public class OciController  extends BaseController{
                 result.put("success", false);
                 result.put("message", "实例停止失败");
             }
+        } catch (OciPermissionDeniedException e) {
+            throw e;
         } catch (Exception e) {
             log.error("停止实例失败", e);
             result.put("success", false);

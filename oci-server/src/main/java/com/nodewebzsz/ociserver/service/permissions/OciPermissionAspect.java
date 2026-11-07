@@ -88,6 +88,18 @@ public class OciPermissionAspect {
         rule("TenantController", "getPasspolicy", "tenant", 0, "tenantId", "PASSWORD_POLICY");
         rule("TenantController", "updateUserState", "tenant", 0, "tenantId", "DOMAIN_USER_MANAGE");
         rule("TenantController", "getAuditLogs", "tenant", 0, "tenantId", "AUDIT_READ");
+        rule("TenantController", "getSecurityRules,getAllBootVolumes", "tenant", 0, "", "BASIC_READ");
+        rule("TenantController", "getUsers", "tenant", 0, "", "USER_READ");
+        rule("TenantController", "getPageUsers", "tenant", 2, "", "USER_READ");
+        rule("TenantController", "groups", "tenant", 0, "tenantId", "USER_READ");
+        rule("TenantController", "createOciUser", "tenant", 0, "tenantId", "USER_CREATE");
+        rule("TenantController", "updatePasswordPolicy", "tenant", 0, "tenantId", "PASSWORD_POLICY");
+        rule("TenantController", "addSecurityRule", "tenant", 0, "tenantId", "NETWORK_MANAGE");
+        rule("TenantController", "updateBootVolumeVpus", "tenant", 1, "tenantId", "VOLUME_MANAGE");
+        rule("TenantController", "deleteBootVolume", "tenant", 1, "tenantId", "BOOT_VOLUME_DELETE");
+        rule("VnicManagementController", "createVnic,deleteVnic,deleteIpv6,deleteAllSecondaryVnics,changeSpecIp,configureLoadBalancer,restoreNetwork",
+                "instance", 0, "instanceId", "NETWORK_MANAGE");
+        rule("VnicManagementController", "createIpv6", "instance", 0, "instanceId", "NETWORK_MANAGE", "INSTANCE_POWER");
         rule("CloudShellController", "consoleMetadata", "instance", 0, "", "INSTANCE_REINSTALL");
         rule("CloudShellController", "createConsoleConnection,createConsoleConnectionAndSaveKey", "instance", 0, "instanceId", "INSTANCE_REINSTALL");
         rule("CloudShellController", "heavyNewRestart", "instance", 0, "instanceId", "INSTANCE_POWER");
@@ -192,9 +204,11 @@ public class OciPermissionAspect {
                 && !tenantIds.toString().trim().isEmpty()) {
             check(tenantRule, tenantIds);
         } else {
-            // An omitted/empty filter means "all tenants" in the existing service.
-            for (Tenant tenant : tenantRepository.findAll()) {
-                OciPermissions.require(tenant, "TRAFFIC_READ");
+            // Global query across all tenants: allow as long as at least one tenant permits TRAFFIC_READ;
+            // InstanceTrafficServiceImpl filters out tenancies without TRAFFIC_READ.
+            List<Tenant> all = tenantRepository.findAll();
+            if (!all.isEmpty() && all.stream().noneMatch(t -> OciPermissions.allows(t, "TRAFFIC_READ"))) {
+                OciPermissions.require(all.get(0), "TRAFFIC_READ");
             }
         }
     }

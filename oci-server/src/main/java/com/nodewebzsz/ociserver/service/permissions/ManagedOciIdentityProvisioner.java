@@ -63,6 +63,15 @@ public class ManagedOciIdentityProvisioner {
                             String tenancyId, String adminUserId, String targetUserName,
                             Function<String, List<String>> statementsForGroupId,
                             ExistingIdentity existing, Set<String> selected, AccountPermissionScope scope) {
+        return provision(adminProvider, tenancyId, adminUserId, targetUserName,
+                statementsForGroupId, existing, selected, scope, null);
+    }
+
+    public Result provision(SimpleAuthenticationDetailsProvider adminProvider,
+                            String tenancyId, String adminUserId, String targetUserName,
+                            Function<String, List<String>> statementsForGroupId,
+                            ExistingIdentity existing, Set<String> selected, AccountPermissionScope scope,
+                            ProgressListener listener) {
         if (adminProvider == null || !Objects.equals(tenancyId, adminProvider.getTenantId())
                 || !Objects.equals(adminUserId, adminProvider.getUserId())
                 || targetUserName == null || !USER_NAME.matcher(targetUserName).matches()
@@ -73,7 +82,7 @@ public class ManagedOciIdentityProvisioner {
         synchronized (LOCKS[(owner.hashCode() & Integer.MAX_VALUE) % LOCKS.length]) {
             try {
                 return reconcile(adminProvider, tenancyId, adminUserId, targetUserName,
-                        statementsForGroupId, existing, owner, selected, scope);
+                        statementsForGroupId, existing, owner, selected, scope, listener);
             } catch (Exception e) {
                 throw safeFailure(e);
             }
@@ -105,7 +114,7 @@ public class ManagedOciIdentityProvisioner {
                              String adminUserId, String username,
                              Function<String, List<String>> statementsForGroupId,
                              ExistingIdentity existing, String owner, Set<String> selected,
-                             AccountPermissionScope scope) throws Exception {
+                             AccountPermissionScope scope, ProgressListener listener) throws Exception {
         try (IdentityClient identity = IdentityClient.builder()
                 .clientConfigurator(ProxyContext.get()).build(admin)) {
             Tenancy tenancy = identity.getTenancy(GetTenancyRequest.builder()
@@ -134,6 +143,9 @@ public class ManagedOciIdentityProvisioner {
             User user = findUser(identity, tenancyId, username);
             if (user != null) {
                 assertNotAdmin(user.getId(), adminUserId);
+                if (!isOwned(user.getFreeformTags(), owner) && isLegacyManagedUser(user, existing)) {
+                    user = adoptLegacyUser(identity, tenancyId, user, tags, existing);
+                }
                 assertOwned(user.getFreeformTags(), owner, "同名用户");
                 assertExpected(existing == null ? null : existing.getUserId(), user.getId(), "专用用户");
                 assertActive(user.getLifecycleState() == User.LifecycleState.Active, "专用用户");
@@ -214,6 +226,9 @@ public class ManagedOciIdentityProvisioner {
                 }
                 assertOwned(group.getFreeformTags(), owner, "专用组");
             }
+            if (listener != null) {
+                listener.onGroupReady(groupName, group.getId());
+            }
             assertMemberships(identity, tenancyId, user, group, baselineGroups);
             roleState = domain == null ? null : domainRoles.audit(admin, domain, tenancyId,
                     user.getId(), group.getId(), owner);
@@ -255,6 +270,9 @@ public class ManagedOciIdentityProvisioner {
             } else {
                 policy = updatePolicy(identity, policy, owner, statements);
             }
+            if (listener != null) {
+                listener.onPolicyReady(policyName, policy.getId());
+            }
 
             // Only the managed API identity is changed, never the source user.
             identity.updateUserCapabilities(UpdateUserCapabilitiesRequest.builder().userId(user.getId())
@@ -281,6 +299,9 @@ public class ManagedOciIdentityProvisioner {
                         owner, securityManagement, userManagement, scope.isAllUsers(),
                         scope.getUserManagementGroupIds());
                 assertDomainIdentity(admin, domain, tenancyId, user, group, baselineGroups, roleState);
+            }
+            if (listener != null) {
+                listener.onUserReady(user.getName(), user.getId());
             }
 
             List<ApiKey> keys = identity.listApiKeys(ListApiKeysRequest.builder()
@@ -312,9 +333,14 @@ public class ManagedOciIdentityProvisioner {
                 privateKeyPem = pem("PRIVATE KEY", keyPair.getPrivate().getEncoded())
                         .getBytes(StandardCharsets.US_ASCII);
             }
+            if (listener != null) {
+                listener.onKeyReady(fingerprint);
+            }
             Result result = new Result();
             result.setTargetUserId(user.getId());
+            result.setGroupName(groupName);
             result.setGroupId(group.getId());
+            result.setPolicyName(policyName);
             result.setPolicyId(policy.getId());
             result.setFingerprint(fingerprint);
             result.setPrivateKeyPem(privateKeyPem);
@@ -322,6 +348,7 @@ public class ManagedOciIdentityProvisioner {
             result.setTenancyName(tenancy.getName());
             result.setTenancyDescription(tenancy.getDescription());
             result.setRegions(Collections.unmodifiableList(new ArrayList<>(regions)));
+            result.setDomainName(domain == null ? "Default" : domain.getDisplayName());
             result.setDomainId(domain == null ? null : domain.getId());
             result.setDomainUrl(domain == null ? null : domainEndpoint(domain));
             result.setDomainGrantsJson(roleState == null ? "[]" : com.alibaba.fastjson2.JSON.toJSONString(roleState.getGrants()));
@@ -741,9 +768,64 @@ public class ManagedOciIdentityProvisioner {
     }
 
     private void assertOwned(Map<String, String> tags, String owner, String resource) {
-        if (tags == null || !MANAGER_VERSION.equals(tags.get(MANAGED_BY)) || !owner.equals(tags.get(OWNER))) {
+        if (!isOwned(tags, owner)) {
             throw new ProvisioningException(resource + "不是本系统创建的专用身份资源，不能自动接管，请使用其他用户名。");
         }
+    }
+
+    private boolean isOwned(Map<String, String> tags, String owner) {
+        return tags != null && MANAGER_VERSION.equals(tags.get(MANAGED_BY)) && owner.equals(tags.get(OWNER));
+    }
+
+    private boolean isLegacyManagedUser(User user, ExistingIdentity existing) {
+        if (user == null) return false;
+        if (existing != null && hasText(existing.getUserId()) && existing.getUserId().equals(user.getId())) {
+            return true;
+        }
+        String desc = user.getDescription() == null ? "" : user.getDescription().trim();
+        String name = user.getName() == null ? "" : user.getName().trim();
+        return "受控 API 专用用户".equals(desc) || name.startsWith("User_for_Api_used_");
+    }
+
+    private User adoptLegacyUser(IdentityClient identity, String tenancyId, User user,
+                                 Map<String, String> tags, ExistingIdentity existing) {
+        Map<String, String> mergedTags = new HashMap<>();
+        if (user.getFreeformTags() != null) {
+            mergedTags.putAll(user.getFreeformTags());
+        }
+        mergedTags.putAll(tags);
+        User updated = identity.updateUser(UpdateUserRequest.builder()
+                .userId(user.getId())
+                .updateUserDetails(UpdateUserDetails.builder()
+                        .description("OCI Pool managed API identity")
+                        .freeformTags(mergedTags)
+                        .build())
+                .build()).getUser();
+        for (UserGroupMembership membership : memberships(identity, tenancyId, user.getId(), null)) {
+            try {
+                Group g = identity.getGroup(GetGroupRequest.builder().groupId(membership.getGroupId()).build()).getGroup();
+                if (g != null && g.getName() != null && g.getName().startsWith("Group_for_Api_used_")) {
+                    String suffix = g.getName().substring("Group_for_Api_used_".length());
+                    identity.removeUserFromGroup(RemoveUserFromGroupRequest.builder()
+                            .userGroupMembershipId(membership.getId()).build());
+                    Policy legacyPolicy = findPolicy(identity, tenancyId, "Policy_for_Api_used_" + suffix);
+                    if (legacyPolicy != null) {
+                        identity.deletePolicy(DeletePolicyRequest.builder().policyId(legacyPolicy.getId()).build());
+                    }
+                    if (memberships(identity, tenancyId, null, g.getId()).isEmpty()) {
+                        identity.deleteGroup(DeleteGroupRequest.builder().groupId(g.getId()).build());
+                    }
+                    if (existing != null && g.getId().equals(existing.getGroupId())) {
+                        existing.setGroupId(null);
+                    }
+                    if (existing != null && legacyPolicy != null && legacyPolicy.getId().equals(existing.getPolicyId())) {
+                        existing.setPolicyId(null);
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return updated;
     }
 
     private void assertExpected(String expected, String actual, String resource) {
@@ -805,13 +887,16 @@ public class ManagedOciIdentityProvisioner {
     @Setter
     public static class Result {
         private String targetUserId;
+        private String groupName;
         private String groupId;
+        private String policyName;
         private String policyId;
         private String fingerprint;
         private byte[] privateKeyPem;
         private String homeRegion;
         private String tenancyName;
         private String tenancyDescription;
+        private String domainName;
         private String domainId;
         private String domainUrl;
         private String domainGrantsJson;
@@ -821,6 +906,13 @@ public class ManagedOciIdentityProvisioner {
         public void setDomainUrl(String domainUrl) { this.domainUrl = domainUrl; }
         public String getDomainGrantsJson() { return domainGrantsJson; }
         public void setDomainGrantsJson(String domainGrantsJson) { this.domainGrantsJson = domainGrantsJson; }
+    }
+
+    public interface ProgressListener {
+        default void onGroupReady(String groupName, String groupId) {}
+        default void onPolicyReady(String policyName, String policyId) {}
+        default void onUserReady(String userName, String userId) {}
+        default void onKeyReady(String fingerprint) {}
     }
 
     public static class ProvisioningException extends IllegalArgumentException {

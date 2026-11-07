@@ -319,10 +319,19 @@ struct TenantSheetHost: View {
                 Image(systemName: "shield.lefthalf.filled")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(AppTheme.sidebarActive)
-                Text("受限账号权限自定义（已选 \(model.selectedPermissions.count) / \(model.permCatalog.count) 项）")
+                Text("受限账号权限")
                     .font(.system(size: 12.5, weight: .bold))
                     .foregroundColor(primaryText)
                     .lineLimit(1)
+                Text("已选 \(model.selectedPermissions.count)/\(model.permCatalog.count) 项")
+                    .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                    .foregroundColor(AppTheme.sidebarActive)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(AppTheme.sidebarActive.opacity(0.14))
+                    )
                 Spacer()
                 HStack(spacing: 5) {
                     AppButton(title: "推荐精简", kind: .secondary) {
@@ -341,12 +350,81 @@ struct TenantSheetHost: View {
                 .fixedSize(horizontal: true, vertical: false)
             }
 
-            FormFieldRow(label: "OCI 专用受限用户名", required: false) {
+            HStack(alignment: .center, spacing: 10) {
+                Text("专用用户名")
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundColor(mutedText)
                 AppTextField(text: $model.managedUserName, placeholder: "默认 oci-pool-operator")
+                    .frame(maxWidth: .infinity)
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.16)) {
+                        model.showPermissionDetails.toggle()
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Text(model.showPermissionDetails ? "收起明细" : "展开明细")
+                            .font(.system(size: 11.5, weight: .semibold))
+                        Image(systemName: model.showPermissionDetails ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .foregroundColor(AppTheme.sidebarActive)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(AppTheme.sidebarActive.opacity(0.10))
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
             }
 
-            ForEach(OciPermissionCatalogData.groups) { grp in
-                permissionGroupSection(grp)
+            if !model.showPermissionDetails {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 6),
+                        GridItem(.flexible(), spacing: 6),
+                        GridItem(.flexible(), spacing: 6),
+                        GridItem(.flexible(), spacing: 6)
+                    ],
+                    spacing: 6
+                ) {
+                    ForEach(OciPermissionCatalogData.groups) { grp in
+                        let groupItems = model.permCatalog.filter { $0.group == grp.key }
+                        let selectedCount = groupItems.filter { model.selectedPermissions.contains($0.code) }.count
+                        let hasSelected = selectedCount > 0
+                        Button(action: {
+                            withAnimation(.easeInOut(duration: 0.16)) {
+                                model.showPermissionDetails = true
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                Text(grp.title)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(hasSelected ? primaryText : mutedText)
+                                    .lineLimit(1)
+                                Spacer(minLength: 2)
+                                Text("\(selectedCount)/\(groupItems.count)")
+                                    .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                                    .foregroundColor(hasSelected ? AppTheme.sidebarActive : mutedText)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(hasSelected ? AppTheme.sidebarActive.opacity(0.08) : surface)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(hasSelected ? AppTheme.sidebarActive.opacity(0.45) : border, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+            } else {
+                ForEach(OciPermissionCatalogData.groups) { grp in
+                    permissionGroupSection(grp)
+                }
             }
 
             if model.selectedPermissions.contains("USER_PASSWORD_RESET") || model.selectedPermissions.contains("DOMAIN_USER_MANAGE") {
@@ -3896,9 +3974,9 @@ struct TenantSheetHost: View {
                 }
             }
         ) {
-            VStack(alignment: .leading, spacing: 14) {
-                // 1. 顶部租户元数据栏 (真实租户名/别名 + 区域 + 主区域标签 + Default 域)
-                HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 12) {
+                // 1. 顶部租户元数据栏 (真实租户名/别名 + 区域 + 主区域标签 + 状态与域徽章)
+                HStack(alignment: .center, spacing: 10) {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 8) {
                             Image(systemName: "shield.checkerboard")
@@ -3913,7 +3991,7 @@ struct TenantSheetHost: View {
                             Text(regCn)
                                 .font(.system(size: 11.5))
                                 .foregroundColor(mutedText)
-                            if !t.region.isEmpty {
+                            if !t.region.isEmpty && t.region != regCn {
                                 Text("· \(t.region)")
                                     .font(.system(size: 11.5, design: .monospaced))
                                     .foregroundColor(mutedText.opacity(0.85))
@@ -3935,77 +4013,54 @@ struct TenantSheetHost: View {
 
                     Spacer()
 
-                    Text("Default")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(mutedText)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 3)
-                        .background(
-                            RoundedRectangle(cornerRadius: 999)
-                                .fill(surface2)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 999)
-                                .stroke(border, lineWidth: 1)
-                        )
-                }
-
-                // 2. 状态徽章条
-                HStack(spacing: 8) {
-                    if isCompleted {
-                        Text("新 API 已启用")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(AppTheme.sidebarActive)
+                    HStack(spacing: 6) {
+                        if isCompleted {
+                            Text("新 API 已启用")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(AppTheme.sidebarActive)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 999)
+                                        .fill(AppTheme.sidebarActive.opacity(0.15))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 999)
+                                        .stroke(AppTheme.sidebarActive, lineWidth: 1)
+                                )
+                        }
+                        Text("不撤销云端原 Key")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(mutedText)
                             .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
+                            .padding(.vertical, 3)
                             .background(
                                 RoundedRectangle(cornerRadius: 999)
-                                    .fill(AppTheme.sidebarActive.opacity(0.15))
+                                    .fill(surface2)
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 999)
-                                    .stroke(AppTheme.sidebarActive, lineWidth: 1)
+                                    .stroke(border, lineWidth: 1)
+                            )
+                        Text("Default")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(mutedText)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 3)
+                            .background(
+                                RoundedRectangle(cornerRadius: 999)
+                                    .fill(surface2)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 999)
+                                    .stroke(border, lineWidth: 1)
                             )
                     }
-                    Text("不撤销 OCI 云端原 Key")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(mutedText)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(
-                            RoundedRectangle(cornerRadius: 999)
-                                .fill(surface2)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 999)
-                                .stroke(border, lineWidth: 1)
-                        )
                 }
 
                 // 3. 阶段 1: 前置安全备份阶段
                 if model.restrictedPhase == .backup {
-                    VStack(alignment: .leading, spacing: 14) {
-                        // 权限收敛说明
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("权限收敛说明")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(primaryText)
-                            Text("系统将在 Oracle 云端自动创建受限组、策略与用户。新 API 仅拥有：实例管理、存储卷管理、虚拟网络管理与用户只读查看权限。云端原全权 API 保持完好不撤销。")
-                                .font(.system(size: 11.5))
-                                .foregroundColor(mutedText)
-                                .lineSpacing(3)
-                        }
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(surface2)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(border, lineWidth: 1)
-                        )
-
+                    VStack(alignment: .leading, spacing: 12) {
                         // 强制备份卡片
                         VStack(alignment: .leading, spacing: 12) {
                             HStack(spacing: 6) {

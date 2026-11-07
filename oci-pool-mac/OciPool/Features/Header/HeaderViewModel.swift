@@ -102,6 +102,8 @@ final class HeaderViewModel: ObservableObject {
                     unreadCount = n
                 } else if let n = obj["data"] as? Int64 {
                     unreadCount = Int(n)
+                } else if let n = obj["data"] as? NSNumber {
+                    unreadCount = n.intValue
                 }
             }
         } catch {
@@ -113,7 +115,10 @@ final class HeaderViewModel: ObservableObject {
         messageDetail = nil
         selectedMessage = nil
         showMessages = true
-        Task { await loadMessages(page: 1) }
+        Task {
+            await loadMessages(page: 1)
+            await refreshUnread()
+        }
     }
 
     func closeMessages() {
@@ -156,6 +161,7 @@ final class HeaderViewModel: ObservableObject {
             do {
                 let url = try APIClient.shared.makeURL(session.serverURL, path: "/sysMessage/read")
                 _ = try await APIClient.shared.postJSON(url, body: [:])
+                unreadCount = 0
                 await loadMessages(page: messagePage.pageNum)
                 await refreshUnread()
             } catch {

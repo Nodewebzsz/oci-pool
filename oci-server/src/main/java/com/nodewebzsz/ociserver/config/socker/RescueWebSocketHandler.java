@@ -31,6 +31,7 @@ import com.nodewebzsz.ociserver.service.oracle.OracleCloudService;
 import com.nodewebzsz.ociserver.service.SecurityRuleService;
 import com.nodewebzsz.ociserver.service.TemInstanceService;
 import com.nodewebzsz.ociserver.service.TenantService;
+import com.nodewebzsz.ociserver.service.permissions.OciPermissions;
 import com.nodewebzsz.ociserver.utils.oracle.OciObjectStorageUtil;
 import com.nodewebzsz.ociserver.utils.oracle.OciBackUpUtils;
 import com.nodewebzsz.ociserver.utils.oracle.OciUtils;
@@ -267,6 +268,10 @@ public class RescueWebSocketHandler extends TextWebSocketHandler {
 
                 //查询下主区域的regionsCode
                 Tenant tenant = byId.get();
+                OciPermissions.require(tenant, "INSTANCE_REINSTALL");
+                OciPermissions.require(tenant, "INSTANCE_POWER");
+                OciPermissions.require(tenant, "INSTANCE_CREATE");
+                OciPermissions.require(tenant, "VOLUME_MANAGE");
                 String sourceRegionCode = StringUtils.EMPTY;
                 Long parenId = tenant.getParenId();
                 Tenant parentTenant = null;

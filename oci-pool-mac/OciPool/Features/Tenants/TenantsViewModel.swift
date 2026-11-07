@@ -33,6 +33,7 @@ final class TenantsViewModel: ObservableObject {
     @Published var scopeAllUsers: Bool = true
     @Published var scopeResetUsersText: String = ""
     @Published var scopeManageGroupsText: String = ""
+    @Published var showPermissionDetails: Bool = false
 
     // Generic edit
     @Published var editText = ""
@@ -599,6 +600,7 @@ final class TenantsViewModel: ObservableObject {
         scopeAllUsers = true
         scopeResetUsersText = ""
         scopeManageGroupsText = ""
+        showPermissionDetails = false
         loadPermissionCatalog()
 
         activeSheet = .restrictedApi(item)
@@ -817,6 +819,7 @@ final class TenantsViewModel: ObservableObject {
         scopeAllUsers = true
         scopeResetUsersText = ""
         scopeManageGroupsText = ""
+        showPermissionDetails = false
         resetAdd()
         loadPermissionCatalog()
         activeSheet = .add
@@ -826,6 +829,7 @@ final class TenantsViewModel: ObservableObject {
         resetAdd()
         editingManagedTenant = item
         addImportRestrictedMode = true
+        showPermissionDetails = true
         addTenancy = item.tenancy
         addRegion = item.region
         addUserName = item.customAlias.isEmpty ? item.displayName : item.customAlias
@@ -884,6 +888,11 @@ final class TenantsViewModel: ObservableObject {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             // 清空配置输入框时，整个弹窗表单彻底重置
             resetAddFields()
+            if let editing = editingManagedTenant {
+                addTenancy = editing.tenancy
+                addRegion = editing.region
+                addUserName = editing.customAlias.isEmpty ? editing.displayName : editing.customAlias
+            }
             return
         }
 
@@ -1013,7 +1022,9 @@ final class TenantsViewModel: ObservableObject {
 
     func submitAdd() {
         formError = nil
-        parseAddConfig()
+        if !addConfigText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            parseAddConfig()
+        }
         let userName = addUserName.trimmingCharacters(in: .whitespacesAndNewlines)
         let tenantId = addTenantId.trimmingCharacters(in: .whitespacesAndNewlines)
         let fingerprint = addFingerprint.trimmingCharacters(in: .whitespacesAndNewlines)
