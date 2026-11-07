@@ -30,7 +30,9 @@ struct AppButton: View {
                 }
                 Text(title)
                     .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
             }
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .background(background)

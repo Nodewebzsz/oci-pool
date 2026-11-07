@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -12,6 +13,14 @@ import static com.nodewebzsz.ocicommon.utils.IpUtils.getClientIpAddress;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(com.nodewebzsz.ociserver.service.permissions.OciPermissionDeniedException.class)
+    @ResponseBody
+    public ResponseEntity<com.nodewebzsz.ocicommon.param.ApiResponse> handleOciPermissionDenied(
+            com.nodewebzsz.ociserver.service.permissions.OciPermissionDeniedException e) {
+        return ResponseEntity.status(403)
+                .body(com.nodewebzsz.ocicommon.param.ApiResponse.error(e.getMessage()));
+    }
 
     @ExceptionHandler(IpBannedException.class)
     public String handleIpBannedException(IpBannedException e, HttpServletRequest request, Model model) {

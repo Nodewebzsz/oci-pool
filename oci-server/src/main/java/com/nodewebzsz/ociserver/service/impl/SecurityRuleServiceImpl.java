@@ -7,6 +7,7 @@ import com.nodewebzsz.ociserver.utils.oracle.OciClassLoader;
 import com.nodewebzsz.ociserver.pojo.request.SecurityRuleDTO;
 import com.nodewebzsz.ocicommon.param.ApiResponse;
 import com.nodewebzsz.ociserver.service.SecurityRuleService;
+import com.nodewebzsz.ociserver.service.permissions.OciPermissions;
 import com.nodewebzsz.ociserver.utils.oracle.OciUtils;
 import com.oracle.bmc.auth.SimpleAuthenticationDetailsProvider;
 import com.oracle.bmc.core.VirtualNetworkClient;
@@ -45,6 +46,7 @@ public class SecurityRuleServiceImpl implements SecurityRuleService {
         // 获取租户信息
         Tenant tenant = tenantRepository.findById(Long.valueOf(tenantId))
                 .orElseThrow(() -> new RuntimeException("Tenant not found"));
+        OciPermissions.require(tenant, "BASIC_READ");
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
 
         try(VirtualNetworkClient vcnClient =VirtualNetworkClient.builder().build(provider)) {
@@ -115,6 +117,8 @@ public class SecurityRuleServiceImpl implements SecurityRuleService {
      * 添加协议规则 - 自动删除重复规则后重新添加
      */
     public void addSecurityBaseRule(Tenant tenant, SecurityRuleDTO ruleDTO) {
+        tenant = currentTenant(tenant);
+        OciPermissions.require(tenant, "NETWORK_MANAGE");
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
 
         try(VirtualNetworkClient vcnClient = VirtualNetworkClient.builder().build(provider)) {
@@ -274,6 +278,7 @@ public class SecurityRuleServiceImpl implements SecurityRuleService {
         // 获取租户信息
         Tenant tenant = tenantRepository.findById(Long.valueOf(tenantId))
                 .orElseThrow(() -> new RuntimeException("Tenant not found"));
+        OciPermissions.require(tenant, "NETWORK_MANAGE");
 
         // 获取安全列表
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
@@ -623,6 +628,9 @@ public class SecurityRuleServiceImpl implements SecurityRuleService {
     public ApiResponse batchAllSecurityRule(String protocol) {
         List<Tenant> all = tenantRepository.findAll();
         for (Tenant tenant : all) {
+            if (!OciPermissions.allows(tenant, "NETWORK_MANAGE")) {
+                continue;
+            }
             checkAndEnableRule(tenant);
         }
         return ApiResponse.success();
@@ -630,6 +638,10 @@ public class SecurityRuleServiceImpl implements SecurityRuleService {
 
     @Override
     public ApiResponse checkAndEnableRule(Tenant tenant) {
+        tenant = currentTenant(tenant);
+        if (!OciPermissions.allows(tenant, "NETWORK_MANAGE")) {
+            return ApiResponse.success("已跳过未授权的网络规则自动配置");
+        }
         try {
             // 获取当前租户的入站规则
             List<SecurityRuleDTO> ingressRules = getSecurityRules(String.valueOf(tenant.getId()), "ingress");
@@ -766,6 +778,8 @@ public class SecurityRuleServiceImpl implements SecurityRuleService {
     @Override
     @Transactional
     public ApiResponse singleSecurityAllRule(Tenant tenant) {
+        tenant = currentTenant(tenant);
+        OciPermissions.require(tenant, "NETWORK_MANAGE");
         try {
             List<SecurityRuleDTO.SecurityRuleDTOBuilder> securityRuleDTOBuilders = Arrays.asList(
                     SecurityRuleDTO.builder()
@@ -794,6 +808,8 @@ public class SecurityRuleServiceImpl implements SecurityRuleService {
 
     @Override
     public ApiResponse singleIpv6Rule(Tenant tenant) {
+        tenant = currentTenant(tenant);
+        OciPermissions.require(tenant, "NETWORK_MANAGE");
         try {
             List<SecurityRuleDTO.SecurityRuleDTOBuilder> securityRuleDTOBuilders = Arrays.asList(
                     SecurityRuleDTO.builder()
@@ -818,6 +834,14 @@ public class SecurityRuleServiceImpl implements SecurityRuleService {
             return ApiResponse.error("开启icmp失败");
         }
         return ApiResponse.success();
+    }
+
+    private Tenant currentTenant(Tenant tenant) {
+        if (tenant == null || tenant.getId() == null) {
+            throw new IllegalArgumentException("Tenant not found");
+        }
+        return tenantRepository.findById(tenant.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Tenant not found"));
     }
 
     private SecurityRuleDTO convertToDTO(IngressSecurityRule rule, String type) {

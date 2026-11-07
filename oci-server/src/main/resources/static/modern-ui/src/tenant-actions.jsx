@@ -1181,17 +1181,381 @@ function useAddBootModal() {
 
 // ─── Simpler modals for the other tenant actions ────────────────
 
+const OCI_PERMISSION_GROUPS = [
+  { key: 'basic', title: '基础权限', desc: '只读拉取区域、实例、镜像、网络与存储卷' },
+  { key: 'compute', title: '实例管理', desc: '实例开关机、创建/抢机、删除、修改配置、重装与控制台' },
+  { key: 'storage', title: '存储卷管理', desc: '创建/扩容/备份存储卷、独立删除启动卷或块卷' },
+  { key: 'network', title: '网络与区域', desc: 'VCN/子网/公网 IP/安全规则管理、新区域订阅' },
+  { key: 'observability', title: '账单、流量与审计', desc: '账单费用、实例流量监控、OCI 审计事件查询' },
+  { key: 'database', title: '数据库管理', desc: 'MySQL 实例查询、创建、启停与管理' },
+  { key: 'account', title: '账号、用户组与身份域', desc: '用户查询、创建、删除、密码重置与身份域角色委托' },
+];
+
+const FALLBACK_OCI_PERMISSION_CATALOG = [
+  { code: 'BASIC_READ', label: '基础资源查询', group: 'basic', defaultEnabled: true, required: true, supported: true, reason: '查询区域、区间、实例、镜像、网络及存储卷；不包含账号列表。', dependencies: [] },
+  { code: 'INSTANCE_POWER', label: '实例开机、关机与重启', group: 'compute', defaultEnabled: true, required: false, supported: true, reason: '', dependencies: ['BASIC_READ'] },
+  { code: 'INSTANCE_CREATE', label: '创建实例与抢机', group: 'compute', defaultEnabled: true, required: false, supported: true, reason: '使用已有子网创建实例。自动新建网络、修改路由和安全规则需另选网络管理。', dependencies: ['BASIC_READ'] },
+  { code: 'INSTANCE_DELETE', label: '删除实例', group: 'compute', defaultEnabled: false, required: false, supported: true, reason: '允许终止实例。OCI 终止接口也可连带删除该实例的启动卷。', dependencies: ['BASIC_READ'] },
+  { code: 'INSTANCE_UPDATE', label: '修改实例配置', group: 'compute', defaultEnabled: false, required: false, supported: true, reason: '允许修改规格、名称和实例元数据。', dependencies: ['BASIC_READ'] },
+  { code: 'INSTANCE_REINSTALL', label: '重装与控制台连接', group: 'compute', defaultEnabled: false, required: false, supported: true, reason: '允许建立实例控制台连接；需同时授权实例开关机。', dependencies: ['BASIC_READ', 'INSTANCE_POWER'] },
+  { code: 'BOOT_VOLUME_DELETE', label: '独立删除启动卷', group: 'storage', defaultEnabled: false, required: false, supported: true, reason: '控制 DeleteBootVolume；不限制终止实例接口连带删除启动卷的行为。', dependencies: ['BASIC_READ'] },
+  { code: 'BLOCK_VOLUME_DELETE', label: '删除块存储卷', group: 'storage', defaultEnabled: false, required: false, supported: true, reason: '', dependencies: ['BASIC_READ'] },
+  { code: 'VOLUME_MANAGE', label: '创建、调整、挂载及备份存储卷', group: 'storage', defaultEnabled: false, required: false, supported: true, reason: '包含创建卷备份；不包含删除启动卷、块存储卷或卷备份。', dependencies: ['BASIC_READ'] },
+  { code: 'NETWORK_MANAGE', label: '网络与安全规则管理', group: 'network', defaultEnabled: false, required: false, supported: true, reason: '允许网络初始化、网卡及公网 IP 管理、安全规则和路由修改。', dependencies: ['BASIC_READ'] },
+  { code: 'REGION_SUBSCRIBE', label: '订阅区域', group: 'network', defaultEnabled: false, required: false, supported: true, reason: '', dependencies: ['BASIC_READ'] },
+  { code: 'COST_READ', label: '账单与费用查询', group: 'observability', defaultEnabled: true, required: false, supported: true, reason: '', dependencies: ['BASIC_READ'] },
+  { code: 'TRAFFIC_READ', label: '流量与监控查询', group: 'observability', defaultEnabled: true, required: false, supported: true, reason: '', dependencies: ['BASIC_READ'] },
+  { code: 'AUDIT_READ', label: '审计日志查询', group: 'observability', defaultEnabled: false, required: false, supported: true, reason: '', dependencies: ['BASIC_READ'] },
+  { code: 'MYSQL_READ', label: 'MySQL 查询', group: 'database', defaultEnabled: false, required: false, supported: true, reason: '', dependencies: ['BASIC_READ'] },
+  { code: 'MYSQL_MANAGE', label: 'MySQL 创建、修改及删除', group: 'database', defaultEnabled: false, required: false, supported: true, reason: '新建网络和公网负载均衡还需单独授权网络管理。', dependencies: ['BASIC_READ', 'MYSQL_READ'] },
+  { code: 'USER_READ', label: '查询账号与用户组', group: 'account', defaultEnabled: false, required: false, supported: true, reason: '', dependencies: ['BASIC_READ'] },
+  { code: 'USER_CREATE', label: '创建普通用户', group: 'account', defaultEnabled: false, required: false, supported: true, reason: '仅创建用户，不设置控制台密码、不加入用户组。', dependencies: ['BASIC_READ', 'USER_READ'] },
+  { code: 'USER_DELETE', label: '删除用户', group: 'account', defaultEnabled: false, required: false, supported: true, reason: '允许删除租户用户，请谨慎授权。', dependencies: ['BASIC_READ', 'USER_READ'] },
+  { code: 'USER_PASSWORD_RESET', label: '重置指定用户密码', group: 'account', defaultEnabled: false, required: false, supported: true, reason: '为指定的用户或全部用户授权密码重置。', dependencies: ['BASIC_READ', 'USER_READ'] },
+  { code: 'DOMAIN_USER_MANAGE', label: '指定用户组内的账号管理', group: 'account', defaultEnabled: false, required: false, supported: true, reason: '授予身份域 User Manager 角色：启用、禁用、编辑、删除用户及重置密码。', dependencies: ['BASIC_READ', 'USER_READ'] },
+  { code: 'DOMAIN_SECURITY_MANAGE', label: '身份域安全设置与应用管理', group: 'account', defaultEnabled: false, required: false, supported: true, reason: '授予 Security Administrator 角色，含通知邮箱、MFA、社交登录、密码策略管理。', dependencies: ['BASIC_READ', 'USER_READ'] },
+];
+
+const DEFAULT_OPS_PERMISSIONS = [
+  'BASIC_READ', 'INSTANCE_POWER', 'INSTANCE_CREATE', 'INSTANCE_DELETE',
+  'INSTANCE_UPDATE', 'INSTANCE_REINSTALL', 'VOLUME_MANAGE', 'NETWORK_MANAGE',
+  'COST_READ', 'TRAFFIC_READ', 'USER_READ',
+];
+
+function normalizeOciPermissions(codes, catalog = FALLBACK_OCI_PERMISSION_CATALOG) {
+  const byCode = new Map(catalog.map(item => [item.code, item]));
+  const selected = new Set(Array.isArray(codes) ? codes.filter(c => byCode.has(c)) : []);
+  selected.add('BASIC_READ');
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const code of Array.from(selected)) {
+      const item = byCode.get(code);
+      for (const dep of (item?.dependencies || [])) {
+        if (byCode.has(dep) && !selected.has(dep)) {
+          selected.add(dep);
+          changed = true;
+        }
+      }
+    }
+  }
+  return catalog.filter(item => selected.has(item.code)).map(item => item.code);
+}
+
+function toggleOciPermission(currentCodes, targetCode, checked, catalog = FALLBACK_OCI_PERMISSION_CATALOG) {
+  if (targetCode === 'BASIC_READ') return normalizeOciPermissions(currentCodes, catalog);
+  const selected = new Set(Array.isArray(currentCodes) ? currentCodes : []);
+  if (checked) {
+    selected.add(targetCode);
+    return normalizeOciPermissions(Array.from(selected), catalog);
+  }
+  selected.delete(targetCode);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const item of catalog) {
+      if (selected.has(item.code) && (item.dependencies || []).some(dep => !selected.has(dep))) {
+        selected.delete(item.code);
+        changed = true;
+      }
+    }
+  }
+  return normalizeOciPermissions(Array.from(selected), catalog);
+}
+
+function parseOcidLines(rawText) {
+  if (!rawText) return [];
+  return String(rawText)
+    .split(/[\r\n,;，；\s]+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+function buildAccountScopeObject(permState) {
+  const selected = new Set(permState.selectedPermissions || []);
+  const needsReset = selected.has('USER_PASSWORD_RESET');
+  const needsManage = selected.has('DOMAIN_USER_MANAGE');
+  if (!needsReset && !needsManage) {
+    return { allUsers: false, passwordResetUserIds: [], userManagementGroupIds: [] };
+  }
+  const allUsers = Boolean(permState.scopeAllUsers);
+  return {
+    allUsers,
+    passwordResetUserIds: (!allUsers && needsReset) ? parseOcidLines(permState.scopeResetUsersText) : [],
+    userManagementGroupIds: (!allUsers && needsManage) ? parseOcidLines(permState.scopeManageGroupsText) : [],
+  };
+}
+
+function renderOciPermissionSelector(permState, onUpdate) {
+  const catalog = Array.isArray(permState.catalog) && permState.catalog.length > 0
+    ? permState.catalog
+    : FALLBACK_OCI_PERMISSION_CATALOG;
+  const selectedSet = new Set(permState.selectedPermissions || ['BASIC_READ']);
+  const needsReset = selectedSet.has('USER_PASSWORD_RESET');
+  const needsManage = selectedSet.has('DOMAIN_USER_MANAGE');
+
+  const applyPreset = (codes) => {
+    permState.selectedPermissions = normalizeOciPermissions(codes, catalog);
+    onUpdate();
+  };
+
+  return (
+    <div style={{
+      padding: '12px 14px',
+      background: 'var(--bg-2)',
+      border: '1px solid var(--border)',
+      borderRadius: 8,
+      marginBottom: 14,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 10,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <Icon name="shield-check" size={15} style={{ color: 'var(--accent)' }} />
+          <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--fg-0)' }}>
+            受限 API 专用用户与权限自定义
+          </span>
+          <span style={{
+            padding: '1px 7px',
+            borderRadius: 999,
+            fontSize: 10.5,
+            fontWeight: 600,
+            background: 'var(--accent-soft)',
+            color: 'var(--accent)',
+          }}>
+            已选 {selectedSet.size} / {catalog.length} 项
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+          <Button size="xs" variant="outline" onClick={() => applyPreset(catalog.filter(i => i.defaultEnabled).map(i => i.code))}>
+            推荐精简 (5项)
+          </Button>
+          <Button size="xs" variant="outline" onClick={() => applyPreset(DEFAULT_OPS_PERMISSIONS)}>
+            日常运维 (11项)
+          </Button>
+          <Button size="xs" variant="outline" onClick={() => applyPreset(['BASIC_READ'])}>
+            仅只读 (1项)
+          </Button>
+          <Button size="xs" variant="outline" onClick={() => applyPreset(catalog.map(i => i.code))}>
+            全选 ({catalog.length}项)
+          </Button>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--fg-1)' }}>
+          OCI 专用用户名 <span style={{ color: 'var(--danger)' }}>*</span>
+        </span>
+        <TextInput
+          mono
+          value={permState.managedUserName}
+          onChange={v => { permState.managedUserName = v; onUpdate(); }}
+          placeholder="oci-pool-operator"
+        />
+      </div>
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(235px, 1fr))',
+        gap: 8,
+        maxHeight: 280,
+        overflowY: 'auto',
+        paddingRight: 2,
+      }}>
+        {OCI_PERMISSION_GROUPS.map(grp => {
+          const items = catalog.filter(item => item.group === grp.key);
+          if (!items.length) return null;
+          const checkedCount = items.filter(item => selectedSet.has(item.code)).length;
+          return (
+            <div
+              key={grp.key}
+              style={{
+                background: 'var(--bg-1)',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                padding: '8px 10px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 5,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--fg-0)' }}>{grp.title}</span>
+                <span style={{ fontSize: 10, color: 'var(--fg-3)' }}>{checkedCount}/{items.length}</span>
+              </div>
+              {items.map(item => {
+                const checked = selectedSet.has(item.code);
+                const locked = Boolean(item.required || item.code === 'BASIC_READ');
+                return (
+                  <label
+                    key={item.code}
+                    title={item.reason || item.label}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 6,
+                      fontSize: 11,
+                      color: checked ? 'var(--fg-0)' : 'var(--fg-2)',
+                      cursor: locked ? 'default' : 'pointer',
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={locked}
+                      onChange={e => {
+                        permState.selectedPermissions = toggleOciPermission(
+                          permState.selectedPermissions,
+                          item.code,
+                          e.target.checked,
+                          catalog
+                        );
+                        onUpdate();
+                      }}
+                      style={{ marginTop: 2 }}
+                    />
+                    <span style={{ flex: 1 }}>
+                      <span>{item.label}</span>
+                      {locked && <span style={{ marginLeft: 4, fontSize: 9.5, color: 'var(--accent)' }}>(必选)</span>}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      {(needsReset || needsManage) && (
+        <div style={{
+          background: 'var(--bg-1)',
+          border: '1px solid var(--border-strong)',
+          borderRadius: 6,
+          padding: '8px 10px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11.5, color: 'var(--fg-0)', cursor: 'pointer', fontWeight: 500 }}>
+            <input
+              type="checkbox"
+              checked={Boolean(permState.scopeAllUsers)}
+              onChange={e => { permState.scopeAllUsers = e.target.checked; onUpdate(); }}
+            />
+            <span>账号操作范围：允许作用于当前租户内全部非管理员用户 (allUsers)</span>
+          </label>
+          {!permState.scopeAllUsers && needsReset && (
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--fg-2)', marginBottom: 4 }}>
+                允许重置密码的目标用户 OCID（每行或逗号分隔，必填）：
+              </div>
+              <TextArea
+                mono
+                rows={2}
+                value={permState.scopeResetUsersText}
+                onChange={v => { permState.scopeResetUsersText = v; onUpdate(); }}
+                placeholder="ocid1.user.oc1..aaaaaaaa..."
+              />
+            </div>
+          )}
+          {!permState.scopeAllUsers && needsManage && (
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--fg-2)', marginBottom: 4 }}>
+                允许管理的目标用户组 OCID（每行或逗号分隔，必填）：
+              </div>
+              <TextArea
+                mono
+                rows={2}
+                value={permState.scopeManageGroupsText}
+                onChange={v => { permState.scopeManageGroupsText = v; onUpdate(); }}
+                placeholder="ocid1.group.oc1..aaaaaaaa..."
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function useApiImportModal() {
   const shell = useShell();
-  return React.useCallback(() => {
+  return React.useCallback((targetTenant) => {
+    const tenantObj = (targetTenant && !targetTenant.nativeEvent && !targetTenant.preventDefault && typeof targetTenant === 'object')
+      ? targetTenant
+      : null;
+    const isEditingManaged = Boolean(tenantObj && (tenantObj._ui?.isManaged || tenantObj.permissionMode));
+    let closed = false;
+    const closeModal = () => {
+      closed = true;
+      shell.closeModal();
+    };
+    let initialPerms = DEFAULT_OPS_PERMISSIONS;
+    if (isEditingManaged) {
+      try {
+        const raw = tenantObj._ui?.permissionsJson || tenantObj.permissionsJson;
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          initialPerms = normalizeOciPermissions(parsed);
+        }
+      } catch (_) {}
+    }
+    let initialScopeAllUsers = true;
+    let initialResetText = '';
+    let initialGroupText = '';
+    if (isEditingManaged) {
+      try {
+        const rawScope = tenantObj._ui?.accountScopeJson || tenantObj.accountScopeJson;
+        const parsedScope = typeof rawScope === 'string' ? JSON.parse(rawScope) : rawScope;
+        if (parsedScope && typeof parsedScope === 'object') {
+          initialScopeAllUsers = Boolean(parsedScope.allUsers);
+          if (Array.isArray(parsedScope.passwordResetUserIds)) {
+            initialResetText = parsedScope.passwordResetUserIds.join('\n');
+          }
+          if (Array.isArray(parsedScope.userManagementGroupIds)) {
+            initialGroupText = parsedScope.userManagementGroupIds.join('\n');
+          }
+        }
+      } catch (_) {}
+    }
+
     const state = {
-      tenancy: '', user: '', fingerprint: '', region: '',
-      privateKey: '', alias: '',
+      importMode: isEditingManaged ? 'restricted' : 'full', // 'full' | 'restricted'
+      tenancy: isEditingManaged ? (tenantObj.tenancy || '') : '',
+      user: '',
+      fingerprint: '',
+      region: isEditingManaged ? (getTenantRegion(tenantObj) || '') : '',
+      privateKey: '',
+      alias: isEditingManaged ? (getTenantAlias(tenantObj) || getTenantName(tenantObj) || '') : '',
       pasteBuffer: '',
       lastParsed: null, // { count, fields }
       keyFileName: '', // when user uploads .pem file
       keyMode: 'upload', // 'upload' | 'paste' — how to input private key
+      managedUserName: isEditingManaged
+        ? (tenantObj._ui?.managedUserName || tenantObj.managedUserName || 'oci-pool-operator')
+        : 'oci-pool-operator',
+      catalog: FALLBACK_OCI_PERMISSION_CATALOG,
+      selectedPermissions: initialPerms,
+      scopeAllUsers: initialScopeAllUsers,
+      scopeResetUsersText: initialResetText,
+      scopeManageGroupsText: initialGroupText,
+      submitting: false,
     };
+
+    // 异步拉取后端权威权限目录
+    window.ociApi.request('/tenants/permissions/catalog')
+      .then(res => {
+        if (closed) return;
+        const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : null);
+        if (list && list.length > 0) {
+          state.catalog = list;
+          state.selectedPermissions = normalizeOciPermissions(state.selectedPermissions, list);
+          render();
+        }
+      })
+      .catch(() => {});
 
     // 重置除 pasteBuffer 外的全部表单字段
     const resetForm = () => {
@@ -1309,14 +1673,66 @@ function useApiImportModal() {
     };
 
     const render = () => {
+      if (closed) return;
       shell.openModal({
-        title: tr('tenant.bcfef1'),
-        subtitle: tr('tenant.86816b'),
+        title: isEditingManaged ? `调整受限 API 权限 · ${getTenantName(tenantObj) || state.alias}` : tr('tenant.bcfef1'),
+        subtitle: isEditingManaged
+          ? '提供具有 IAM 管理权限的临时 API 凭据以更新云端策略与身份域角色（原管理密钥不会落盘）'
+          : tr('tenant.86816b'),
         icon: 'zap',
         iconColor: 'var(--accent)',
         size: 'lg',
+        onClose: closeModal,
         body: (
           <div style={{ padding: 22 }}>
+            {/* ─── 导入模式切换（完整 API vs 受限自定义权限） ─────────────── */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 8,
+              marginBottom: 14,
+              padding: 4,
+              background: 'var(--bg-2)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+            }}>
+              {[
+                { id: 'full', label: '完整 API 导入（直接保存原凭证）', icon: 'key' },
+                { id: 'restricted', label: isEditingManaged ? '受限权限更新（自定义最小权限）' : '受限权限导入（创建专用用户 · 推荐）', icon: 'shield-check' },
+              ].map(tab => {
+                const active = state.importMode === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    disabled={isEditingManaged && tab.id === 'full'}
+                    onClick={() => { state.importMode = tab.id; render(); }}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: 6,
+                      border: active ? '1px solid var(--accent)' : '1px solid transparent',
+                      background: active ? 'var(--accent-soft)' : 'transparent',
+                      color: active ? 'var(--accent)' : 'var(--fg-2)',
+                      fontSize: 12,
+                      fontWeight: active ? 600 : 500,
+                      cursor: (isEditingManaged && tab.id === 'full') ? 'not-allowed' : 'pointer',
+                      opacity: (isEditingManaged && tab.id === 'full') ? 0.5 : 1,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      transition: 'all 120ms',
+                    }}
+                  >
+                    <Icon name={tab.icon} size={13} />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {state.importMode === 'restricted' && renderOciPermissionSelector(state, render)}
+
             {/* ─── API 配置快速导入 ─────────────────────────────── */}
             <div style={{
               padding: 14,
@@ -1566,12 +1982,53 @@ function useApiImportModal() {
         ),
         footer: (
           <>
-            <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('tenant.625fb2')}</Button>
+            <Button variant="ghost" size="md" onClick={closeModal}>{tr('tenant.625fb2')}</Button>
             <Button variant="outline" size="md" icon="upload">{tr('tenant.832307')}</Button>
             <Button
               variant="primary" size="md" icon="check"
-              disabled={!state.alias || !state.region || !state.tenancy || !state.user || !state.fingerprint || !state.privateKey}
+              loading={state.submitting}
+              disabled={state.submitting || !state.alias || !state.region || !state.tenancy || !state.user || !state.fingerprint || !state.privateKey || (state.importMode === 'restricted' && !state.managedUserName.trim())}
               onClick={async () => {
+                if (state.importMode === 'restricted') {
+                  state.submitting = true;
+                  render();
+                  try {
+                    const fd = new FormData();
+                    fd.append('tenantId', state.user.trim());
+                    fd.append('tenancy', state.tenancy.trim());
+                    fd.append('fingerprint', state.fingerprint.trim());
+                    fd.append('region', state.region);
+                    fd.append('userName', state.alias.trim());
+                    fd.append('managedUserName', state.managedUserName.trim());
+                    fd.append('permissions', JSON.stringify(state.selectedPermissions));
+                    fd.append('accountScope', JSON.stringify(buildAccountScopeObject(state)));
+                    const pemBlob = new Blob([state.privateKey], { type: 'application/x-pem-file' });
+                    fd.append('keyFileStr', pemBlob, state.keyFileName || 'oci_api_key.pem');
+
+                    const res = await fetch('/tenants/restricted/save', {
+                      method: 'POST',
+                      headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                      credentials: 'include',
+                      body: fd,
+                    });
+                    const body = await res.json().catch(() => ({}));
+                    if (res.ok && body && body.success) {
+                      closeModal();
+                      shell.showToast(body.data?.message || '受限 API 专用用户权限配置成功', { kind: 'success' });
+                      window.dispatchEvent(new CustomEvent('ocip-refresh-page', { detail: 'tenants' }));
+                      return;
+                    } else {
+                      shell.showToast(body?.message || `受限配置失败 (${res.status})`, { kind: 'error' });
+                    }
+                  } catch (e) {
+                    shell.showToast(e.message || '受限配置失败', { kind: 'error' });
+                  } finally {
+                    state.submitting = false;
+                    if (!closed) render();
+                  }
+                  return;
+                }
+
                 // 真实后端导入:POST /tenants/import → tenantService.importData(List<Map>)
                 // 后端 createTenantFromRecord 读取: id/tenant_id/user_name/fingerprint/tenancy/region/cloud_type/key_file_content/tenancy_name
                 // · user_name 必须保留完整 user OCID(OCI API 认证依赖,不能改成可读名)。
@@ -1617,7 +2074,7 @@ function useApiImportModal() {
                   });
                   const txt = await res.text();
                   if (res.ok) {
-                    shell.closeModal();
+                    closeModal();
                     shell.showToast(tr('tenant.f7572c').replace('{0}',txt || tr('tenant.importOk')), { kind: 'success' });
                     // 原地刷新租户数据(不整页 reload)
                     window.dispatchEvent(new CustomEvent('ocip-refresh-page', { detail: 'tenants' }));
@@ -4603,13 +5060,18 @@ function useUserManageModal() {
 
     const normUser = (u) => {
       const st = String(u.lifecycleState || '').toLowerCase();
+      const domainActive = typeof u.active === 'boolean' ? u.active : (st === 'active');
       let status = 'inactive';
-      if (st === 'active') status = 'active';
+      if (st === 'active' && domainActive !== false) status = 'active';
       return {
         id: u.id,
         username: u.username,
         email: u.email,
         status,
+        domainActive,
+        canManage: Boolean(u.canManage),
+        canResetPassword: u.canResetPassword !== false,
+        canDelete: u.canDelete !== false,
         createdAt: fmtDate(u.timeCreated),
         lastLogin: u.lastSuccessfulLoginTime ? fmtDate(u.lastSuccessfulLoginTime) : '-',
         domain: u.domain,
@@ -4954,11 +5416,14 @@ function useUserManageModal() {
                             </td>
                             <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                               {(() => {
+                                const hasActions = Boolean(u.canManage || u.canResetPassword || u.canDelete);
                                 const isOpen = state.menuFor === u.id;
                                 return (
                                   <button type="button"
+                                    disabled={!hasActions}
                                     onClick={e => {
                                       e.stopPropagation();
+                                      if (!hasActions) return;
                                       if (isOpen) { state.menuFor = null; render(); return; }
                                       state.menuFor = u.id;
                                       state.menuAnchor = e.currentTarget;
@@ -4969,10 +5434,11 @@ function useUserManageModal() {
                                       background: isOpen ? 'var(--accent)' : 'var(--bg-2)',
                                       border: '1px solid ' + (isOpen ? 'var(--accent)' : 'var(--border)'),
                                       color: isOpen ? 'var(--accent-fg)' : 'var(--fg-1)',
-                                      cursor: 'pointer',
+                                      cursor: hasActions ? 'pointer' : 'not-allowed',
+                                      opacity: hasActions ? 1 : 0.4,
                                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                                     }}
-                                    title={tr('tenant.2b6bc0')}
+                                    title={hasActions ? tr('tenant.2b6bc0') : '当前凭据无权操作该用户'}
                                   ><Icon name="more-horizontal" size={13} /></button>
                                 );
                               })()}
@@ -4984,10 +5450,21 @@ function useUserManageModal() {
                   </table>
                 </div>
 
-                {/* 行操作菜单 · 对齐原项目仅 重置密码 / 删除用户 */}
+                {/* 行操作菜单 · 按当前凭据权限展示 启用禁用 / 重置密码 / 删除用户 */}
                 {state.menuFor && state.menuAnchor && (() => {
                   const u = state.users.find(x => x.id === state.menuFor);
                   if (!u) return null;
+                  const actionItems = [
+                    ...(u.canManage ? [{
+                      id: 'toggle-state',
+                      label: u.domainActive === false ? '启用用户' : '禁用用户',
+                      icon: u.domainActive === false ? 'check-circle' : 'slash',
+                      color: u.domainActive === false ? 'var(--accent)' : 'var(--orange)',
+                    }] : []),
+                    ...(u.canResetPassword ? [{ id: 'reset',  label: tr('tenant.0719aa'), icon: 'key',     color: 'var(--info)' }] : []),
+                    ...(u.canDelete ?        [{ id: 'delete', label: tr('tenant.10991c'), icon: 'trash-2', color: 'var(--danger)' }] : []),
+                  ];
+                  if (actionItems.length === 0) return null;
                   return (
                     <RowActionMenu
                       anchorEl={state.menuAnchor}
@@ -5004,13 +5481,34 @@ function useUserManageModal() {
                           <span className="mono" style={{ color: 'var(--fg-0)', flex: 1 }}>{u.username}</span>
                         </>
                       }
-                      items={[
-                        { id: 'reset',  label: tr('tenant.0719aa'), icon: 'key',           color: 'var(--info)' },
-                        { id: 'delete', label: tr('tenant.10991c'), icon: 'trash-2',        color: 'var(--danger)' },
-                      ]}
+                      items={actionItems}
                       onClose={() => { state.menuFor = null; state.menuAnchor = null; render(); }}
                       onAction={(id) => {
-                        if (id === 'reset') {
+                        if (id === 'toggle-state') {
+                          const targetActive = u.domainActive === false;
+                          const actionText = targetActive ? '启用' : '禁用';
+                          shell.openConfirm({
+                            title: `${actionText}用户 · ${u.username}`,
+                            body: <div>确认在 OCI 身份域中<b>{actionText}</b>用户 <span className="mono">{u.username}</span> 吗？</div>,
+                            danger: !targetActive,
+                            confirmLabel: `${actionText}用户`,
+                            onConfirm: async () => {
+                              try {
+                                const r = await window.ociApi.request('/tenants/oracle-users/state', {
+                                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ tenantId: getTenantDbId(tenant), userId: u.id, active: targetActive }),
+                                });
+                                if (r && r.success === false) {
+                                  throw new Error(r.message || `${actionText}用户失败`);
+                                }
+                                shell.showToast(r?.data?.message || `用户 ${u.username} 已${actionText}`, { kind: 'success' });
+                                loadUsers();
+                              } catch (e) {
+                                shell.showToast(`${actionText}失败: ` + ((e && (e.message || e)) || tr('tenant.netError')), { kind: 'error' });
+                              }
+                            },
+                          });
+                        } else if (id === 'reset') {
                           shell.openConfirm({
                             title: tr('tenant.f602f5').replace('{0}',u.username),
                             body: <div>{tr('tenant.8bb392')}</div>,
@@ -5021,7 +5519,13 @@ function useUserManageModal() {
                                   method: 'POST', headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify({ tenantId: getTenantDbId(tenant), userId: u.id, userName: u.username }),
                                 });
-                                shell.showToast(tr('tenant.5fc3e4').replace('{0}',u.username).replace('{1}',r && r.message ? ' · ' + r.message : ''), { kind: 'success' });
+                                if (r && r.success === false) {
+                                  throw new Error(r.message || '重置密码失败');
+                                }
+                                const detailMsg = r?.data?.temporaryPassword
+                                  ? ` · 临时密码: ${r.data.temporaryPassword}`
+                                  : (r?.data?.message ? ` · ${r.data.message}` : (r?.message ? ` · ${r.message}` : ''));
+                                shell.showToast(tr('tenant.5fc3e4').replace('{0}',u.username).replace('{1}',detailMsg), { kind: 'success', duration: 8000 });
                               } catch (e) {
                                 shell.showToast(tr('tenant.40b937').replace('{0}',(e && (e.message || e)) || tr('tenant.netError')), { kind: 'error' });
                               }
@@ -5034,10 +5538,13 @@ function useUserManageModal() {
                             danger: true, requireText: u.username, confirmLabel: tr('tenant.96d2b7'),
                             onConfirm: async () => {
                               try {
-                                await window.ociApi.request('/tenants/oracle-users/deleteUser', {
+                                const r = await window.ociApi.request('/tenants/oracle-users/deleteUser', {
                                   method: 'POST', headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify({ tenantId: getTenantDbId(tenant), userId: u.id }),
                                 });
+                                if (r && r.success === false) {
+                                  throw new Error(r.message || '删除用户失败');
+                                }
                                 shell.showToast(tr('tenant.1e5301').replace('{0}',u.username), { kind: 'warn' });
                                 loadUsers();
                               } catch (e) {
@@ -7402,7 +7909,7 @@ function useRestrictedApiModal() {
   const shell = useShell();
 
   return React.useCallback((tenant, onReload) => {
-    const tenantDbId = window.getTenantDbId ? window.getTenantDbId(tenant) : (tenant.id || tenant.tenantDbId);
+    const tenantDbId = window.getTenantDbId ? window.getTenantDbId(tenant) : (tenant?.idStr || tenant?.tenantDbId);
     const src = (tenant && tenant._ui) ? tenant : (window.ociTenantRow ? window.ociTenantRow.normalize(tenant, window.REGIONS) : (tenant || {}));
     const realTenancyName = src.tenancyName || (window.getTenantName ? window.getTenantName(src) : '') || tenant.userName || '租户';
     const customAlias = window.getTenantAlias ? window.getTenantAlias(src) : '';
@@ -7415,6 +7922,7 @@ function useRestrictedApiModal() {
     const isHome = src.isHomeRegion || src.parenId === 0 || src.parenId === '0' || tenant.parenId === 0;
 
     let sseSource = null;
+    let closed = false;
 
     const state = {
       phase: 'backup', // 'backup' | 'executing'
@@ -7442,7 +7950,27 @@ function useRestrictedApiModal() {
       detailsOpen: false,
       taskSummary: null,
       errorMsg: '',
+
+      // 自定义权限选择状态
+      managedUserName: src._ui?.managedUserName || tenant?.managedUserName || 'oci-pool-operator',
+      catalog: FALLBACK_OCI_PERMISSION_CATALOG,
+      selectedPermissions: DEFAULT_OPS_PERMISSIONS,
+      scopeAllUsers: true,
+      scopeResetUsersText: '',
+      scopeManageGroupsText: '',
     };
+
+    window.ociApi.request('/tenants/permissions/catalog')
+      .then(res => {
+        if (closed) return;
+        const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : null);
+        if (list && list.length > 0) {
+          state.catalog = list;
+          state.selectedPermissions = normalizeOciPermissions(state.selectedPermissions, list);
+          render();
+        }
+      })
+      .catch(() => {});
 
     // 1. 加载备份信息
     const loadBackup = async () => {
@@ -7457,7 +7985,7 @@ function useRestrictedApiModal() {
         console.warn('加载备份密钥失败:', err);
       } finally {
         state.loadingBackup = false;
-        render();
+        if (!closed) render();
       }
     };
 
@@ -7513,7 +8041,13 @@ function useRestrictedApiModal() {
       state.steps[0].progressText = '正在创建云端专用组...';
       render();
 
-      sseSource = new EventSource(`/tenants/restricted-api/switch-stream?tenantId=${encodeURIComponent(tenantDbId)}`);
+      const qs = new URLSearchParams({
+        tenantId: String(tenantDbId),
+        managedUserName: (state.managedUserName || '').trim() || 'oci-pool-operator',
+        permissions: JSON.stringify(state.selectedPermissions || DEFAULT_OPS_PERMISSIONS),
+        accountScope: JSON.stringify(buildAccountScopeObject(state)),
+      });
+      sseSource = new EventSource(`/tenants/restricted-api/switch-stream?${qs.toString()}`);
 
       sseSource.addEventListener('step', (event) => {
         try {
@@ -7579,6 +8113,7 @@ function useRestrictedApiModal() {
     };
 
     const handleClose = () => {
+      closed = true;
       if (sseSource) {
         sseSource.close();
         sseSource = null;
@@ -7587,12 +8122,13 @@ function useRestrictedApiModal() {
     };
 
     const render = () => {
+      if (closed) return;
       const isCompleted = state.currentStep === 8;
       const isExecuting = state.phase === 'executing' && !isCompleted && !state.errorMsg;
 
       shell.openModal({
         title: '切换为受限 API',
-        width: 580,
+        width: 680,
         onClose: handleClose,
         body: (
           <div style={{ padding: '18px 22px 22px' }}>
@@ -7668,21 +8204,7 @@ function useRestrictedApiModal() {
             {/* 阶段 1: 前置安全备份 */}
             {state.phase === 'backup' && (
               <div>
-                <div style={{
-                  padding: '12px 14px',
-                  background: 'var(--bg-2)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 8,
-                  fontSize: 12,
-                  color: 'var(--fg-2)',
-                  lineHeight: 1.6,
-                  marginBottom: 16
-                }}>
-                  <div style={{ fontWeight: 600, color: 'var(--fg-0)', marginBottom: 4 }}>
-                    权限收敛说明
-                  </div>
-                  <div>系统将在 Oracle 云端自动创建受限组、策略与用户。新 API 仅拥有：<b>实例管理、存储卷管理、虚拟网络管理与用户只读查看权限</b>。云端原全权 API 保持完好不撤销。</div>
-                </div>
+                {renderOciPermissionSelector(state, render)}
 
                 <div style={{
                   padding: '14px 16px',

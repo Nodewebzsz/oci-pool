@@ -192,6 +192,7 @@ private struct SelectMenuPanelView: View {
                 .stroke(AppInputStyle.border(dark, focused: true).opacity(0.7), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(dark ? 0.45 : 0.14), radius: 14, y: 6)
+        .padding(20)
     }
 
     private var searchBar: some View {
@@ -286,6 +287,7 @@ private struct SelectMenuPanelView: View {
 /// so it floats above all sheets, ScrollViews, and layer-backed views without occlusion.
 private struct SelectMenuFloatBridge: NSViewRepresentable {
     final class AnchorView: NSView {
+        private static let shadowBleed: CGFloat = 20
         var panelWidth: CGFloat = 160
         var gap: CGFloat = 4
         var panelState: SelectMenuPanelState?
@@ -308,7 +310,7 @@ private struct SelectMenuFloatBridge: NSViewRepresentable {
 
                 let panel = NSPanel(
                     contentRect: NSRect(x: 0, y: 0, width: panelWidth, height: 100),
-                    styleMask: [.nonactivatingPanel, .fullSizeContentView],
+                    styleMask: [.borderless, .nonactivatingPanel],
                     backing: .buffered,
                     defer: false
                 )
@@ -352,6 +354,7 @@ private struct SelectMenuFloatBridge: NSViewRepresentable {
         func layoutPanel() {
             guard let panel = popupPanel, let window = window, let host = panel.contentView as? NSHostingView<AnyView> else { return }
 
+            let bleed = Self.shadowBleed
             let fitting = host.fittingSize
             let w = max(panelWidth, 1)
             let estimated: CGFloat = {
@@ -363,20 +366,20 @@ private struct SelectMenuFloatBridge: NSViewRepresentable {
                 h += rows * 36
                 return min(h, state.maxPanelHeight + (state.showSearch ? 38 : 0) + 8)
             }()
-            let h = max(fitting.height > 10 ? fitting.height : estimated, 40)
+            let cardH = max(fitting.height > (10 + bleed * 2) ? (fitting.height - bleed * 2) : estimated, 40)
 
             // Trigger frame converted to screen coordinates
             let triggerWin = convert(bounds, to: nil)
             let triggerScreen = window.convertToScreen(triggerWin)
 
             var panelX = triggerScreen.minX
-            var panelY = triggerScreen.minY - gap - h
+            var panelY = triggerScreen.minY - gap - cardH
 
             // Screen bounds clamp
             let screenFrame = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
             if panelY < screenFrame.minY + 4 {
                 let aboveY = triggerScreen.maxY + gap
-                if aboveY + h <= screenFrame.maxY - 4 {
+                if aboveY + cardH <= screenFrame.maxY - 4 {
                     panelY = aboveY
                 } else {
                     panelY = max(screenFrame.minY + 4, panelY)
@@ -389,7 +392,10 @@ private struct SelectMenuFloatBridge: NSViewRepresentable {
                 panelX = screenFrame.minX + 4
             }
 
-            panel.setFrame(NSRect(x: panelX, y: panelY, width: w, height: h), display: true)
+            panel.setFrame(
+                NSRect(x: panelX - bleed, y: panelY - bleed, width: w + bleed * 2, height: cardH + bleed * 2),
+                display: true
+            )
         }
 
         func startMonitoring() {
@@ -427,7 +433,8 @@ private struct SelectMenuFloatBridge: NSViewRepresentable {
 
         private func eventHitsMenu() -> Bool {
             let p = NSEvent.mouseLocation // screen points
-            if let panel = popupPanel, panel.frame.insetBy(dx: -4, dy: -4).contains(p) {
+            let bleed = Self.shadowBleed
+            if let panel = popupPanel, panel.frame.insetBy(dx: bleed - 4, dy: bleed - 4).contains(p) {
                 return true
             }
             if let window = self.window {

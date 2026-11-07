@@ -8,6 +8,7 @@ import com.nodewebzsz.ociserver.pojo.request.AuditLogRequest;
 import com.nodewebzsz.ociserver.pojo.request.BootVolumeUpdateRequest;
 import com.nodewebzsz.ociserver.pojo.request.DeleteOciUserRequest;
 import com.nodewebzsz.ociserver.pojo.request.ResetOciPassRequest;
+import com.nodewebzsz.ociserver.pojo.request.UpdateOciUserStateRequest;
 import com.nodewebzsz.ociserver.pojo.request.TenantDTO;
 import com.nodewebzsz.ociserver.pojo.response.AccountCheckRes;
 import com.nodewebzsz.ociserver.pojo.response.PasswordPolicyDetail;
@@ -133,6 +134,7 @@ public interface TenantService {
      * @Date: 9/7/25 9:11 AM
      */
     ApiResponse resetPassword(ResetOciPassRequest request);
+    ApiResponse updateUserState(UpdateOciUserStateRequest request);
 
     ApiResponse enableEmailService(Map<String, Object> request);
 
@@ -168,4 +170,6 @@ public interface TenantService {
     Map<String, Object> getBackupKeyInfo(Long tenantId);
 
     void switchRestrictedApiWithSSE(Long tenantId, SseEmitter emitter);
+
+    void switchRestrictedApiWithSSE(Long tenantId, String managedUserName, String permissionsJson, String accountScopeJson, SseEmitter emitter);
 }

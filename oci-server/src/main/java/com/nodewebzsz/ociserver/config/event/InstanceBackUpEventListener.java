@@ -49,7 +49,7 @@ public class InstanceBackUpEventListener {
     @Async
     @EventListener
     public void handleInstanceBackUpEvent(InstanceBackUpEvent event) {
-        log.debug("handleInstanceBackUpEvent 开始执行......: {}", JSON.toJSONString(event.getInstanceData()));
+        log.debug("handleInstanceBackUpEvent 开始执行，租户ID:{}", event.getInstanceData().getTenantId());
         try {
             OracleInstanceDetail instanceData = event.getInstanceData();
             Instance instance = instanceData.getInstance();
@@ -59,6 +59,9 @@ public class InstanceBackUpEventListener {
                 return;
             }
             Tenant tenant = byId.get();
+            if (!com.nodewebzsz.ociserver.service.permissions.OciPermissions.allows(tenant, "VOLUME_MANAGE")) {
+                return;
+            }
             String accountType = tenant.getAccountType();
 
             if (StringUtils.isEmpty(accountType) || accountType.equals(AccountTypeEnum.UN_KNOW_ACCOUNT.getType())){

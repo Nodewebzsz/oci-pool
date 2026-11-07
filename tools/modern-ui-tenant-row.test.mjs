@@ -158,3 +158,29 @@ test('费用、流量和审计导出必须基于真实查询结果，不能只�
   assert.doesNotMatch(actions, /已导出流量报表 → traffic-report\.csv/);
   assert.doesNotMatch(actions, /已导出账单 → cost_/);
 });
+
+test('受限权限字段透传到 _ui 并派生 isManaged 标记', () => {
+  const tenantRow = loadTenantRow();
+  const managed = tenantRow.normalize({
+    id: 18,
+    idStr: '18',
+    tenancyName: 'managed-tenancy',
+    permissionMode: 'managed-v1',
+    permissionsJson: '["BASIC_READ","INSTANCE_POWER"]',
+    managedUserName: 'oci-pool-operator',
+    accountScopeJson: '{"allUsers":true}',
+  }, regions);
+  assert.equal(managed._ui.isManaged, true);
+  assert.equal(managed._ui.permissionMode, 'managed-v1');
+  assert.equal(managed._ui.permissionsJson, '["BASIC_READ","INSTANCE_POWER"]');
+  assert.equal(managed._ui.managedUserName, 'oci-pool-operator');
+  assert.equal(managed._ui.accountScopeJson, '{"allUsers":true}');
+
+  const full = tenantRow.normalize({
+    id: 19,
+    idStr: '19',
+    tenancyName: 'full-tenancy',
+  }, regions);
+  assert.equal(full._ui.isManaged, false);
+  assert.equal(full._ui.permissionMode, '');
+});

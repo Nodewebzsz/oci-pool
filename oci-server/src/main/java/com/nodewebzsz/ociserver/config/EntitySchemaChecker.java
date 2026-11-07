@@ -115,6 +115,10 @@ public class EntitySchemaChecker implements CommandLineRunner {
     }
 
     private String generateColumnDefinition(Field field) {
+        javax.persistence.Column columnAnn = field.getAnnotation(javax.persistence.Column.class);
+        if (columnAnn != null && columnAnn.columnDefinition() != null && !columnAnn.columnDefinition().trim().isEmpty()) {
+            return columnAnn.columnDefinition().trim();
+        }
         Class<?> type = field.getType();
         if (type == String.class) {
             return "VARCHAR(255)";

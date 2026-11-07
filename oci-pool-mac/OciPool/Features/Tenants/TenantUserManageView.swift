@@ -359,13 +359,23 @@ struct TenantUserManageView: View {
             cell(user.timeCreated.isEmpty ? "—" : user.timeCreated, wCreated, muted: true)
             cell(user.lastSuccessfulLoginTime.isEmpty ? "—" : user.lastSuccessfulLoginTime, wLogin, muted: true)
             HStack(spacing: 4) {
-                AppButton(title: "重置", kind: .secondary) {
-                    guard let t = tenant else { return }
-                    model.resetUserPassword(for: t, user: user)
+                if user.canManage {
+                    AppButton(title: user.isDomainActive ? "冻结" : "激活", kind: .secondary) {
+                        guard let t = tenant else { return }
+                        model.toggleUserState(for: t, user: user)
+                    }
                 }
-                AppButton(title: "删除", kind: .danger) {
-                    guard let t = tenant else { return }
-                    model.deleteUser(for: t, user: user)
+                if user.canResetPassword {
+                    AppButton(title: "重置", kind: .secondary) {
+                        guard let t = tenant else { return }
+                        model.resetUserPassword(for: t, user: user)
+                    }
+                }
+                if user.canDelete {
+                    AppButton(title: "删除", kind: .danger) {
+                        guard let t = tenant else { return }
+                        model.deleteUser(for: t, user: user)
+                    }
                 }
             }
             .frame(width: wAction, alignment: .center)

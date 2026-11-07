@@ -13,6 +13,8 @@ import com.nodewebzsz.ociserver.pojo.request.AuditLogRequest;
 import com.nodewebzsz.ociserver.pojo.request.DeleteOciUserRequest;
 import com.nodewebzsz.ociserver.pojo.request.ImageInfoReq;
 import com.nodewebzsz.ociserver.pojo.request.ResetOciPassRequest;
+import com.nodewebzsz.ociserver.pojo.request.UpdateOciUserStateRequest;
+import com.nodewebzsz.ociserver.service.permissions.ManagedAccountAccessService;
 import com.nodewebzsz.ociserver.pojo.request.UpdateCustomNameRequest;
 import com.nodewebzsz.ociserver.pojo.request.UpdatePasswordPolicyRequest;
 import com.nodewebzsz.ociserver.pojo.response.PasswordPolicyDetail;
@@ -564,6 +566,8 @@ public class TenantController extends BaseController{
         try {
             tenantService.saveTenant(tenant, keyFile);
             return ApiResponse.success();
+        } catch (IllegalArgumentException e) {
+            return ApiResponse.error(e.getMessage());
         } catch (IOException e) {
             log.error("保存租户信息失败", e);
             return ApiResponse.error("保存失败: " + e.getMessage());
@@ -788,6 +792,12 @@ public class TenantController extends BaseController{
         return tenantService.resetPassword(request);
     }
 
+    @PostMapping("/oracle-users/state")
+    @ResponseBody
+    public ApiResponse updateUserState(@RequestBody @Valid UpdateOciUserStateRequest request) {
+        return tenantService.updateUserState(request);
+    }
+
     /**
      * 删除一个 用户
      */
@@ -842,13 +852,14 @@ public class TenantController extends BaseController{
                                     user.getId(),
                                     user.getName(),
                                     user.getLifecycleState().name(),
-                                    user.getName(),
+                                    user.getId(),
                                     user.getEmail(),
                                     user.getLastSuccessfulLoginTime(),
                                     user.getTimeCreated(),
                                     extractDomain(user.getName())
                             ))
                     .collect(Collectors.toList());
+            ManagedAccountAccessService.enrichUsers(tenantService.getById(Long.valueOf(tenantId)), users);
             // 模拟数据：无用户且开关开启时返回 demo 用户
             if (users.isEmpty() && mockDataService.isMockEnabled()) {
                 return ResponseEntity.ok(mockDataService.userList());
@@ -877,13 +888,14 @@ public class TenantController extends BaseController{
                                     user.getId(),
                                     user.getName(),
                                     user.getLifecycleState().name(),
-                                    user.getName(),
+                                    user.getId(),
                                     user.getEmail(),
                                     user.getLastSuccessfulLoginTime(),
                                     user.getTimeCreated(),
                                     extractDomain(user.getName())
                             ))
                     .collect(Collectors.toList());
+            ManagedAccountAccessService.enrichUsers(tenantService.getById(Long.valueOf(tenantId)), users);
             Page<UserRes> emptyPage = PageUtils.createEmptyPage(page, size);
             return ResponseEntity.ok(users);
         } catch (Exception e) {
@@ -1461,7 +1473,11 @@ public class TenantController extends BaseController{
      * 一键切换为受限 API（SSE 流式推进 8 步全生命周期）
      */
     @GetMapping(value = "/restricted-api/switch-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter switchRestrictedApiStream(@RequestParam Long tenantId) {
+    public SseEmitter switchRestrictedApiStream(
+            @RequestParam Long tenantId,
+            @RequestParam(required = false) String managedUserName,
+            @RequestParam(required = false) String permissions,
+            @RequestParam(required = false) String accountScope) {
         SseEmitter emitter = new SseEmitter(300000L);
         emitter.onCompletion(() -> log.info("切换受限 API SSE 连接完成, tenantId: {}", tenantId));
         emitter.onTimeout(() -> {
@@ -1469,7 +1485,7 @@ public class TenantController extends BaseController{
             emitter.complete();
         });
         emitter.onError((e) -> log.error("切换受限 API SSE 出错, tenantId: {}", tenantId, e));
-        tenantService.switchRestrictedApiWithSSE(tenantId, emitter);
+        tenantService.switchRestrictedApiWithSSE(tenantId, managedUserName, permissions, accountScope, emitter);
         return emitter;
     }
 

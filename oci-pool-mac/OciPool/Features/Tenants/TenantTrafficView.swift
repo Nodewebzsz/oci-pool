@@ -934,7 +934,7 @@ private struct RegionMultiSelectFloatBridge<DropdownContent: View>: NSViewRepres
 
                 let panel = NSPanel(
                     contentRect: NSRect(x: 0, y: 0, width: panelWidth, height: 100),
-                    styleMask: [.nonactivatingPanel, .fullSizeContentView],
+                    styleMask: [.borderless, .nonactivatingPanel],
                     backing: .buffered,
                     defer: false
                 )
