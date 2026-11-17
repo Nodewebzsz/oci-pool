@@ -10,6 +10,8 @@ err()   { echo -e "${R}✗${N} $*"; }
 
 RAW="https://raw.githubusercontent.com/Nodewebzsz/oci-pool/master/deploy"
 COMPOSE_PULL="docker-compose.pull.yml"
+UNINSTALL="uninstall.sh"
+RESET_PW="reset-password.sh"
 
 info "OCI Pool Manager · update"
 command -v docker >/dev/null 2>&1 || { err "Docker not found"; exit 1; }
@@ -25,6 +27,10 @@ fi
 # 确保存在 docker-compose.yml 快捷软链接
 if [ -L "docker-compose.yml" ] || [ ! -f "docker-compose.yml" ]; then
   ln -sf "$COMPOSE_PULL" docker-compose.yml 2>/dev/null || true
+fi
+if command -v curl >/dev/null 2>&1; then
+  [ ! -f "$UNINSTALL" ] && curl -L --fail -sS -o "$UNINSTALL" "$RAW/$UNINSTALL" 2>/dev/null && chmod +x "$UNINSTALL" || true
+  [ ! -f "$RESET_PW" ] && curl -L --fail -sS -o "$RESET_PW" "$RAW/$RESET_PW" 2>/dev/null && chmod +x "$RESET_PW" || true
 fi
 # 读取 .env 里的 OCI_WEB_PORT，供健康检查使用（web 反代为统一入口）
 if [ -f .env ]; then set -a; . ./.env; set +a; fi

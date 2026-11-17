@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -45,7 +46,11 @@ public class PasswordResetController  extends BaseController {
             }
 
             verifyService.sendVerificationCodeForPasswordReset(username,httpServletRequest);
-            return ApiResponse.success("验证码已发送到您的通知终端");
+            boolean channelEnabled = verifyService.isMessageEnabled();
+            String msg = channelEnabled
+                    ? "验证码已发送到您的通知终端"
+                    : "未配置通知终端，请在服务器日志查看 6 位验证码（或执行 ./oci-pool.sh reset-password）";
+            return ApiResponse.success(msg, Collections.singletonMap("channelEnabled", channelEnabled));
 
         } catch (RateLimitException e) {
             return ApiResponse.error(e.getMessage());
@@ -119,7 +124,11 @@ public class PasswordResetController  extends BaseController {
             }
 
             verifyService.resetPassword(username, resetToken);
-            return ApiResponse.success("密码重置成功，新密码已发送到您的通知终端");
+            boolean channelEnabled = verifyService.isMessageEnabled();
+            String msg = channelEnabled
+                    ? "密码重置成功，新密码已发送到您的通知终端"
+                    : "密码重置成功，请在服务器日志查看 12 位新密码（或执行 ./oci-pool.sh reset-password）";
+            return ApiResponse.success(msg, Collections.singletonMap("channelEnabled", channelEnabled));
 
         } catch (IllegalStateException e) {
             return ApiResponse.error(e.getMessage());

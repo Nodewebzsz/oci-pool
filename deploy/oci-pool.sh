@@ -11,6 +11,7 @@
 #   ./oci-pool.sh restart    重启
 #   ./oci-pool.sh status     查看运行状态
 #   ./oci-pool.sh update     升级（源码模式 git pull + Maven 重打包 / 独立模式重新下载 release jar）
+#   ./oci-pool.sh reset-password [用户名]  一键重置管理员密码（保留现有数据）
 #   ./oci-pool.sh uninstall  卸载（停止并清理 data / logs / pid）
 #   ./oci-pool.sh uninstall --purge  彻底卸载（额外清理 .env、.env.example 与 Redis 会话/状态键）
 #
@@ -36,8 +37,9 @@ LOG_DIR="$APP_ROOT/logs"
 DATA_DIR="$APP_ROOT/data"
 
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; C='\033[0;36m'; N='\033[0m'
-info()  { echo -e "${C}──$*──${N}"; }
+info()  { echo -e "${C}── $* ──${N}"; }
 ok()    { echo -e "${G}✓${N} $*"; }
+note()  { echo -e "${C}•${N} $*"; }
 warn()  { echo -e "${Y}⚠${N} $*"; }
 err()   { echo -e "${R}✗${N} $*"; }
 
@@ -170,9 +172,9 @@ clean_redis_keys() {
     done < <(redis-cli --scan --pattern "$pattern" 2>/dev/null || true)
   done
   if [ "$count" -gt 0 ]; then
-    warn "已清理 Redis 中残留的 OCI-Pool 会话/状态键（共 ${count} 条）"
+    ok "已清理 Redis 会话/状态键 (${count} 条)"
   else
-    ok "Redis 中无残留 OCI-Pool 会话/状态键"
+    note "Redis 中无残留 OCI-Pool 会话/状态键"
   fi
 }
 
@@ -244,6 +246,8 @@ cmd_start() {
   ensure_java
   ensure_redis
   resolve_jar
+  local had_existing_db=0
+  [ -f "$DATA_DIR/vps_db.mv.db" ] && had_existing_db=1
   mkdir -p "$DATA_DIR" "$LOG_DIR"
   load_env
   local existing_pids; existing_pids="$(find_port_pids "$PORT" || true)"
@@ -289,13 +293,16 @@ cmd_start() {
       echo -e "${G}===================================================================${N}"
       echo -e "  管理入口:   ${C}http://localhost:${PORT}/${N}"
       echo -e "  管理员账号: ${Y}${ADMIN_USERNAME:-admin}${N}"
-      if [ -n "${ADMIN_PASSWORD:-}" ]; then
+      if [ -n "${ADMIN_PASSWORD:-}" ] && [ "$had_existing_db" -eq 0 ]; then
         echo -e "  初始强密码: ${Y}${ADMIN_PASSWORD}${N}"
         echo -e "  ${Y}⚠️  安全提示: 初始密码已加密存入数据库，首次登录后请前往「系统设置」及时修改密码！${N}"
+      elif [ -n "${ADMIN_PASSWORD:-}" ] && [ "$had_existing_db" -eq 1 ]; then
+        echo -e "  当前记录密码: ${Y}${ADMIN_PASSWORD}${N} ${C}(若已在网页端修改过密码，请以修改后为准)${N}"
+        echo -e "  ${Y}💡 如忘记密码: 直接执行 ${C}./oci-pool.sh reset-password${Y} 即可一键重置${N}"
       elif [ -f "$DATA_DIR/vps_db.mv.db" ]; then
         echo -e "  初始密码:   [已保留数据库中原密码]"
-        echo -e "  ${Y}💡 如忘记密码: 在登录页点「忘记密码」，然后从日志获取验证码与新密码：${N}"
-        echo -e "  ${C}   grep -E \"密码重置验证码|重置成功\" \"$LOG_DIR/application.log\"${N}"
+        echo -e "  ${Y}💡 如忘记密码: 执行 ${C}./oci-pool.sh reset-password${Y} 一键重置，或在登录页点「忘记密码」后查看日志：${N}"
+        echo -e "  ${C}   ./oci-pool.sh reset-password --logs${N}"
       else
         echo -e "  初始密码:   [未设置 ADMIN_PASSWORD，请访问 http://localhost:${PORT}/register 注册首个管理员]"
       fi
@@ -309,14 +316,14 @@ cmd_start() {
 }
 
 cmd_stop() {
-  info "stop"
+  [ "${1:-}" != "--no-header" ] && info "stop"
   load_port_from_env
   if is_running; then
     local pid; pid="$(cat "$PID_FILE")"
     stop_pid "$pid"
-    ok "已停止（pid $pid）"
+    ok "已停止服务 (pid $pid)"
   else
-    warn "未运行（无有效 pid 文件）"
+    note "服务未运行 (无有效 pid 文件)"
   fi
   rm -f "$PID_FILE"
 
@@ -325,7 +332,7 @@ cmd_stop() {
     if is_oci_pool_pid "$opid"; then
       warn "发现占用端口 $PORT 的残留 OCI-Pool 进程（pid $opid），正在停止..."
       stop_pid "$opid"
-      ok "已停止残留进程（pid $opid）"
+      ok "已停止残留进程 (pid $opid)"
     fi
   done
 
@@ -367,19 +374,184 @@ cmd_update() {
 cmd_uninstall() {
   local purge="${1:-}"
   info "uninstall"
-  cmd_stop
-  warn "删除数据与日志: $DATA_DIR / $LOG_DIR"
-  rm -rf "$DATA_DIR" "$LOG_DIR"
-  [ -f "$JAR" ] && rm -f "$JAR"
+  cmd_stop --no-header
+  local removed=()
+  [ -d "$DATA_DIR" ] && rm -rf "$DATA_DIR" && removed+=("data/")
+  [ -d "$LOG_DIR" ] && rm -rf "$LOG_DIR" && removed+=("logs/")
+  [ -f "$JAR" ] && rm -f "$JAR" && removed+=("oci-pool.jar")
+  if [ "${#removed[@]}" -gt 0 ]; then
+    ok "已清理目录与程序 (${APP_ROOT}): ${removed[*]}"
+  else
+    note "无可清理的数据、日志或 jar 文件"
+  fi
   if [ "$purge" = "--purge" ] || [ "$purge" = "--all" ]; then
-    [ -f "$APP_ROOT/.env" ] && rm -f "$APP_ROOT/.env" && warn "已删除配置文件: $APP_ROOT/.env"
-    [ -f "$APP_ROOT/.env.example" ] && rm -f "$APP_ROOT/.env.example"
+    local purged=()
+    [ -f "$APP_ROOT/.env" ] && rm -f "$APP_ROOT/.env" && purged+=(".env")
+    [ -f "$APP_ROOT/.env.example" ] && rm -f "$APP_ROOT/.env.example" && purged+=(".env.example")
+    if [ "${#purged[@]}" -gt 0 ]; then
+      ok "已删除配置文件: ${purged[*]}"
+    fi
     clean_redis_keys
   elif [ -f "$APP_ROOT/.env" ]; then
     warn "已保留配置文件: $APP_ROOT/.env（若需彻底重置密码与配置，请执行 ./oci-pool.sh uninstall --purge）"
   fi
-  warn "说明：系统软件包（JDK 17、redis-server）及其他目录/Docker 部署不会被当前脚本自动卸载"
-  ok "已卸载完成"
+  note "系统依赖 (JDK 17 / redis-server) 及其他目录或 Docker 部署保留未动"
+  ok "卸载完成"
+}
+
+show_reset_logs() {
+  local target_user="$1"
+  if [ ! -f "$LOG_DIR/application.log" ]; then
+    warn "未找到日志文件: $LOG_DIR/application.log"
+    return 1
+  fi
+  local code_line pw_line
+  code_line="$(grep -F "用户:${target_user} 的密码重置验证码是:" "$LOG_DIR/application.log" 2>/dev/null | tail -n 1 || true)"
+  pw_line="$(grep -F "用户:${target_user} 密码:" "$LOG_DIR/application.log" 2>/dev/null | grep "重置成功" | tail -n 1 || true)"
+  [ -n "$code_line" ] && echo -e "  ${C}最新验证码记录:${N} $code_line"
+  [ -n "$pw_line" ] && echo -e "  ${G}最新重置密码记录:${N} $pw_line"
+  if [ -z "$code_line" ] && [ -z "$pw_line" ]; then
+    note "日志中暂无用户 ${target_user} 的密码重置记录"
+  fi
+}
+
+cmd_reset_password() {
+  info "reset-password"
+  load_port_from_env
+  local logs_only=0
+  local target_user=""
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      --logs|-l) logs_only=1 ;;
+      -h|--help)
+        echo "用法: ./oci-pool.sh reset-password [用户名] [--logs]"
+        echo "  默认用户名: ${ADMIN_USERNAME:-admin}；传入 --logs 仅查看日志中最新验证码与新密码"
+        return 0
+        ;;
+      *) [ -z "$target_user" ] && target_user="$arg" ;;
+    esac
+  done
+  target_user="${target_user:-${ADMIN_USERNAME:-admin}}"
+  case "$target_user" in
+    *\"*|*\\*|*[[:space:]]*) err "用户名格式无效: $target_user"; exit 1 ;;
+  esac
+
+  if [ "$logs_only" -eq 1 ]; then
+    show_reset_logs "$target_user"
+    return 0
+  fi
+
+  command -v curl >/dev/null 2>&1 || { err "缺少 curl，无法调用本机重置接口"; exit 1; }
+  if ! curl -sf "http://127.0.0.1:$PORT/actuator/health" >/dev/null 2>&1; then
+    if [ ! -f "$DATA_DIR/vps_db.mv.db" ]; then
+      warn "服务未运行且尚未初始化数据库，直接执行 ./oci-pool.sh start 即可生成全新初始密码"
+    else
+      err "服务未运行（无法连接 http://127.0.0.1:$PORT），请先执行 ./oci-pool.sh start 启动后再重置密码。"
+      note "如果不保留任何旧数据，也可直接执行: ./oci-pool.sh uninstall --purge && ./oci-pool.sh start"
+    fi
+    exit 1
+  fi
+
+  local base_url="http://127.0.0.1:$PORT"
+  local send_resp
+  send_resp="$(curl -sS -X POST "${base_url}/api/send-reset-code" \
+    -H 'Content-Type: application/json' \
+    -d "{\"username\":\"${target_user}\"}" || true)"
+
+  if ! printf '%s' "$send_resp" | grep -q '"success"[[:space:]]*:[[:space:]]*true' && printf '%s' "$send_resp" | grep -q "用户名或密码错误"; then
+    sleep 1
+    local detected_users=""
+    if [ -f "$LOG_DIR/application.log" ]; then
+      detected_users="$(grep "当前数据库已注册管理员账号为:" "$LOG_DIR/application.log" 2>/dev/null | tail -n 1 | sed -n 's/.*当前数据库已注册管理员账号为: \[\([^]]*\)\].*/\1/p')"
+    fi
+    if [ -n "$detected_users" ] && [[ "$detected_users" != *","* ]] && [[ "$detected_users" != *" "* ]] && [ "$detected_users" != "$target_user" ]; then
+      note "未找到默认账号 ${target_user}，自动识别到数据库已注册管理员账号: ${detected_users}"
+      target_user="$detected_users"
+      send_resp="$(curl -sS -X POST "${base_url}/api/send-reset-code" \
+        -H 'Content-Type: application/json' \
+        -d "{\"username\":\"${target_user}\"}" || true)"
+    elif [ -n "$detected_users" ]; then
+      err "未找到用户 ${target_user}；当前数据库已注册管理员账号为: ${detected_users}"
+      note "请指定用户名重试: ./oci-pool.sh reset-password <用户名>"
+      exit 1
+    fi
+  fi
+
+  if ! printf '%s' "$send_resp" | grep -q '"success"[[:space:]]*:[[:space:]]*true'; then
+    if printf '%s' "$send_resp" | grep -q "用户名或密码错误"; then
+      err "未找到用户 ${target_user}；若注册时修改过用户名，请执行: ./oci-pool.sh reset-password <实际用户名>"
+      exit 1
+    elif printf '%s' "$send_resp" | grep -qE "请稍后再试|频繁"; then
+      note "检测到近期已触发过验证码，尝试读取日志中有效验证码继续重置..."
+    else
+      err "触发重置验证码失败: ${send_resp:-无响应}"
+      exit 1
+    fi
+  fi
+
+  local code=""
+  for _ in 1 2 3; do
+    if [ -f "$LOG_DIR/application.log" ]; then
+      code="$(grep -F "用户:${target_user} 的密码重置验证码是:" "$LOG_DIR/application.log" 2>/dev/null | tail -n 1 | sed -n 's/.*密码重置验证码是:\([0-9][0-9]*\).*/\1/p')"
+    fi
+    [ -n "$code" ] && break
+    sleep 1
+  done
+  if [ -z "$code" ]; then
+    err "未能在 $LOG_DIR/application.log 中找到用户 ${target_user} 的验证码。"
+    note "请确认服务正常运行或等待 5 分钟后重试；如无需保留数据可执行 ./oci-pool.sh uninstall --purge && ./oci-pool.sh start"
+    exit 1
+  fi
+
+  local verify_resp reset_token
+  verify_resp="$(curl -sS -X POST "${base_url}/api/verify-reset-code" \
+    -H 'Content-Type: application/json' \
+    -d "{\"username\":\"${target_user}\",\"verificationCode\":\"${code}\"}" || true)"
+  reset_token="$(printf '%s' "$verify_resp" | sed -n 's/.*"resetToken"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+  if [ -z "$reset_token" ]; then
+    err "验证码校验未通过: ${verify_resp:-无响应}"
+    note "若您刚刚已完成过一次密码重置，可直接查看日志中的新密码，或等待 5 分钟后重试："
+    show_reset_logs "$target_user" || true
+    exit 1
+  fi
+
+  local reset_resp
+  reset_resp="$(curl -sS -X POST "${base_url}/api/reset-password" \
+    -H 'Content-Type: application/json' \
+    -H "Reset-Token: ${reset_token}" \
+    -d "{\"username\":\"${target_user}\",\"resetToken\":\"${reset_token}\"}" || true)"
+  if ! printf '%s' "$reset_resp" | grep -q '"success"[[:space:]]*:[[:space:]]*true'; then
+    err "密码重置失败: ${reset_resp:-无响应}"
+    exit 1
+  fi
+
+  local new_pass=""
+  for _ in 1 2 3; do
+    new_pass="$(grep -F "用户:${target_user} 密码:" "$LOG_DIR/application.log" 2>/dev/null | grep "重置成功" | tail -n 1 | sed -n 's/.*密码:\([^ ]*\)重置成功.*/\1/p')"
+    [ -n "$new_pass" ] && break
+    sleep 1
+  done
+
+  echo ""
+  echo -e "${G}===================================================================${N}"
+  echo -e "${G}🔑 OCI-Pool 管理员密码重置成功！${N}"
+  echo -e "${G}===================================================================${N}"
+  echo -e "  管理入口:   ${C}http://localhost:${PORT}/${N}"
+  echo -e "  管理员账号: ${Y}${target_user}${N}"
+  if [ -n "$new_pass" ]; then
+    if [ -f "$APP_ROOT/.env" ]; then
+      sed -i.bak "s|^ADMIN_USERNAME=.*|ADMIN_USERNAME=${target_user}|" "$APP_ROOT/.env" 2>/dev/null && rm -f "$APP_ROOT/.env.bak" || true
+      sed -i.bak "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${new_pass}|" "$APP_ROOT/.env" 2>/dev/null && rm -f "$APP_ROOT/.env.bak" || true
+    fi
+    echo -e "  新登录密码: ${Y}${new_pass}${N}"
+  else
+    warn "新密码已生成并写入日志，请查看: $LOG_DIR/application.log"
+  fi
+  echo -e "  ${C}•${N} 如之前开启过 MFA（双因素认证），已同步自动关闭。"
+  echo -e "  ${C}•${N} 登录后请前往「系统设置」及时修改为自己的常用密码。"
+  echo -e "${G}===================================================================${N}"
+  echo ""
 }
 
 usage() {
@@ -392,6 +564,7 @@ usage() {
   echo "  restart            重启"
   echo "  status             查看运行状态"
   echo "  update             升级（源码重打包 / 重新下载 release jar）"
+  echo "  reset-password     一键重置管理员密码（保留现有数据，可选传用户名或 --logs）"
   echo "  uninstall          卸载（停止并清理 data / logs / pid，保留 .env）"
   echo "  uninstall --purge  彻底卸载（额外清理 .env、.env.example 与 Redis 会话/状态键）"
   echo
@@ -404,6 +577,7 @@ case "${1:-}" in
   restart)  cmd_restart ;;
   status)   cmd_status ;;
   update)   cmd_update ;;
+  reset-password) shift; cmd_reset_password "$@" ;;
   uninstall) cmd_uninstall "${2:-}" ;;
   -h|--help|help|"") usage ;;
   *) err "未知命令: ${1:-}"; usage; exit 1 ;;

@@ -145,6 +145,7 @@ chmod +x oci-pool.sh
 ./oci-pool.sh restart            # 重启
 ./oci-pool.sh status             # 查看状态
 ./oci-pool.sh update             # 升级(拉取源码重打包/重新下载 release jar)
+./oci-pool.sh reset-password     # 一键重置管理员密码(保留原有数据，可传用户名或 --logs)
 ./oci-pool.sh uninstall          # 卸载(停止并清理 data/logs/jar，保留 .env)
 ./oci-pool.sh uninstall --purge  # 彻底卸载(额外清理 .env 与 .env.example)
 ```
@@ -214,6 +215,7 @@ docker compose logs -f  # 实时查看日志
 docker compose restart  # 重启服务
 docker compose down     # 停止(保留 data/ logs/ redis-data/ 数据)
 ./update.sh             # 更新到最新镜像
+./reset-password.sh     # 一键重置管理员密码(保留数据，可传用户名或 --logs)
 ```
 
 #### 更新
@@ -293,24 +295,40 @@ location ~ ^/websockify/(\d+)$ {
 
 #### 常见问题：忘记管理员密码 / 重装提示「已保留数据库中原密码」
 
-* **原因说明**：管理员密码使用 BCrypt 单向加密保存在本地数据库 `data/vps_db.mv.db`（`login_user` 表）中，**无法从日志或数据库解密还原**。如果重装时保留了旧数据库（或 `.env` 中 `ADMIN_PASSWORD` 为空），终端就会显示 `[已保留数据库中原密码]`。
-* **保留旧数据重置密码（即使未配置 Telegram / Bark / 钉钉 / 飞书也能操作）**：
-  1. 打开登录页点击 **忘记密码?**，输入管理员用户名（默认 `admin`）提交；
-  2. 在服务器查看日志获取 6 位验证码：
-     - 脚本部署：`grep "密码重置验证码" logs/application.log`
-     - Docker 部署：`docker compose logs app | grep "密码重置验证码"`
-  3. 在网页完成验证码校验并确认重置后，从日志读取系统生成的 12 位新密码（如开启过 MFA 也会同步关闭）：
-     - 脚本部署：`grep "重置成功" logs/application.log`
-     - Docker 部署：`docker compose logs app | grep "重置成功"`
-* **彻底清库重装（不保留旧数据）**：
-  - 脚本部署：
-    ```bash
-    ./oci-pool.sh uninstall --purge && ./oci-pool.sh start
-    ```
-  - Docker 部署：
-    ```bash
-    ./uninstall.sh --purge && ./install.sh
-    ```
+> **原理一句话**：管理员密码使用 BCrypt 单向加密存放在本地数据库 `data/vps_db.mv.db` 中，**无法从日志或数据库直接反查原密码**；如果重装时保留了旧库，终端会提示 `[已保留数据库中原密码]`。请按下面 3 种情况对应处理：
+
+1. **刚安装完还没改过密码，只是忘了抄写初始密码**
+   - 进入部署目录查看 `.env` 文件中的 `ADMIN_PASSWORD=` 行即可（如果里面是空的，说明之前已登录修改过或保留了旧库，请看第 2 步）：
+     ```bash
+     grep '^ADMIN_PASSWORD=' .env
+     ```
+2. **想保留现有甲骨文账号数据，把密码重置为新的（推荐，即使没配 Telegram / Bark 等通知也能用）**
+   - **方法一（最简单，服务器一行命令自动重置并打印新密码，如开过 MFA 会同步关闭）**：
+     - 脚本部署（进入 `oci-pool` 目录执行）：
+       ```bash
+       ./oci-pool.sh reset-password
+       ```
+     - Docker 部署（进入 `oci-pool` 目录执行；若旧版本目录尚未下载该脚本，先 `curl -fsSL -o reset-password.sh https://raw.githubusercontent.com/Nodewebzsz/oci-pool/master/deploy/reset-password.sh && chmod +x reset-password.sh`）：
+       ```bash
+       ./reset-password.sh
+       ```
+     - *提示*：默认重置用户名为 `admin`；如果当初注册时改过用户名，在命令末尾加上用户名即可，例如 `./oci-pool.sh reset-password myadmin`。
+   - **方法二（网页点「忘记密码」+ 查日志）**：
+     1. 打开登录页点击 **忘记密码?**，输入管理员用户名（默认 `admin`）提交；
+     2. 如已配置 Telegram / Bark / 钉钉 / 飞书会自动收到推送；**未配置任何通知**时，在服务器执行命令获取 6 位验证码：
+        - 脚本部署：`./oci-pool.sh reset-password --logs`（或 `grep "密码重置验证码" logs/application.log`）
+        - Docker 部署：`./reset-password.sh --logs`（或 `docker compose logs app | grep "密码重置验证码"`）
+     3. 网页校验验证码并点击 **重置密码** 后，再用上面的 `--logs` 命令（或 `grep "重置成功" logs/application.log`）读取系统生成的 12 位新密码，返回登录即可。
+3. **里面没有重要数据，只想彻底清空重装并生成新密码**
+   - **一定要加 `--purge`**（普通 `uninstall` 会保留 `.env`），并在部署目录执行：
+     - 脚本部署：
+       ```bash
+       ./oci-pool.sh uninstall --purge && ./oci-pool.sh start
+       ```
+     - Docker 部署：
+       ```bash
+       ./uninstall.sh --purge && ./install.sh
+       ```
 
 #### 常见问题：客户端 Remote 模式下「开机日志」一直显示「连接中…」
 

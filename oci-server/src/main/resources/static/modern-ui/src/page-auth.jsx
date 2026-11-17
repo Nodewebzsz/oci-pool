@@ -849,20 +849,65 @@ function VerifyView({ state, dispatch, tr, onSuccess, authConfig }) {
   );
 }
 
-function ForgotView({ state, dispatch, tr }) {
-  const [step, setStep] = useStateAuth(1); // 1=input email, 2=verify code, 3=confirm reset
+function ForgotLogHint({ title, commands }) {
+  return (
+    <div style={{
+      padding: '10px 12px', borderRadius: 6, marginBottom: 16,
+      background: 'var(--bg-2)', border: '1px solid var(--border)',
+      fontSize: 11.5, color: 'var(--fg-1)', lineHeight: 1.55,
+    }}>
+      <div style={{ display: 'flex', gap: 7, alignItems: 'flex-start', marginBottom: commands && commands.length ? 8 : 0 }}>
+        <Icon name="terminal" size={14} style={{ marginTop: 2, color: 'var(--info)', flexShrink: 0 }} />
+        <span>{title}</span>
+      </div>
+      {commands && commands.map((cmd, idx) => (
+        <div key={idx} className="mono" style={{
+          marginTop: idx === 0 ? 0 : 6,
+          padding: '6px 8px', borderRadius: 4,
+          background: 'var(--bg-1)', border: '1px solid var(--border)',
+          fontSize: 11, color: 'var(--fg-0)',
+          overflowX: 'auto', whiteSpace: 'nowrap', userSelect: 'all',
+        }}>
+          {cmd}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ForgotView({ state, dispatch, tr, messageEnabled }) {
+  const [step, setStep] = useStateAuth(1); // 1=input username, 2=verify code, 3=confirm reset, 4=done
   const [loading, setLoading] = useStateAuth(false);
   const [error, setError] = useStateAuth('');
   const [resetToken, setResetToken] = useStateAuth('');
-  // 新版忘记密码:后端会自行生成新密码并发送到通知终端,前端不再输入新密码。
+  const [channelEnabled, setChannelEnabled] = useStateAuth(messageEnabled);
+
+  useEffectAuth(() => {
+    if (channelEnabled === null && messageEnabled !== null) {
+      setChannelEnabled(messageEnabled);
+    }
+  }, [messageEnabled, channelEnabled]);
+
+  const hasChannel = channelEnabled !== false;
+
+  // 新版忘记密码:后端会自行生成新密码并发送到已启用通知终端，同时写入服务器日志。
   const submit = async () => {
+    if (step === 4) {
+      dispatch({ type: 'goto', view: 'login', prefillUsername: state.resetUsername });
+      return;
+    }
     setError('');
     setLoading(true);
     try {
       if (step === 1) {
         const j = await window.ociServices.auth.sendResetCode({ username: state.resetUsername });
         if (j && j.success === false) setError(j.message || tr('auth.err.network'));
-        else setStep(2);
+        else {
+          if (j && j.data && typeof j.data.channelEnabled === 'boolean') {
+            setChannelEnabled(j.data.channelEnabled);
+          }
+          setStep(2);
+        }
       } else if (step === 2) {
         const j = await window.ociServices.auth.verifyResetCode({ username: state.resetUsername, verificationCode: state.resetCode });
         if (j && j.success !== false && j.data && j.data.resetToken) {
@@ -872,7 +917,12 @@ function ForgotView({ state, dispatch, tr }) {
       } else {
         const j = await window.ociServices.auth.resetPassword({ username: state.resetUsername, resetToken });
         if (j && j.success === false) setError(j.message || tr('auth.err.network'));
-        else dispatch({ type: 'goto', view: 'login', flash: tr('auth.forgot.done') });
+        else {
+          if (j && j.data && typeof j.data.channelEnabled === 'boolean') {
+            setChannelEnabled(j.data.channelEnabled);
+          }
+          setStep(4);
+        }
       }
     } catch (e) {
       setError((e && e.message) || tr('auth.err.network'));
@@ -880,6 +930,16 @@ function ForgotView({ state, dispatch, tr }) {
       setLoading(false);
     }
   };
+
+  const codeCommands = [
+    'grep "密码重置验证码" logs/application.log',
+    'docker compose logs app | grep "密码重置验证码"',
+  ];
+  const newPwCommands = [
+    'grep "重置成功" logs/application.log',
+    'docker compose logs app | grep "重置成功"',
+  ];
+
   return (
     <>
       <div style={{ marginBottom: 26 }}>
@@ -887,7 +947,7 @@ function ForgotView({ state, dispatch, tr }) {
           {tr('auth.forgot.title')}
         </h1>
         <p style={{ fontSize: 12.5, color: 'var(--fg-2)', margin: '6px 0 0' }}>
-          {tr('auth.forgot.step')} {step} / 3
+          {step === 4 ? tr('auth.forgot.done.title') : `${tr('auth.forgot.step')} ${step} / 3`}
         </p>
       </div>
 
@@ -896,30 +956,43 @@ function ForgotView({ state, dispatch, tr }) {
         {[1, 2, 3].map(i => (
           <div key={i} style={{
             flex: 1, height: 3, borderRadius: 2,
-            background: i <= step ? 'var(--accent)' : 'var(--bg-3)',
+            background: i <= Math.min(step, 3) ? 'var(--accent)' : 'var(--bg-3)',
             transition: 'background 200ms',
           }} />
         ))}
       </div>
 
       {step === 1 && (
-        <AuthField label={tr('auth.forgot.username')}>
-          <AuthInput value={state.resetUsername}
-            onChange={v => dispatch({ type: 'set', field: 'resetUsername', value: v })}
-            placeholder={tr('auth.forgot.username.placeholder')}
-            autoFocus autoComplete="username"
-          />
-        </AuthField>
+        <>
+          <AuthField label={tr('auth.forgot.username')}>
+            <AuthInput value={state.resetUsername}
+              onChange={v => dispatch({ type: 'set', field: 'resetUsername', value: v })}
+              placeholder={tr('auth.forgot.username.placeholder')}
+              autoFocus autoComplete="username"
+              onKeyDown={e => e.key === 'Enter' && submit()}
+            />
+          </AuthField>
+          <ForgotLogHint title={tr('auth.forgot.username.tip')} />
+        </>
       )}
       {step === 2 && (
-        <AuthField label={tr('auth.forgot.code')}
-                   hint={<span style={{ color: 'var(--fg-3)' }}>{tr('auth.forgot.code.sent')} {state.resetUsername}</span>}>
-          <AuthInput mono value={state.resetCode}
-            onChange={v => dispatch({ type: 'set', field: 'resetCode', value: v })}
-            placeholder={tr('auth.code.placeholder')}
-            maxLength={6} autoFocus
+        <>
+          <AuthField label={tr('auth.forgot.code')}
+                     hint={<span style={{ color: 'var(--fg-3)' }}>
+                       {hasChannel ? `${tr('auth.forgot.code.sent')} ${state.resetUsername}` : tr('auth.forgot.code.sent.logs')}
+                     </span>}>
+            <AuthInput mono value={state.resetCode}
+              onChange={v => dispatch({ type: 'set', field: 'resetCode', value: v })}
+              placeholder={tr('auth.code.placeholder')}
+              maxLength={6} autoFocus
+              onKeyDown={e => e.key === 'Enter' && submit()}
+            />
+          </AuthField>
+          <ForgotLogHint
+            title={hasChannel ? tr('auth.forgot.code.hint.channel') : tr('auth.forgot.code.hint.logs')}
+            commands={codeCommands}
           />
-        </AuthField>
+        </>
       )}
       {step === 3 && (
         <div style={{
@@ -929,8 +1002,25 @@ function ForgotView({ state, dispatch, tr }) {
           display: 'flex', gap: 10, alignItems: 'flex-start',
         }}>
           <Icon name="info" size={16} style={{ marginTop: 1, color: 'var(--info)' }} />
-          <span>{tr('auth.forgot.reset.notice')}</span>
+          <span>{hasChannel ? tr('auth.forgot.reset.notice') : tr('auth.forgot.reset.notice.logs')}</span>
         </div>
+      )}
+      {step === 4 && (
+        <>
+          <div style={{
+            padding: '12px 14px', borderRadius: 8,
+            background: 'var(--accent-soft)', border: '1px solid var(--accent)',
+            fontSize: 12.5, color: 'var(--fg-0)', lineHeight: 1.6, marginBottom: 14,
+            display: 'flex', gap: 10, alignItems: 'flex-start',
+          }}>
+            <Icon name="check-circle-2" size={16} style={{ marginTop: 2, color: 'var(--accent)', flexShrink: 0 }} />
+            <span>{hasChannel ? tr('auth.forgot.done') : tr('auth.forgot.done.title')}</span>
+          </div>
+          <ForgotLogHint
+            title={hasChannel ? tr('auth.forgot.done.channel.tip') : tr('auth.forgot.done.logs')}
+            commands={newPwCommands}
+          />
+        </>
       )}
 
       {error && (
@@ -946,20 +1036,22 @@ function ForgotView({ state, dispatch, tr }) {
       )}
 
       <AuthButton onClick={submit} loading={loading}
-                  icon={step === 3 ? 'check' : 'arrow-right'}>
-        {step === 3 ? tr('auth.forgot.submit') : tr('auth.forgot.next')}
+                  icon={step === 4 ? 'log-in' : step === 3 ? 'check' : 'arrow-right'}>
+        {step === 4 ? tr('auth.forgot.backLogin') : step === 3 ? tr('auth.forgot.submit') : tr('auth.forgot.next')}
       </AuthButton>
 
-      <div style={{ marginTop: 14, textAlign: 'center' }}>
-        <button type="button"
-          onClick={() => dispatch({ type: 'goto', view: 'login' })}
-          style={{ background: 'none', border: 'none', color: 'var(--fg-2)',
-                   cursor: 'pointer', fontSize: 12, padding: 4,
-                   display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <Icon name="chevron-left" size={12} />
-          {tr('auth.go.login')}
-        </button>
-      </div>
+      {step !== 4 && (
+        <div style={{ marginTop: 14, textAlign: 'center' }}>
+          <button type="button"
+            onClick={() => dispatch({ type: 'goto', view: 'login' })}
+            style={{ background: 'none', border: 'none', color: 'var(--fg-2)',
+                     cursor: 'pointer', fontSize: 12, padding: 4,
+                     display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <Icon name="chevron-left" size={12} />
+            {tr('auth.go.login')}
+          </button>
+        </div>
+      )}
     </>
   );
 }
@@ -993,7 +1085,13 @@ function AuthPage({ onLogin, authView, onAuthViewChange }) {
           const hashView = action.view === 'forgot' ? 'forgot-password' : action.view;
           onAuthViewChange && onAuthViewChange(hashView);
         }
-        return { ...s, view: action.view, errors: {}, flash: action.flash || '' };
+        return {
+          ...s,
+          view: action.view,
+          ...(action.prefillUsername ? { username: action.prefillUsername } : {}),
+          errors: {},
+          flash: action.flash || '',
+        };
       }
       return s;
     });
@@ -1041,7 +1139,7 @@ function AuthPage({ onLogin, authView, onAuthViewChange }) {
     if (state.view === 'login')    return <LoginView state={state} dispatch={dispatch} tr={tr} onLoginSuccess={onLogin} />;
     if (state.view === 'register') return <RegisterView state={state} dispatch={dispatch} tr={tr} />;
     if (state.view === 'verify')   return <VerifyView key={`sv-${Number(verifyCfg.messageEnabled)}-${Number(verifyCfg.mfaEnabled)}`} state={state} dispatch={dispatch} tr={tr} onSuccess={onLogin} authConfig={verifyCfg} />;
-    if (state.view === 'forgot')   return <ForgotView state={state} dispatch={dispatch} tr={tr} />;
+    if (state.view === 'forgot')   return <ForgotView state={state} dispatch={dispatch} tr={tr} messageEnabled={serverAuth ? serverAuth.messageEnabled : null} />;
   };
 
   return (
