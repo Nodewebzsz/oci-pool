@@ -298,13 +298,13 @@ struct RegionWorldMapView: View {
     @State private var hoverMonitor: Any?
     @State private var hoverBox = MapHoverBox()
 
-    private var bg0: Color { dark ? Color(hex: "060a0d") : Color(hex: "f8fafd") }
-    private var landFill: Color { dark ? Color(hex: "151c21") : Color(hex: "f1f4f6") }
+    private var bg0: Color { AppTheme.pageBg(dark) }
+    private var landFill: Color { AppTheme.sidebarHover(dark) }
     private var landStroke: Color { dark ? Color(hex: "363e45") : Color(hex: "bfc5ca") }
     private var fg3: Color { dark ? Color(hex: "5d646a") : Color(hex: "81878c") }
-    private var fg1: Color { dark ? Color(hex: "ccd2d6") : Color(hex: "2d3439") }
+    private var fg1: Color { AppTheme.sidebarText(dark) }
     private var fg0: Color { dark ? Color(hex: "f6f9fb") : Color(hex: "0c1217") }
-    private var bg2: Color { dark ? Color(hex: "151c21") : Color(hex: "f1f4f6") }
+    private var bg2: Color { AppTheme.sidebarHover(dark) }
 
     var body: some View {
         GeometryReader { geo in

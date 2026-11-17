@@ -38,7 +38,7 @@ struct TenantBootCreateView: View {
     private var tenant: TenantItem? { model.bootPageParent }
 
     private var accent: Color { AppTheme.sidebarActive }
-    private var cardBg: Color { dark ? AppTheme.sidebarHoverDark : Color.white }
+    private var cardBg: Color { AppTheme.isClaude ? AppTheme.sidebarBg(dark) : (dark ? AppTheme.sidebarHoverDark : Color.white) }
     private var cardBorder: Color { dark ? AppTheme.borderDark : AppTheme.borderLight }
     private var primaryText: Color { dark ? Color.white.opacity(0.92) : Color.primary }
     private var mutedText: Color { AppTheme.sidebarText(dark) }

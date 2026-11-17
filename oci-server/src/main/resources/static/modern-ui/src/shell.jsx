@@ -113,7 +113,7 @@ function ModalShell({ title, subtitle, icon, iconColor = 'var(--accent)', size =
     <>
       <div onClick={onClose} style={{
         position: 'fixed', inset: 0,
-        background: 'rgba(0,0,0,0.55)',
+        background: 'rgba(20,20,19,0.45)',
         backdropFilter: 'blur(2px)',
         zIndex: 80, animation: 'fade-in 150ms',
       }} />
@@ -127,7 +127,7 @@ function ModalShell({ title, subtitle, icon, iconColor = 'var(--accent)', size =
         background: 'var(--bg-1)',
         border: '1px solid var(--border-strong)',
         borderRadius: 'var(--radius-lg)',
-        boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+        boxShadow: '0 12px 32px rgba(20,20,19,0.18)',
         zIndex: 81,
         display: 'flex', flexDirection: 'column',
         animation: 'fade-in 180ms',
@@ -191,7 +191,7 @@ function DrawerShell({ title, subtitle, statusDot, icon, iconColor = 'var(--acce
     <>
       <div onClick={onClose} style={{
         position: 'fixed', inset: 0,
-        background: 'rgba(0,0,0,0.5)',
+        background: 'rgba(20,20,19,0.4)',
         backdropFilter: 'blur(2px)',
         zIndex: 60, animation: 'fade-in 150ms',
       }} />
@@ -201,7 +201,7 @@ function DrawerShell({ title, subtitle, statusDot, icon, iconColor = 'var(--acce
         background: 'var(--bg-1)',
         borderLeft: '1px solid var(--border)',
         zIndex: 61, overflowY: 'auto',
-        boxShadow: '-10px 0 30px rgba(0,0,0,0.4)',
+        boxShadow: '-8px 0 24px rgba(20,20,19,0.16)',
         animation: 'slide-in-right 220ms cubic-bezier(0.2, 0, 0, 1)',
         display: 'flex', flexDirection: 'column',
       }}>
@@ -261,7 +261,7 @@ function ConfirmShell({ title, body, danger, requireText, confirmLabel = tr('she
     <>
       <div onClick={onClose} style={{
         position: 'fixed', inset: 0,
-        background: 'rgba(0,0,0,0.6)',
+        background: 'rgba(20,20,19,0.5)',
         backdropFilter: 'blur(2px)',
         zIndex: 90, animation: 'fade-in 150ms',
       }} />
@@ -273,7 +273,7 @@ function ConfirmShell({ title, body, danger, requireText, confirmLabel = tr('she
         background: 'var(--bg-1)',
         border: `1px solid ${danger ? 'var(--danger)' : 'var(--border-strong)'}`,
         borderRadius: 'var(--radius-lg)',
-        boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+        boxShadow: '0 12px 32px rgba(20,20,19,0.18)',
         zIndex: 91,
         overflow: 'hidden',
         animation: 'fade-in 180ms',
@@ -377,7 +377,7 @@ function DropdownMenu({ anchor, onClose, sections, width = 240 }) {
         background: 'var(--bg-1)',
         border: '1px solid var(--border-strong)',
         borderRadius: 10,
-        boxShadow: '0 12px 32px rgba(0,0,0,0.5)',
+        boxShadow: '0 8px 24px rgba(20,20,19,0.16)',
         zIndex: 70,
         overflow: 'hidden',
         opacity: pos ? 1 : 0,
@@ -547,7 +547,7 @@ function RowActionMenu({ anchorEl, items, header, columns = 2, width = 280, onCl
       border: '1px solid var(--border-strong)',
       borderRadius: 8,
       padding: 4,
-      boxShadow: '0 16px 40px oklch(0 0 0 / 0.55)',
+      boxShadow: '0 10px 28px rgba(20,20,19,0.18)',
       zIndex: 1000,
       display: 'grid',
       gridTemplateColumns: columns === 1 ? '1fr' : '1fr 1fr',

@@ -11,9 +11,9 @@ struct RegionDetailSheet: View {
     private var info: Color { AppTheme.info }
     private var cyan: Color { Color(hex: "00b6be") }
     private var fg0: Color { dark ? Color(hex: "f6f9fb") : Color(hex: "0c1217") }
-    private var fg1: Color { dark ? Color(hex: "ccd2d6") : Color(hex: "2d3439") }
+    private var fg1: Color { AppTheme.sidebarText(dark) }
     private var fg3: Color { dark ? Color(hex: "5d646a") : Color(hex: "81878c") }
-    private var bg2: Color { dark ? Color(hex: "151c21") : Color(hex: "f1f4f6") }
+    private var bg2: Color { AppTheme.sidebarHover(dark) }
     private var bg3: Color { dark ? Color(hex: "1e252a") : Color(hex: "e7ecef") }
     private var borderColor: Color { dark ? Color(hex: "363e45") : Color(hex: "bfc5ca") }
 

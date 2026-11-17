@@ -198,7 +198,7 @@ function GrabTaskDrawerBody({ task }) {
           </div>
           <div style={{
             marginTop: 10, padding: '6px 8px',
-            background: 'oklch(0.10 0.008 240 / 0.5)', borderRadius: 5,
+            background: 'color-mix(in srgb, var(--surface-code) 50%, transparent)', borderRadius: 5,
             fontFamily: 'var(--font-mono)', fontSize: 10.5,
             color: 'var(--fg-2)',
             display: 'flex', alignItems: 'center', gap: 8,
@@ -316,7 +316,7 @@ function GrabTaskDrawerBody({ task }) {
         </div>
       )}
       <div style={{
-        background: 'oklch(0.10 0.008 240)',
+        background: 'var(--surface-code)',
         border: '1px solid var(--border)',
         borderRadius: 6,
         padding: 12,
@@ -335,19 +335,19 @@ function GrabTaskDrawerBody({ task }) {
               display: 'flex', gap: 8,
               padding: isSuccess ? '5px 8px' : '2px 0',
               margin: isSuccess ? '3px -4px' : 0,
-              background: isSuccess ? 'oklch(0.30 0.10 155 / 0.35)' : 'transparent',
+              background: isSuccess ? 'var(--success-soft)' : 'transparent',
               borderLeft: isSuccess ? '3px solid var(--accent)' : '3px solid transparent',
               borderRadius: isSuccess ? 4 : 0,
               animation: 'none',
             }}>
-              <span style={{ color: 'oklch(0.55 0.05 240)', flexShrink: 0 }}>{l.time}</span>
+              <span style={{ color: 'var(--on-dark-mute)', flexShrink: 0 }}>{l.time}</span>
               <span style={{
                 color: logColor(l.level).fg,
                 fontWeight: 700,
                 minWidth: 62, flexShrink: 0,
               }}>[{l.level}]</span>
               <span style={{
-                color: isSuccess ? 'oklch(0.85 0.12 155)' : 'oklch(0.86 0.008 240)',
+                color: isSuccess ? 'var(--success)' : 'var(--on-dark)',
                 fontWeight: isSuccess ? 600 : 400,
                 wordBreak: 'break-all',
               }}>{l.msg}</span>
@@ -967,14 +967,14 @@ function useGrabOneShotModal() {
 
             <SectionLabel>{tr('ga.progress')}</SectionLabel>
             <div style={{
-              background: 'oklch(0.10 0.008 240)',
+              background: 'var(--surface-code)',
               border: '1px solid var(--border)',
               borderRadius: 6,
               padding: 14,
               fontFamily: 'var(--font-mono)',
               fontSize: 11.5,
               lineHeight: 1.7,
-              color: 'oklch(0.86 0.008 240)',
+              color: 'var(--on-dark)',
               minHeight: 180,
             }}>
               <PhaseLine done={['preparing', 'requesting', 'waiting', 'done'].indexOf(state.phase) > 0} active={state.phase === 'preparing'}>
@@ -1034,13 +1034,13 @@ function useGrabOneShotModal() {
 }
 
 function PhaseLine({ done, active, children }) {
-  const color = done ? 'oklch(0.72 0.16 155)' : active ? 'oklch(0.72 0.16 55)' : 'oklch(0.5 0.02 240)';
+  const color = done ? 'var(--success)' : active ? 'var(--orange)' : 'var(--fg-3)';
   return (
     <div style={{ color, display: 'flex', gap: 8, padding: '2px 0' }}>
       <span style={{ display: 'inline-flex' }}>
-        {done ? <Icon name="check" size={12} color="oklch(0.72 0.16 155)" />
-          : active ? <Icon name="loader" size={12} color="oklch(0.72 0.16 55)" />
-          : <Icon name="circle" size={12} color="oklch(0.5 0.02 240)" />}
+        {done ? <Icon name="check" size={12} color="var(--success)" />
+          : active ? <Icon name="loader" size={12} color="var(--orange)" />
+          : <Icon name="circle" size={12} color="var(--fg-3)" />}
       </span>
       <span>{children}</span>
     </div>
@@ -1199,12 +1199,12 @@ function TaskLogDrawerBody() {
     <div style={{ padding: 4 }}>
       {error && <div role="alert" style={{ color: 'var(--danger)', padding: 20 }}>{error}</div>}
       {!error && logs.length === 0 && <div style={{ color: 'var(--fg-3)', padding: 20, textAlign: 'center' }}>{tr('ga.noLogs')}</div>}
-      <div style={{ background: 'oklch(0.10 0.008 240)', border: '1px solid var(--border)', borderRadius: 6, padding: 12, maxHeight: 480, overflowY: 'auto', fontFamily: 'var(--font-mono)', fontSize: 11.5, lineHeight: 1.6 }}>
+      <div style={{ background: 'var(--surface-code)', border: '1px solid var(--border)', borderRadius: 6, padding: 12, maxHeight: 480, overflowY: 'auto', fontFamily: 'var(--font-mono)', fontSize: 11.5, lineHeight: 1.6 }}>
         {logs.map((l, i) => (
           <div key={i} style={{ display: 'flex', gap: 8, padding: '2px 0' }}>
-            <span style={{ color: 'oklch(0.55 0.05 240)', flexShrink: 0 }}>{l.time}</span>
+            <span style={{ color: 'var(--on-dark-mute)', flexShrink: 0 }}>{l.time}</span>
             <span style={{ color: logColor(l.level).fg, fontWeight: 700, minWidth: 62, flexShrink: 0 }}>[{l.level}]</span>
-            <span style={{ color: 'oklch(0.86 0.008 240)', wordBreak: 'break-all' }}>{l.msg}</span>
+            <span style={{ color: 'var(--on-dark)', wordBreak: 'break-all' }}>{l.msg}</span>
           </div>
         ))}
       </div>

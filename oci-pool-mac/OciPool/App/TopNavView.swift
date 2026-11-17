@@ -111,13 +111,13 @@ struct TopNavView: View {
     // Web topbar 引擎状态 pill:运行点(pulse) + 引擎 + 运行中
     private var engineStatus: some View {
         HStack(spacing: 8) {
-            PulseDotView(color: AppTheme.sidebarActive)
+            PulseDotView(color: AppTheme.success)
             Text("抢机引擎")
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.navIcon(dark))
             Text("运行中")
                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                .foregroundColor(AppTheme.sidebarActive)
+                .foregroundColor(AppTheme.success)
         }
         .padding(.horizontal, 10)
         .frame(height: 30)
@@ -316,13 +316,13 @@ struct TopNavView: View {
                     // Web UserAvatar：26px linear-gradient(135deg, accent, cyan) 底 + 深色字
                     Circle()
                         .fill(LinearGradient(
-                            gradient: Gradient(colors: [AppTheme.brand(dark), Color(hex: "2fd0cc")]),
+                            gradient: Gradient(colors: [AppTheme.brand(dark), AppTheme.isClaude ? AppTheme.brand(dark) : Color(hex: "2fd0cc")]),
                             startPoint: .topLeading, endPoint: .bottomTrailing
                         ))
                         .frame(width: 26, height: 26)
                     Text(avatarLetter)
                         .font(.system(size: 10.5, weight: .bold))
-                        .foregroundColor(Color(hex: "0e2a22"))
+                        .foregroundColor(AppTheme.isClaude ? .white : Color(hex: "0e2a22"))
                         .tracking(-0.2)
                 }
                 Image(systemName: "chevron.down")

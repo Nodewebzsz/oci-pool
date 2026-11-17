@@ -9,6 +9,8 @@ import Combine
 /// client window height (compresses the art; scrolls on very short windows).
 /// macOS 11 compatible (no Canvas / TimelineView / GraphicsContext / .overlay(alignment:)).
 struct LoginHeroView: View {
+    @EnvironmentObject private var appearance: AppearanceController
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var dark: Bool
     var crying: Bool = false
     var shyMode: Bool = false
@@ -17,10 +19,10 @@ struct LoginHeroView: View {
     @State private var t: TimeInterval = 0
     private let viewBox: CGFloat = 600
 
-    private var accent: Color { Color(hex: "34d399") }
-    private var cyanAccent: Color { Color(hex: "22d3ee") }
+    private var accent: Color { AppTheme.sidebarActive }
+    private var cyanAccent: Color { AppTheme.isClaude ? AppTheme.sidebarActive.opacity(0.65) : AppTheme.cyan }
     private var orangeAccent: Color { AppTheme.orange }
-    private var coreFill: Color { Color(hex: dark ? "272c34" : "f2f4f7") }
+    private var coreFill: Color { Color(hex: dark ? "161b22" : "f8fafc") }
     private var grid: Color { Color(hex: dark ? "7c848f" : "c8ced6").opacity(0.10) }
 
     private var zh: Bool { locale == .zhCN || locale == .zhTW }
@@ -40,9 +42,7 @@ struct LoginHeroView: View {
         ZStack {
             // Web hero 背景：linear-gradient(135deg, var(--bg-1), var(--bg-0))
             LinearGradient(
-                gradient: Gradient(colors: dark
-                    ? [Color(hex: "0d1216"), Color(hex: "060a0d")]
-                    : [Color(hex: "ffffff"), Color(hex: "f8fafd")]),
+                gradient: Gradient(colors: [AppTheme.sidebarBg(dark), AppTheme.pageBg(dark)]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -96,15 +96,16 @@ struct LoginHeroView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
         .onReceive(Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()) { _ in
-            t += 1.0 / 30.0
+            if !reduceMotion { t += 1.0 / 30.0 }
         }
+        .onChange(of: reduceMotion) { if $0 { t = 0 } }
     }
 
     // MARK: - Brand header (top)
 
     private var brandHeader: some View {
         HStack(spacing: 12) {
-            LoginBrandBadge(size: 38, accent: accent, cyan: cyanAccent)
+            BrandMarkView(size: 38, dark: dark)
             VStack(alignment: .leading, spacing: 3) {
                 Text("OCI-POOL")
                     .font(.system(size: 15, weight: .bold))
@@ -131,7 +132,7 @@ struct LoginHeroView: View {
                 Text("OCI-POOL · 45 REGIONS GLOBAL TOPOLOGY")
                     .font(.system(size: max(8, 9 * scale), weight: .semibold, design: .monospaced))
                     .foregroundColor(LoginPalette.muted(dark))
-                    .tracking(2.0)
+                    .tracking(2.0 * scale)
                     .opacity(0.65)
                     .position(x: cx, y: cy - 212 * scale)
 
@@ -190,7 +191,7 @@ struct LoginHeroView: View {
     private var bottomCopy: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(heroTitle)
-                .font(.system(size: 30, weight: .heavy))
+                .font(AppTypography.heroTitle)
                 .foregroundColor(LoginPalette.text(dark))
                 .tracking(-0.8)
                 .lineSpacing(2)
@@ -225,67 +226,7 @@ struct LoginHeroView: View {
     }
 }
 
-// Mini brand badge (top-left logo) — 与 Web 端 PoolBrandMark 1:1 精确对齐（纯白、上移2px居中）
-private struct LoginBrandBadge: View {
-    var size: CGFloat = 38
-    var accent: Color
-    var cyan: Color
 
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: size * (10.0 / 34.0))
-                .fill(LinearGradient(gradient: Gradient(colors: [accent, cyan]),
-                                     startPoint: .topLeading, endPoint: .bottomTrailing))
-                .frame(width: size, height: size)
-            PoolCloudOutlineShape()
-                .stroke(Color.white,
-                        style: StrokeStyle(lineWidth: size * (2.2 / 36.0), lineCap: .round, lineJoin: .round))
-                .frame(width: size, height: size)
-            PoolLightningBoltShape()
-                .fill(Color.white)
-                .frame(width: size, height: size)
-        }
-        .frame(width: size, height: size)
-    }
-}
-
-// 科技云朵外轮廓（纯白、上移2px居中）
-private struct PoolCloudOutlineShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        let sx = rect.width / 36.0
-        let sy = rect.height / 36.0
-        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-            CGPoint(x: rect.minX + x * sx, y: rect.minY + y * sy)
-        }
-        var path = Path()
-        path.move(to: p(7.5, 23.0))
-        path.addCurve(to: p(9.7, 14.5), control1: p(6.5, 18.8), control2: p(7.4, 15.8))
-        path.addCurve(to: p(23.5, 16.0), control1: p(12.5, 7.8), control2: p(21.0, 8.2))
-        path.addCurve(to: p(27.0, 23.0), control1: p(26.2, 16.5), control2: p(28.2, 19.8))
-        path.addLine(to: p(7.5, 23.0))
-        return path
-    }
-}
-
-// 居中高能折角闪电核（纯白、上移2px）
-private struct PoolLightningBoltShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        let sx = rect.width / 36.0
-        let sy = rect.height / 36.0
-        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-            CGPoint(x: rect.minX + x * sx, y: rect.minY + y * sy)
-        }
-        var path = Path()
-        path.move(to: p(18.5, 11.2))
-        path.addLine(to: p(14.2, 16.5))
-        path.addLine(to: p(17.5, 16.5))
-        path.addLine(to: p(15.8, 21.8))
-        path.addLine(to: p(21.8, 15.2))
-        path.addLine(to: p(18.2, 15.2))
-        path.closeSubpath()
-        return path
-    }
-}
 
 // MARK: - HUD Crosshairs
 private struct HudCrosshairs: View {
@@ -565,7 +506,7 @@ private struct CentralComputeCore: View {
 
             // 磨砂玻璃底盘
             Circle()
-                .fill(Color(hex: dark ? "161b22" : "f8fafc"))
+                .fill(coreFill)
                 .frame(width: 76 * scale, height: 76 * scale)
                 .position(x: cx, y: cy)
 
@@ -579,15 +520,7 @@ private struct CentralComputeCore: View {
                 .frame(width: 64 * scale, height: 64 * scale)
                 .position(x: cx, y: cy)
 
-            // OCI 云中闪电芯片徽标（尺寸 44）
-            PoolCloudOutlineShape()
-                .stroke(accent, style: StrokeStyle(lineWidth: 2.2 * scale, lineCap: .round, lineJoin: .round))
-                .frame(width: 44 * scale, height: 44 * scale)
-                .position(x: cx, y: cy)
-
-            PoolLightningBoltShape()
-                .fill(accent)
-                .frame(width: 44 * scale, height: 44 * scale)
+            BrandGlyphView(size: 44 * scale, color: accent)
                 .position(x: cx, y: cy)
         }
     }

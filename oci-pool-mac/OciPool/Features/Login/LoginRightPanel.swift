@@ -5,6 +5,9 @@ import AppKit
 /// Keeps native desktop extras (deployment mode + status) compact so the login
 /// page still matches the web layout while fitting the client window height.
 struct LoginRightPanel: View {
+    @EnvironmentObject private var appearance: AppearanceController
+    @State private var showAppearance = false
+    @State private var recoveryLinkHovered = false
     @ObservedObject var model: LoginFormModel
     var dark: Bool
     @ObservedObject var backend: BackendController
@@ -57,6 +60,8 @@ struct LoginRightPanel: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(LoginPalette.bg(dark))
+        .overlay(appearanceOverlay, alignment: .topTrailing)
+        .onExitCommand { showAppearance = false }
         .animation(.easeInOut(duration: 0.28), value: showBootLoading)
         .animation(.easeInOut(duration: 0.28), value: localBootFailed != nil)
         .animation(.easeInOut(duration: 0.22), value: model.modeActivated)
@@ -157,6 +162,37 @@ struct LoginRightPanel: View {
         HStack {
             Spacer()
             languageChip
+            Button(action: { showAppearance.toggle() }) {
+                Image(systemName: appearance.mode == .system ? "desktopcomputer" : (dark ? "moon" : "sun.max"))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .frame(width: 30, height: 30)
+                    .background(AppTheme.sidebarHover(dark))
+                    .cornerRadius(5)
+                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(AppTheme.border(dark), lineWidth: 1))
+            }
+            .buttonStyle(PlainButtonStyle())
+            .accessibilityLabel(model.locale == .enUS ? "Appearance" : "主题设置")
+            .help(model.locale == .enUS ? "Appearance" : "主题设置")
+        }
+    }
+
+    @ViewBuilder
+    private var appearanceOverlay: some View {
+        if showAppearance {
+            ZStack(alignment: .topTrailing) {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { showAppearance = false }
+
+                AppearanceOptionsView(english: model.locale == .enUS, onSelect: { showAppearance = false })
+                    .environmentObject(appearance)
+                    .cornerRadius(9)
+                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(AppTheme.border(dark), lineWidth: 1))
+                    .shadow(color: .black.opacity(dark ? 0.30 : 0.12), radius: 12, x: 0, y: 6)
+                    .padding(.top, 68)
+                    .padding(.trailing, 40)
+            }
         }
     }
 
@@ -661,7 +697,7 @@ struct LoginRightPanel: View {
     private func heading(title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.system(size: 22, weight: .bold))
+                .font(AppTypography.loginTitle)
                 .foregroundColor(LoginPalette.text(dark))
                 .tracking(-0.3)
             Text(subtitle)
@@ -686,9 +722,11 @@ struct LoginRightPanel: View {
             Button(action: onForgotPassword) {
                 Text(model.locale == .enUS ? "Forgot password?" : "忘记密码?")
                     .font(.system(size: 12))
-                    .foregroundColor(infoColor)
+                    .foregroundColor(LoginPalette.recoveryLink(dark))
+                    .underline(recoveryLinkHovered)
             }
             .buttonStyle(PlainButtonStyle())
+            .onHover { recoveryLinkHovered = $0 }
         }
         .padding(.bottom, 6)
     }
@@ -792,19 +830,19 @@ struct LoginRightPanel: View {
         HStack(alignment: .center, spacing: 8) {
             Image(systemName: "info.circle")
                 .font(.system(size: 13))
-                .foregroundColor(infoColor)
+                .foregroundColor(AppTheme.textSecondary(dark))
             Text(model.locale == .enUS ? "Sign in with the admin account from initial deployment. Please go to System Settings > Security Settings to change your username and password after login." : "使用您首次部署时的管理员账号登录，登录后请立即前往系统管理--安全管理修改用户名密码")
                 .font(.system(size: 11))
-                .foregroundColor(LoginPalette.text(dark))
+                .foregroundColor(AppTheme.textSecondary(dark))
                 .lineSpacing(1.5)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(hex: dark ? "1e1b4b" : "eef2ff").opacity(dark ? 0.45 : 0.8))
+        .background(AppTheme.sidebarHover(dark))
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(infoColor, style: StrokeStyle(lineWidth: 1, dash: [6, 3]))
+                .stroke(AppTheme.border(dark), lineWidth: 1)
         )
         .cornerRadius(6)
     }

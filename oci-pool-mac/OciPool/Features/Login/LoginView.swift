@@ -6,12 +6,13 @@ struct LoginView: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var backend: BackendController
     @EnvironmentObject private var appearance: AppearanceController
+    @Environment(\.colorScheme) private var colorScheme
 
     @StateObject private var model = LoginFormModel()
     @State private var countdownTask: Task<Void, Never>?
     @State private var resetCountdownTask: Task<Void, Never>?
 
-    private var dark: Bool { appearance.isDarkEffective }
+    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
 
     var body: some View {
         ZStack {

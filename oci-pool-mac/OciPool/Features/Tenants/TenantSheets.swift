@@ -2067,9 +2067,9 @@ struct TenantSheetHost: View {
 
     private func syncPhaseColor(_ phase: TenantSyncPhase) -> Color {
         switch phase {
-        case .running: return AppTheme.sidebarActive
+        case .running: return AppTheme.success
         case .waitingLong: return AppTheme.orange
-        case .success: return AppTheme.sidebarActive
+        case .success: return AppTheme.success
         case .error: return AppTheme.danger
         }
     }

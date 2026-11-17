@@ -15,12 +15,12 @@ struct TenantTrafficView: View {
     private var accentGreen: Color { AppTheme.sidebarActive }
     private var accentBlue: Color { AppTheme.info }
     private var accentRed: Color { Color(hex: "f87171") }
-    private var surface: Color { dark ? Color(hex: "1a1d27") : Color.white }
-    private var surface2: Color { dark ? Color(hex: "1f2233") : Color(hex: "f8f9fa") }
-    private var cardBorder: Color { dark ? Color(hex: "2a2d3a") : Color(hex: "e2e8f0") }
-    private var primaryText: Color { dark ? Color(hex: "e2e8f0") : Color(hex: "222222") }
-    private var secondaryText: Color { dark ? Color(hex: "8892a4") : Color(hex: "555555") }
-    private var pageBg: Color { dark ? Color(hex: "0f1117") : Color(hex: "f3f6fa") }
+    private var surface: Color { AppTheme.isClaude ? AppTheme.sidebarBg(dark) : (dark ? Color(hex: "1a1d27") : Color.white) }
+    private var surface2: Color { (AppTheme.isClaude ? AppTheme.sidebarHover(dark) : (dark ? Color(hex: "1f2233") : Color(hex: "f8f9fa"))) }
+    private var cardBorder: Color { AppTheme.isClaude ? AppTheme.border(dark) : (dark ? Color(hex: "2a2d3a") : Color(hex: "e2e8f0")) }
+    private var primaryText: Color { AppTheme.isClaude ? AppTheme.navIcon(dark) : (dark ? Color(hex: "e2e8f0") : Color(hex: "222222")) }
+    private var secondaryText: Color { AppTheme.isClaude ? AppTheme.textSecondary(dark) : (dark ? Color(hex: "8892a4") : Color(hex: "555555")) }
+    private var pageBg: Color { AppTheme.isClaude ? AppTheme.pageBg(dark) : (dark ? Color(hex: "0f1117") : Color(hex: "f3f6fa")) }
     private var inColor: Color { Color(hex: "34d399") }
     private var outColor: Color { Color(hex: "f87171") }
 

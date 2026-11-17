@@ -69,13 +69,13 @@ struct PageScaffold<Toolbar: View, Content: View, Footer: View>: View {
                                 .font(.system(size: 14, weight: .regular))
                                 .foregroundColor(AppTheme.textTertiary(dark).opacity(0.8))
                             Text(title)
-                                .font(.system(size: 16, weight: .semibold))
+                                .font(AppTheme.isClaude ? AppTypography.pageTitle : .system(size: 16, weight: .semibold))
                                 .foregroundColor(AppTheme.navIcon(dark))
                                 .tracking(-0.2)
                         }
                     } else {
                         Text(title)
-                            .font(.system(size: 17, weight: .semibold))
+                            .font(AppTypography.pageTitle)
                             .foregroundColor(AppTheme.navIcon(dark))
                             .tracking(-0.2)
                     }

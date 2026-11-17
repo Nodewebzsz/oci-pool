@@ -44,7 +44,7 @@ enum OpenLogFilterLevel: String, CaseIterable, Identifiable {
         case .info: return Color(hex: "00b6be")
         case .warn: return AppTheme.orange
         case .error: return AppTheme.danger
-        case .success: return AppTheme.sidebarActive
+        case .success: return AppTheme.success
         }
     }
 }
@@ -79,7 +79,7 @@ enum OpenLogLevel: Equatable {
         // 对齐 Web page-monitor.jsx logColor：INFO=cyan/WARN=orange/ERROR=danger/SUCCESS=accent
         switch self {
         case .plain: return Color(hex: "8d9398")
-        case .success: return AppTheme.sidebarActive
+        case .success: return AppTheme.success
         case .warn: return AppTheme.orange
         case .error: return AppTheme.danger
         case .info: return Color(hex: "00b6be")

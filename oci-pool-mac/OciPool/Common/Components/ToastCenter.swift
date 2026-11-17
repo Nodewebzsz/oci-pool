@@ -81,7 +81,7 @@ struct ToastHost: View {
     private var background: Color {
         switch center.style {
         case .info: return AppTheme.info
-        case .success: return AppTheme.sidebarActive
+        case .success: return AppTheme.success
         case .warn: return AppTheme.orange
         case .error: return AppTheme.danger
         }

@@ -22,16 +22,10 @@ function needsVerification(message) {
   return /验证码|mfa|MFA/i.test(message || '');
 }
 
-// ── Brand Logo: 内嵌高能电光云 (Cloud + Inset Lightning Core · 纯白居中) ─────────────
-function BrandLogoRender({ size = 25, color = '#ffffff' }) {
+function BrandLogoRender({ size = 25, color = '#faf9f5' }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 36 36" fill="none">
-      {/* 科技云朵外轮廓（纯白、上移2px光学居中） */}
-      <path d="M7.5 23a4.8 4.8 0 0 1 2.2-8.5 7 7 0 0 1 13.8 1.5 4.8 4.8 0 0 1 3.5 9H7.5z"
-            stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      {/* 居中高能折角闪电核（纯白） */}
-      <polygon points="18.5,11.2 14.2,16.5 17.5,16.5 15.8,21.8 21.8,15.2 18.2,15.2"
-               fill={color} stroke={color} strokeWidth="0.8" strokeLinejoin="round" />
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      <PoolBrandGlyph color={color} />
     </svg>
   );
 }
@@ -39,22 +33,38 @@ function BrandLogoRender({ size = 25, color = '#ffffff' }) {
 // ── Brand hero (SVG · left panel) ────────────────────────────────────────
 
 // 全球算力互联拓扑 (Global Cloud Topology · 深度强化版)
-function AuthHeroArt() {
+function AuthHeroArt({ design = 'claude' }) {
+  const claude = design === 'claude';
+  const secondary = claude ? 'color-mix(in srgb, var(--accent) 65%, transparent)' : 'var(--cyan)';
+  const artRef = useRefAuth(null);
+  useEffectAuth(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const syncMotion = () => {
+      if (!artRef.current) return;
+      if (media.matches) {
+        artRef.current.pauseAnimations();
+        artRef.current.setCurrentTime(0);
+      } else artRef.current.unpauseAnimations();
+    };
+    syncMotion();
+    media.addEventListener('change', syncMotion);
+    return () => media.removeEventListener('change', syncMotion);
+  }, []);
   return (
-    <svg viewBox="0 0 600 600" width="100%" height="100%" style={{ maxWidth: 550, maxHeight: 550 }}
+    <svg ref={artRef} viewBox={claude ? '35 35 530 530' : '0 0 600 600'} width="100%" height="100%" style={{ maxWidth: 550, maxHeight: 550 }}
          xmlns="http://www.w3.org/2000/svg">
       <defs>
         {/* 球体大气层晕光 */}
         <radialGradient id="topo-atmo" cx="40%" cy="35%" r="65%">
           <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.28" />
-          <stop offset="50%" stopColor="var(--cyan)" stopOpacity="0.10" />
-          <stop offset="85%" stopColor="var(--cyan)" stopOpacity="0.02" />
+          <stop offset="50%" stopColor={secondary} stopOpacity="0.10" />
+          <stop offset="85%" stopColor={secondary} stopOpacity="0.02" />
           <stop offset="100%" stopColor="transparent" stopOpacity="0" />
         </radialGradient>
         {/* 边缘高光轮廓渐变 */}
         <linearGradient id="topo-rim" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.8" />
-          <stop offset="50%" stopColor="var(--cyan)" stopOpacity="0.3" />
+          <stop offset="50%" stopColor={secondary} stopOpacity="0.3" />
           <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.1" />
         </linearGradient>
         {/* 核心反应堆渐变 */}
@@ -78,8 +88,8 @@ function AuthHeroArt() {
         <path d="M 120 480 L 120 472 M 120 480 L 128 480" />
         <path d="M 480 480 L 480 472 M 480 480 L 472 480" />
       </g>
-      <text x="300" y="86" textAnchor="middle" fill="var(--fg-3)" fontSize="10" fontWeight="600"
-            fontFamily="var(--font-mono)" letterSpacing="2.5" opacity="0.6">
+      <text x="300" y={claude ? 91 : 86} textAnchor="middle" fill={claude ? 'var(--fg-2)' : 'var(--fg-3)'} fontSize={claude ? 9 : 10} fontWeight="600"
+            fontFamily="var(--font-mono)" letterSpacing={claude ? 2 : 2.5} opacity={claude ? 0.65 : 0.6}>
         OCI-POOL · 45 REGIONS GLOBAL TOPOLOGY
       </text>
 
@@ -91,16 +101,20 @@ function AuthHeroArt() {
       <g transform="rotate(-22 300 300)">
         <ellipse cx="300" cy="300" rx="236" ry="68" fill="none" stroke="var(--accent)" strokeWidth="1.2"
                  strokeOpacity="0.4" strokeDasharray="8 6">
-          <animateTransform attributeName="transform" type="rotate" from="0 300 300" to="360 300 300" dur="30s" repeatCount="indefinite" />
+          {claude
+            ? <animate attributeName="stroke-dashoffset" from="0" to="-14" dur="1.167s" repeatCount="indefinite" />
+            : <animateTransform attributeName="transform" type="rotate" from="0 300 300" to="360 300 300" dur="30s" repeatCount="indefinite" />}
         </ellipse>
-        <ellipse cx="300" cy="300" rx="248" ry="72" fill="none" stroke="var(--cyan)" strokeWidth="0.8"
-                 strokeOpacity="0.25" strokeDasharray="30 180 60 120">
-          <animateTransform attributeName="transform" type="rotate" from="360 300 300" to="0 300 300" dur="24s" repeatCount="indefinite" />
+        <ellipse cx="300" cy="300" rx="248" ry="72" fill="none" stroke={secondary} strokeWidth="0.8"
+                 strokeOpacity="0.25" strokeDasharray={claude ? '20 120 40 80' : '30 180 60 120'}>
+          {claude
+            ? <animate attributeName="stroke-dashoffset" from="0" to="260" dur="17.333s" repeatCount="indefinite" />
+            : <animateTransform attributeName="transform" type="rotate" from="360 300 300" to="0 300 300" dur="24s" repeatCount="indefinite" />}
         </ellipse>
       </g>
 
       {/* 3D 经纬球体骨架（增强厚度与景深） */}
-      <g stroke="var(--cyan)" fill="none">
+      <g stroke={secondary} fill="none">
         {/* 纬线 */}
         <ellipse cx="300" cy="225" rx="165" ry="46" strokeWidth="0.9" strokeOpacity="0.2" strokeDasharray="3 3" />
         <ellipse cx="300" cy="300" rx="200" ry="58" strokeWidth="1.2" strokeOpacity="0.35" />
@@ -118,7 +132,7 @@ function AuthHeroArt() {
         <animate attributeName="opacity" values="0.7;0" dur="3.6s" repeatCount="indefinite" />
         <animate attributeName="strokeWidth" values="1.8;0.4" dur="3.6s" repeatCount="indefinite" />
       </circle>
-      <circle cx="300" cy="300" r="50" fill="none" stroke="var(--cyan)" strokeWidth="1.2" opacity="0.6">
+      <circle cx="300" cy="300" r="50" fill="none" stroke={secondary} strokeWidth="1.2" opacity="0.6">
         <animate attributeName="r" values="50;210" begin="1.8s" dur="3.6s" repeatCount="indefinite" />
         <animate attributeName="opacity" values="0.7;0" begin="1.8s" dur="3.6s" repeatCount="indefinite" />
         <animate attributeName="strokeWidth" values="1.6;0.4" begin="1.8s" dur="3.6s" repeatCount="indefinite" />
@@ -179,8 +193,8 @@ function AuthHeroArt() {
 
           {/* 节点实体圆点 */}
           <circle cx={pt.x} cy={pt.y} r={pt.hot ? 4.5 : 3}
-                  fill={pt.hot ? 'var(--orange)' : 'var(--cyan)'}
-                  stroke="var(--bg-0)" strokeWidth="1.5">
+                  fill={pt.hot ? 'var(--orange)' : secondary}
+                  stroke={claude ? 'none' : 'var(--bg-0)'} strokeWidth="1.5">
             {pt.hot && (
               <animate attributeName="r" values="4;5.5;4" dur="2s" repeatCount="indefinite" />
             )}
@@ -189,10 +203,10 @@ function AuthHeroArt() {
           {/* 核心地标文字微徽章 */}
           {pt.code && (
             <g transform={`translate(${pt.x + pt.tagX}, ${pt.y + pt.tagY})`}>
-              <rect width="42" height="15" rx="3" fill="var(--bg-1)" fillOpacity="0.85"
-                    stroke={pt.hot ? 'var(--orange)' : 'var(--cyan)'} strokeWidth="0.8" strokeOpacity="0.6" />
+              <rect width="42" height="15" rx="3" fill={claude ? 'var(--topology-tag)' : 'var(--bg-1)'} fillOpacity="0.85"
+                    stroke={pt.hot ? 'var(--orange)' : secondary} strokeWidth="0.8" strokeOpacity={pt.hot ? 0.6 : 0.5} />
               <text x="21" y="11" textAnchor="middle"
-                    fill={pt.hot ? 'var(--orange)' : 'var(--fg-1)'}
+                    fill={pt.hot ? 'var(--orange)' : (claude ? 'var(--fg-0)' : 'var(--fg-1)')}
                     fontSize="8.5" fontWeight="700" fontFamily="var(--font-mono)">
                 {pt.code}
               </text>
@@ -207,7 +221,7 @@ function AuthHeroArt() {
         <circle r="65" fill="url(#topo-core-glow)" filter="url(#topo-blur-sm)" />
 
         {/* 外部精密 HUD 刻度齿轮环 */}
-        <circle r="52" fill="none" stroke="var(--cyan)" strokeWidth="1" strokeDasharray="3 4" strokeOpacity="0.4">
+        <circle r="52" fill="none" stroke={secondary} strokeWidth="1" strokeDasharray="3 4" strokeOpacity="0.4">
           <animateTransform attributeName="transform" type="rotate" from="360" to="0" dur="20s" repeatCount="indefinite" />
         </circle>
         <circle r="46" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeDasharray="16 8 8 8" strokeOpacity="0.75">
@@ -215,12 +229,12 @@ function AuthHeroArt() {
         </circle>
 
         {/* 核心磨砂玻璃底盘 */}
-        <circle r="38" fill="var(--bg-1)" stroke="var(--accent)" strokeWidth="1.8" />
-        <circle r="32" fill="var(--bg-2)" fillOpacity="0.7" stroke="var(--border)" strokeWidth="1" />
+        <circle r="38" fill={claude ? 'var(--topology-core)' : 'var(--bg-1)'} stroke="var(--accent)" strokeWidth="1.8" />
+        <circle r="32" fill={claude ? 'none' : 'var(--bg-2)'} fillOpacity="0.7" stroke={claude ? 'var(--topology-core-border)' : 'var(--border)'} strokeWidth="1" />
 
         {/* 中心 OCI 云池芯片徽标（适当放大为 46px） */}
-        <g transform="translate(-23,-23)">
-          <BrandLogoRender size={46} color="var(--accent)" />
+        <g transform={claude ? 'translate(-22,-22)' : 'translate(-23,-23)'}>
+          <BrandLogoRender size={claude ? 44 : 46} color="var(--accent)" />
         </g>
       </g>
     </svg>
@@ -416,7 +430,7 @@ function LoginView({ state, dispatch, tr, onLoginSuccess }) {
   return (
     <>
       <div style={{ marginBottom: 26 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--fg-0)', margin: 0, letterSpacing: -0.3 }}>
+        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 'var(--auth-title-size)', fontWeight: 'var(--auth-title-weight)', color: 'var(--fg-0)', margin: 0, letterSpacing: -0.4, lineHeight: 1.15 }}>
           {tr('auth.login.title')}
         </h1>
         <p style={{ fontSize: 12.5, color: 'var(--fg-2)', margin: '6px 0 0' }}>
@@ -438,8 +452,9 @@ function LoginView({ state, dispatch, tr, onLoginSuccess }) {
       <AuthField label={tr('auth.password')} error={state.errors.password}
                  hint={
                    <button type="button"
+                     className="auth-recovery-link"
                      onClick={() => dispatch({ type: 'goto', view: 'forgot' })}
-                     style={{ background: 'none', border: 'none', color: 'var(--info)',
+                     style={{ background: 'none', border: 'none', color: 'color-mix(in srgb, var(--accent) 65%, var(--fg-0))',
                               cursor: 'pointer', fontSize: 11, padding: 0 }}>
                      {tr('auth.forgot')}
                    </button>
@@ -468,11 +483,11 @@ function LoginView({ state, dispatch, tr, onLoginSuccess }) {
       {/* Initial admin notice */}
       <div style={{
         marginTop: 18, padding: '10px 12px',
-        background: 'var(--info-soft)', border: '1px dashed var(--info)',
-        borderRadius: 6, fontSize: 11, color: 'var(--fg-1)',
+        background: 'var(--bg-2)', border: '1px solid var(--border)',
+        borderRadius: 6, fontSize: 11, color: 'var(--fg-2)',
         display: 'flex', gap: 8, alignItems: 'center', lineHeight: 1.5,
       }}>
-        <Icon name="info" size={13} style={{ color: 'var(--info)', flexShrink: 0 }} />
+        <Icon name="info" size={13} style={{ color: 'var(--fg-2)', flexShrink: 0 }} />
         <span>{tr('auth.login.notice')}</span>
       </div>
     </>
@@ -501,7 +516,7 @@ function RegisterView({ state, dispatch, tr }) {
   return (
     <>
       <div style={{ marginBottom: 26 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--fg-0)', margin: 0, letterSpacing: -0.3 }}>
+        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 'var(--auth-title-size)', fontWeight: 'var(--auth-title-weight)', color: 'var(--fg-0)', margin: 0, letterSpacing: -0.4, lineHeight: 1.15 }}>
           {tr('auth.register.title')}
         </h1>
         <p style={{ fontSize: 12.5, color: 'var(--fg-2)', margin: '6px 0 0' }}>
@@ -712,7 +727,7 @@ function VerifyView({ state, dispatch, tr, onSuccess, authConfig }) {
         }}>
           <Icon name={iconName} size={22} />
         </div>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--fg-0)', margin: 0, letterSpacing: -0.3 }}>
+        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 'var(--auth-title-size)', fontWeight: 'var(--auth-title-weight)', color: 'var(--fg-0)', margin: 0, letterSpacing: -0.4, lineHeight: 1.15 }}>
           {tr(titleKey)}
         </h1>
         <p style={{ fontSize: 12.5, color: 'var(--fg-2)', margin: '6px 0 0', lineHeight: 1.6 }}>
@@ -943,7 +958,7 @@ function ForgotView({ state, dispatch, tr, messageEnabled }) {
   return (
     <>
       <div style={{ marginBottom: 26 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--fg-0)', margin: 0, letterSpacing: -0.3 }}>
+        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 'var(--auth-title-size)', fontWeight: 'var(--auth-title-weight)', color: 'var(--fg-0)', margin: 0, letterSpacing: -0.4, lineHeight: 1.15 }}>
           {tr('auth.forgot.title')}
         </h1>
         <p style={{ fontSize: 12.5, color: 'var(--fg-2)', margin: '6px 0 0' }}>
@@ -1057,7 +1072,7 @@ function ForgotView({ state, dispatch, tr, messageEnabled }) {
 }
 
 // ── Main AuthPage container ──────────────────────────────────────────────
-function AuthPage({ onLogin, authView, onAuthViewChange }) {
+function AuthPage({ onLogin, authView, onAuthViewChange, theme = 'light', onChangeTheme, design = 'claude', onChangeDesign }) {
   const { t: tr, lang, setLang } = useT();
   // 登录视图由 hash 提供: /login | /register | /forgot-password
   const routeView = authView === 'register' ? 'register'
@@ -1176,20 +1191,13 @@ function AuthPage({ onLogin, authView, onAuthViewChange }) {
         <div style={{
           position: 'absolute', inset: 0,
           backgroundImage: `radial-gradient(circle at 20% 30%, color-mix(in oklab, var(--accent) 8%, transparent), transparent 45%),
-                            radial-gradient(circle at 80% 70%, color-mix(in oklab, var(--cyan)  8%, transparent), transparent 45%)`,
+                            radial-gradient(circle at 80% 70%, color-mix(in oklab, var(--accent) 6%, transparent), transparent 45%)`,
           pointerEvents: 'none',
         }} />
 
         {/* Top: mini logo bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative', zIndex: 1 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 9,
-            background: 'linear-gradient(135deg, var(--accent), var(--cyan))',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 8px color-mix(in oklab, var(--accent) 30%, transparent)',
-          }}>
-            <BrandLogoRender size={25} color="#ffffff" />
-          </div>
+          <PoolBrandMark size={36} />
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--fg-0)', letterSpacing: -0.2 }}>{tr('brand.name')}</div>
             <div style={{ fontSize: 10, color: 'var(--fg-3)', letterSpacing: 0.4 }}>{tr('brand.tagline')}</div>
@@ -1201,14 +1209,14 @@ function AuthPage({ onLogin, authView, onAuthViewChange }) {
           flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
           position: 'relative', zIndex: 1,
         }}>
-          <AuthHeroArt />
+          <AuthHeroArt design={design} />
         </div>
 
         {/* Bottom: brand tagline + stats */}
         <div style={{ position: 'relative', zIndex: 1 }}>
           <h2 style={{
-            fontSize: 30, fontWeight: 800, color: 'var(--fg-0)', margin: 0,
-            letterSpacing: -0.8, lineHeight: 1.15,
+            fontFamily: 'var(--font-serif)', fontSize: 'var(--auth-hero-size)', fontWeight: 'var(--auth-hero-weight)', color: 'var(--fg-0)', margin: 0,
+            letterSpacing: -0.8, lineHeight: 1.1,
           }}>
             {tr('auth.hero.title')}
           </h2>
@@ -1255,6 +1263,7 @@ function AuthPage({ onLogin, authView, onAuthViewChange }) {
             <Icon name="languages" size={13} />
             <span className="mono">{lang === 'zh' ? tr('top.lang.zh') : tr('top.lang.en')}</span>
           </button>
+          <ThemeMenuButton theme={theme} onChangeTheme={onChangeTheme} design={design} onChangeDesign={onChangeDesign} />
         </div>
 
         {/* Form card */}

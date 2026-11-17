@@ -330,11 +330,11 @@ function VncConsoleModal({ inst, onClose }) {
       )}
 
       <div ref={boxRef} style={{
-        background: 'oklch(0.06 0.005 240)', border: '1px solid var(--border-strong)',
+        background: 'var(--surface-code)', border: '1px solid var(--border-strong)',
         borderRadius: 6, padding: 16, fontFamily: 'var(--font-mono)', fontSize: 11.5,
-        color: 'oklch(0.85 0.05 155)', minHeight: state === 'running' ? 120 : 300, maxHeight: 260, overflow: 'auto', lineHeight: 1.7,
+        color: 'var(--success)', minHeight: state === 'running' ? 120 : 300, maxHeight: 260, overflow: 'auto', lineHeight: 1.7,
       }}>
-        {lines.length === 0 && <div style={{ color: 'oklch(0.55 0.05 240)' }}>{tr('inst.4eb3c3')}</div>}
+        {lines.length === 0 && <div style={{ color: 'var(--on-dark-mute)' }}>{tr('inst.4eb3c3')}</div>}
         {lines.map((l, i) => <div key={i} style={{ whiteSpace: 'pre-wrap' }}>{l}</div>)}
       </div>
 
@@ -475,7 +475,7 @@ function SshTerminalModal({ inst, config, onClose }) {
         </span>
       </div>
       {error && <div style={{ padding: '8px 10px', marginBottom: 10, color: 'var(--danger)', background: 'var(--danger-soft)', border: '1px solid var(--danger)', borderRadius: 5, fontSize: 11.5 }}>{error}</div>}
-      <div ref={outputRef} style={{ height: 300, overflow: 'auto', padding: 12, background: 'oklch(0.06 0.005 240)', border: '1px solid var(--border-strong)', borderRadius: 6, color: 'oklch(0.85 0.05 155)', fontFamily: 'var(--font-mono)', fontSize: 11.5, whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>
+      <div ref={outputRef} style={{ height: 300, overflow: 'auto', padding: 12, background: 'var(--surface-code)', border: '1px solid var(--border-strong)', borderRadius: 6, color: 'var(--success)', fontFamily: 'var(--font-mono)', fontSize: 11.5, whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>
         {lines.length ? lines.join('') : tr('inst.d32d7a')}
       </div>
       <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>

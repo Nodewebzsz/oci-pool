@@ -465,7 +465,7 @@ struct TenantsView: View {
             Text(item.defNameText)
                 .font(.system(size: 12))
                 // Web：自定义名 fg-1，未设置为空白
-                .foregroundColor(dark ? Color(hex: "ccd2d6") : Color(hex: "2d3439"))
+                .foregroundColor(AppTheme.sidebarText(dark))
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(width: width, alignment: .center)

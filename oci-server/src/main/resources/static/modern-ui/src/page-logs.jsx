@@ -172,7 +172,7 @@ function LogsPage() {
       <div style={{
         flex: 1, minHeight: 0,
         display: 'flex', flexDirection: 'column',
-        background: 'oklch(0.10 0.008 240)',
+        background: 'var(--surface-code)',
         border: '1px solid var(--border-strong)',
         borderRadius: 'var(--radius)',
         overflow: 'hidden',
@@ -182,7 +182,7 @@ function LogsPage() {
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '10px 14px',
-          background: 'oklch(0.13 0.010 240)',
+          background: 'var(--surface-code-2)',
           borderBottom: '1px solid var(--border)',
         }}>
           <h2 style={{
@@ -247,18 +247,18 @@ function LogsPage() {
                 transition: 'background 80ms',
                 animation: i === 0 && !paused ? 'fade-in 300ms' : 'none',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = 'oklch(0.16 0.010 240)'}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--code-hover)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
-              <span style={{ color: 'oklch(0.55 0.05 240)', flexShrink: 0 }}>{l.time}</span>
+              <span style={{ color: 'var(--on-dark-mute)', flexShrink: 0 }}>{l.time}</span>
               <span style={{
                 color: logColor(l.level).fg,
                 fontWeight: 700, minWidth: 66,
                 flexShrink: 0,
               }}>[{l.level}]</span>
-              <span style={{ color: 'oklch(0.72 0.05 240)', minWidth: 54, flexShrink: 0 }}>{l.tenant}</span>
+              <span style={{ color: 'var(--on-dark-soft)', minWidth: 54, flexShrink: 0 }}>{l.tenant}</span>
               <span style={{ color: 'oklch(0.65 0.09 200)', minWidth: 130, flexShrink: 0 }}>{l.region}</span>
-              <span style={{ color: 'oklch(0.86 0.008 240)', flex: 1, wordBreak: 'break-all' }}>{l.msg}</span>
+              <span style={{ color: 'var(--on-dark)', flex: 1, wordBreak: 'break-all' }}>{l.msg}</span>
             </div>
           ))}
         </div>
@@ -267,7 +267,7 @@ function LogsPage() {
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '8px 16px',
-          background: 'oklch(0.13 0.010 240)',
+          background: 'var(--surface-code-2)',
           borderTop: '1px solid var(--border)',
           fontSize: 11,
         }}>

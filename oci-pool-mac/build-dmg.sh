@@ -448,7 +448,8 @@ echo "════════════════════════�
 echo " Step 2.5  生成应用图标"
 echo "══════════════════════════════════════════"
 cd "$MAC_DIR"
-swift generate-icon.swift "OciPool/Assets.xcassets/AppIcon.appiconset"
+swiftc OciPool/Supporting/BrandGeometry.swift generate-icon.swift -o "$BUILD_DIR/generate-icon"
+"$BUILD_DIR/generate-icon" "OciPool/Assets.xcassets/AppIcon.appiconset"
 swift verify-icon.swift "OciPool/Assets.xcassets/AppIcon.appiconset/icon_1024.png"
 
 # ────────────────────────── Step 3: xcodegen ─────────────────────────────

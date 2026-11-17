@@ -612,10 +612,10 @@ private struct RegionsPulseDot: View {
 // MARK: - Theme（对齐 Web index.html oklch CSS 变量）
 
 enum RegionsTheme {
-    static func bg(_ dark: Bool) -> Color { dark ? Color(hex: "060a0d") : Color(hex: "f8fafd") }
-    static func surface(_ dark: Bool) -> Color { dark ? Color(hex: "0d1216") : Color.white }
-    static func surface2(_ dark: Bool) -> Color { dark ? Color(hex: "151c21") : Color(hex: "f1f4f6") }
-    static func border(_ dark: Bool) -> Color { dark ? Color(hex: "232a2f") : Color(hex: "d9dfe3") }
+    static func bg(_ dark: Bool) -> Color { AppTheme.pageBg(dark) }
+    static func surface(_ dark: Bool) -> Color { AppTheme.sidebarBg(dark) }
+    static func surface2(_ dark: Bool) -> Color { AppTheme.sidebarHover(dark) }
+    static func border(_ dark: Bool) -> Color { AppTheme.border(dark) }
     static func text(_ dark: Bool) -> Color { dark ? Color(hex: "f6f9fb") : Color(hex: "0c1217") }
     static func muted(_ dark: Bool) -> Color { dark ? Color(hex: "5d646a") : Color(hex: "81878c") }
     static func orange(_ dark: Bool) -> Color { Color(hex: "ef852e") }

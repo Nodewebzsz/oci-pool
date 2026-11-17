@@ -47,7 +47,7 @@ struct DashboardView: View {
                     MenuGlyph(name: "activity", size: 17, color: AppTheme.sidebarActive)
                 }
                 Text("系统监控")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(AppTypography.pageTitle)
                     .foregroundColor(AppTheme.navIcon(dark))
                     
             }
@@ -115,7 +115,7 @@ struct DashboardView: View {
                     value: "\(model.stats.totalBootInstances)")
             kpiCard(icon: "arrow.triangle.2.circlepath", iconColor: AppTheme.info, title: "总抢机次数",
                     value: "\(model.stats.totalAttempts)")
-            kpiCard(icon: "checkmark.circle", iconColor: AppTheme.sidebarActive, title: "抢机成功次数",
+            kpiCard(icon: "checkmark.circle", iconColor: AppTheme.success, title: "抢机成功次数",
                     value: "\(model.stats.successfulAttempts)")
             kpiCard(icon: "xmark.circle", iconColor: AppTheme.danger, title: "抢机失败次数",
                     value: "\(model.stats.failCounts)")
@@ -469,7 +469,7 @@ struct DashboardView: View {
         switch level {
         case "ERROR": return (AppTheme.dangerSoft(dark), AppTheme.danger)
         case "WARN": return (AppTheme.orangeSoft(dark), AppTheme.orange)
-        case "SUCCESS": return (AppearanceController.shared.accent.accentSoft(dark), AppTheme.sidebarActive)
+        case "SUCCESS": return (AppTheme.successSoft(dark), AppTheme.success)
         case "DEBUG": return (AppTheme.bg3(dark), AppTheme.textSecondary(dark))
         default: return (AppTheme.cyanSoft(dark), AppTheme.cyan)
         }

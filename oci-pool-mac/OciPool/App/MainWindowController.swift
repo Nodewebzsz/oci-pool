@@ -149,6 +149,13 @@ final class MainWindowController: NSWindowController {
     }
 
     private func bindSession() {
+        appearance.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                self.window?.backgroundColor = NSColor(AppTheme.pageBg(self.appearance.isDarkEffective))
+            }
+            .store(in: &cancellables)
         session.$isLoggedIn
             .dropFirst() // init already rebuildContent()'d once
             .removeDuplicates()

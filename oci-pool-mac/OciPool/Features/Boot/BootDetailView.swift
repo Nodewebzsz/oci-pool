@@ -271,7 +271,7 @@ struct BootDetailView: View {
 
     private func bootLogColor(_ tone: BootLogLine.BootLogTone) -> Color {
         switch tone {
-        case .success: return AppTheme.sidebarActive
+        case .success: return AppTheme.success
         case .warn: return AppTheme.orange
         case .error: return AppTheme.danger
         case .normal: return primaryText

@@ -3,14 +3,14 @@ import SwiftUI
 enum StatusTone {
     case success, warning, danger, info, neutral
 
-    /// 对齐 Web 语义色：success=accent、warning=orange、danger=danger、info=info
+    /// 成功状态与用户强调色独立，确保主题切换后语义不变。
     func color(dark: Bool) -> Color {
         switch self {
-        case .success: return AppTheme.sidebarActive
+        case .success: return AppTheme.success
         case .warning: return AppTheme.orange
         case .danger:  return AppTheme.danger
         case .info:    return AppTheme.info
-        case .neutral: return dark ? Color(hex: "8d9398") : Color(hex: "5d646a")
+        case .neutral: return AppTheme.textSecondary(dark)
         }
     }
 

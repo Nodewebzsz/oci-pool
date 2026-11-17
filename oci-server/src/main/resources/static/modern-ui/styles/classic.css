@@ -1,0 +1,104 @@
+[data-design="classic"] {
+  --bg-0: oklch(0.14 0.010 240);
+  --bg-1: oklch(0.18 0.012 240);
+  --bg-2: oklch(0.22 0.014 240);
+  --bg-3: oklch(0.26 0.014 240);
+  --bg-4: oklch(0.30 0.014 240);
+  --border: oklch(0.28 0.014 240);
+  --border-strong: oklch(0.36 0.016 240);
+  --fg-0: oklch(0.98 0.005 240);
+  --fg-1: oklch(0.86 0.008 240);
+  --fg-2: oklch(0.66 0.010 240);
+  --fg-3: oklch(0.50 0.012 240);
+  --success: var(--accent);
+  --success-soft: var(--accent-soft);
+  --cyan: oklch(0.70 0.13 200);
+  --cyan-soft: oklch(0.30 0.09 200);
+  --orange: oklch(0.72 0.16 55);
+  --orange-soft: oklch(0.30 0.10 55);
+  --danger: oklch(0.66 0.19 25);
+  --danger-soft: oklch(0.30 0.11 25);
+  --info: oklch(0.68 0.13 260);
+  --info-soft: oklch(0.30 0.10 260);
+  --violet: oklch(0.70 0.15 305);
+  --violet-soft: oklch(0.30 0.11 305);
+  --on-dark: oklch(0.86 0.008 240);
+  --on-dark-soft: oklch(0.72 0.05 240);
+  --on-dark-mute: oklch(0.55 0.05 240);
+  --surface-code: oklch(0.10 0.008 240);
+  --surface-code-2: oklch(0.13 0.010 240);
+  --code-hover: oklch(0.16 0.010 240);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.4);
+  --radius-sm: 5px;
+  --font-serif: var(--font-sans);
+  --page-title-size: 17px;
+  --page-title-weight: 600;
+  --auth-title-size: 22px;
+  --auth-title-weight: 700;
+  --auth-hero-size: 30px;
+  --auth-hero-weight: 800;
+  --brand-title-size: 27px;
+  --brand-title-weight: 800;
+  --brand-title-spacing: 4.5px;
+  --button-radius: var(--radius-sm);
+  --button-hover-filter: brightness(1.15);
+  --nav-active-bg: transparent;
+  --nav-active-fg: var(--accent);
+  --nav-service: var(--accent);
+  --nav-proxy: var(--cyan);
+  --nav-resource: var(--violet);
+  --nav-system: var(--orange);
+  --nav-tools: var(--info);
+  --nav-developer: var(--violet);
+  --brand-bg: var(--bg-2);
+  --brand-border: var(--border-strong);
+  --brand-cloud: var(--fg-0);
+  --brand-resource: var(--accent);
+}
+
+[data-design="classic"][data-theme="light"] {
+  --brand-bg: color-mix(in srgb, var(--accent) 65%, #475569);
+  --brand-border: color-mix(in srgb, var(--accent) 55%, #ffffff);
+  --brand-cloud: #ffffff;
+  --brand-resource: #ffffff;
+  --bg-0: oklch(0.985 0.004 240);
+  --bg-1: oklch(1 0 0);
+  --bg-2: oklch(0.965 0.005 240);
+  --bg-3: oklch(0.94 0.007 240);
+  --bg-4: oklch(0.90 0.008 240);
+  --border: oklch(0.90 0.008 240);
+  --border-strong: oklch(0.82 0.010 240);
+  --fg-0: oklch(0.18 0.014 240);
+  --fg-1: oklch(0.32 0.014 240);
+  --fg-2: oklch(0.50 0.012 240);
+  --fg-3: oklch(0.62 0.010 240);
+  --cyan-soft: oklch(0.93 0.06 200);
+  --orange-soft: oklch(0.94 0.07 55);
+  --danger-soft: oklch(0.94 0.06 25);
+  --info-soft: oklch(0.94 0.06 260);
+  --violet-soft: oklch(0.94 0.07 305);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+[data-design="classic"] .sidebar:not([data-collapsed="true"]) .sidebar-item-active::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+[data-design="classic"] .sidebar:not([data-collapsed="true"]) .sidebar-item-active::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--orange);
+  animation: pulse-dot 1.8s infinite;
+  flex-shrink: 0;
+}

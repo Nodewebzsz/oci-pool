@@ -14,6 +14,7 @@ struct AppButton: View {
     var isLoading: Bool = false
     var enabled: Bool = true
     let action: () -> Void
+    @State private var hovering = false
 
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme
@@ -46,6 +47,8 @@ struct AppButton: View {
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(!enabled || isLoading)
+        .onHover { hovering = $0 && enabled && !isLoading }
+        .animation(.easeOut(duration: 0.12), value: hovering)
     }
 
     private var background: Color {
@@ -68,12 +71,12 @@ struct AppButton: View {
             }
         }
         switch kind {
-        case .primary: return AppTheme.sidebarActive
+        case .primary: return hovering && AppTheme.isClaude ? AppTheme.primaryHover : AppTheme.sidebarActive
         case .danger: return AppTheme.danger
-        case .cyan: return Color(hex: "00b6be")
+        case .cyan: return AppTheme.cyan
         case .info: return AppTheme.info
         case .orange: return AppTheme.orange
-        case .secondary: return dark ? Color(hex: "151c21") : Color(hex: "f1f4f6")
+        case .secondary: return AppTheme.sidebarHover(dark)
         case .plain: return Color.clear
         }
     }
@@ -100,7 +103,7 @@ struct AppButton: View {
         }
         switch kind {
         case .primary, .danger, .cyan, .info, .orange: return .white
-        case .secondary: return dark ? Color(hex: "f6f9fb") : Color(hex: "0c1217")
+        case .secondary: return AppTheme.navIcon(dark)
         case .plain: return AppTheme.sidebarActive
         }
     }

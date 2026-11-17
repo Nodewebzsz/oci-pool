@@ -9,43 +9,47 @@ enum LoginPalette {
     // --text:#cdd9e5; --muted:#768390; --line:#31363d;
 
     static func bg(_ dark: Bool) -> Color {
-        dark ? Color(hex: "060a0d") : Color(hex: "f8fafd")
+        AppTheme.pageBg(dark)
     }
     static func panel(_ dark: Bool) -> Color {
-        dark ? Color(hex: "1e2124") : Color(hex: "F3F4F6")
+        (AppTheme.isClaude ? AppTheme.sidebarHover(dark) : (dark ? Color(hex: "1e2124") : Color(hex: "F3F4F6")))
     }
     static func card(_ dark: Bool) -> Color {
-        dark ? Color(hex: "22262b") : Color.white
+        (AppTheme.isClaude ? AppTheme.sidebarBg(dark) : (dark ? Color(hex: "22262b") : Color.white))
     }
     /// Glass shell over aurora
     static func shellFill(_ dark: Bool) -> Color {
-        dark ? Color(hex: "22262b").opacity(0.92) : Color.white.opacity(0.92)
+        AppTheme.isClaude ? AppTheme.sidebarBg(dark) : (dark ? Color(hex: "22262b").opacity(0.92) : Color.white.opacity(0.92))
     }
     static func shellBorder(_ dark: Bool) -> Color {
         dark ? Color.white.opacity(0.06) : Color.white.opacity(0.55)
     }
     static func text(_ dark: Bool) -> Color {
-        dark ? Color(hex: "cdd9e5") : Color(hex: "111827")
+        (AppTheme.isClaude ? AppTheme.navIcon(dark) : (dark ? Color(hex: "cdd9e5") : Color(hex: "111827")))
     }
     static func muted(_ dark: Bool) -> Color {
-        dark ? Color(hex: "768390") : Color(hex: "6B7280")
+        (AppTheme.isClaude ? AppTheme.textSecondary(dark) : (dark ? Color(hex: "768390") : Color(hex: "6B7280")))
     }
     static func line(_ dark: Bool) -> Color {
-        dark ? Color(hex: "31363d") : Color(hex: "D1D5DB")
+        (AppTheme.isClaude ? AppTheme.border(dark) : (dark ? Color(hex: "31363d") : Color(hex: "D1D5DB")))
     }
     /// Primary CTA + brand badge — 跟随当前强调色预设（Web `--accent` oklch(0.72 0.16 hue)）。
     static func primary(_ dark: Bool) -> Color {
         AppearanceController.shared.accent.color
+    }
+    /// 与 Web 登录链接一致：65% 强调色混合正文前景，兼顾深浅色可读性。
+    static func recoveryLink(_ dark: Bool) -> Color {
+        AppTheme.mix(primary(dark), over: AppTheme.navIcon(dark), amount: 0.65)
     }
     /// 主按钮文字色（对齐 Web `--accent-fg`：dark 深色字 / light 白字）。
     static func buttonFg(_ dark: Bool) -> Color {
         AppearanceController.shared.accent.accentFg(dark)
     }
     static func oauthBg(_ dark: Bool) -> Color {
-        dark ? Color(hex: "292d32") : Color(hex: "F3F4F6")
+        (AppTheme.isClaude ? AppTheme.sidebarHover(dark) : (dark ? Color(hex: "292d32") : Color(hex: "F3F4F6")))
     }
     static func oauthBorder(_ dark: Bool) -> Color {
-        dark ? Color(hex: "31363d") : Color(hex: "E5E7EB")
+        (AppTheme.isClaude ? AppTheme.border(dark) : (dark ? Color(hex: "31363d") : Color(hex: "E5E7EB")))
     }
     static func tabActiveBg(_ dark: Bool) -> Color {
         AppearanceController.shared.accent.accentSoft(dark)
@@ -57,6 +61,6 @@ enum LoginPalette {
         dark ? Color.white.opacity(0.06) : Color.black.opacity(0.06)
     }
     static func chipBg(_ dark: Bool) -> Color {
-        dark ? Color(hex: "22262b").opacity(0.95) : Color.white.opacity(0.92)
+        AppTheme.isClaude ? AppTheme.sidebarHover(dark) : (dark ? Color(hex: "22262b").opacity(0.95) : Color.white.opacity(0.92))
     }
 }

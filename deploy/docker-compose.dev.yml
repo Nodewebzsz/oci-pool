@@ -1,0 +1,35 @@
+name: oci-pool-dev
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: oci-pool-dev-redis
+    volumes: [./dev/redis-data:/data]
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 3s, retries: 10 }
+  app:
+    build: { context: .., dockerfile: deploy/Dockerfile.deploy }
+    image: oci-pool-modern-ui:dev
+    container_name: oci-pool-dev-app
+    depends_on: { redis: { condition: service_healthy } }
+    ports: ["127.0.0.1:${DEV_APP_PORT:-19856}:9856"]
+    environment:
+      TZ: "Asia/Shanghai"
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: "6379"
+      MODERN_UI_ENABLED: "true"
+      MODERN_UI_MOCK_DATA: "false"
+      DB_PASSWORD: "${DEV_DB_PASSWORD:-oci-dev-db-password}"
+      ADMIN_USERNAME: "${DEV_ADMIN_USERNAME:-admin}"
+      ADMIN_PASSWORD: "${DEV_ADMIN_PASSWORD:-Dev@123456}"
+    volumes:
+      - ./dev/data:/oci-pool/data
+      - ./dev/logs:/oci-pool/logs
+    healthcheck: { test: ["CMD", "curl", "-sf", "http://127.0.0.1:9856/actuator/health"], interval: 10s, timeout: 5s, retries: 12, start_period: 60s }
+  web:
+    image: nginx:stable-alpine
+    container_name: oci-pool-dev-web
+    depends_on: { app: { condition: service_healthy } }
+    ports: ["127.0.0.1:${DEV_WEB_PORT:-19857}:80"]
+    volumes:
+      - ./nginx.dev.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../oci-server/src/main/resources/static/modern-ui:/usr/share/nginx/modern-ui:ro

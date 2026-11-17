@@ -26,11 +26,11 @@ function toPascal(kebab) {
 // Status dot
 function StatusDot({ status, size = 8, pulse = false }) {
   const colorMap = {
-    running: 'var(--accent)',
-    healthy: 'var(--accent)',
-    active: 'var(--accent)',
-    enabled: 'var(--accent)',
-    success: 'var(--accent)',
+    running: 'var(--success)',
+    healthy: 'var(--success)',
+    active: 'var(--success)',
+    enabled: 'var(--success)',
+    success: 'var(--success)',
 
     stopped: 'var(--fg-3)',
     idle: 'var(--fg-3)',
@@ -62,13 +62,13 @@ function StatusDot({ status, size = 8, pulse = false }) {
 // Status pill
 function StatusPill({ status, label, size = 'md' }) {
   const bgMap = {
-    running: 'var(--accent-soft)', healthy: 'var(--accent-soft)', active: 'var(--accent-soft)', enabled: 'var(--accent-soft)', success: 'var(--accent-soft)',
+    running: 'var(--success-soft)', healthy: 'var(--success-soft)', active: 'var(--success-soft)', enabled: 'var(--success-soft)', success: 'var(--success-soft)',
     stopped: 'var(--bg-3)', idle: 'var(--bg-3)', disabled: 'var(--bg-3)',
     paused: 'var(--orange-soft)', warning: 'var(--orange-soft)', provisioning: 'var(--orange-soft)',
     failed: 'var(--danger-soft)', error: 'var(--danger-soft)', invalid: 'var(--danger-soft)', suspended: 'var(--danger-soft)', danger: 'var(--danger-soft)'
   };
   const fgMap = {
-    running: 'var(--accent)', healthy: 'var(--accent)', active: 'var(--accent)', enabled: 'var(--accent)', success: 'var(--accent)',
+    running: 'var(--success)', healthy: 'var(--success)', active: 'var(--success)', enabled: 'var(--success)', success: 'var(--success)',
     stopped: 'var(--fg-2)', idle: 'var(--fg-2)', disabled: 'var(--fg-2)',
     paused: 'var(--orange)', warning: 'var(--orange)', provisioning: 'var(--orange)',
     failed: 'var(--danger)', error: 'var(--danger)', invalid: 'var(--danger)', suspended: 'var(--danger)', danger: 'var(--danger)'
@@ -161,7 +161,7 @@ function Button({ children, variant = 'ghost', size = 'md', onClick, style = {},
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 'var(--radius-sm)',
+        borderRadius: 'var(--button-radius)',
         fontFamily: 'inherit',
         fontWeight: 500,
         cursor: disabled || loading ? 'not-allowed' : 'pointer',
@@ -170,8 +170,18 @@ function Button({ children, variant = 'ghost', size = 'md', onClick, style = {},
         whiteSpace: 'nowrap',
         ...style
       }}
-      onMouseEnter={(e) => !(disabled || loading) && (e.currentTarget.style.filter = 'brightness(1.15)')}
-      onMouseLeave={(e) => !(disabled || loading) && (e.currentTarget.style.filter = 'brightness(1)')}>
+      onMouseEnter={(e) => {
+        if (disabled || loading) return;
+        e.currentTarget.style.filter = 'var(--button-hover-filter)';
+        if (variant === 'primary') e.currentTarget.style.background = 'var(--accent-active)';
+        else if (variant === 'ghost' || variant === 'outline' || variant === 'secondary') e.currentTarget.style.background = 'var(--bg-3)';
+        else e.currentTarget.style.filter = 'brightness(0.92)';
+      }}
+      onMouseLeave={(e) => {
+        if (disabled || loading) return;
+        e.currentTarget.style.background = variants[variant].background;
+        e.currentTarget.style.filter = 'none';
+      }}>
       
       {loading
         ? <Icon name="loader" size={size === 'xs' || size === 'sm' ? 12 : 14} style={{ animation: 'button-spin 800ms linear infinite' }} />
@@ -904,7 +914,7 @@ function PageHeader({ title, subtitle, icon, iconColor = 'var(--accent)', action
           </div>
         }
         <div style={{ minWidth: 0 }}>
-          <h1 style={{ fontSize: 17, fontWeight: 600, margin: 0, color: 'var(--fg-0)', letterSpacing: -0.2 }}>{title}</h1>
+          <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 'var(--page-title-size)', lineHeight: 1.15, fontWeight: 'var(--page-title-weight)', margin: 0, color: 'var(--fg-0)', letterSpacing: -0.3, fontVariantNumeric: 'lining-nums' }}>{title}</h1>
           {subtitle && <div style={{ marginTop: 2, fontSize: 12, color: 'var(--fg-3)' }}>{subtitle}</div>}
         </div>
       </div>

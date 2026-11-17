@@ -160,18 +160,9 @@ const __TWEAKS_STYLE = `
 // Single source of truth for tweak values. setTweak persists via the host
 // (__edit_mode_set_keys → host rewrites the EDITMODE block on disk).
 function useTweaks(defaults) {
-  const STORAGE_KEY = 'ocip-tweaks';
+  const STORAGE_KEY = window.ociAppearance.STORAGE_KEY;
   const loadValues = React.useCallback(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object') {
-          return { ...defaults, ...parsed };
-        }
-      }
-    } catch (_) {}
-    return defaults;
+    return window.ociAppearance.readPreferences(defaults);
   }, [defaults]);
   const [values, setValues] = React.useState(loadValues);
   const setTweak = React.useCallback((keyOrEdits, val) => {
