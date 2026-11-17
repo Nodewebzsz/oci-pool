@@ -227,6 +227,8 @@ final class TenantsViewModel: ObservableObject {
     @Published var bootCount = "1"
     @Published var bootDayGap = ""
     @Published var bootImages: [TenantImageInfo] = []
+    @Published var bootImagesLoading = false
+    @Published var bootImagesError: String?
     @Published var bootOSList: [String] = []
     @Published var bootSelectedOS = ""
     @Published var bootVersions: [TenantImageInfo] = []
@@ -457,6 +459,7 @@ final class TenantsViewModel: ObservableObject {
             let list = try await listTask
             proxyQuickItems = list.items
             proxyQuickSelectedId = bound?.id
+            proxyQuickForm.bindingRevision = list.items.first?.bindingRevision ?? bound?.bindingRevision ?? ""
         } catch {
             proxyQuickItems = []
             ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
@@ -478,7 +481,11 @@ final class TenantsViewModel: ObservableObject {
         let proxyService = ProxyConfigService(baseURL: session.serverURL)
         do {
             try await LoadingHUD.shared.during {
-                try await proxyService.bindTenant(tenantId: tenantId, proxyId: proxyQuickSelectedId)
+                try await proxyService.bindTenant(
+                    tenantId: tenantId,
+                    proxyId: proxyQuickSelectedId,
+                    expectedBindingRevision: proxyQuickForm.bindingRevision
+                )
             }
             activeSheet = nil
             proxyQuickTenant = nil
@@ -2044,6 +2051,9 @@ final class TenantsViewModel: ObservableObject {
     }
 
     func loadBootImages(tenantId: Int64) async {
+        bootImagesLoading = true
+        bootImagesError = nil
+        defer { bootImagesLoading = false }
         do {
             let imgs = try await service.querySystemImages(tenantId: tenantId, shapeType: bootArchitecture)
             bootImages = imgs
@@ -2054,7 +2064,9 @@ final class TenantsViewModel: ObservableObject {
                 applyBootOS(first)
             }
         } catch {
-            ToastCenter.shared.error(error.localizedDescription)
+            bootImages = []; bootOSList = []; bootSelectedOS = ""
+            bootVersions = []; bootSelectedVersion = ""; bootImageId = ""
+            bootImagesError = error.localizedDescription
         }
     }
 

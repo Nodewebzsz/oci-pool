@@ -633,7 +633,11 @@ struct TenantsService {
 
     func querySystemImages(tenantId: Int64, shapeType: String) async throws -> [TenantImageInfo] {
         let url = try client.makeURL(baseURL, path: "/tenants/querySystemImages")
-        let raw = try await client.postJSON(url, body: ["tenantId": "\(tenantId)", "shapeType": shapeType])
+        let raw = try await client.postJSON(url, body: ["tenantId": "\(tenantId)", "shapeType": shapeType], longTimeout: true)
+        if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
+           let ok = obj["success"] as? Bool, !ok {
+            throw APIError.serverMessage((obj["message"] as? String) ?? "获取镜像失败")
+        }
         if let env = try? JSONDecoder().decode(TenantApiEnvelope.self, from: raw), let data = env.data {
             let d = try JSONSerialization.data(withJSONObject: jsonObject(data))
             return (try? JSONDecoder().decode([TenantImageInfo].self, from: d)) ?? []

@@ -83,6 +83,8 @@
     // 动态镜像状态 (真实探测)
     const [images, setImages] = useState([]);
     const [loadingImages, setLoadingImages] = useState(false);
+    const [imageError, setImageError] = useState('');
+    const [imageReloadKey, setImageReloadKey] = useState(0);
     const [selectedOS, setSelectedOS] = useState('');
     const [selectedVersion, setSelectedVersion] = useState('');
     const [imageId, setImageId] = useState('');
@@ -151,12 +153,14 @@
 
       (async () => {
         setLoadingImages(true);
+        setImageError('');
         try {
           const res = await window.ociApi.request('/tenants/querySystemImages', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tenantId: String(activeTenantId), shapeType: architecture }),
           });
+          if (res && res.success === false) throw new Error(res.message || '获取镜像失败');
           const rawImgs = res?.data || res || [];
           const list = Array.isArray(rawImgs) ? rawImgs : [];
           if (active) {
@@ -182,14 +186,20 @@
           }
         } catch (e) {
           console.warn('拉取镜像失败:', e);
-          if (active) setImages([]);
+          if (active) {
+            setImages([]);
+            setSelectedOS('');
+            setSelectedVersion('');
+            setImageId('');
+            setImageError(e?.message || '获取镜像失败，请稍后重试');
+          }
         } finally {
           if (active) setLoadingImages(false);
         }
       })();
 
       return () => { active = false; };
-    }, [activeTenantId, architecture]);
+    }, [activeTenantId, architecture, imageReloadKey]);
 
     // 操作系统切换联动 (自动按倒序排列并默认选中首项新版本)
     const handleOSChange = (os) => {
@@ -781,7 +791,7 @@
                 </div>
 
                 {/* 操作系统选择 (动态探测) */}
-                <FormRow label="操作系统镜像" required hint={loadingImages ? '正在实时探测该区域镜像…' : `该区域已探测到 ${images.length} 个可用镜像`}>
+                <FormRow label="操作系统镜像" required hint={loadingImages ? '正在实时探测该区域镜像…' : imageError ? '镜像探测失败' : `该区域已探测到 ${images.length} 个可用镜像`}>
                   <CustomDropdown
                     value={selectedOS}
                     onChange={handleOSChange}
@@ -790,11 +800,24 @@
                     disabled={loadingImages || availableOSList.length === 0}
                   >
                     {availableOSList.length === 0 ? (
-                      <option value="">{loadingImages ? '探测中…' : '暂无可用镜像'}</option>
+                      <option value="">{loadingImages ? '探测中…' : imageError ? '探测失败' : '暂无可用镜像'}</option>
                     ) : (
                       availableOSList.map(os => <option key={os} value={os}>{os}</option>)
                     )}
                   </CustomDropdown>
+                  {!loadingImages && imageError && (
+                    <div style={{
+                      marginTop: 8, padding: '8px 10px', borderRadius: 8,
+                      background: 'var(--danger-soft)', color: 'var(--danger)',
+                      fontSize: 12, lineHeight: 1.5,
+                      display: 'flex', alignItems: 'center', gap: 8,
+                    }}>
+                      <span style={{ flex: 1, minWidth: 0, wordBreak: 'break-word' }}>{imageError}</span>
+                      <Button type="button" variant="outline" size="sm" icon="rotate-cw" onClick={() => setImageReloadKey(k => k + 1)}>
+                        重试
+                      </Button>
+                    </div>
+                  )}
                 </FormRow>
 
                 {/* 系统版本选择 (纯净展示版本号，去除乱码哈希后缀) */}

@@ -88,9 +88,12 @@ public class VpnProxyRecordController extends BaseController{
         try {
             vpnProxyRecordService.saveOrUpdate(vpnProxyRecordRequest);
             return ApiResponse.success();
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            log.warn("保存代理配置被拒绝: {}", e.getMessage());
+            return ApiResponse.error(e.getMessage());
         } catch (Exception e) {
-            log.error("查询vpn代理配置列表失败", e);
-            return ApiResponse.error("查询vpn代理配置列表失败: " + e.getMessage());
+            log.error("保存代理配置失败", e);
+            return ApiResponse.error("保存代理配置失败: " + e.getMessage());
         }
     }
 
@@ -178,7 +181,7 @@ public class VpnProxyRecordController extends BaseController{
                 return ApiResponse.error("租户 id 不能为空");
             }
             // id 表示目标代理；null/0 = 解绑
-            vpnProxyRecordService.bindTenant(request.getTenantId(), request.getId());
+            vpnProxyRecordService.bindTenant(request.getTenantId(), request.getId(), request.getExpectedBindingRevision());
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("绑定租户代理失败", e);

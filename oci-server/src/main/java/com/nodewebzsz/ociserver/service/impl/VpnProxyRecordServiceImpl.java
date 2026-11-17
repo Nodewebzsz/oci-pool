@@ -10,6 +10,7 @@ import com.nodewebzsz.ociserver.pojo.request.VpnProxyRecordRequest;
 import com.nodewebzsz.ociserver.service.VpnProxyRecordService;
 import com.nodewebzsz.ociserver.utils.PageUtils;
 import com.nodewebzsz.ociserver.utils.PingUtil;
+import com.nodewebzsz.ociserver.config.ProxyHealthCache;
 import com.nodewebzsz.ociserver.utils.SocksProxyUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -20,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import javax.persistence.criteria.Predicate;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,8 +32,10 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /**
@@ -78,16 +83,22 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
     @Override
     @Transactional
     public void saveOrUpdate(VpnProxyRecordRequest request) {
+        assertBindingRevision(request.getExpectedBindingRevision());
         LocalDateTime now = LocalDateTime.now();
         VpnProxyRecord record = null;
 
         if (request.getId() != null) {
             record = vpnProxyRecordRepository.findById(request.getId()).orElse(null);
         }
+        boolean isNew = record == null;
         if (record == null) {
             record = new VpnProxyRecord();
             record.setCreateTime(now);
         }
+        if (!isNew) {
+            assertPasswordNotCarriedOver(record, request);
+        }
+        boolean endpointChanged = isNew || endpointChanged(record, request);
 
         record.setProxyType(request.getProxyType());
         record.setProxyHost(request.getProxyHost());
@@ -99,6 +110,15 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
         // 密码：null 未传则保留原密码；空串表示清空
         if (request.getProxyPassword() != null) {
             record.setProxyPassword(request.getProxyPassword());
+        }
+        if (request.getProxyUsername() != null && StringUtils.isBlank(request.getProxyUsername())
+                && request.getProxyPassword() == null) {
+            record.setProxyPassword(null);
+        }
+        if (endpointChanged) {
+            record.setLastCheckedAt(null);
+            record.setLastCheckError(null);
+            record.setLastExitIp(null);
         }
         if (request.getAvailableStatus() != null) {
             record.setAvailableStatus(request.getAvailableStatus());
@@ -182,7 +202,8 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
 
     @Override
     @Transactional
-    public void bindTenant(Long tenantId, Long proxyId) {
+    public void bindTenant(Long tenantId, Long proxyId, String expectedBindingRevision) {
+        assertBindingRevision(expectedBindingRevision);
         Long rootId = normalizeTenantId(tenantId);
         if (rootId == null) {
             throw new IllegalArgumentException("租户 id 无效");
@@ -235,7 +256,14 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
             checkResult = new SocksProxyUtils.ProxyCheckResult(false, "测试异常: " + e.getMessage());
         }
         boolean connected = checkResult.isConnected();
+        String message = SocksProxyUtils.redact(checkResult.getMessage(), record);
+        ProxyHealthCache.record(record, connected, message);
         record.setAvailableStatus(connected ? 1 : 0);
+        record.setLastCheckedAt(LocalDateTime.now());
+        record.setLastCheckError(connected ? null : message);
+        if (connected && StringUtils.isNotBlank(checkResult.getExitIp())) {
+            record.setLastExitIp(checkResult.getExitIp().trim());
+        }
         // 若连通探测成功并识别到了真实公网出口归属地（方案 A），优先落库真实出口归属地
         if (connected && checkResult.getExitLocation() != null && !checkResult.getExitLocation().trim().isEmpty()) {
             record.setLocation(checkResult.getExitLocation().trim());
@@ -257,11 +285,80 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
         data.put("proxyPort", record.getProxyPort());
         data.put("proxyType", record.getProxyType());
         data.put("location", record.getLocation());
-        data.put("message", checkResult.getMessage());
+        data.put("message", message);
+        data.put("lastCheckedAt", record.getLastCheckedAt());
+        data.put("lastExitIp", record.getLastExitIp());
         if (checkResult.getLatencyMs() != null) {
             data.put("latency", checkResult.getLatencyMs());
         }
         return data;
+    }
+
+    /**
+     * 计算全部绑定关系（bind 表 + 兼容旧 tenant_id 列）的摘要，任何绑定变化都会改变该值。
+     */
+    String currentBindingRevision() {
+        TreeSet<String> parts = new TreeSet<>();
+        for (VpnProxyTenantBind b : vpnProxyTenantBindRepository.findAll()) {
+            if (b != null && b.getProxyId() != null && b.getTenantId() != null) {
+                parts.add("b:" + b.getProxyId() + ":" + b.getTenantId());
+            }
+        }
+        for (VpnProxyRecord r : vpnProxyRecordRepository.findAllBoundRecords()) {
+            parts.add("t:" + r.getId() + ":" + r.getTenantId());
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(String.join(",", parts).getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < 8; i++) {
+                sb.append(String.format("%02x", hash[i]));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            throw new IllegalStateException("计算代理绑定版本失败", e);
+        }
+    }
+
+    /**
+     * 客户端回传了打开编辑时的绑定版本时，与当前版本比对；不一致说明其他客户端已修改绑定，拒绝覆盖。
+     */
+    private void assertBindingRevision(String expected) {
+        if (StringUtils.isBlank(expected)) {
+            return;
+        }
+        if (!expected.trim().equals(currentBindingRevision())) {
+            throw new IllegalStateException("代理绑定已被其他操作修改，请刷新列表后重新编辑");
+        }
+    }
+
+    /**
+     * 修改代理类型、地址、端口或用户名却没有重新填写密码时拒绝保存，避免旧密码被带到新的代理上。
+     */
+    private void assertPasswordNotCarriedOver(VpnProxyRecord existing, VpnProxyRecordRequest request) {
+        if (request.getProxyPassword() != null || StringUtils.isBlank(existing.getProxyPassword())) {
+            return;
+        }
+        String newUsername = request.getProxyUsername() != null ? request.getProxyUsername() : existing.getProxyUsername();
+        if (StringUtils.isBlank(newUsername)) {
+            return;
+        }
+        if (endpointChanged(existing, request)) {
+            throw new IllegalArgumentException("修改代理类型、地址、端口或用户名时请重新填写密码");
+        }
+    }
+
+    private static boolean endpointChanged(VpnProxyRecord existing, VpnProxyRecordRequest request) {
+        boolean usernameChanged = request.getProxyUsername() != null
+                && !StringUtils.equals(StringUtils.trimToEmpty(request.getProxyUsername()),
+                StringUtils.trimToEmpty(existing.getProxyUsername()));
+        boolean passwordChanged = request.getProxyPassword() != null
+                && !StringUtils.equals(request.getProxyPassword(), existing.getProxyPassword());
+        return !StringUtils.equalsIgnoreCase(StringUtils.trimToEmpty(request.getProxyType()), StringUtils.trimToEmpty(existing.getProxyType()))
+                || !StringUtils.equalsIgnoreCase(StringUtils.trimToEmpty(request.getProxyHost()), StringUtils.trimToEmpty(existing.getProxyHost()))
+                || !Objects.equals(request.getProxyPort(), existing.getProxyPort())
+                || usernameChanged
+                || passwordChanged;
     }
 
     /**
@@ -327,11 +424,13 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
             }
         }
         Map<Long, String> nameMap = loadTenantNames(allTenantIds);
+        String revision = currentBindingRevision();
 
         for (VpnProxyRecord r : records) {
             if (r == null) {
                 continue;
             }
+            r.setBindingRevision(revision);
             List<Long> ids = proxyToTenants.get(r.getId());
             if (ids == null || ids.isEmpty()) {
                 if (r.getTenantId() != null) {

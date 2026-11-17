@@ -211,6 +211,7 @@
     return api.request('/vpnProxy/bindTenant', jsonBody({
       tenantId: tenantId,
       id: o.id === null || o.id === undefined || o.id === '' ? null : o.id,
+      expectedBindingRevision: o.expectedBindingRevision || undefined,
     }));
   }, 'POST', '/vpnProxy/bindTenant', 'application/json');
 
@@ -219,6 +220,7 @@
       id: o.id, proxyType: o.proxyType, proxyHost: o.proxyHost, proxyPort: o.proxyPort,
       proxyUsername: o.proxyUsername, proxyPassword: o.proxyPassword, availableStatus: o.availableStatus,
       forceProxy: o.forceProxy, tenantId: o.tenantId, tenantIds: o.tenantIds, customName: o.customName,
+      expectedBindingRevision: o.expectedBindingRevision,
     };
   }
 

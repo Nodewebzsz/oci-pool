@@ -1,5 +1,6 @@
 package com.nodewebzsz.dao.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
@@ -56,10 +57,19 @@ public class VpnProxyRecord {
     private String proxyUsername;
 
     /**
-     * 代理密码（可选）
+     * 代理密码（可选）。只写：接口响应永不返回密码原文，前端通过 hasPassword 判断是否已设置
      */
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     @Column(name = "proxy_password", length = 128)
     private String proxyPassword;
+
+    /**
+     * 是否已设置代理密码（仅用于接口展示）
+     */
+    @JsonProperty("hasPassword")
+    public boolean hasPassword() {
+        return proxyPassword != null && !proxyPassword.isEmpty();
+    }
 
     /**
      * 可用状态（1 = 可用，0 = 不可用）
@@ -68,7 +78,7 @@ public class VpnProxyRecord {
     private Integer availableStatus = 1;
 
     /**
-     * 是否强制代理（1 = 强制：探测失败则拒绝请求；0 = 非强制：失败可直连）
+     * 是否强制代理（1 = 强制：探测失败则拒绝请求，不更换出口；0 = 非强制：失败时切换到全局代理池其他节点，不直连）
      */
     @Column(name = "force_proxy", nullable = false)
     private Integer forceProxy = 0;
@@ -91,6 +101,30 @@ public class VpnProxyRecord {
      */
     @Column(name = "location", length = 128)
     private String location;
+
+    /**
+     * 最近一次检测时间（手动检测或请求链路实时检测）
+     */
+    @Column(name = "last_checked_at")
+    private LocalDateTime lastCheckedAt;
+
+    /**
+     * 最近一次检测失败原因（已脱敏；成功时清空）
+     */
+    @Column(name = "last_check_error", length = 512)
+    private String lastCheckError;
+
+    /**
+     * 最近一次手动检测识别到的出口 IP
+     */
+    @Column(name = "last_exit_ip", length = 64)
+    private String lastExitIp;
+
+    /**
+     * 全部代理绑定关系的版本号（非持久化，列表接口填充；保存绑定时回传用于检测并发修改）
+     */
+    @Transient
+    private String bindingRevision;
 
     /**
      * 绑定租户展示名（非持久化，列表接口填充；多租户时逗号拼接）

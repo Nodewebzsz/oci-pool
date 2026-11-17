@@ -10,7 +10,7 @@ function ProxyEditModalBody({ initialData, isNew, onSaved, shell, tr, lang }) {
     host: initialData?.proxyHost || initialData?.host || '',
     port: initialData?.proxyPort || initialData?.port || 1080,
     username: initialData?.proxyUsername || initialData?.username || '',
-    password: initialData?.proxyPassword || '',
+    password: '',
     availableStatus: initialData?.availableStatus == null ? 1 : Number(initialData.availableStatus),
     forceProxy: initialData?.forceProxy == null ? 0 : Number(initialData.forceProxy),
     tenants: initialData?.tenantIds || initialData?.tenants || [],
@@ -94,6 +94,7 @@ function ProxyEditModalBody({ initialData, isNew, onSaved, shell, tr, lang }) {
         forceProxy: Number(state.forceProxy) === 1 ? 1 : 0,
         tenantIds: state.tenants || [],
         customName: state.name.trim(),
+        expectedBindingRevision: initialData?.bindingRevision,
       });
       if (result && result.success === false) throw new Error(result.message || tr('proxy.save.fail') || '保存失败');
       shell.closeModal();
@@ -208,7 +209,7 @@ function ProxyEditModalBody({ initialData, isNew, onSaved, shell, tr, lang }) {
               type="password"
               value={state.password}
               onChange={v => setState(s => ({ ...s, password: v }))}
-              placeholder="留空表示无鉴权"
+              placeholder={initialData?.hasPassword ? '已设置，留空保留原密码' : '留空表示无鉴权'}
             />
           </FormRow>
         </div>
@@ -232,7 +233,7 @@ function ProxyEditModalBody({ initialData, isNew, onSaved, shell, tr, lang }) {
               height={32}
               width="100%"
             >
-              <option value="0">否 (可回退直连)</option>
+              <option value="0">否 (可切换其他节点)</option>
               <option value="1">是 (严格走代理)</option>
             </CustomDropdown>
           </FormRow>
@@ -250,7 +251,7 @@ function ProxyEditModalBody({ initialData, isNew, onSaved, shell, tr, lang }) {
           <span>
             {state.forceProxy === 1
               ? '已开启强制代理：代理链路异常时不回退，直接拒绝云厂商操作'
-              : '非强制代理：代理链路异常或不通时，允许系统平滑回退直连'}
+              : '非强制代理：代理链路异常时，自动切换到全局代理池其他节点，不会直连'}
           </span>
         </div>
       </div>

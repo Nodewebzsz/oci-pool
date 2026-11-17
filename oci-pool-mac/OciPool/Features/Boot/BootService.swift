@@ -149,7 +149,11 @@ struct BootService {
         let raw = try await client.postJSON(url, body: [
             "tenantId": "\(tenantId)",
             "shapeType": shapeType
-        ])
+        ], longTimeout: true)
+        if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
+           let ok = obj["success"] as? Bool, !ok {
+            throw APIError.serverMessage((obj["message"] as? String) ?? "获取镜像失败")
+        }
         if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
            let data = obj["data"] {
             let d = try JSONSerialization.data(withJSONObject: data)

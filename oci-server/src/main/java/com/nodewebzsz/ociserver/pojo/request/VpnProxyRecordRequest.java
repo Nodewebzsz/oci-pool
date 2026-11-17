@@ -67,4 +67,9 @@ public class VpnProxyRecordRequest extends BaseRequest{
      * 代理归属地（可选）
      */
     private String location;
+
+    /**
+     * 打开编辑时拿到的绑定版本号；不为空时与当前版本比对，不一致则拒绝保存
+     */
+    private String expectedBindingRevision;
 }

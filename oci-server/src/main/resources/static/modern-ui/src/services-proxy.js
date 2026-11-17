@@ -12,7 +12,7 @@
   function body(input) {
     const o = input || {};
     const out = {};
-    ['id','proxyType','proxyHost','proxyPort','proxyUsername','proxyPassword','availableStatus','forceProxy','tenantId','tenantIds','customName','pageNum','pageSize','sort','order']
+    ['id','proxyType','proxyHost','proxyPort','proxyUsername','proxyPassword','availableStatus','forceProxy','tenantId','tenantIds','customName','location','expectedBindingRevision','pageNum','pageSize','sort','order']
       .forEach(k => { if (o[k] !== undefined) out[k] = o[k]; });
     return { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(out) };
   }

@@ -142,7 +142,7 @@ struct ProxyConfigSheet: View {
                                 model.activeForm = f
                             }
                         ),
-                        placeholder: "留空表示无鉴权",
+                        placeholder: (model.activeForm?.hasPassword ?? false) ? "已设置，留空保留原密码" : "留空表示无鉴权",
                         secure: true,
                         leadingSystemImage: "key"
                     )
@@ -195,7 +195,7 @@ struct ProxyConfigSheet: View {
                 Text(
                     (model.activeForm?.forceProxy == 1)
                         ? "已开启强制：代理不通时拒绝向云厂商发起请求"
-                        : "非强制：代理不通时可回退直连"
+                        : "非强制：代理不通时切换到代理池其他节点，不会直连"
                 )
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.sidebarText(dark))

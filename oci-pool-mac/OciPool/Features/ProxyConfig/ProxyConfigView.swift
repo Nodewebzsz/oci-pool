@@ -6,7 +6,6 @@ struct ProxyConfigView: View {
     @EnvironmentObject private var appearance: AppearanceController
     @StateObject private var model = ProxyConfigViewModel()
     /// Row ids currently showing plaintext password (click-to-reveal, align Web).
-    @State private var revealedPasswordIds: Set<Int64> = []
 
     private var dark: Bool { appearance.isDarkEffective }
 
@@ -132,8 +131,15 @@ struct ProxyConfigView: View {
             cell(item.tenantLabel, width: 110)
             // 强制列可点切换（橙=强制 / 绿=非强制）
             forceShieldCell(item)
-            StatusBadge(text: item.statusLabel, tone: item.statusTone)
-                .frame(width: 80, alignment: .center)
+            VStack(spacing: 2) {
+                StatusBadge(text: item.statusLabel, tone: item.statusTone)
+                Text(item.checkLabel)
+                    .font(.system(size: 9.5))
+                    .foregroundColor(item.lastCheckError.isEmpty ? Color.secondary : AppTheme.danger)
+                    .lineLimit(1)
+                    .help(item.checkHelp)
+            }
+            .frame(width: 80, alignment: .center)
             HStack(spacing: 6) {
                 Spacer(minLength: 0)
                 Button(action: { model.testConnection(item) }) {
@@ -224,36 +230,12 @@ struct ProxyConfigView: View {
         .buttonStyle(PlainButtonStyle())
         .help(item.isForce
               ? "强制代理：不通则拒绝请求（点击关闭）"
-              : "非强制：不通可直连（点击开启强制）")
+              : "非强制：不通时切换代理池其他节点，不直连（点击开启强制）")
     }
 
     private func passwordCell(_ item: VpnProxyItem) -> some View {
-        if item.proxyPassword.isEmpty {
-            return AnyView(cell("—", width: 80))
-        }
-        let revealed = revealedPasswordIds.contains(item.id)
-        return AnyView(
-            Button(action: {
-                if revealedPasswordIds.contains(item.id) {
-                    revealedPasswordIds.remove(item.id)
-                } else {
-                    revealedPasswordIds.insert(item.id)
-                }
-            }) {
-                HStack(spacing: 4) {
-                    Text(revealed ? item.proxyPassword : "••••••••")
-                        .font(.system(size: 12, design: revealed ? .monospaced : .default))
-                        .foregroundColor(dark ? Color.white.opacity(0.88) : Color(hex: "1e2f42"))
-                        .lineLimit(1)
-                    Image(systemName: revealed ? "eye.slash" : "eye")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(AppTheme.sidebarText(dark))
-                }
-                .frame(width: 80, alignment: .center)
-            }
-            .buttonStyle(PlainButtonStyle())
-            .help(revealed ? "隐藏密码" : "显示密码")
-        )
+        cell(item.hasPassword ? "••••••••" : "—", width: 80)
+            .help(item.hasPassword ? "已设置密码（出于安全不再显示原文）" : "未设置密码")
     }
 
     private func locationCell(_ item: VpnProxyItem) -> some View {

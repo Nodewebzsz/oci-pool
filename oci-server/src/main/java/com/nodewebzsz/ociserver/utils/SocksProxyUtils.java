@@ -80,14 +80,52 @@ public class SocksProxyUtils {
      * 检测代理是否可用
      */
     public static boolean isProxyAvailable(VpnProxyRecord proxyConfig) {
-        ProxyCheckResult result = checkProxyWithDetail(proxyConfig);
-        return result.isConnected();
+        return checkTunnel(proxyConfig).isConnected();
+    }
+
+    private static final java.util.regex.Pattern URL_CREDENTIALS =
+            java.util.regex.Pattern.compile("([a-zA-Z][a-zA-Z0-9+.-]*://)[^/\\s@:]+(?::[^/\\s@]*)?@");
+    private static final int MAX_ERROR_LENGTH = 500;
+
+    /**
+     * 错误信息脱敏：去掉 URL 中的账号密码，替换代理用户名和密码原文，并限制长度，可安全落库与展示。
+     */
+    public static String redact(String message, VpnProxyRecord proxy) {
+        if (message == null) {
+            return null;
+        }
+        String result = message;
+        if (proxy != null) {
+            result = replaceSecret(result, proxy.getProxyPassword());
+            result = replaceSecret(result, proxy.getProxyUsername());
+        }
+        result = URL_CREDENTIALS.matcher(result).replaceAll("$1***@");
+        result = result.replaceAll("\\s+", " ").trim();
+        return result.length() > MAX_ERROR_LENGTH ? result.substring(0, MAX_ERROR_LENGTH) + "…" : result;
+    }
+
+    private static String replaceSecret(String text, String secret) {
+        if (secret == null || secret.trim().length() < 3) {
+            return text;
+        }
+        return text.replace(secret, "***");
+    }
+
+    /**
+     * 轻量连通检测：只验证代理能否建立到 OCI 的隧道，不查询出口 IP 与归属地，供请求链路快速选路使用。
+     */
+    public static ProxyCheckResult checkTunnel(VpnProxyRecord proxyConfig) {
+        return check(proxyConfig, false);
     }
 
     /**
      * 检测代理并返回详细诊断信息（错误原因、耗时、真实出口 IP 及真实归属地）
      */
     public static ProxyCheckResult checkProxyWithDetail(VpnProxyRecord proxyConfig) {
+        return check(proxyConfig, true);
+    }
+
+    private static ProxyCheckResult check(VpnProxyRecord proxyConfig, boolean resolveExit) {
         if (proxyConfig == null) {
             return new ProxyCheckResult(false, "代理配置为空");
         }
@@ -109,11 +147,11 @@ public class SocksProxyUtils {
             if ("HTTP".equalsIgnoreCase(type) || "HTTPS".equalsIgnoreCase(type)) {
                 String u = (proxyUsername != null && !proxyUsername.trim().isEmpty()) ? proxyUsername.trim() : null;
                 String p = (proxyPassword != null && !proxyPassword.isEmpty()) ? proxyPassword : null;
-                return testHttpProxy(cleanHost, port, u, p, start);
+                return testHttpProxy(cleanHost, port, u, p, start, resolveExit);
             } else { // 默认 SOCKS5
                 String u = (proxyUsername != null && !proxyUsername.trim().isEmpty()) ? proxyUsername.trim() : null;
                 String p = (proxyPassword != null && !proxyPassword.isEmpty()) ? proxyPassword : null;
-                return testSocks5Proxy(cleanHost, port, u, p, start);
+                return testSocks5Proxy(cleanHost, port, u, p, start, resolveExit);
             }
         } catch (Exception e) {
             log.warn("代理检测未捕获异常: {}:{} [{}] -> {}", cleanHost, port, type, e.getMessage());
@@ -124,7 +162,8 @@ public class SocksProxyUtils {
     /**
      * RFC 1928 / RFC 1929 规范标准 SOCKS5 握手（支持无认证与用户名密码认证）
      */
-    private static ProxyCheckResult testSocks5Proxy(String host, int port, String username, String password, long startTime) {
+    private static ProxyCheckResult testSocks5Proxy(String host, int port, String username, String password, long startTime,
+                                                    boolean resolveExit) {
         String lastError = null;
 
         for (String[] target : TEST_TARGETS) {
@@ -209,7 +248,7 @@ public class SocksProxyUtils {
                     log.info("SOCKS5 代理连通成功: {}:{} -> {}:{} ({}ms)", host, port, targetHost, targetPort, latency);
 
                     // 4. 连通成功后，通过代理探测真实公网出口 IP（方案 A）
-                    String exitIp = resolveSocks5ExitIp(host, port, username, password);
+                    String exitIp = resolveExit ? resolveSocks5ExitIp(host, port, username, password) : null;
                     String location = null;
                     if (exitIp != null) {
                         location = PingUtil.getFormattedGeoInfo(exitIp);
@@ -236,7 +275,8 @@ public class SocksProxyUtils {
     /**
      * HTTP / HTTPS 代理检测（发送 CONNECT 请求，支持 Basic Auth 与真实出口 IP 反射）
      */
-    private static ProxyCheckResult testHttpProxy(String host, int port, String username, String password, long startTime) {
+    private static ProxyCheckResult testHttpProxy(String host, int port, String username, String password, long startTime,
+                                                  boolean resolveExit) {
         String lastError = null;
 
         for (String[] target : TEST_TARGETS) {
@@ -276,7 +316,7 @@ public class SocksProxyUtils {
                         log.info("HTTP 代理连通成功: {}:{} -> {}:{} ({}ms)", host, port, targetHost, targetPort, latency);
 
                         // 通过 HTTP 代理隧道探测真实公网出口 IP（方案 A）
-                        String exitIp = resolveHttpExitIp(host, port, username, password);
+                        String exitIp = resolveExit ? resolveHttpExitIp(host, port, username, password) : null;
                         String location = null;
                         if (exitIp != null) {
                             location = PingUtil.getFormattedGeoInfo(exitIp);

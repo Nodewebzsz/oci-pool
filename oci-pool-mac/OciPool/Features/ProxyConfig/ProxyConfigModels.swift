@@ -9,6 +9,8 @@ struct VpnProxyItem: Identifiable, Equatable {
     var proxyPort: Int = 8080
     var proxyUsername: String = ""
     var proxyPassword: String = ""
+    /// 后端不再返回密码原文，只告知是否已设置
+    var hasPassword: Bool = false
     var availableStatus: Int = 1
     /// 1 = 强制代理（不通则拒绝请求）
     var forceProxy: Int = 0
@@ -21,6 +23,14 @@ struct VpnProxyItem: Identifiable, Equatable {
     var customName: String = ""
     /// 代理归属地（国家/省市，由 proxyHost 自动解析或连通测试时识别）
     var location: String = ""
+    /// 最近一次检测时间（后端原始值，可能为空）
+    var lastCheckedAt: String = ""
+    /// 最近一次检测失败原因（已脱敏）
+    var lastCheckError: String = ""
+    /// 最近一次手动检测识别到的出口 IP
+    var lastExitIp: String = ""
+    /// 全部绑定关系的版本号，保存绑定时回传用于检测并发修改
+    var bindingRevision: String = ""
     /// Client-side: row is currently being probed.
     var isTesting: Bool = false
 
@@ -57,6 +67,22 @@ struct VpnProxyItem: Identifiable, Equatable {
     }
 
     var forceLabel: String { isForce ? "强制" : "非强制" }
+
+    /// 列表中状态下方的检测信息：未检测 / 检测于 MM-dd HH:mm / 检测失败 MM-dd HH:mm
+    var checkLabel: String {
+        let normalized = lastCheckedAt.replacingOccurrences(of: "T", with: " ")
+        guard normalized.count >= 16 else { return "未检测" }
+        let start = normalized.index(normalized.startIndex, offsetBy: 5)
+        let end = normalized.index(normalized.startIndex, offsetBy: 16)
+        let text = String(normalized[start..<end])
+        return lastCheckError.isEmpty ? "检测于 \(text)" : "检测失败 \(text)"
+    }
+
+    var checkHelp: String {
+        if !lastCheckError.isEmpty { return lastCheckError }
+        if lastCheckedAt.isEmpty { return "尚未检测，代理池选路时会实时检测" }
+        return lastExitIp.isEmpty ? "" : "出口 IP：\(lastExitIp)"
+    }
 }
 
 struct ProxyTestResult: Equatable {
@@ -87,6 +113,10 @@ struct ProxyFormState: Equatable, Identifiable {
     /// 多选父租户；空 = 全局共享
     var tenantIds: [Int64] = []
     var customName: String = ""
+    /// 打开编辑时的绑定版本号
+    var bindingRevision: String = ""
+    /// 编辑的代理是否已设置密码（表单密码留空即保留原密码）
+    var hasPassword: Bool = false
 
     var isEditing: Bool { id != nil }
 
@@ -110,11 +140,13 @@ struct ProxyFormState: Equatable, Identifiable {
             proxyHost: item.proxyHost,
             proxyPort: "\(item.proxyPort)",
             proxyUsername: item.proxyUsername,
-            proxyPassword: item.proxyPassword,
+            proxyPassword: "",
             availableStatus: item.availableStatus,
             forceProxy: item.forceProxy,
             tenantIds: ids,
-            customName: item.customName
+            customName: item.customName,
+            bindingRevision: item.bindingRevision,
+            hasPassword: item.hasPassword
         )
     }
 }
@@ -153,6 +185,7 @@ enum ProxyConfigJSON {
         item.proxyPort = int(d["proxyPort"], fallback: 8080)
         item.proxyUsername = str(d["proxyUsername"])
         item.proxyPassword = str(d["proxyPassword"])
+        item.hasPassword = bool(d["hasPassword"]) || !item.proxyPassword.isEmpty
         item.availableStatus = int(d["availableStatus"], fallback: 1)
         // 兼容 1 / "1" / true
         if let b = d["forceProxy"] as? Bool {
@@ -166,6 +199,10 @@ enum ProxyConfigJSON {
         item.tenantName = str(d["tenantName"])
         item.customName = str(d["customName"])
         item.location = str(d["location"])
+        item.lastCheckedAt = dateText(d["lastCheckedAt"])
+        item.lastCheckError = str(d["lastCheckError"])
+        item.lastExitIp = str(d["lastExitIp"])
+        item.bindingRevision = str(d["bindingRevision"])
         // tenantIds: 数组 或 兼容单值
         if let arr = d["tenantIds"] as? [Any] {
             item.tenantIds = arr.compactMap { v -> Int64? in
@@ -277,6 +314,17 @@ enum ProxyConfigJSON {
     static func str(_ v: Any?) -> String {
         if let s = v as? String { return s }
         if let n = v as? NSNumber { return n.stringValue }
+        return ""
+    }
+
+    /// 兼容 "2026-11-17T02:00:00" 字符串与 [2026,11,17,2,0,0] 数组两种时间格式
+    static func dateText(_ v: Any?) -> String {
+        if let s = v as? String { return s }
+        if let arr = v as? [Any], arr.count >= 5 {
+            let parts = arr.prefix(6).map { int($0) }
+            let second = parts.count > 5 ? parts[5] : 0
+            return String(format: "%04d-%02d-%02d %02d:%02d:%02d", parts[0], parts[1], parts[2], parts[3], parts[4], second)
+        }
         return ""
     }
 
