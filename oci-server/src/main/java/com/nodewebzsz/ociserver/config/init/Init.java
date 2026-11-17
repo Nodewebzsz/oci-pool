@@ -15,8 +15,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
 import java.net.NetworkInterface;
 import java.util.Enumeration;
@@ -32,6 +34,7 @@ import java.util.UUID;
  * @Date 2025-09-12 15:14
  */
 @Component
+@Lazy(false)
 @Slf4j
 public class Init implements CommandLineRunner {
 
@@ -71,6 +74,11 @@ public class Init implements CommandLineRunner {
 
     @Value("${ADMIN_PASSWORD:}")
     private String adminPassword;
+
+    @PostConstruct
+    public void initAdminOnStartup() {
+        initAdminUser();
+    }
 
     @Override
     public void run(String... args) throws Exception {

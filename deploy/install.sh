@@ -13,6 +13,18 @@ COMPOSE_PULL="docker-compose.pull.yml"
 ENV_EXAMPLE=".env.example"
 UNINSTALL="uninstall.sh"
 
+gen_random_alnum() {
+  local len="${1:-16}"
+  local out=""
+  if [ -r /dev/urandom ]; then
+    out="$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | dd bs=1 count="$len" 2>/dev/null || true)"
+  fi
+  if [ "${#out}" -lt "$len" ] && command -v openssl >/dev/null 2>&1; then
+    out="$(openssl rand -hex "$(( (len + 1) / 2 ))" 2>/dev/null | dd bs=1 count="$len" 2>/dev/null || true)"
+  fi
+  printf '%s' "$out"
+}
+
 run_cmd() {
   if [ "$(id -u)" -eq 0 ]; then
     "$@"
@@ -139,13 +151,13 @@ if [ ! -f .env ] && [ -f "$ENV_EXAMPLE" ]; then
   cp "$ENV_EXAMPLE" .env
   # 若为全新部署（不存在已有数据库），自动生成 24 位高强度字母数字密码，保护 H2 数据库
   if [ ! -f "./data/vps_db.mv.db" ]; then
-    RAND_PASS=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 24 || openssl rand -hex 12 2>/dev/null || true)
+    RAND_PASS="$(gen_random_alnum 24)"
     if [ -n "$RAND_PASS" ]; then
       sed -i.bak "s|^DB_PASSWORD=.*|DB_PASSWORD=${RAND_PASS}|" .env 2>/dev/null && rm -f .env.bak || true
       ok "已自动生成 24 位高强度 DB_PASSWORD 并存入 .env（保护本地租户私钥）"
     fi
     # 自动生成 16 位高强度初始管理员密码，杜绝公网抢注
-    ADMIN_PASS=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 16 || openssl rand -hex 8 2>/dev/null || true)
+    ADMIN_PASS="$(gen_random_alnum 16)"
     if [ -n "$ADMIN_PASS" ]; then
       sed -i.bak "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${ADMIN_PASS}|" .env 2>/dev/null && rm -f .env.bak || true
       ok "已自动生成初始管理员随机密码并存入 .env（0 秒公网抢注窗口）"

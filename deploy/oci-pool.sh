@@ -111,6 +111,43 @@ resolve_jar() {
 
 is_running() { [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE" 2>/dev/null)" >/dev/null 2>&1; }
 
+gen_random_alnum() {
+  local len="${1:-16}"
+  local out=""
+  if [ -r /dev/urandom ]; then
+    out="$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | dd bs=1 count="$len" 2>/dev/null || true)"
+  fi
+  if [ "${#out}" -lt "$len" ] && command -v openssl >/dev/null 2>&1; then
+    out="$(openssl rand -hex "$(( (len + 1) / 2 ))" 2>/dev/null | dd bs=1 count="$len" 2>/dev/null || true)"
+  fi
+  printf '%s' "$out"
+}
+
+find_port_pids() {
+  local p="$1"
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -tiTCP:"$p" -sTCP:LISTEN 2>/dev/null | sort -u || true
+  elif command -v ss >/dev/null 2>&1; then
+    ss -ltnp "sport = :$p" 2>/dev/null | sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' | sort -u
+  elif command -v fuser >/dev/null 2>&1; then
+    fuser "${p}/tcp" 2>/dev/null | tr -s ' ' '\n' | grep -E '^[0-9]+$' | sort -u || true
+  fi
+}
+
+is_oci_pool_pid() {
+  local pid="$1"
+  local cmdline=""
+  cmdline="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+  [[ "$cmdline" == *"oci-pool"* ]]
+}
+
+stop_pid() {
+  local pid="$1"
+  kill "$pid" 2>/dev/null || true
+  for _ in $(seq 1 10); do kill -0 "$pid" >/dev/null 2>&1 || break; sleep 1; done
+  kill -0 "$pid" >/dev/null 2>&1 && kill -9 "$pid" 2>/dev/null || true
+}
+
 load_env() {
   if [ ! -f "$APP_ROOT/.env" ]; then
     if [ ! -f "$APP_ROOT/.env.example" ] && command -v curl >/dev/null 2>&1; then
@@ -130,12 +167,12 @@ EOF
     fi
 
     if [ ! -f "$DATA_DIR/vps_db.mv.db" ]; then
-      local rand_pass; rand_pass=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 24 || openssl rand -hex 12 2>/dev/null || true)
+      local rand_pass; rand_pass="$(gen_random_alnum 24)"
       if [ -n "$rand_pass" ]; then
         sed -i.bak "s|^DB_PASSWORD=.*|DB_PASSWORD=${rand_pass}|" "$APP_ROOT/.env" 2>/dev/null && rm -f "$APP_ROOT/.env.bak" || true
         ok "已自动生成 24 位高强度 DB_PASSWORD 并存入 .env（保护本地租户私钥）"
       fi
-      local admin_pass; admin_pass=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 16 || openssl rand -hex 8 2>/dev/null || true)
+      local admin_pass; admin_pass="$(gen_random_alnum 16)"
       if [ -n "$admin_pass" ]; then
         sed -i.bak "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${admin_pass}|" "$APP_ROOT/.env" 2>/dev/null && rm -f "$APP_ROOT/.env.bak" || true
         ok "已自动生成初始管理员随机密码并存入 .env（0 秒公网抢注窗口）"
@@ -146,6 +183,7 @@ EOF
   fi
   if [ -f "$APP_ROOT/.env" ]; then
     set -a; . "$APP_ROOT/.env"; set +a
+    PORT="${OCI_PORT:-$PORT}"
   fi
 }
 
@@ -157,6 +195,12 @@ cmd_start() {
   resolve_jar
   mkdir -p "$DATA_DIR" "$LOG_DIR"
   load_env
+  local existing_pids; existing_pids="$(find_port_pids "$PORT" || true)"
+  if [ -n "$existing_pids" ] || curl -sf "http://127.0.0.1:$PORT/actuator/health" >/dev/null 2>&1; then
+    err "端口 $PORT 已被占用${existing_pids:+ (pid: $(echo "$existing_pids" | tr '\n' ' '))}，未启动新实例（防止健康检查误判到旧进程）。"
+    warn "请先停止占用端口的旧进程或 Docker 容器（例如: ./oci-pool.sh stop、docker ps、ss -ltnp | grep :$PORT），再重新启动。"
+    exit 1
+  fi
   ( cd "$APP_ROOT" && nohup java \
       -XX:+UseG1GC \
       -XX:+HeapDumpOnOutOfMemoryError \
@@ -170,7 +214,19 @@ cmd_start() {
   ok "已启动（pid $(cat "$PID_FILE")）· http://localhost:$PORT"
   info "等待健康检查（最多 60s）..."
   for i in $(seq 1 20); do
+    if ! is_running; then
+      err "OCI-Pool 启动后意外退出，请查看日志: $LOG_DIR/console.log"
+      tail -n 30 "$LOG_DIR/console.log" 2>/dev/null || true
+      rm -f "$PID_FILE"
+      exit 1
+    fi
     if curl -sf "http://127.0.0.1:$PORT/actuator/health" >/dev/null 2>&1; then
+      if [ -n "${ADMIN_PASSWORD:-}" ] && [ -f "$LOG_DIR/application.log" ]; then
+        for _ in $(seq 1 10); do
+          grep -qE "首次部署自动初始化管理员账号成功|Started OciServerApplication" "$LOG_DIR/application.log" 2>/dev/null && break
+          sleep 1
+        done
+      fi
       ok "healthy"
       echo ""
       echo -e "${G}===================================================================${N}"
@@ -201,12 +257,24 @@ cmd_stop() {
   info "stop"
   if is_running; then
     local pid; pid="$(cat "$PID_FILE")"
-    kill "$pid" 2>/dev/null || true
-    for i in $(seq 1 10); do kill -0 "$pid" >/dev/null 2>&1 || break; sleep 1; done
-    kill -0 "$pid" >/dev/null 2>&1 && kill -9 "$pid" 2>/dev/null || true
+    stop_pid "$pid"
     ok "已停止（pid $pid）"
   else
     warn "未运行（无有效 pid 文件）"
+    if [ -f "$APP_ROOT/.env" ]; then
+      set -a; . "$APP_ROOT/.env"; set +a
+      PORT="${OCI_PORT:-$PORT}"
+    fi
+    local orphan_pids; orphan_pids="$(find_port_pids "$PORT" || true)"
+    for opid in $orphan_pids; do
+      if is_oci_pool_pid "$opid"; then
+        warn "发现占用端口 $PORT 的残留 OCI-Pool 进程（pid $opid），正在停止..."
+        stop_pid "$opid"
+        ok "已停止残留进程（pid $opid）"
+      else
+        warn "端口 $PORT 正被其他进程占用（pid $opid），请确认是否为 Docker 容器或其他服务"
+      fi
+    done
   fi
   rm -f "$PID_FILE"
 }
