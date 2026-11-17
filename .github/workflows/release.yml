@@ -1,9 +1,8 @@
 name: 发布 Release
 
+# 默认由本地 scripts/release_local.sh 构建并上传；此工作流仅作手动兜底，
+# 或在仓库变量 RELEASE_MODE=ci 时由「镜像构建与推送」自动触发。
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       version:
