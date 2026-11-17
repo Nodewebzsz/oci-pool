@@ -481,7 +481,7 @@ final class BootViewModel: ObservableObject {
 
     func applyCreateOS(_ os: String) {
         createSelectedOS = os
-        createVersions = createImages.filter { $0.operatingSystem == os }
+        createVersions = TenantImageInfo.sortedByVersion(createImages.filter { $0.operatingSystem == os })
         if let v = createVersions.first {
             createSelectedVersion = v.operatingSystemVersion
             createImageId = v.imageId

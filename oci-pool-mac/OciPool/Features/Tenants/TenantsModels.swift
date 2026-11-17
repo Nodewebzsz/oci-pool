@@ -1260,6 +1260,24 @@ struct TenantImageInfo: Decodable, Equatable, Identifiable {
     var imageId: String = ""
     var operatingSystem: String = ""
     var operatingSystemVersion: String = ""
+
+    /// 版本倒序（24.04 > 22.04）；数字相同时完整版优先于 Minimal 等变体，保证默认选中完整版
+    static func sortedByVersion(_ images: [TenantImageInfo]) -> [TenantImageInfo] {
+        images.sorted { a, b in
+            let pa = a.operatingSystemVersion.components(separatedBy: CharacterSet.decimalDigits.inverted).compactMap { Int($0) }
+            let pb = b.operatingSystemVersion.components(separatedBy: CharacterSet.decimalDigits.inverted).compactMap { Int($0) }
+            let len = max(pa.count, pb.count)
+            for i in 0..<len {
+                let va = i < pa.count ? pa[i] : 0
+                let vb = i < pb.count ? pb[i] : 0
+                if va != vb { return va > vb }
+            }
+            let sa = a.operatingSystemVersion.trimmingCharacters(in: .whitespaces)
+            let sb = b.operatingSystemVersion.trimmingCharacters(in: .whitespaces)
+            if sa.count != sb.count { return sa.count < sb.count }
+            return sa < sb
+        }
+    }
 }
 
 struct TenantSubscribedRegion: Decodable, Identifiable, Equatable {

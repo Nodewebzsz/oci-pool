@@ -141,7 +141,10 @@
           const va = pa[i] || 0, vb = pb[i] || 0;
           if (va !== vb) return vb - va; // 倒序
         }
-        return String(b.operatingSystemVersion || '').localeCompare(String(a.operatingSystemVersion || ''));
+        // 数字相同时完整版优先于 Minimal 等变体，保证默认选中完整版
+        const sa = String(a.operatingSystemVersion || '').trim(), sb = String(b.operatingSystemVersion || '').trim();
+        if (sa.length !== sb.length) return sa.length - sb.length;
+        return sa.localeCompare(sb);
       });
     };
 
