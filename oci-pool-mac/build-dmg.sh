@@ -92,7 +92,7 @@ bump_app_version() {
         marketing="${marketing#v-}"
         marketing="${marketing#v}"
         build=$((build + 1))
-        echo "📌 指定版本 VERSION=$marketing，构建号 $old_build → $build"
+        echo "📌 指定版本 VERSION=${marketing}，构建号 $old_build → $build"
     else
         local oci_ver
         oci_ver="$(read_oci_version || true)"
@@ -102,7 +102,7 @@ bump_app_version() {
             echo "📈 跟随 oci.version: $old_marketing ($old_build) → $marketing ($build)"
         else
             build=$((build + 1))
-            echo "⚠️  未读到 oci.version，保持 MARKETING_VERSION=$marketing，构建号 $old_build → $build"
+            echo "⚠️  未读到 oci.version，保持 MARKETING_VERSION=${marketing}，构建号 $old_build → $build"
         fi
     fi
 
@@ -367,7 +367,7 @@ slim_jre() {
     local before after
 
     if [ ! -f "$home/bin/java" ]; then
-        echo "⚠️  跳过瘦身 $arch_label：未找到 $home/bin/java"
+        echo "⚠️  跳过瘦身 ${arch_label}：未找到 $home/bin/java"
         return
     fi
 

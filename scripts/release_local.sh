@@ -69,7 +69,7 @@ wait_for_deploy() {
     sleep 15
   done
   if [ -n "$line" ] && [ "$conclusion" != "success" ]; then
-    echo "CI「镜像构建与推送」最近一次结果为 $conclusion，已中止发布" >&2
+    echo "CI「镜像构建与推送」最近一次结果为 ${conclusion}，已中止发布" >&2
     exit 1
   fi
 }
@@ -84,7 +84,7 @@ MASTER_VERSION="$(git show origin/master:VERSION | tr -d '[:space:]' | sed -E 's
 VERSION="$(printf '%s' "${VERSION_ARG:-$MASTER_VERSION}" | sed -E 's/^[vV][-_]?//')"
 
 if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "版本号无效: $VERSION（应为 x.y.z）" >&2; exit 1
+  echo "版本号无效: ${VERSION}（应为 x.y.z）" >&2; exit 1
 fi
 if [ "$VERSION" != "$MASTER_VERSION" ]; then
   echo "版本 $VERSION 与 origin/master 的 VERSION ($MASTER_VERSION) 不一致" >&2; exit 1
@@ -118,7 +118,7 @@ for tool in mvn xcodebuild; do
 done
 if [ -z "${MAXMIND_LICENSE_KEY:-}" ] && [ "${ALLOW_NO_GEOIP:-0}" != "1" ]; then
   echo "未设置 MAXMIND_LICENSE_KEY，JAR 将缺少 GeoLite2-City（IP 定位不可用）。" >&2
-  echo "请写入 $ENV_FILE，或设置 ALLOW_NO_GEOIP=1 跳过。" >&2
+  echo "请写入 ${ENV_FILE}，或设置 ALLOW_NO_GEOIP=1 跳过。" >&2
   exit 1
 fi
 
@@ -179,7 +179,7 @@ upload() {
     echo "上传失败（第 $attempt 次）: $(basename "$file")，重试..." >&2
     sleep 5
   done
-  echo "上传失败: $file（草稿 Release 已保留，可重新运行本脚本）" >&2
+  echo "上传失败: ${file}（草稿 Release 已保留，可重新运行本脚本）" >&2
   exit 1
 }
 
