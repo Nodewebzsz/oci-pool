@@ -53,6 +53,9 @@ struct SidebarView: View {
                             .padding(.top, 24)
                     } else {
                         ForEach(catalog, id: \.0) { section, items in
+                            if section.isLeaf, let only = items.first {
+                                leafHeader(section, item: only)
+                            } else {
                             sectionHeader(section, firstItem: items.first)
                             // 折叠:全部子项图标态;展开:手风琴(当前 section 或搜索命中时显示子项)
                             // 平滑撑开高度 + 渐隐(对齐 Web grid-template-rows/opacity)
@@ -68,6 +71,7 @@ struct SidebarView: View {
                             .frame(maxHeight: show ? nil : 0, alignment: .top)
                             .clipped()
                             .animation(.timingCurve(0.4, 0, 0.2, 1, duration: 0.24), value: show)
+                            }
                         }
                     }
                 }
@@ -323,6 +327,44 @@ struct SidebarView: View {
         }
     }
 
+    /// 一级菜单（如「代理池」）：样式同分组标题，点击直接进入页面，无展开箭头
+    private func leafHeader(_ section: NavSection, item: NavigationItem) -> some View {
+        let selected = navigation.sidebarActiveID == item.nav
+        let activeColor = AppTheme.isClaude ? AppTheme.navIcon(dark) : AppTheme.sidebarActive
+        return Button(action: {
+            withAnimation(.timingCurve(0.4, 0, 0.2, 1, duration: 0.24)) {
+                navigation.select(item.nav)
+            }
+        }) {
+            HStack(spacing: 8) {
+                MenuGlyph(name: section.lucideIcon, size: 15, color: selected ? activeColor : sectionColor(section))
+                    .frame(width: 16)
+                if !collapsed {
+                    Text(section.title)
+                        .font(.system(size: 12.5, weight: .semibold))
+                    Spacer(minLength: 4)
+                }
+            }
+            .foregroundColor(selected ? activeColor : AppTheme.navIcon(dark))
+            .padding(.horizontal, collapsed ? 0 : 10)
+            .padding(.vertical, collapsed ? 10 : 8)
+            .frame(maxWidth: .infinity, alignment: collapsed ? .center : .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(selected
+                          ? (AppTheme.isClaude ? AppTheme.bg3(dark) : AppTheme.sidebarActive.opacity(0.12))
+                          : (hoveredSection == section ? AppTheme.sidebarHover(dark) : Color.clear))
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
+        .help(collapsed ? section.title : "")
+        .onHover { hovering in
+            hoveredSection = hovering ? section : nil
+        }
+        .padding(.bottom, 4)
+    }
+
     private func sectionHeader(_ section: NavSection, firstItem: NavigationItem?) -> some View {
         Button(action: {
             let wasExpanded = navigation.isSectionExpanded(section)
@@ -476,7 +518,7 @@ struct SidebarView: View {
         if AppTheme.isClaude { return AppTheme.textSecondary(dark) }
         switch section {
         case .service: return AppTheme.sidebarActive
-        case .proxy: return Color(hex: "2fd0cc")
+        case .proxy, .proxyPool: return Color(hex: "2fd0cc")
         case .resource: return Color(hex: "a78bfa")
         case .system: return AppTheme.orange
         case .tools: return Color(hex: "3b82f6")

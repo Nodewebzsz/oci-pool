@@ -92,6 +92,7 @@ extension NavID {
 
 enum NavSection: String, CaseIterable {
     case service
+    case proxyPool
     case proxy
     case resource
     case system
@@ -101,7 +102,8 @@ enum NavSection: String, CaseIterable {
     var title: String {
         switch self {
         case .service: return "服务管理"
-        case .proxy: return "代理管理"
+        case .proxyPool: return "代理池"
+        case .proxy: return "域名与 CDN"
         case .resource: return "资源管理"
         case .system: return "系统管理"
         case .tools: return "我的工具"
@@ -112,7 +114,8 @@ enum NavSection: String, CaseIterable {
     var systemImage: String {
         switch self {
         case .service: return "server.rack"
-        case .proxy: return "arrow.left.arrow.right"
+        case .proxyPool: return "shuffle"
+        case .proxy: return "globe"
         case .resource: return "shippingbox"
         case .system: return "gearshape"
         case .tools: return "wrench.and.screwdriver"
@@ -125,11 +128,15 @@ enum NavSection: String, CaseIterable {
     var lucideIcon: String {
         switch self {
         case .service: return "layers"
-        case .proxy: return "shuffle"
+        case .proxyPool: return "shuffle"
+        case .proxy: return "earth"
         case .resource: return "package"
         case .system: return "settings"
         case .tools: return "wrench"
         case .devConfig: return "code-2"
         }
     }
+
+    /// 一级菜单：无子项展开，点击直接进入唯一页面
+    var isLeaf: Bool { self == .proxyPool }
 }

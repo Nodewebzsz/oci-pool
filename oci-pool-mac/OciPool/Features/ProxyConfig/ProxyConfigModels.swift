@@ -29,6 +29,8 @@ struct VpnProxyItem: Identifiable, Equatable {
     var lastCheckError: String = ""
     /// 最近一次手动检测识别到的出口 IP
     var lastExitIp: String = ""
+    /// 最近一次检测成功的连接延时（毫秒）
+    var lastLatencyMs: Int? = nil
     /// 全部绑定关系的版本号，保存绑定时回传用于检测并发修改
     var bindingRevision: String = ""
     /// Client-side: row is currently being probed.
@@ -55,33 +57,82 @@ struct VpnProxyItem: Identifiable, Equatable {
         return "\(ids.count) 个租户"
     }
 
-    /// 连通状态（落库 availableStatus：1=通畅，0=不通）
-    var statusLabel: String {
-        if isTesting { return "测试中…" }
-        return isEnabled ? "通畅" : "不通"
+    var boundTenantIds: [Int64] {
+        !tenantIds.isEmpty ? tenantIds : (tenantId.map { [$0] } ?? [])
     }
 
-    var statusTone: StatusTone {
-        if isTesting { return .warning }
-        return isEnabled ? .success : .danger
+    var endpoint: String { "\(proxyHost):\(proxyPort)" }
+
+    /// 有效延时：仅在最近一次检测成功时展示
+    var latency: Int? {
+        guard lastCheckError.isEmpty, let ms = lastLatencyMs, ms >= 0 else { return nil }
+        return ms
     }
 
-    var forceLabel: String { isForce ? "强制" : "非强制" }
+    var checkedDate: Date? { ProxyHealth.parseDate(lastCheckedAt) }
 
-    /// 列表中状态下方的检测信息：未检测 / 检测于 MM-dd HH:mm / 检测失败 MM-dd HH:mm
-    var checkLabel: String {
-        let normalized = lastCheckedAt.replacingOccurrences(of: "T", with: " ")
-        guard normalized.count >= 16 else { return "未检测" }
-        let start = normalized.index(normalized.startIndex, offsetBy: 5)
-        let end = normalized.index(normalized.startIndex, offsetBy: 16)
-        let text = String(normalized[start..<end])
-        return lastCheckError.isEmpty ? "检测于 \(text)" : "检测失败 \(text)"
+    var checkedText: String {
+        guard let d = checkedDate else { return "" }
+        return "检测于 " + ProxyHealth.shortFormatter.string(from: d)
     }
 
-    var checkHelp: String {
-        if !lastCheckError.isEmpty { return lastCheckError }
-        if lastCheckedAt.isEmpty { return "尚未检测，代理池选路时会实时检测" }
-        return lastExitIp.isEmpty ? "" : "出口 IP：\(lastExitIp)"
+    /// 与 Web `healthOf` 一致：检测中 / 异常 / 未检测 / 建议复检(>24h) / 通畅
+    var health: ProxyHealth {
+        if isTesting { return .testing }
+        if !lastCheckError.isEmpty || availableStatus == 0 { return .error }
+        guard let d = checkedDate else { return .unchecked }
+        if Date().timeIntervalSince(d) >= 24 * 3600 { return .stale }
+        return .healthy
+    }
+
+    var healthHelp: String {
+        var lines: [String] = []
+        switch health {
+        case .error: if !lastCheckError.isEmpty { lines.append(lastCheckError) }
+        case .unchecked: lines.append("尚未检测，代理池选路时会实时检测")
+        case .stale: lines.append("距上次检测已超过 24 小时，建议重新检测")
+        case .healthy: lines.append("最近 24 小时内检测通过")
+        case .testing: break
+        }
+        if !checkedText.isEmpty { lines.append(checkedText) }
+        if !lastExitIp.isEmpty, health != .error { lines.append("出口 IP：\(lastExitIp)") }
+        return lines.joined(separator: "\n")
+    }
+}
+
+enum ProxyHealth: Equatable {
+    case testing, healthy, error, unchecked, stale
+
+    var label: String {
+        switch self {
+        case .testing: return "检测中"
+        case .healthy: return "通畅"
+        case .error: return "异常"
+        case .unchecked: return "未检测"
+        case .stale: return "建议复检"
+        }
+    }
+
+    static let shortFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "MM-dd HH:mm"
+        return f
+    }()
+
+    private static let parser: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return f
+    }()
+
+    static func parseDate(_ raw: String) -> Date? {
+        let normalized = raw.replacingOccurrences(of: "T", with: " ")
+        guard normalized.count >= 19 else {
+            return normalized.count >= 16 ? parser.date(from: String(normalized.prefix(16)) + ":00") : nil
+        }
+        return parser.date(from: String(normalized.prefix(19)))
     }
 }
 
@@ -91,6 +142,10 @@ struct ProxyTestResult: Equatable {
     var availableStatus: Int = 0
     var message: String = ""
     var location: String? = nil
+    var lastCheckedAt: String = ""
+    var lastCheckError: String = ""
+    var lastExitIp: String = ""
+    var lastLatencyMs: Int? = nil
 }
 
 struct ProxyTestAllResult: Equatable {
@@ -202,6 +257,7 @@ enum ProxyConfigJSON {
         item.lastCheckedAt = dateText(d["lastCheckedAt"])
         item.lastCheckError = str(d["lastCheckError"])
         item.lastExitIp = str(d["lastExitIp"])
+        item.lastLatencyMs = optionalInt(d["lastLatencyMs"])
         item.bindingRevision = str(d["bindingRevision"])
         // tenantIds: 数组 或 兼容单值
         if let arr = d["tenantIds"] as? [Any] {
@@ -272,6 +328,10 @@ enum ProxyConfigJSON {
         if let loc = payload["location"] as? String, !loc.isEmpty {
             r.location = loc
         }
+        r.lastCheckedAt = dateText(payload["lastCheckedAt"])
+        r.lastCheckError = str(payload["lastCheckError"])
+        r.lastExitIp = str(payload["lastExitIp"])
+        r.lastLatencyMs = optionalInt(payload["lastLatencyMs"])
         return r
     }
 
@@ -326,6 +386,14 @@ enum ProxyConfigJSON {
             return String(format: "%04d-%02d-%02d %02d:%02d:%02d", parts[0], parts[1], parts[2], parts[3], parts[4], second)
         }
         return ""
+    }
+
+    static func optionalInt(_ v: Any?) -> Int? {
+        if v == nil || v is NSNull { return nil }
+        if let i = v as? Int { return i }
+        if let n = v as? NSNumber { return n.intValue }
+        if let s = v as? String, let i = Int(s) { return i }
+        return nil
     }
 
     static func int(_ v: Any?, fallback: Int = 0) -> Int {

@@ -3719,7 +3719,7 @@ function NotifyPage() {
 //   1. IP 质量管理 (SysIpQualityPage) → ip_settings.ftl · /system/ipSettings
 //   2. 系统日志    (SysLogsPage)      → sys_log.ftl     · /system/logs
 //   3. 系统设置    (SysSettingPage)   → system_settings.ftl · /system/settings
-//   4. 代理配置    (SysVpnProxyPage)  → vpn_proxy.ftl   · /vpnProxy/page
+//   4. 代理池      (SysVpnProxyPage · 一级菜单)  → vpn_proxy.ftl   · /vpnProxy/page
 // ═══════════════════════════════════════════════════════════════════════
 
 // ─── 通用小组件:设置卡片 ────────────────────────
@@ -5424,7 +5424,7 @@ function SysVpnProxyPage() {
   const [proxies, setProxies] = React.useState([]);
   const [totalElements, setTotalElements] = React.useState(0);
   const [page, setPage] = React.useState(1);
-  const [perPage, setPerPage] = React.useState(20);
+  const [perPage, setPerPage] = React.useState(100);
   const [loading, setLoading] = React.useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
   const [parentTenants, setParentTenants] = React.useState([]);
@@ -5477,7 +5477,13 @@ function SysVpnProxyPage() {
       const connected = !!payload.connected;
       const status = payload.availableStatus != null ? Number(payload.availableStatus) : (connected ? 1 : 0);
       const newLoc = payload.location;
-      setProxies(prev => prev.map(x => x.id === p.id ? { ...x, availableStatus: status, ...(newLoc ? { location: newLoc } : {}) } : x));
+      setProxies(prev => prev.map(x => x.id === p.id ? {
+        ...x, availableStatus: status, ...(newLoc ? { location: newLoc } : {}),
+        lastCheckedAt: payload.lastCheckedAt ?? x.lastCheckedAt,
+        lastCheckError: payload.lastCheckError ?? null,
+        lastExitIp: payload.lastExitIp ?? x.lastExitIp,
+        lastLatencyMs: payload.lastLatencyMs ?? null,
+      } : x));
       const toastMsg = res.message || (connected ? tr('pageMisc.d2b3fc') : tr('pageMisc.645aa5'));
       shell.showToast(toastMsg, { kind: connected ? 'success' : 'error' });
     } catch (e) {
@@ -5572,208 +5578,234 @@ function SysVpnProxyPage() {
     }
   };
 
-  const checkInfo = (record) => {
-    const raw = record.lastCheckedAt;
-    let text = '';
+  const parseTime = (raw) => {
     if (Array.isArray(raw) && raw.length >= 5) {
-      const pad = n => String(n).padStart(2, '0');
-      text = `${pad(raw[1])}-${pad(raw[2])} ${pad(raw[3])}:${pad(raw[4])}`;
-    } else if (typeof raw === 'string' && raw.length >= 16) {
-      text = raw.replace('T', ' ').slice(5, 16);
+      return new Date(raw[0], raw[1] - 1, raw[2], raw[3], raw[4], raw[5] || 0).getTime();
     }
-    const error = record.lastCheckError || '';
-    if (!text) return { text: '未检测', title: '尚未检测，代理池选路时会实时检测', color: 'var(--fg-3)' };
-    if (error) return { text: `检测失败 ${text}`, title: error, color: 'var(--danger)' };
-    return { text: `检测于 ${text}`, title: record.lastExitIp ? `出口 IP：${record.lastExitIp}` : '', color: 'var(--fg-3)' };
+    if (typeof raw === 'string' && raw) {
+      const t = Date.parse(raw.length === 19 ? raw : raw.replace(' ', 'T'));
+      return Number.isFinite(t) ? t : null;
+    }
+    return null;
+  };
+  const fmtTime = (ms) => {
+    if (ms == null) return '';
+    const d = new Date(ms);
+    const pad = n => String(n).padStart(2, '0');
+    return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
-  const statusCfg = (record) => {
-    if (testingAll || testingId === record.id) {
-      return { label: tr('pageMisc.2ff33d'), color: 'var(--info)', bg: 'var(--info-soft)', icon: 'refresh-cw' };
+  const healthOf = (p) => {
+    if (testingAll || testingId === p.id) return { state: 'testing', label: tr('proxyPool.health.testing'), title: '', tone: 'var(--info)' };
+    const checkedMs = parseTime(p.lastCheckedAt);
+    const ipTip = p.lastExitIp ? tr('proxyPool.exitIp').replace('{0}', p.lastExitIp) : '';
+    const when = checkedMs != null ? tr('proxyPool.checkedAt').replace('{0}', fmtTime(checkedMs)) : '';
+    if (p.lastCheckError || p.availableStatus === 0) {
+      return { state: 'error', label: tr('proxyPool.health.error'), title: [p.lastCheckError, when].filter(Boolean).join('\n'), tone: 'var(--danger)', when };
     }
-    if (record.availableStatus === 1) return { label: tr('pageMisc.c5ea9c'), color: 'var(--accent)', bg: 'var(--accent-soft)', icon: 'check-circle' };
-    return { label: tr('pageMisc.d1e4a7'), color: 'var(--danger)', bg: 'var(--danger-soft)', icon: 'x-circle' };
+    if (checkedMs == null) return { state: 'unchecked', label: tr('proxyPool.health.unchecked'), title: tr('proxyPool.health.uncheckedTip'), tone: 'var(--fg-3)', when };
+    if (Date.now() - checkedMs >= 24 * 3600 * 1000) {
+      return { state: 'stale', label: tr('proxyPool.health.stale'), title: [tr('proxyPool.health.staleTip'), when, ipTip].filter(Boolean).join('\n'), tone: 'var(--orange)', when };
+    }
+    return { state: 'healthy', label: tr('proxyPool.health.healthy'), title: [tr('proxyPool.health.healthyTip'), when, ipTip].filter(Boolean).join('\n'), tone: 'var(--success, var(--accent))', when };
   };
+
+  const tenantIdsOf = (p) => Array.isArray(p.tenantIds) && p.tenantIds.length ? p.tenantIds
+    : (p.tenantId != null && p.tenantId !== '' ? [p.tenantId] : []);
+  const isForced = (p) => p.forceProxy === 1 || p.forceProxy === true || p.forceProxy === '1';
+  const latencyOf = (p) => {
+    const n = Number(p.lastLatencyMs);
+    return p.lastLatencyMs != null && Number.isFinite(n) && n >= 0 && !p.lastCheckError ? Math.round(n) : null;
+  };
+  const latencyTone = (ms) => ms < 300 ? 'var(--success, var(--accent))' : ms < 800 ? 'var(--orange)' : 'var(--danger)';
+
+  const kpiHealthy = proxies.filter(p => healthOf(p).state === 'healthy').length;
+  const kpiBound = new Set(proxies.flatMap(p => tenantIdsOf(p).map(String))).size;
+  const kpiLatency = (() => {
+    const list = proxies.map(latencyOf).filter(n => n != null && n > 0);
+    return list.length ? Math.round(list.reduce((a, b) => a + b, 0) / list.length) : null;
+  })();
+
+  const copyEndpoint = async (p) => {
+    const text = `${String(p.proxyType || 'http').toLowerCase()}://${p.proxyHost}:${p.proxyPort}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      shell.showToast(tr('proxyPool.copied') + ' · ' + text, { kind: 'info', duration: 1800 });
+    } catch (e) {
+      shell.showToast(text, { kind: 'info' });
+    }
+  };
+
+  const columns = [
+    { h: tr('proxyPool.col.index'), w: 52, align: 'center' },
+    { h: tr('proxyPool.col.name'), minW: 180 },
+    { h: tr('proxyPool.col.type'), w: 92 },
+    { h: tr('proxyPool.col.endpoint'), minW: 220 },
+    { h: tr('proxyPool.col.location'), minW: 130 },
+    { h: tr('proxyPool.col.tenants'), w: 92, align: 'center' },
+    { h: tr('proxyPool.col.latency'), w: 92 },
+    { h: tr('proxyPool.col.status'), w: 120, align: 'center' },
+    { h: tr('proxyPool.col.actions'), w: 176, align: 'center' },
+  ];
+  const tdStyle = { padding: '10px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', verticalAlign: 'middle' };
+  const actionBtn = (hover) => ({
+    width: 28, height: 28, background: 'transparent', color: 'var(--fg-2)', border: 'none', borderRadius: 6,
+    cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    '--hover-color': hover,
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <PageHeader
-        title={tr('nav.sysVpnProxy')}
-        subtitle={tr('pageMisc.c17f05')}
+        title={<span>{tr('nav.sysVpnProxy')} <span className="num" style={{ fontSize: 12, fontWeight: 400, color: 'var(--fg-3)' }}>({totalElements})</span></span>}
+        subtitle={tr('proxyPool.subtitle')}
         icon="shuffle"
         iconColor="var(--cyan)"
         actions={
           <>
-            <Button variant="outline" size="md" icon="zap" loading={testingAll} onClick={testAll}>{tr('pageMisc.570b66')}</Button>
-            <Button variant="primary" size="md" icon="plus" onClick={() => openProxyModal(null)}>{tr('pageMisc.dc0572')}</Button>
+            <Button variant="outline" size="md" icon="wifi" loading={testingAll} disabled={testingAll || !proxies.length} onClick={testAll}>{tr('pageMisc.570b66')}</Button>
+            <Button variant="primary" size="md" icon="plus" onClick={() => openProxyModal(null)}>{tr('proxyPool.add')}</Button>
           </>
         }
       />
-      <div style={{ flex: 1, minHeight: 0, background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <div style={{
-          padding: '10px 14px', borderBottom: '1px solid var(--border)', background: 'var(--bg-2)',
-          fontSize: 12, fontWeight: 600, color: 'var(--fg-0)', display: 'flex', alignItems: 'center', gap: 6,
-        }}>
-          <Icon name="list" size={13} style={{ color: 'var(--fg-2)' }} />
-          {tr('pageMisc.54a278')}
-          <span className="num" style={{ color: 'var(--fg-3)', fontWeight: 400 }}>({totalElements})</span>
-        </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 14 }}>
+        <KPICard label={tr('proxyPool.kpi.total')} value={totalElements} icon="shuffle" iconColor="var(--cyan)" />
+        <KPICard label={tr('proxyPool.kpi.healthy')} value={<span style={{ color: 'var(--success, var(--accent))' }}>{kpiHealthy}</span>} icon="check-circle" iconColor="var(--success, var(--accent))" />
+        <KPICard label={tr('proxyPool.kpi.latency')} value={<span className="mono" style={{ color: 'var(--orange)' }}>{kpiLatency != null ? `${kpiLatency} ms` : '—'}</span>} icon="gauge" iconColor="var(--orange)" />
+        <KPICard label={tr('proxyPool.kpi.bound')} value={kpiBound} icon="users" iconColor="var(--info)" />
+      </div>
+      <div style={{ flex: 1, minHeight: 0, background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <div style={{ flex: 1, overflow: 'auto' }}>
-          {loading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--fg-2)' }}>{tr('pageMisc.c6c150')}</div>
-          ) : (
-            <table style={{ width: '100%', minWidth: 1200, borderCollapse: 'separate', borderSpacing: 0, fontSize: 12 }}>
-              <thead>
-                <tr>
-                  {[
-                    { h: tr('pageMisc.664795'), w: 140 },
-                    { h: tr('pageMisc.226b09'), w: 80, align: 'center' },
-                    { h: 'URL', w: 160 },
-                    { h: tr('pageMisc.c76cfe'), w: 70, align: 'center' },
-                    { h: tr('pageMisc.proxyLocation') || '代理归属地', w: 140, align: 'center' },
-                    { h: tr('pageMisc.819767'), w: 110 },
-                    { h: tr('pageMisc.a81052'), w: 90 },
-                    { h: tr('pageMisc.4787d6'), w: 160 },
-                    { h: tr('pageMisc.4def0b'), w: 70, align: 'center' },
-                    { h: tr('pageMisc.791261'), w: 120, align: 'center' },
-                    { h: tr('pageMisc.2b6bc0'), w: 120, align: 'center' },
-                  ].map((c, i) => (
-                    <th key={i} style={{
-                      textAlign: c.align || 'center', padding: '9px 12px', width: c.w,
-                      background: 'var(--bg-2)', color: 'var(--fg-3)',
-                      fontSize: 10.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
-                      borderBottom: '1px solid var(--border)',
-                      position: 'sticky', top: 0, zIndex: 1,
-                    }}>{c.h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody style={{ opacity: (loading && proxies.length > 0) ? 0.6 : 1, transition: 'opacity 120ms' }}>
-                {(loading || !hasLoadedOnce) && proxies.length === 0 ? (
-                  <tr><td colSpan={11} style={{ padding: 48, textAlign: 'center', color: 'var(--fg-3)' }}>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-                      <Icon name="loader-2" size={18} className="spin" style={{ opacity: 0.6 }} />
-                      <span style={{ fontSize: 13 }}>加载中…</span>
-                    </div>
-                  </td></tr>
-                ) : proxies.length === 0 ? (
-                  <tr><td colSpan={11} style={{ padding: 0 }}>
-                    <EmptyState
-                      icon="shield"
-                      title="暂无代理配置"
-                      subtitle="点击「新增代理」配置 HTTP/HTTPS 出口代理"
-                      actionLabel="新增代理"
-                      onAction={() => openProxyModal(null)}
-                    />
-                  </td></tr>
-                ) : proxies.map((p, i) => {
-                  const st = statusCfg(p);
-                  const tenantIds = Array.isArray(p.tenantIds) && p.tenantIds.length ? p.tenantIds
-                    : (p.tenantId != null && p.tenantId !== '' ? [p.tenantId] : []);
-                  const tenantLabel = tenantIds.length ? (p.tenantName || tenantIds.map(id => '#' + id).join(', ')) : tr('pageMisc.32a721');
-                  const forced = p.forceProxy === 1 || p.forceProxy === true || p.forceProxy === '1';
-                  return (
-                    <tr key={p.id} style={{ background: i % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 30%, transparent)' : 'transparent' }}>
-                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-                        <span style={{ fontSize: 12, color: 'var(--fg-0)', fontWeight: 500 }}>{p.customName || '—'}</span>
-                      </td>
-                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-                        <span className="mono" style={{
-                          padding: '2px 8px', borderRadius: 3,
-                          background: p.proxyType === 'HTTPS' ? 'var(--accent-soft)' : 'var(--info-soft)',
-                          color: p.proxyType === 'HTTPS' ? 'var(--accent)' : 'var(--info)',
-                          fontSize: 10.5, fontWeight: 700,
-                        }}>{p.proxyType}</span>
-                      </td>
-                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-                        <span className="mono" style={{ fontSize: 11.5, color: 'var(--fg-1)' }}>{p.proxyHost}</span>
-                      </td>
-                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-                        <span className="num mono" style={{ fontSize: 11.5, color: 'var(--fg-1)' }}>{p.proxyPort}</span>
-                      </td>
-                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-                        {testingAll || testingId === p.id ? (
-                          <span style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 4,
-                            fontSize: 11, color: 'var(--fg-3)',
-                          }}>
-                            <Icon name="loader-2" size={12} className="spin" style={{ color: 'var(--accent)' }} />
-                            <span>探测中…</span>
-                          </span>
-                        ) : p.location ? (
-                          <span style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 4,
-                            fontSize: 11.5, color: 'var(--fg-1)',
-                          }}>
-                            <Icon name="map-pin" size={11} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                            <span>{p.location}</span>
-                          </span>
-                        ) : (
-                          <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>—</span>
+          <table style={{ width: '100%', minWidth: 1080, borderCollapse: 'separate', borderSpacing: 0, fontSize: 12.5 }}>
+            <thead>
+              <tr>
+                {columns.map((c, i) => (
+                  <th key={i} style={{
+                    textAlign: c.align || 'left', padding: '10px 12px', width: c.w, minWidth: c.minW,
+                    background: 'var(--bg-2)', color: 'var(--fg-2)', fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap',
+                    borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 1,
+                  }}>{c.h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody style={{ opacity: (loading && proxies.length > 0) ? 0.6 : 1, transition: 'opacity 120ms' }}>
+              {(loading || !hasLoadedOnce) && proxies.length === 0 ? (
+                <tr><td colSpan={columns.length} style={{ padding: 48, textAlign: 'center', color: 'var(--fg-3)' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+                    <Icon name="loader-2" size={18} className="spin" style={{ opacity: 0.6 }} />
+                    <span style={{ fontSize: 13 }}>{tr('pageMisc.c6c150')}</span>
+                  </div>
+                </td></tr>
+              ) : proxies.length === 0 ? (
+                <tr><td colSpan={columns.length} style={{ padding: 0 }}>
+                  <EmptyState icon="shuffle" title={tr('proxyPool.emptyTitle')} subtitle={tr('proxyPool.empty')}
+                    actionLabel={tr('proxyPool.add')} onAction={() => openProxyModal(null)} />
+                </td></tr>
+              ) : proxies.map((p, i) => {
+                const health = healthOf(p);
+                const tIds = tenantIdsOf(p);
+                const forced = isForced(p);
+                const latency = latencyOf(p);
+                const testing = health.state === 'testing';
+                const proto = String(p.proxyType || '').toUpperCase();
+                return (
+                  <tr key={p.id} className="proxy-pool-row">
+                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                      <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{(page - 1) * perPage + i + 1}</span>
+                    </td>
+                    <td style={tdStyle}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                        <span title={health.title} style={{ width: 8, height: 8, borderRadius: 999, background: health.tone, flexShrink: 0 }} />
+                        <span style={{ fontWeight: 500, color: 'var(--fg-0)' }}>{p.customName || p.proxyHost}</span>
+                        {forced && (
+                          <span title={tr('proxyPool.action.forceOff')} style={{
+                            padding: '1px 6px', borderRadius: 4, fontSize: 10.5, fontWeight: 600,
+                            color: 'var(--danger)', background: 'var(--danger-soft)',
+                            border: '1px solid color-mix(in oklab, var(--danger) 25%, transparent)',
+                          }}>{tr('proxyPool.force')}</span>
                         )}
-                      </td>
-                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-                        <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>{p.proxyUsername || '—'}</span>
-                      </td>
-                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-                        <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{p.hasPassword ? '••••••' : '—'}</span>
-                      </td>
-                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-                        <span style={{ fontSize: 11.5, color: tenantIds.length ? 'var(--fg-1)' : 'var(--fg-3)' }}>{tenantLabel}</span>
-                      </td>
-                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-                        {forced ? (
-                          <span style={{ padding: '1px 6px', background: 'var(--orange-soft)', color: 'var(--orange)', borderRadius: 3, fontSize: 10, fontWeight: 600 }}>{tr('pageMisc.4def0b')}</span>
-                        ) : <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>{tr('pageMisc.781c06')}</span>}
-                      </td>
-                      <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                          padding: '2px 8px', borderRadius: 3,
-                          background: st.bg, color: st.color,
-                          fontSize: 10.5, fontWeight: 500, whiteSpace: 'nowrap',
-                        }}>
-                          <Icon name={st.icon} size={9} />
-                          <span>{st.label}</span>
+                      </div>
+                    </td>
+                    <td style={tdStyle}>
+                      <span className="mono" style={{
+                        padding: '2px 7px', borderRadius: 4, fontSize: 10.5, fontWeight: 700,
+                        background: proto === 'SOCKS5' ? 'var(--accent-soft)' : 'var(--info-soft)',
+                        color: proto === 'SOCKS5' ? 'var(--accent)' : 'var(--info)',
+                      }}>{proto || '—'}</span>
+                    </td>
+                    <td style={tdStyle}>
+                      <span className="mono" style={{ fontSize: 12, color: 'var(--cyan)' }}>{p.proxyHost}:{p.proxyPort}</span>
+                    </td>
+                    <td style={tdStyle}>
+                      {testing ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: 'var(--fg-3)' }}>
+                          <Icon name="loader-2" size={12} className="spin" />{tr('proxyPool.health.testing')}…
                         </span>
-                        {(() => {
-                          const ci = checkInfo(p);
-                          return (
-                            <div title={ci.title} style={{ marginTop: 3, fontSize: 10, color: ci.color, whiteSpace: 'nowrap' }}>{ci.text}</div>
-                          );
-                        })()}
-                      </td>
-                      <td style={{ padding: '6px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-                        <div style={{ display: 'inline-flex', gap: 4 }}>
-                          <button title={tr('pageMisc.db06c7')} onClick={() => testOne(p)}
-                            disabled={testingId === p.id || testingAll}
-                            style={{ width: 26, height: 26, background: 'var(--bg-2)', color: 'var(--info)', border: '1px solid var(--border)', borderRadius: 3, cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Icon name="zap" size={11} />
-                          </button>
-                          <button title={tr('pageMisc.ffdf01')} onClick={() => toggleForce(p)}
-                            style={{ width: 26, height: 26, background: 'var(--bg-2)', color: 'var(--orange)', border: '1px solid var(--border)', borderRadius: 3, cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Icon name="shield" size={11} />
-                          </button>
-                          <button title={tr('pageMisc.95b351')} onClick={() => openProxyModal(p)}
-                            style={{ width: 26, height: 26, background: 'var(--bg-2)', color: 'var(--info)', border: '1px solid var(--border)', borderRadius: 3, cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Icon name="edit" size={11} />
-                          </button>
-                          <button title={tr('pageMisc.2f4aad')} onClick={() => deleteProxy(p)}
-                            style={{ width: 26, height: 26, background: 'var(--bg-2)', color: 'var(--danger)', border: '1px solid var(--border)', borderRadius: 3, cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Icon name="trash-2" size={11} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
+                      ) : p.location ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--fg-1)' }}>
+                          <Icon name="map-pin" size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />{p.location}
+                        </span>
+                      ) : <span style={{ color: 'var(--fg-3)' }}>—</span>}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                      <button type="button" title={[tr('proxyPool.tenantsTip'), p.tenantName].filter(Boolean).join('\n')} onClick={() => openProxyModal(p)}
+                        style={{
+                          minWidth: 26, height: 22, padding: '0 8px', borderRadius: 999, border: 'none', cursor: 'pointer',
+                          background: 'var(--bg-3, var(--bg-2))', color: tIds.length ? 'var(--fg-0)' : 'var(--fg-3)',
+                          fontSize: 11.5, fontWeight: 600, fontFamily: 'inherit',
+                        }}>{tIds.length}</button>
+                    </td>
+                    <td style={tdStyle}>
+                      {latency != null
+                        ? <span className="mono" style={{ fontSize: 12, color: latencyTone(latency) }}>{latency} ms</span>
+                        : <span style={{ color: 'var(--fg-3)' }}>—</span>}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                      <span title={health.title} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 10px', borderRadius: 999,
+                        fontSize: 11.5, fontWeight: 500, border: '1px solid var(--border)',
+                        color: health.state === 'unchecked' ? 'var(--fg-2)' : health.tone,
+                        background: `color-mix(in oklab, ${health.tone} 8%, transparent)`,
+                      }}>
+                        {testing && <Icon name="loader-2" size={10} className="spin" />}
+                        {health.label}
+                      </span>
+                      {health.when && !testing && (
+                        <div style={{ marginTop: 3, fontSize: 10, color: 'var(--fg-3)' }}>{health.when}</div>
+                      )}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: 'center', padding: '6px 12px' }}>
+                      <div className="proxy-pool-actions" style={{ display: 'inline-flex', gap: 2 }}>
+                        <button type="button" title={tr('proxyPool.action.test')} onClick={() => testOne(p)} disabled={testing}
+                          style={actionBtn('var(--accent)')}>
+                          <Icon name={testing ? 'loader-2' : 'wifi'} size={14} className={testing ? 'spin' : ''} />
+                        </button>
+                        <button type="button" title={forced ? tr('proxyPool.action.forceOff') : tr('proxyPool.action.forceOn')} onClick={() => toggleForce(p)}
+                          style={{ ...actionBtn('var(--danger)'), color: forced ? 'var(--danger)' : 'var(--fg-2)' }}>
+                          <Icon name={forced ? 'shield-check' : 'shield'} size={14} />
+                        </button>
+                        <button type="button" title={tr('proxyPool.action.edit')} onClick={() => openProxyModal(p)} style={actionBtn('var(--fg-0)')}>
+                          <Icon name="pencil" size={14} />
+                        </button>
+                        <button type="button" title={tr('proxyPool.action.copy')} onClick={() => copyEndpoint(p)} style={actionBtn('var(--info)')}>
+                          <Icon name="copy" size={14} />
+                        </button>
+                        <button type="button" title={tr('proxyPool.action.delete')} onClick={() => deleteProxy(p)} style={actionBtn('var(--danger)')}>
+                          <Icon name="trash-2" size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-        <div style={{ flexShrink: 0, borderTop: '1px solid var(--border)', background: 'var(--bg-1)' }}>
-          <Pagination total={totalElements} page={page} perPage={perPage} onPageChange={setPage} onPerPageChange={n => { setPerPage(n); setPage(1); }} t={tr} />
-        </div>
+        {totalElements > perPage && (
+          <div style={{ flexShrink: 0, borderTop: '1px solid var(--border)', background: 'var(--bg-1)' }}>
+            <Pagination total={totalElements} page={page} perPage={perPage} onPageChange={setPage} onPerPageChange={n => { setPerPage(n); setPage(1); }} t={tr} />
+          </div>
+        )}
       </div>
     </div>
   );

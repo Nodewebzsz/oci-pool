@@ -240,6 +240,35 @@ private struct MenuGlyphShape: Shape {
         path.addCurve(to: p(12, 2), control1: p(16, 8.278), control2: p(14.567, 4.695))
         path.move(to: p(2, 12))
         path.addLine(to: p(22, 12))
+        case "earth":
+        let k: CGFloat = 0.5523
+        func corner(_ from: CGPoint, _ c: CGPoint, _ to: CGPoint) {
+            path.addCurve(
+                to: p(to.x, to.y),
+                control1: p(from.x + k * (c.x - from.x), from.y + k * (c.y - from.y)),
+                control2: p(to.x + k * (c.x - to.x), to.y + k * (c.y - to.y))
+            )
+        }
+        path.addEllipse(in: r(2, 2, 20, 20))
+        path.move(to: p(21.54, 15))
+        path.addLine(to: p(17, 15))
+        corner(CGPoint(x: 17, y: 15), CGPoint(x: 15, y: 15), CGPoint(x: 15, y: 17))
+        path.addLine(to: p(15, 21.54))
+        path.move(to: p(7, 3.34))
+        path.addLine(to: p(7, 5))
+        corner(CGPoint(x: 7, y: 5), CGPoint(x: 7, y: 8), CGPoint(x: 10, y: 8))
+        corner(CGPoint(x: 10, y: 8), CGPoint(x: 12, y: 8), CGPoint(x: 12, y: 10))
+        corner(CGPoint(x: 12, y: 10), CGPoint(x: 12, y: 12), CGPoint(x: 14, y: 12))
+        corner(CGPoint(x: 14, y: 12), CGPoint(x: 16, y: 12), CGPoint(x: 16, y: 10))
+        corner(CGPoint(x: 16, y: 10), CGPoint(x: 16, y: 8), CGPoint(x: 18, y: 8))
+        path.addLine(to: p(21.17, 8))
+        path.move(to: p(11, 21.95))
+        path.addLine(to: p(11, 18))
+        corner(CGPoint(x: 11, y: 18), CGPoint(x: 11, y: 16), CGPoint(x: 9, y: 16))
+        corner(CGPoint(x: 9, y: 16), CGPoint(x: 7, y: 16), CGPoint(x: 7, y: 14))
+        path.addLine(to: p(7, 13))
+        corner(CGPoint(x: 7, y: 13), CGPoint(x: 7, y: 11), CGPoint(x: 5, y: 11))
+        path.addLine(to: p(2.05, 11))
         case "users":
         path.move(to: p(16, 21))
         path.addLine(to: p(16, 19))

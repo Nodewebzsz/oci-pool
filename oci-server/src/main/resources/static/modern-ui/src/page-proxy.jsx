@@ -245,7 +245,7 @@ function ProxyPage({ density }) {
   );
 }
 
-// ─── 1. 秘钥配置 (API Token) ──────────────────────────
+// ─── 1. 密钥配置 (API Token) ──────────────────────────
 // 严格对齐原项目 api_token_config.ftl · 平台自身 REST API 的 Bearer Token 管理
 // 4 张卡:Token 状态 · Token 配置 · API 文档访问 · API 使用说明
 function KeyConfigPage() {
@@ -681,8 +681,8 @@ function SecretInputExternal({ value, onChange, show, onToggleShow, placeholder,
   );
 }
 
-// ─── 1b. 代理秘钥配置(域名服务商配置)─────────────────────
-// 挂在"代理管理"分组下 · Cloudflare + 腾讯云 EdgeOne 双卡
+// ─── 1b. 代理密钥配置(域名服务商配置)─────────────────────
+// 挂在"域名与 CDN"分组下 · Cloudflare + 腾讯云 EdgeOne 双卡
 // 保留原有实现,只改名 KeyConfigPage → ProxyKeyConfigPage
 function ProxyKeyConfigPage() {
   const { t: tr } = useT();
@@ -1574,7 +1574,7 @@ function CFManagePage() {
 //   · 状态严格 3 态: online / offline / pending
 //   · DNS 搜索: 名称 + 值 双输入
 //   · 域名搜索: 域名 + 状态 select
-//   · 顶部工具:秘钥配置 + 同步 + 刷新列表
+//   · 顶部工具:密钥配置 + 同步 + 刷新列表
 function EOManagePage() {
   const { t: tr } = useT();
   const shell = useShell();

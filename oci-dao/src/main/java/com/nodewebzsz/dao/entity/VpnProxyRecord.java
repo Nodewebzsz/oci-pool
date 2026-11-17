@@ -121,6 +121,12 @@ public class VpnProxyRecord {
     private String lastExitIp;
 
     /**
+     * 最近一次检测成功的连接延时（毫秒；失败或端点变更后清空）
+     */
+    @Column(name = "last_latency_ms")
+    private Long lastLatencyMs;
+
+    /**
      * 全部代理绑定关系的版本号（非持久化，列表接口填充；保存绑定时回传用于检测并发修改）
      */
     @Transient
