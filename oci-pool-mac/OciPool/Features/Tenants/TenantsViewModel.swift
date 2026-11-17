@@ -2073,17 +2073,7 @@ final class TenantsViewModel: ObservableObject {
     func applyBootOS(_ os: String) {
         bootSelectedOS = os
         // 语义化倒序排列（24.04 > 22.04 > 20.04），新版本优先
-        bootVersions = bootImages.filter { $0.operatingSystem == os }.sorted { a, b in
-            let pa = a.operatingSystemVersion.components(separatedBy: CharacterSet.decimalDigits.inverted).compactMap { Int($0) }
-            let pb = b.operatingSystemVersion.components(separatedBy: CharacterSet.decimalDigits.inverted).compactMap { Int($0) }
-            let len = max(pa.count, pb.count)
-            for i in 0..<len {
-                let va = i < pa.count ? pa[i] : 0
-                let vb = i < pb.count ? pb[i] : 0
-                if va != vb { return va > vb }
-            }
-            return a.operatingSystemVersion > b.operatingSystemVersion
-        }
+        bootVersions = TenantImageInfo.sortedByVersion(bootImages.filter { $0.operatingSystem == os })
         if let v = bootVersions.first {
             bootSelectedVersion = v.operatingSystemVersion
             bootImageId = v.imageId

@@ -1,6 +1,5 @@
 package com.nodewebzsz.ociserver.utils.oracle;
 
-import com.alibaba.fastjson2.JSON;
 import com.nodewebzsz.dao.entity.Tenant;
 import com.nodewebzsz.ocicommon.enums.CloudTypeEnum;
 import com.nodewebzsz.ociserver.pojo.enums.ArchitectureEnum;
@@ -10,7 +9,6 @@ import com.oracle.bmc.auth.SimpleAuthenticationDetailsProvider;
 import com.oracle.bmc.core.ComputeClient;
 import com.oracle.bmc.core.model.Image;
 import com.oracle.bmc.core.requests.ListImagesRequest;
-import com.oracle.bmc.core.responses.ListImagesResponse;
 import com.oracle.bmc.model.BmcException;
 import com.oracle.bmc.retrier.RetryConfiguration;
 import com.oracle.bmc.waiter.FixedTimeDelayStrategy;
@@ -27,8 +25,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
 import com.nodewebzsz.ociserver.config.ProxyContext;
 
 /**
@@ -53,77 +49,76 @@ public class OciImageUtils {
                     .build())
             .build();
 
+    /** 单页最多拉取的镜像数（OCI 上限 100，其余通过翻页获取） */
+    private static final int IMAGE_PAGE_LIMIT = 100;
+
     /**
-     * 获取镜像系统列表（仅 Oracle Linux / Ubuntu / CentOS）
+     * 获取指定 Shape 可用的官方 Linux 镜像，按「系统 + 版本」去重并保留最新构建。
+     * <p>
+     * 由 OCI 按 Shape 过滤兼容镜像（不再靠镜像名猜架构），并自动翻页拉全；
+     * 仅保留白名单内的官方 Linux 系统（含 Ubuntu Minimal 等以版本区分的变体）。
      *
      * @throws IllegalStateException 查询失败时抛出，消息可直接展示给用户
      */
-    public static List<ImageInfoRes> listSupportedLinuxImages(Tenant tenant) {
+    public static List<ImageInfoRes> listSupportedLinuxImages(Tenant tenant, String shape, String arch) {
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
-        List<ImageInfoRes> result = new ArrayList<>();
+        Map<String, Image> latest = new HashMap<>();
 
         try (ComputeClient computeClient = ComputeClient.builder()
                 .configuration(IMAGE_CLIENT_CONFIG)
                 .clientConfigurator(ProxyContext.get())
                 .build(provider)) {
-            ListImagesResponse response = computeClient.listImages(
-                    ListImagesRequest.builder()
-                            .compartmentId(provider.getTenantId())
-                            .sortBy(ListImagesRequest.SortBy.Displayname)
-                            .sortOrder(ListImagesRequest.SortOrder.Asc)
-                            .build()
-            );
+            ListImagesRequest request = ListImagesRequest.builder()
+                    .compartmentId(provider.getTenantId())
+                    .shape(shape)
+                    .lifecycleState(Image.LifecycleState.Available)
+                    .sortBy(ListImagesRequest.SortBy.Timecreated)
+                    .sortOrder(ListImagesRequest.SortOrder.Desc)
+                    .limit(IMAGE_PAGE_LIMIT)
+                    .build();
 
-            Map<String, ImageInfoRes> map = new HashMap<>();
-
-            for (Image img : response.getItems()) {
+            int total = 0;
+            for (Image img : computeClient.getPaginators().listImagesRecordIterator(request)) {
+                total++;
                 if (img.getOperatingSystem() == null || img.getOperatingSystemVersion() == null) continue;
-                log.debug("Image: {}", JSON.toJSONString( img));
-
                 String os = img.getOperatingSystem().trim();
-                String version = img.getOperatingSystemVersion();
-                String display = Optional.ofNullable(img.getDisplayName()).orElse("").toLowerCase();
-
-                // 只保留 Oracle Linux / Ubuntu / CentOS
+                String version = img.getOperatingSystemVersion().trim();
                 if (!isAllowedOs(os)) {
                     continue;
                 }
-
-                // 判断架构
-                String arch;
-                if (display.contains("aarch64") || display.contains("ampere")) {
-                    arch = "ARM";
-                } else {
-                    arch = "AMD";
-                }
-
-
-                boolean free = isAlwaysFreeImage(os, version, arch);
-                String key = os + "_" + version + "_" + arch;
-
-                if (!map.containsKey(key)) {
-                    ImageInfoRes info = new ImageInfoRes();
-                    info.setImageId(img.getId());
-                    info.setOperatingSystem(os);
-                    info.setOperatingSystemVersion(version);
-                    info.setArchitecture(arch);
-                    info.setAlwaysFreeEligible(free);
-                    info.setCloudType(CloudTypeEnum.ORACLE_CLOUD.getType());
-                    map.put(key, info);
+                String key = os + "_" + version;
+                Image existing = latest.get(key);
+                if (existing == null || isNewer(img, existing)) {
+                    latest.put(key, img);
                 }
             }
-
-            result.addAll(map.values().stream()
-                    .sorted(Comparator.comparing(ImageInfoRes::getOperatingSystem)
-                            .thenComparing(ImageInfoRes::getOperatingSystemVersion))
-                    .collect(Collectors.toList()));
-
+            log.info("镜像查询完成 shape={} 共 {} 个镜像，保留 {} 个系统版本", shape, total, latest.size());
         } catch (Exception e) {
-            log.error("获取镜像系统列表失败: {}", e.getMessage(), e);
+            log.error("获取镜像系统列表失败 shape={}: {}", shape, e.getMessage(), e);
             throw new IllegalStateException(describeFailure(e), e);
         }
 
+        List<ImageInfoRes> result = new ArrayList<>();
+        for (Image img : latest.values()) {
+            ImageInfoRes info = new ImageInfoRes();
+            info.setImageId(img.getId());
+            info.setOperatingSystem(img.getOperatingSystem().trim());
+            info.setOperatingSystemVersion(img.getOperatingSystemVersion().trim());
+            info.setArchitecture(arch);
+            info.setAlwaysFreeEligible(isAlwaysFreeImage(info.getOperatingSystem(), info.getOperatingSystemVersion(), arch));
+            info.setCloudType(CloudTypeEnum.ORACLE_CLOUD.getType());
+            result.add(info);
+        }
+        result.sort(Comparator.comparing(ImageInfoRes::getOperatingSystem)
+                .thenComparing(ImageInfoRes::getOperatingSystemVersion));
         return result;
+    }
+
+    private static boolean isNewer(Image candidate, Image current) {
+        if (candidate.getTimeCreated() == null) {
+            return false;
+        }
+        return current.getTimeCreated() == null || candidate.getTimeCreated().after(current.getTimeCreated());
     }
 
     private static String describeFailure(Throwable error) {
@@ -165,6 +160,7 @@ public class OciImageUtils {
     private static boolean isAllowedOs(String os) {
         String lower = os.toLowerCase();
         return lower.contains("oracle linux") ||
+                lower.contains("oracle autonomous linux") ||
                 lower.contains("ubuntu") ||
                 lower.contains("centos");
     }
@@ -191,17 +187,7 @@ public class OciImageUtils {
             return Collections.emptyList();
         }
 
-        String archType = archEnum.getBackUpName(); // ARM 或 AMD
-
-        // 拿到所有镜像
-        List<ImageInfoRes> allImages = listSupportedLinuxImages(tenant);
-
-        // 根据 Shape 的架构过滤
-        return allImages.stream()
-                .filter(img -> archType.equalsIgnoreCase(img.getArchitecture()))
-                .sorted(Comparator.comparing(ImageInfoRes::getOperatingSystem)
-                        .thenComparing(ImageInfoRes::getOperatingSystemVersion))
-                .collect(Collectors.toList());
+        return listSupportedLinuxImages(tenant, archEnum.getShapeDetail(), archEnum.getBackUpName());
     }
 
 }
