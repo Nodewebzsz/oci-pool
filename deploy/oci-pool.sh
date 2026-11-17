@@ -12,6 +12,7 @@
 #   ./oci-pool.sh status     查看运行状态
 #   ./oci-pool.sh update     升级（源码模式 git pull + Maven 重打包 / 独立模式重新下载 release jar）
 #   ./oci-pool.sh uninstall  卸载（停止并清理 data / logs / pid）
+#   ./oci-pool.sh uninstall --purge  彻底卸载（额外清理 .env 与 .env.example）
 #
 set -euo pipefail
 
@@ -26,6 +27,7 @@ fi
 
 PORT="${OCI_PORT:-9856}"
 REPO_URL="https://github.com/Nodewebzsz/oci-pool"
+RAW_BASE="https://raw.githubusercontent.com/Nodewebzsz/oci-pool/master/deploy"
 DOWNLOAD_URL="$REPO_URL/releases/latest/download/oci-pool-release.jar"
 JAR="$APP_ROOT/oci-pool.jar"
 BUILT_JAR="$APP_ROOT/oci-server/target/oci-pool-release.jar"
@@ -110,13 +112,36 @@ resolve_jar() {
 is_running() { [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE" 2>/dev/null)" >/dev/null 2>&1; }
 
 load_env() {
-  if [ ! -f "$APP_ROOT/.env" ] && [ -f "$APP_ROOT/.env.example" ]; then
-    cp "$APP_ROOT/.env.example" "$APP_ROOT/.env"
+  if [ ! -f "$APP_ROOT/.env" ]; then
+    if [ ! -f "$APP_ROOT/.env.example" ] && command -v curl >/dev/null 2>&1; then
+      warn "下载 .env.example 配置模板..."
+      curl -L --fail -sS -o "$APP_ROOT/.env.example" "$RAW_BASE/.env.example" 2>/dev/null || rm -f "$APP_ROOT/.env.example"
+    fi
+
+    if [ -f "$APP_ROOT/.env.example" ]; then
+      cp "$APP_ROOT/.env.example" "$APP_ROOT/.env"
+    else
+      cat > "$APP_ROOT/.env" <<EOF
+OCI_PORT=${PORT}
+DB_PASSWORD=
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=
+EOF
+    fi
+
     if [ ! -f "$DATA_DIR/vps_db.mv.db" ]; then
       local rand_pass; rand_pass=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 24 || openssl rand -hex 12 2>/dev/null || true)
-      [ -n "$rand_pass" ] && sed -i.bak "s|^DB_PASSWORD=.*|DB_PASSWORD=${rand_pass}|" "$APP_ROOT/.env" 2>/dev/null && rm -f "$APP_ROOT/.env.bak" || true
+      if [ -n "$rand_pass" ]; then
+        sed -i.bak "s|^DB_PASSWORD=.*|DB_PASSWORD=${rand_pass}|" "$APP_ROOT/.env" 2>/dev/null && rm -f "$APP_ROOT/.env.bak" || true
+        ok "已自动生成 24 位高强度 DB_PASSWORD 并存入 .env（保护本地租户私钥）"
+      fi
       local admin_pass; admin_pass=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 16 || openssl rand -hex 8 2>/dev/null || true)
-      [ -n "$admin_pass" ] && sed -i.bak "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${admin_pass}|" "$APP_ROOT/.env" 2>/dev/null && rm -f "$APP_ROOT/.env.bak" || true
+      if [ -n "$admin_pass" ]; then
+        sed -i.bak "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${admin_pass}|" "$APP_ROOT/.env" 2>/dev/null && rm -f "$APP_ROOT/.env.bak" || true
+        ok "已自动生成初始管理员随机密码并存入 .env（0 秒公网抢注窗口）"
+      fi
+    else
+      warn "检测到已有数据库 $DATA_DIR/vps_db.mv.db，本次生成的 .env 未覆盖管理员密码"
     fi
   fi
   if [ -f "$APP_ROOT/.env" ]; then
@@ -156,8 +181,12 @@ cmd_start() {
       if [ -n "${ADMIN_PASSWORD:-}" ]; then
         echo -e "  初始强密码: ${Y}${ADMIN_PASSWORD}${N}"
         echo -e "  ${Y}⚠️  安全提示: 初始密码已加密存入数据库，首次登录后请前往「系统设置」及时修改密码！${N}"
-      else
+      elif [ -f "$DATA_DIR/vps_db.mv.db" ]; then
         echo -e "  初始密码:   [已保留数据库中原密码]"
+        echo -e "  ${Y}💡 如忘记密码: 在登录页点「忘记密码」，然后从日志获取验证码与新密码：${N}"
+        echo -e "  ${C}   grep -E \"密码重置验证码|重置成功\" \"$LOG_DIR/application.log\"${N}"
+      else
+        echo -e "  初始密码:   [未设置 ADMIN_PASSWORD，请访问 http://localhost:${PORT}/register 注册首个管理员]"
       fi
       echo -e "${G}===================================================================${N}"
       echo ""
@@ -214,11 +243,18 @@ cmd_update() {
 }
 
 cmd_uninstall() {
+  local purge="${1:-}"
   info "uninstall"
   cmd_stop
   warn "删除数据与日志: $DATA_DIR / $LOG_DIR"
   rm -rf "$DATA_DIR" "$LOG_DIR"
   [ -f "$JAR" ] && rm -f "$JAR"
+  if [ "$purge" = "--purge" ] || [ "$purge" = "--all" ]; then
+    [ -f "$APP_ROOT/.env" ] && rm -f "$APP_ROOT/.env" && warn "已删除配置文件: $APP_ROOT/.env"
+    [ -f "$APP_ROOT/.env.example" ] && rm -f "$APP_ROOT/.env.example"
+  elif [ -f "$APP_ROOT/.env" ]; then
+    warn "已保留配置文件: $APP_ROOT/.env（若需彻底重置密码与配置，请执行 ./oci-pool.sh uninstall --purge）"
+  fi
   ok "已卸载"
 }
 
@@ -227,12 +263,13 @@ usage() {
   echo
   echo "用法: ./oci-pool.sh <command>"
   echo
-  echo "  start       启动（自动检测/安装 JDK17 + Redis，并准备 jar）"
-  echo "  stop        停止"
-  echo "  restart     重启"
-  echo "  status      查看运行状态"
-  echo "  update      升级（源码重打包 / 重新下载 release jar）"
-  echo "  uninstall   卸载（停止并清理 data / logs / pid）"
+  echo "  start              启动（自动检测/安装 JDK17 + Redis，并准备 jar）"
+  echo "  stop               停止"
+  echo "  restart            重启"
+  echo "  status             查看运行状态"
+  echo "  update             升级（源码重打包 / 重新下载 release jar）"
+  echo "  uninstall          卸载（停止并清理 data / logs / pid，保留 .env）"
+  echo "  uninstall --purge  彻底卸载（额外清理 .env 与 .env.example）"
   echo
   echo "环境变量: OCI_PORT（默认 9856）、OCI_POOL_HOME（部署根目录）"
 }
@@ -243,7 +280,7 @@ case "${1:-}" in
   restart)  cmd_restart ;;
   status)   cmd_status ;;
   update)   cmd_update ;;
-  uninstall) cmd_uninstall ;;
+  uninstall) cmd_uninstall "${2:-}" ;;
   -h|--help|help|"") usage ;;
   *) err "未知命令: ${1:-}"; usage; exit 1 ;;
 esac

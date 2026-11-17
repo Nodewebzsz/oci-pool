@@ -8,4 +8,9 @@ done
 rm -rf ./data ./logs ./redis-data
 # 清理软链接
 [ -L docker-compose.yml ] && rm -f docker-compose.yml || true
+if [ "${1:-}" = "--purge" ] || [ "${1:-}" = "--all" ]; then
+  rm -f .env .env.example
+elif [ -f .env ]; then
+  echo 'ℹ 已保留 .env（若需连同配置与密码一并清理，请执行 ./uninstall.sh --purge）'
+fi
 echo '✓ stopped, data removed'
