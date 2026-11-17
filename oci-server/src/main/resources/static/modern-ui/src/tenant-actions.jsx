@@ -5193,12 +5193,14 @@ function useUserManageModal() {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tenantId: getTenantDbId(tenant) }),
         });
         const list = (r && r.success && Array.isArray(r.data)) ? r.data : [];
-        const enabled = list.filter(p => p.enablePasswordExpiry);
-        const withDays = list.filter(p => p.expiryDays != null).map(p => (p.expiryDays == null ? 120 : Number(p.expiryDays)));
-        let min = 120;
-        if (withDays.length) min = Math.min(...withDays);
-        state.passwordPolicy = { active: enabled.length > 0, expireDays: min };
+        state.ppList = list;
+        const customList = list.filter(p => String(p.passwordStrength || '').toLowerCase() === 'custom');
+        const active = customList.some(p => p.enablePasswordExpiry);
+        const withDays = customList.filter(p => p.enablePasswordExpiry && p.expiryDays > 0).map(p => Number(p.expiryDays));
+        const min = withDays.length ? Math.min(...withDays) : 120;
+        state.passwordPolicy = { active, expireDays: min };
       } catch (e) {
+        state.ppList = [];
         state.passwordPolicy = { active: false, expireDays: 120 };
       }
     };
@@ -5211,13 +5213,19 @@ function useUserManageModal() {
 
     // ── 密码策略浮层弹窗（层级高于用户管理） ─────────
     const openPasswordPolicy = async () => {
+      // 先把弹窗与骨架展示出来，避免策略列表异步加载后才“闪现”
+      state.ppLoading = true;
+      state.ppList = [];
+      state.ppDraft = { active: false, expireDays: 120 };
+      state.showPasswordPolicyModal = true;
+      render();
       await loadPasswordPolicy();
       const draft = { ...state.passwordPolicy };
       if (!draft.expireDays || draft.expireDays === 0) {
         draft.expireDays = 120;
       }
       state.ppDraft = draft;
-      state.showPasswordPolicyModal = true;
+      state.ppLoading = false;
       render();
     };
 
@@ -5914,8 +5922,63 @@ function useUserManageModal() {
                     }}>
                       <Icon name="info" size={14} style={{ flexShrink: 0 }} />
                       <div>
-                        当前密码策略状态: <b>{state.ppDraft?.active ? `已启用 (${state.ppDraft.expireDays}天)` : '未启用'}</b>
+                        当前密码策略状态: <b>{state.ppLoading ? '加载中…' : (state.ppDraft?.active ? `已启用 (${state.ppDraft.expireDays}天)` : '未启用')}</b>
                       </div>
+                    </div>
+
+                    {/* 身份域密码策略列表（便于在 app 内核对策略名/强度/优先级，无需切到 OCI 控制台） */}
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg-1)', marginBottom: 8 }}>当前身份域密码策略</div>
+                      {state.ppLoading ? (
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '10px 12px', background: 'var(--bg-2)',
+                          border: '1px solid var(--border)', borderRadius: 6,
+                          fontSize: 12, color: 'var(--fg-3)',
+                        }}>
+                          <Icon name="loader-2" size={14} className="spin" style={{ flexShrink: 0 }} />
+                          加载中…
+                        </div>
+                      ) : (!Array.isArray(state.ppList) || state.ppList.length === 0) ? (
+                        <div style={{
+                          padding: '10px 12px', background: 'var(--bg-2)',
+                          border: '1px solid var(--border)', borderRadius: 6,
+                          fontSize: 12, color: 'var(--fg-3)',
+                        }}>
+                          暂无密码策略
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {state.ppList.slice().sort((a, b) => ((a.priority ?? 999) - (b.priority ?? 999))).map((p, i) => (
+                            <div key={i} style={{
+                              display: 'flex', alignItems: 'center', gap: 8,
+                              padding: '8px 12px',
+                              background: 'var(--bg-2)',
+                              border: '1px solid ' + (p.managed ? 'var(--accent)' : 'var(--border)'),
+                              borderRadius: 6,
+                            }}>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-0)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {p.name || '(未命名)'}
+                                  {p.managed && (
+                                    <span style={{ marginLeft: 6, fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'var(--accent-soft)', color: 'var(--accent)' }}>本项目托管</span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>
+                                  强度 {p.passwordStrength || '-'} · 优先级 {p.priority ?? '-'} · {p.enablePasswordExpiry ? `${p.expiryDays} 天过期` : '永不过期'}
+                                </div>
+                              </div>
+                              <span style={{
+                                flexShrink: 0, fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                                background: p.editable ? 'var(--success-soft)' : 'var(--bg-3)',
+                                color: p.editable ? 'var(--success)' : 'var(--fg-3)',
+                              }}>
+                                {p.editable ? '可修改' : '只读'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* 启用强制修改密码勾选框 */}

@@ -349,13 +349,19 @@ struct TenantOciGroup: Decodable, Identifiable, Equatable {
 }
 
 struct TenantPasswordPolicy: Decodable, Identifiable, Equatable {
-    var id: String { name + "\(isEnabled)" }
+    var id: String { name + "\(priority ?? -1)" }
     var name: String = ""
     var isEnabled: Bool = false
-    var description: String = ""
+    var expiryDays: Int = 0
+    var passwordStrength: String = ""
+    var priority: Int? = nil
+    var editable: Bool = false
+    var managed: Bool = false
 
     enum CodingKeys: String, CodingKey {
-        case name, isEnabled, enabled, description, policyName
+        case name, policyName
+        case enablePasswordExpiry, isEnabled, enabled
+        case expiryDays, passwordStrength, priority, editable, managed
     }
 
     init(from decoder: Decoder) throws {
@@ -363,11 +369,19 @@ struct TenantPasswordPolicy: Decodable, Identifiable, Equatable {
         name = (try? c.decode(String.self, forKey: .name))
             ?? (try? c.decode(String.self, forKey: .policyName))
             ?? ""
-        isEnabled = (try? c.decode(Bool.self, forKey: .isEnabled))
+        isEnabled = (try? c.decode(Bool.self, forKey: .enablePasswordExpiry))
+            ?? (try? c.decode(Bool.self, forKey: .isEnabled))
             ?? (try? c.decode(Bool.self, forKey: .enabled))
             ?? false
-        description = (try? c.decode(String.self, forKey: .description)) ?? ""
+        expiryDays = (try? c.decode(Int.self, forKey: .expiryDays)) ?? 0
+        passwordStrength = (try? c.decode(String.self, forKey: .passwordStrength)) ?? ""
+        priority = try? c.decode(Int.self, forKey: .priority)
+        editable = (try? c.decode(Bool.self, forKey: .editable)) ?? false
+        managed = (try? c.decode(Bool.self, forKey: .managed)) ?? false
     }
+
+    /// 过期描述：已启用显示天数，否则“永不过期”
+    var expiryText: String { isEnabled ? "\(expiryDays) 天过期" : "永不过期" }
 }
 
 // MARK: - Traffic / Boot / Social / Quota / Check

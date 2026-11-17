@@ -963,20 +963,19 @@ public class TenantServiceImpl implements TenantService {
         if (!CollectionUtils.isEmpty(currentPasswordPolicy)){
             for (PasswordPolicy passwordPolicy : currentPasswordPolicy) {
                 PasswordPolicy.PasswordStrength passwordStrength = passwordPolicy.getPasswordStrength();
-                if (!passwordStrength.equals(PasswordPolicy.PasswordStrength.Custom)){
-                    log.debug("{}当前策略不支持修改",passwordPolicy.getName());
-                    continue;
-                }
                 PasswordPolicyDetail passwordPolicyDetail = new PasswordPolicyDetail();
                 passwordPolicyDetail.setName(passwordPolicy.getName());
+                passwordPolicyDetail.setPasswordStrength(passwordStrength != null ? passwordStrength.getValue() : null);
+                passwordPolicyDetail.setPriority(passwordPolicy.getPriority());
                 Integer passwordExpiresAfter = passwordPolicy.getPasswordExpiresAfter();
-                if (passwordExpiresAfter != null && passwordExpiresAfter > 0){
-                    passwordPolicyDetail.setEnablePasswordExpiry(true);
-                    passwordPolicyDetail.setExpiryDays(passwordExpiresAfter);
-                }else {
-                    passwordPolicyDetail.setEnablePasswordExpiry(false);
-                    passwordPolicyDetail.setExpiryDays(0);
-                }
+                boolean enabled = passwordExpiresAfter != null && passwordExpiresAfter > 0;
+                passwordPolicyDetail.setEnablePasswordExpiry(enabled);
+                passwordPolicyDetail.setExpiryDays(passwordExpiresAfter != null ? passwordExpiresAfter : 0);
+                passwordPolicyDetail.setEditable(
+                        PasswordPolicy.PasswordStrength.Custom.equals(passwordStrength)
+                                && OciUtils.isPasswordPolicyReplaceable(passwordPolicy));
+                passwordPolicyDetail.setManaged(
+                        OciUtils.MANAGED_PASSWORD_POLICY_NAME.equals(passwordPolicy.getName()));
                 result.add(passwordPolicyDetail);
             }
         }
