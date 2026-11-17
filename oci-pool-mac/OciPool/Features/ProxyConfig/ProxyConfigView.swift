@@ -138,10 +138,10 @@ struct ProxyConfigView: View {
     private var listBody: some View {
         DataList {
             DataListColumnHeader(title: "序号", width: 44)
-            DataListColumnHeader(title: "名称", width: nil, alignment: .leading)
+            DataListColumnHeader(title: "名称", width: 140, alignment: .leading)
             DataListColumnHeader(title: "协议类型", width: 76, alignment: .leading)
             DataListColumnHeader(title: "端点地址", width: 200, alignment: .leading)
-            DataListColumnHeader(title: "代理归属地", width: 110, alignment: .leading)
+            DataListColumnHeader(title: "代理归属地", width: nil, alignment: .leading)
             DataListColumnHeader(title: "关联租户", width: 64)
             DataListColumnHeader(title: "延时", width: 70, alignment: .leading)
             DataListColumnHeader(title: "状态", width: 96)
@@ -210,6 +210,7 @@ struct ProxyConfigView: View {
                     .foregroundColor(primaryText)
                     .lineLimit(1)
                     .truncationMode(.tail)
+                    .help(item.customName.isEmpty ? item.proxyHost : item.customName)
                 if item.isForce {
                     Text("强制")
                         .font(.system(size: 10.5, weight: .semibold))
@@ -223,7 +224,7 @@ struct ProxyConfigView: View {
                 }
             }
             .padding(.horizontal, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(width: 140, alignment: .leading)
             Text(proto.isEmpty ? "—" : proto)
                 .font(.system(size: 10.5, weight: .bold, design: .monospaced))
                 .foregroundColor(protoColor)
@@ -273,12 +274,11 @@ struct ProxyConfigView: View {
                 .padding(.vertical, 2)
                 .background(Capsule().fill(tone.opacity(0.08)))
                 .overlay(Capsule().stroke(AppTheme.border(dark), lineWidth: 1))
-                if health != .testing, !item.checkedText.isEmpty {
-                    Text(item.checkedText)
-                        .font(.system(size: 9.5))
-                        .foregroundColor(AppTheme.textTertiary(dark))
-                        .lineLimit(1)
-                }
+                Text(item.checkedText.isEmpty ? " " : item.checkedText)
+                    .font(.system(size: 9.5))
+                    .foregroundColor(AppTheme.textTertiary(dark))
+                    .lineLimit(1)
+                    .frame(height: 12)
             }
             .help(item.healthHelp)
             .frame(width: 96)
@@ -336,7 +336,7 @@ struct ProxyConfigView: View {
                     .foregroundColor(AppTheme.textTertiary(dark))
             }
         }
-        .frame(width: 110, alignment: .leading)
+        .frame(minWidth: 110, maxWidth: .infinity, alignment: .leading)
         .help(item.location.isEmpty ? "未解析" : item.location)
     }
 

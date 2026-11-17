@@ -5596,10 +5596,10 @@ function SysVpnProxyPage() {
   };
 
   const healthOf = (p) => {
-    if (testingAll || testingId === p.id) return { state: 'testing', label: tr('proxyPool.health.testing'), title: '', tone: 'var(--info)' };
     const checkedMs = parseTime(p.lastCheckedAt);
     const ipTip = p.lastExitIp ? tr('proxyPool.exitIp').replace('{0}', p.lastExitIp) : '';
     const when = checkedMs != null ? tr('proxyPool.checkedAt').replace('{0}', fmtTime(checkedMs)) : '';
+    if (testingAll || testingId === p.id) return { state: 'testing', label: tr('proxyPool.health.testing'), title: '', tone: 'var(--info)', when };
     if (p.lastCheckError || p.availableStatus === 0) {
       return { state: 'error', label: tr('proxyPool.health.error'), title: [p.lastCheckError, when].filter(Boolean).join('\n'), tone: 'var(--danger)', when };
     }
@@ -5638,7 +5638,7 @@ function SysVpnProxyPage() {
 
   const columns = [
     { h: tr('proxyPool.col.index'), w: 52, align: 'center' },
-    { h: tr('proxyPool.col.name'), minW: 180 },
+    { h: tr('proxyPool.col.name'), w: 140 },
     { h: tr('proxyPool.col.type'), w: 92 },
     { h: tr('proxyPool.col.endpoint'), minW: 220 },
     { h: tr('proxyPool.col.location'), minW: 130 },
@@ -5713,12 +5713,12 @@ function SysVpnProxyPage() {
                     <td style={{ ...tdStyle, textAlign: 'center' }}>
                       <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{(page - 1) * perPage + i + 1}</span>
                     </td>
-                    <td style={tdStyle}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <td style={{ ...tdStyle, maxWidth: 140 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, maxWidth: 116 }}>
                         <span title={health.title} style={{ width: 8, height: 8, borderRadius: 999, background: health.tone, flexShrink: 0 }} />
-                        <span style={{ fontWeight: 500, color: 'var(--fg-0)' }}>{p.customName || p.proxyHost}</span>
+                        <span title={p.customName || p.proxyHost} style={{ fontWeight: 500, color: 'var(--fg-0)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.customName || p.proxyHost}</span>
                         {forced && (
-                          <span title={tr('proxyPool.action.forceOff')} style={{
+                          <span title={tr('proxyPool.action.forceOff')} style={{ flexShrink: 0,
                             padding: '1px 6px', borderRadius: 4, fontSize: 10.5, fontWeight: 600,
                             color: 'var(--danger)', background: 'var(--danger-soft)',
                             border: '1px solid color-mix(in oklab, var(--danger) 25%, transparent)',
@@ -5770,9 +5770,7 @@ function SysVpnProxyPage() {
                         {testing && <Icon name="loader-2" size={10} className="spin" />}
                         {health.label}
                       </span>
-                      {health.when && !testing && (
-                        <div style={{ marginTop: 3, fontSize: 10, color: 'var(--fg-3)' }}>{health.when}</div>
-                      )}
+                      <div style={{ marginTop: 3, height: 14, lineHeight: '14px', fontSize: 10, color: 'var(--fg-3)' }}>{health.when || '\u00a0'}</div>
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'center', padding: '6px 12px' }}>
                       <div className="proxy-pool-actions" style={{ display: 'inline-flex', gap: 2 }}>

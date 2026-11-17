@@ -1,6 +1,6 @@
 import AppKit
 
-let bundleId = "com.nodewebzsz.ocipool"
+let bundleId = Bundle.main.bundleIdentifier ?? "com.nodewebzsz.ocipool"
 
 // Single instance: if already running, activate existing and exit this process.
 // Prevents “second click looks like flash quit” and multiple Java backends.

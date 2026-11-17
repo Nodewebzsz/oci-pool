@@ -102,6 +102,8 @@ jobs:
             docker.io/zszken/oci-pool-web:latest
 
       - name: Trigger release workflow
+        # 默认本地发布（scripts/release_local.sh）；仓库变量 RELEASE_MODE=ci 时回退为云端构建
+        if: ${{ vars.RELEASE_MODE == 'ci' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
