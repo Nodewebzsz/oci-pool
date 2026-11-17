@@ -181,8 +181,12 @@ echo -e "  管理员账号: ${Y}${ADMIN_USERNAME:-admin}${N}"
 if [ -n "${ADMIN_PASSWORD:-}" ]; then
   echo -e "  初始强密码: ${Y}${ADMIN_PASSWORD}${N}"
   echo -e "  ${Y}⚠️  安全提示: 初始密码已加密存入数据库，登录后请前往「系统设置」及时修改密码！${N}"
-else
+elif [ -f "./data/vps_db.mv.db" ]; then
   echo -e "  初始密码:   [已保留数据库中原密码]"
+  echo -e "  ${Y}💡 如忘记密码: 在登录页点「忘记密码」，然后从容器日志获取验证码与新密码：${N}"
+  echo -e "  ${C}   docker compose -f $COMPOSE_PULL logs app | grep -E \"密码重置验证码|重置成功\"${N}"
+else
+  echo -e "  初始密码:   [未设置 ADMIN_PASSWORD，请访问页面 /register 注册首个管理员]"
 fi
 echo -e "${G}===================================================================${N}"
 echo -e "  健康检查:   http://localhost:${OCI_WEB_PORT:-9857}/actuator/health"

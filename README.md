@@ -104,15 +104,15 @@ OCI-Pool 提供完整的 Oracle Cloud (OCI) 资源生命周期管理、自动化
 
 | 组件 | 版本 |
 |------|------|
-| Java | 8 或更高 |
+| Java | 17 或更高（脚本部署会自动检测并尝试安装 `openjdk-17-jdk`） |
 | 系统 | Linux (推荐 Debian / Ubuntu) |
 | Docker | 可选,用于容器化部署 |
 
-Debian / Ubuntu 安装 JDK:
+Debian / Ubuntu 安装 JDK 17:
 
 ```bash
 sudo apt update
-sudo apt install default-jdk
+sudo apt install openjdk-17-jdk
 ```
 
 ---
@@ -140,19 +140,22 @@ chmod +x oci-pool.sh
 常用命令:
 
 ```bash
-./oci-pool.sh start      # 启动
-./oci-pool.sh stop       # 停止
-./oci-pool.sh restart    # 重启
-./oci-pool.sh status     # 查看状态
-./oci-pool.sh update     # 升级(拉取源码重打包/重新下载 release jar)
-./oci-pool.sh uninstall  # 卸载(停止并清理数据)
+./oci-pool.sh start              # 启动
+./oci-pool.sh stop               # 停止
+./oci-pool.sh restart            # 重启
+./oci-pool.sh status             # 查看状态
+./oci-pool.sh update             # 升级(拉取源码重打包/重新下载 release jar)
+./oci-pool.sh uninstall          # 卸载(停止并清理 data/logs/jar，保留 .env)
+./oci-pool.sh uninstall --purge  # 彻底卸载(额外清理 .env 与 .env.example)
 ```
 
-启动后浏览器访问 `http://your-ip:9856`,注册管理员账号即可登录。默认端口 `9856`,可通过环境变量覆盖:
+首次启动时，脚本会自动补齐 `.env`、生成 24 位数据库密码 `DB_PASSWORD` 与 16 位初始管理员密码 `ADMIN_PASSWORD`，并在终端打印管理入口与初始凭据（也可在 `.env` 查看）。浏览器访问 `http://your-ip:9856` 直接登录即可；默认端口 `9856`，可通过环境变量覆盖:
 
 ```bash
 OCI_PORT=9860 ./oci-pool.sh start
 ```
+
+> 若部署目录残留了旧版数据库 `data/vps_db.mv.db`，启动时会提示 `[已保留数据库中原密码]`；若忘记旧密码，请参考下方「[常见问题：忘记管理员密码 / 重装提示「已保留数据库中原密码」](#常见问题忘记管理员密码--重装提示已保留数据库中原密码)」。
 
 > 新版本脚本会自动检测/安装 Redis,如本机已部署 Redis 请先评估冲突。
 
@@ -170,7 +173,7 @@ chmod +x install.sh update.sh
 ./install.sh
 ```
 
-脚本会自动拉取 `zszken/oci-pool` 最新镜像并启动 Redis + 应用,无需在服务器上编译。启动后浏览器访问 `http://your-ip:9856`,注册管理员账号即可登录。
+脚本会自动拉取 `zszken/oci-pool` 最新镜像并启动 Redis + 应用,无需在服务器上编译。首次安装会自动生成 24 位 `DB_PASSWORD` 与 16 位 `ADMIN_PASSWORD` 并打印在终端。启动后浏览器访问 `http://your-ip:9857`（Nginx 统一入口，含 VNC WebSocket；`9856` 默认仅绑定 `127.0.0.1`）使用管理员账号登录即可。
 
 #### 端口与环境变量
 
@@ -222,7 +225,8 @@ cd oci-pool && ./update.sh
 #### 卸载
 
 ```bash
-cd oci-pool && ./uninstall.sh   # 停止并删除 data/ logs/ redis-data/ 数据文件夹
+cd oci-pool && ./uninstall.sh          # 停止并删除 data/ logs/ redis-data/ 数据文件夹（保留 .env）
+cd oci-pool && ./uninstall.sh --purge  # 彻底清理（额外删除 .env 与 .env.example）
 ```
 
 #### 本地/源码构建(可选)
@@ -286,6 +290,27 @@ location ~ ^/websockify/(\d+)$ {
     proxy_read_timeout 86400;
 }
 ```
+
+#### 常见问题：忘记管理员密码 / 重装提示「已保留数据库中原密码」
+
+* **原因说明**：管理员密码使用 BCrypt 单向加密保存在本地数据库 `data/vps_db.mv.db`（`login_user` 表）中，**无法从日志或数据库解密还原**。如果重装时保留了旧数据库（或 `.env` 中 `ADMIN_PASSWORD` 为空），终端就会显示 `[已保留数据库中原密码]`。
+* **保留旧数据重置密码（即使未配置 Telegram / Bark / 钉钉 / 飞书也能操作）**：
+  1. 打开登录页点击 **忘记密码?**，输入管理员用户名（默认 `admin`）提交；
+  2. 在服务器查看日志获取 6 位验证码：
+     - 脚本部署：`grep "密码重置验证码" logs/application.log`
+     - Docker 部署：`docker compose logs app | grep "密码重置验证码"`
+  3. 在网页完成验证码校验并确认重置后，从日志读取系统生成的 12 位新密码（如开启过 MFA 也会同步关闭）：
+     - 脚本部署：`grep "重置成功" logs/application.log`
+     - Docker 部署：`docker compose logs app | grep "重置成功"`
+* **彻底清库重装（不保留旧数据）**：
+  - 脚本部署：
+    ```bash
+    ./oci-pool.sh uninstall --purge && ./oci-pool.sh start
+    ```
+  - Docker 部署：
+    ```bash
+    ./uninstall.sh --purge && ./install.sh
+    ```
 
 #### 常见问题：客户端 Remote 模式下「开机日志」一直显示「连接中…」
 
