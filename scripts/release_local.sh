@@ -26,7 +26,7 @@ usage() {
 环境变量（可写入 ~/.config/oci-pool/release.env，不要提交到仓库）:
   MAXMIND_LICENSE_KEY   打包 GeoLite2-City 数据库（必需，除非 ALLOW_NO_GEOIP=1）
   RELEASE_REPO          目标仓库，默认当前仓库
-  RELEASE_OUT_DIR       产物输出目录，默认 ~/Downloads/OciPool-releases/<tag>
+  RELEASE_OUT_DIR       产物输出目录，默认项目根目录 dist/（已加入 .gitignore，发布后仅保留当前版本）
 USAGE
 }
 
@@ -91,7 +91,7 @@ if [ "$VERSION" != "$MASTER_VERSION" ]; then
 fi
 
 TAG="v$VERSION"
-OUT_DIR="${RELEASE_OUT_DIR:-$HOME/Downloads/OciPool-releases/$TAG}"
+OUT_DIR="${RELEASE_OUT_DIR:-$ROOT_DIR/dist}"
 
 RELEASE_STATE="none"
 if is_draft="$(gh release view "$TAG" --repo "$REPO" --json isDraft -q .isDraft 2>/dev/null)"; then
@@ -123,8 +123,10 @@ if [ -z "${MAXMIND_LICENSE_KEY:-}" ] && [ "${ALLOW_NO_GEOIP:-0}" != "1" ]; then
 fi
 
 WORKTREE="$(mktemp -d "${TMPDIR:-/tmp}/oci-pool-release-$VERSION.XXXXXX")"
+NOTES=""
 cleanup() {
   git -C "$ROOT_DIR" worktree remove --force "$WORKTREE" >/dev/null 2>&1 || true
+  [ -n "$NOTES" ] && rm -f "$NOTES"
 }
 trap cleanup EXIT
 
@@ -151,7 +153,7 @@ cp -f "$JAR" "$DMG" "$OUT_DIR/"
 )
 
 echo "==> 生成发布说明..."
-NOTES="$OUT_DIR/release-notes.md"
+NOTES="$(mktemp "$OUT_DIR/.release-notes.XXXXXX")"
 PREV="$(git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | grep -v "^$TAG$" | tail -n1 || true)"
 RANGE="$TARGET_SHA"
 [ -n "$PREV" ] && RANGE="$PREV..$TARGET_SHA"
@@ -192,4 +194,13 @@ echo "==> 发布 Release..."
 gh release edit "$TAG" --repo "$REPO" --draft=false --latest
 
 echo "==> 已发布 https://github.com/$REPO/releases/tag/$TAG"
+
+echo "==> 清理旧版本本地产物..."
+find "$OUT_DIR" -maxdepth 1 -type f \
+  ! -name "oci-pool-release.jar" \
+  ! -name "OciPool-$VERSION.dmg" \
+  ! -name "SHA256SUMS.txt" \
+  ! -name ".release-notes.*" \
+  -delete
+
 echo "    本地产物: $OUT_DIR"

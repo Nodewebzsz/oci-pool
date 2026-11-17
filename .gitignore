@@ -85,3 +85,6 @@ deploy/data.bak*/
 
 # Workbuddy AI internals
 .workbuddy-ai/
+
+# Local release artifacts (scripts/release_local.sh)
+/dist/
