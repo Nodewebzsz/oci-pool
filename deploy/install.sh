@@ -25,6 +25,36 @@ gen_random_alnum() {
   printf '%s' "$out"
 }
 
+find_port_pids() {
+  local p="$1"
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -tiTCP:"$p" -sTCP:LISTEN 2>/dev/null | sort -u || true
+  elif command -v ss >/dev/null 2>&1; then
+    ss -ltnp "sport = :$p" 2>/dev/null | sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' | sort -u
+  elif command -v fuser >/dev/null 2>&1; then
+    fuser "${p}/tcp" 2>/dev/null | tr -s ' ' '\n' | grep -E '^[0-9]+$' | sort -u || true
+  fi
+}
+
+container_running() {
+  local cname="$1"
+  docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$cname"
+}
+
+check_port_conflict() {
+  local port="$1"
+  local expected_container="$2"
+  if container_running "$expected_container"; then
+    return 0
+  fi
+  local pids; pids="$(find_port_pids "$port" || true)"
+  if [ -n "$pids" ]; then
+    err "端口 $port 已被宿主机其他进程占用（pid: $(echo "$pids" | tr '\n' ' ')），无法启动容器 $expected_container。"
+    warn "若此前使用裸机脚本部署，请先停止（./oci-pool.sh stop），或通过 ss -ltnp | grep :$port 排查后重试。"
+    exit 1
+  fi
+}
+
 run_cmd() {
   if [ "$(id -u)" -eq 0 ]; then
     "$@"
@@ -162,6 +192,8 @@ if [ ! -f .env ] && [ -f "$ENV_EXAMPLE" ]; then
       sed -i.bak "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${ADMIN_PASS}|" .env 2>/dev/null && rm -f .env.bak || true
       ok "已自动生成初始管理员随机密码并存入 .env（0 秒公网抢注窗口）"
     fi
+  else
+    warn "检测到已有数据库 ./data/vps_db.mv.db 但缺少 .env：若原库启用过 DB_PASSWORD 加密，请先在 .env 中补回原 DB_PASSWORD 后再启动"
   fi
   warn "已从模板生成 .env（如需修改 OCI_PORT/OCI_WEB_PORT 等配置，可编辑 .env 后重跑本脚本）"
 fi
@@ -169,12 +201,19 @@ fi
 # 读取 .env 里的 OCI_WEB_PORT，供健康检查使用（web 反代为统一入口）
 if [ -f .env ]; then set -a; . ./.env; set +a; fi
 
+check_port_conflict "${OCI_PORT:-9856}" "oci-pool-modern"
+check_port_conflict "${OCI_WEB_PORT:-9857}" "oci-pool-web"
+
 warn "拉取 zszken/oci-pool 最新镜像..."
 docker compose -f "$COMPOSE_PULL" pull
 docker compose -f "$COMPOSE_PULL" up -d
 
 warn "等待健康检查（最多 90s）..."
 for i in $(seq 1 30); do
+  if ! container_running "oci-pool-modern"; then
+    err "容器 oci-pool-modern 已退出，请查看日志：docker compose -f $COMPOSE_PULL logs app"
+    exit 1
+  fi
   curl -sf "http://localhost:${OCI_WEB_PORT:-9857}/actuator/health" >/dev/null 2>&1 && { ok "healthy"; break; }
   sleep 3
   [[ $i -eq 30 ]] && { err "timeout · docker compose -f $COMPOSE_PULL logs app"; exit 1; }
