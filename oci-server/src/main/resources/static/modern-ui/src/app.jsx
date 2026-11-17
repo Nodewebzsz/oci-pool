@@ -2,15 +2,17 @@
 const { useState: useStateA, useEffect: useEffectA } = React;
 
 const ACCENT_PRESETS = {
-  green:  { hue: 155, name: tr('app.d1425a'), nameEn: 'Vitality Green' },
-  cyan:   { hue: 200, name: tr('app.963895'), nameEn: 'Ocean Cyan' },
-  violet: { hue: 305, name: tr('app.eef286'),   nameEn: 'Violet' },
-  orange: { hue: 55,  name: tr('app.d47a64'), nameEn: 'Amber' },
-  blue:   { hue: 240, name: tr('app.91345d'), nameEn: 'Classic Blue' },
+  coral:  { ...window.ociAppearance.ACCENTS.coral, name: 'Claude Coral', nameEn: 'Claude Coral' },
+  green:  { ...window.ociAppearance.ACCENTS.green, name: tr('app.d1425a'), nameEn: 'Vitality Green' },
+  cyan:   { ...window.ociAppearance.ACCENTS.cyan, name: tr('app.963895'), nameEn: 'Ocean Cyan' },
+  violet: { ...window.ociAppearance.ACCENTS.violet, name: tr('app.eef286'), nameEn: 'Violet' },
+  orange: { ...window.ociAppearance.ACCENTS.orange, name: tr('app.d47a64'), nameEn: 'Amber' },
+  blue:   { ...window.ociAppearance.ACCENTS.blue, name: tr('app.91345d'), nameEn: 'Classic Blue' },
 };
 // 挂 window · Topbar 里的强调色切换器要用
 window.ACCENT_PRESETS = ACCENT_PRESETS;
-window.getAccentColor = (k) => `oklch(0.72 0.16 ${(ACCENT_PRESETS[k] || ACCENT_PRESETS.green).hue})`;
+const accentColorOf = window.ociAppearance.accentColor;
+window.getAccentColor = accentColorOf;
 
 function App() {
   return (
@@ -20,15 +22,6 @@ function App() {
       </ShellProvider>
     </LangProvider>);
 
-}
-
-// 主题解析: dark / light / system → 实际生效的 data-theme
-function resolveTheme(theme) {
-  if (theme === 'dark' || theme === 'light') return theme;
-  if (typeof window !== 'undefined' && window.matchMedia) {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  }
-  return 'dark';
 }
 
 function useTabletLayout() {
@@ -80,7 +73,7 @@ function BrandLoading() {
       <div aria-hidden="true" style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
         backgroundImage: `radial-gradient(circle at 18% 22%, color-mix(in oklab, var(--accent) 16%, transparent), transparent 42%),
-          radial-gradient(circle at 82% 78%, color-mix(in oklab, var(--cyan) 14%, transparent), transparent 42%),
+          radial-gradient(circle at 82% 78%, color-mix(in oklab, var(--accent) 8%, transparent), transparent 42%),
           radial-gradient(circle at 50% 50%, color-mix(in oklab, var(--accent) 6%, transparent), transparent 58%)`,
       }} />
 
@@ -115,25 +108,19 @@ function BrandLoading() {
           }} />
           <div style={{
             width: 92, height: 92, borderRadius: 26,
-            background: 'linear-gradient(135deg, var(--accent) 0%, var(--cyan) 100%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 18px 52px color-mix(in oklab, var(--accent) 35%, transparent)',
+            boxShadow: 'var(--shadow-md)',
             animation: 'ocip-load-drift 5s ease-in-out infinite',
           }}>
-            <svg width="50" height="50" viewBox="0 0 36 36" role="img" aria-label={tr('layout.2e9579')}>
-              <path d="M7.5 23a4.8 4.8 0 0 1 2.2-8.5 7 7 0 0 1 13.8 1.5 4.8 4.8 0 0 1 3.5 9H7.5z"
-                    fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-              <polygon points="18.5,11.2 14.2,16.5 17.5,16.5 15.8,21.8 21.8,15.2 18.2,15.2"
-                       fill="#ffffff" stroke="#ffffff" strokeWidth="0.8" strokeLinejoin="round" />
-            </svg>
+            <PoolBrandMark size={92} />
           </div>
         </div>
 
         {/* 品牌名 */}
         <div style={{ textAlign: 'center', marginTop: 22 }}>
           <div style={{
-            fontSize: 27, fontWeight: 800, letterSpacing: 4.5,
-            color: 'var(--fg-0)', fontFamily: 'var(--font-sans)',
+            fontSize: 'var(--brand-title-size)', fontWeight: 'var(--brand-title-weight)', letterSpacing: 'var(--brand-title-spacing)',
+            color: 'var(--fg-0)', fontFamily: 'var(--font-serif)',
           }}>
             {tr('brand.name')}
           </div>
@@ -153,7 +140,7 @@ function BrandLoading() {
           <div style={{ position: 'relative', height: '100%' }}>
             <div style={{
               position: 'absolute', top: 0, height: '100%', borderRadius: 999,
-              background: 'linear-gradient(90deg, var(--accent), var(--cyan))',
+              background: 'var(--accent)',
               animation: 'ocip-load-bar 1.5s ease-in-out infinite',
             }} />
           </div>
@@ -175,6 +162,9 @@ function AppInner() {
   const { lang, setLang, t: tr } = useT();
   const tk = useTweaks(window.OCI_TWEAK_DEFAULTS);
   const [tweaks, setTweak] = [tk[0], tk[1]];
+  const currentAppearance = window.ociAppearance.preferences(tweaks);
+  const setDesign = (value) => setTweak(window.ociAppearance.changeDesign(tweaks, value));
+  const setAccent = (value) => setTweak(window.ociAppearance.changeAccent(tweaks, value));
   const isTabletLayout = useTabletLayout();
   const [tabletSidebarOpen, setTabletSidebarOpen] = useStateA(false);
 
@@ -307,36 +297,15 @@ function AppInner() {
   }, []);
 
 
-  // Apply theme
   useEffectA(() => {
-    const apply = () => document.documentElement.setAttribute('data-theme', resolveTheme(tweaks.theme));
+    const media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+    const apply = () => window.ociAppearance.apply(document.documentElement, tweaks, media && media.matches);
     apply();
-    if (tweaks.theme === 'system' && window.matchMedia) {
-      const mq = window.matchMedia('(prefers-color-scheme: dark)');
-      const onChange = () => apply();
-      mq.addEventListener && mq.addEventListener('change', onChange);
-      return () => { mq.removeEventListener && mq.removeEventListener('change', onChange); };
+    if (tweaks.theme === 'system' && media) {
+      media.addEventListener && media.addEventListener('change', apply);
+      return () => { media.removeEventListener && media.removeEventListener('change', apply); };
     }
-  }, [tweaks.theme]);
-
-  // Apply accent
-  useEffectA(() => {
-    // tweaks.accent 存的可能是 preset key(旧字段)、preset 对象、或早期版本存的 { value, color, label }
-    const accentKey =
-      typeof tweaks.accent === 'string' ? tweaks.accent :
-      (tweaks.accent && (tweaks.accent.value || tweaks.accent.key)) || 'green';
-    const preset = ACCENT_PRESETS[accentKey] || ACCENT_PRESETS.green;
-    const hue = preset.hue;
-    const root = document.documentElement;
-    root.style.setProperty('--accent', `oklch(0.72 0.16 ${hue})`);
-    const resolvedTheme = resolveTheme(tweaks.theme);
-    root.style.setProperty('--accent-soft', resolvedTheme === 'light' ?
-    `oklch(0.93 0.06 ${hue})` :
-    `oklch(0.30 0.10 ${hue})`);
-    root.style.setProperty('--accent-fg', resolvedTheme === 'light' ?
-    'white' :
-    `oklch(0.14 0.02 ${hue})`);
-  }, [tweaks.accent, tweaks.theme]);
+  }, [currentAppearance.design, currentAppearance.accent, tweaks.theme]);
 
   // Icons re-render on every update
   useEffectA(() => {
@@ -432,6 +401,10 @@ function AppInner() {
   if (authState === 'anonymous') {
     return <AuthPage
       onLogin={login}
+      theme={tweaks.theme}
+      onChangeTheme={(value) => setTweak('theme', value)}
+      design={currentAppearance.design}
+      onChangeDesign={setDesign}
       authView={route.params.authView || 'login'}
       onAuthViewChange={(v) => window.ociRouter.go('auth', { authView: v })} />;
   }
@@ -464,15 +437,14 @@ function AppInner() {
         <Topbar
           theme={tweaks.theme}
           onChangeTheme={(v) => setTweak('theme', v)}
+          design={currentAppearance.design}
+          onChangeDesign={setDesign}
           lang={lang}
           onToggleLang={() => setLang(lang === 'zh' ? 'en' : 'zh')}
           collapsed={sidebarCollapsed}
           onToggleCollapse={toggleSidebar}
-          accent={
-            typeof tweaks.accent === 'string' && ACCENT_PRESETS[tweaks.accent] ? tweaks.accent :
-            (tweaks.accent && (tweaks.accent.value || tweaks.accent.key)) || 'green'
-          }
-          onChangeAccent={(k) => setTweak('accent', k)}
+          accent={currentAppearance.accent}
+          onChangeAccent={setAccent}
           density={tweaks.density}
           onToggleDensity={() => setTweak('density', tweaks.density === 'compact' ? 'comfortable' : 'compact')}
           currentTime={now} />
@@ -511,6 +483,14 @@ function AppInner() {
 
         <TweakSection title={tr('tw.section.theme')}>
           <TweakRadio
+            label={tr('appearance.design')}
+            value={currentAppearance.design}
+            onChange={setDesign}
+            options={[
+              { value: 'claude', label: tr('appearance.claude') },
+              { value: 'classic', label: tr('appearance.classic') },
+            ]} />
+          <TweakRadio
             label={tr('tw.mode')}
             value={tweaks.theme}
             onChange={(v) => setTweak('theme', v)}
@@ -523,19 +503,17 @@ function AppInner() {
           {(() => {
             // TweakColor 只支持"色值字符串" or "色值字符串数组"两种 option 形态
             // 所以我们:options 传色值字符串;value 用当前 preset 对应的色值字符串;onChange 时反查回 preset key
-            const colorOf = (k) => `oklch(0.72 0.16 ${ACCENT_PRESETS[k].hue})`;
+            const colorOf = (k) => accentColorOf(k);
             const accentOptions = Object.keys(ACCENT_PRESETS).map(colorOf);
             // 归一化:把可能是 string/旧对象 的 tweaks.accent 收敛到 preset key
-            const currentKey =
-              typeof tweaks.accent === 'string' && ACCENT_PRESETS[tweaks.accent] ? tweaks.accent :
-              (tweaks.accent && (tweaks.accent.value || tweaks.accent.key)) || 'green';
-            const currentColor = colorOf(ACCENT_PRESETS[currentKey] ? currentKey : 'green');
+            const currentKey = currentAppearance.accent;
+            const currentColor = colorOf(ACCENT_PRESETS[currentKey] ? currentKey : 'coral');
             const colorToKey = Object.fromEntries(Object.keys(ACCENT_PRESETS).map(k => [colorOf(k), k]));
             return (
               <TweakColor
                 label={tr('tw.accent')}
                 value={currentColor}
-                onChange={(v) => setTweak('accent', colorToKey[v] || 'green')}
+                onChange={(v) => setAccent(colorToKey[v] || 'coral')}
                 options={accentOptions}
               />
             );

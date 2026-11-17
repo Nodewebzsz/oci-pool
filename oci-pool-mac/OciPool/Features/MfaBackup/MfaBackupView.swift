@@ -398,7 +398,7 @@ struct MfaBackupView: View {
                     .padding(.vertical, 5)
                     .background(
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(copiedItemId == item.id ? AppTheme.sidebarActive.opacity(0.15) : (dark ? Color(hex: "151c21") : Color(hex: "f1f4f6")))
+                            .fill(copiedItemId == item.id ? AppTheme.sidebarActive.opacity(0.15) : (AppTheme.sidebarHover(dark)))
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)

@@ -530,7 +530,7 @@ function KeyConfigPage() {
             <div style={{ position: 'relative' }}>
               <pre style={{
                 margin: 0, padding: '12px 44px 12px 14px',
-                background: '#0f1419', color: '#a2d2ff',
+                background: 'var(--surface-code)', color: '#a2d2ff',
                 border: '1px solid var(--border)', borderRadius: 4,
                 fontSize: 12, fontFamily: 'var(--font-mono)',
                 overflow: 'auto', lineHeight: 1.5,

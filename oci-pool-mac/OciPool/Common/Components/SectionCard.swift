@@ -13,7 +13,7 @@ struct SectionCard<Content: View>: View {
             if let title = title {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                    .foregroundColor(AppTheme.navIcon(dark))
             }
             content()
         }

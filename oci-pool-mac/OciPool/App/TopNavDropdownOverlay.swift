@@ -17,9 +17,9 @@ struct TopNavDropdownOverlay: View {
     private let userControlWidth: CGFloat = 44
 
     private var dark: Bool { appearance.isDarkEffective }
-    private var popupSurface: Color { dark ? Color(hex: "171b20") : Color.white }
-    private var popupSurface2: Color { dark ? Color(hex: "20252b") : Color(hex: "f5f7fa") }
-    private var popupBorder: Color { dark ? Color.white.opacity(0.13) : Color.black.opacity(0.12) }
+    private var popupSurface: Color { AppTheme.isClaude ? AppTheme.sidebarBg(dark) : (dark ? Color(hex: "171b20") : Color.white) }
+    private var popupSurface2: Color { AppTheme.isClaude ? AppTheme.sidebarHover(dark) : (dark ? Color(hex: "20252b") : Color(hex: "f5f7fa")) }
+    private var popupBorder: Color { AppTheme.isClaude ? AppTheme.borderStrong(dark) : (dark ? Color.white.opacity(0.13) : Color.black.opacity(0.12)) }
 
     private var notificationTrailing: CGFloat {
         trailingPad + userControlWidth + controlGap
@@ -133,13 +133,8 @@ struct TopNavDropdownOverlay: View {
     }
 
     private var themePanel: some View {
-        VStack(spacing: 0) {
-            themeRow(.light, title: "浅色", icon: "sun.max")
-            themeRow(.dark, title: "深色", icon: "moon.fill")
-            themeRow(.system, title: "跟随系统", icon: "desktopcomputer")
-        }
-        .padding(4)
-        .frame(width: 148)
+        AppearanceOptionsView(onSelect: closeAll)
+        .frame(width: 196)
         .background(popupSurface)
         .cornerRadius(8)
         .overlay(
@@ -149,35 +144,7 @@ struct TopNavDropdownOverlay: View {
         .shadow(color: Color.black.opacity(dark ? 0.4 : 0.12), radius: 12, y: 6)
     }
 
-    private func themeRow(_ mode: AppAppearanceMode, title: String, icon: String) -> some View {
-        let selected = appearance.mode == mode
-        return Button(action: {
-            appearance.mode = mode
-            closeAll()
-        }) {
-            HStack(spacing: 9) {
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .medium))
-                    .frame(width: 14)
-                Text(title)
-                    .font(.system(size: 12, weight: selected ? .semibold : .medium))
-                Spacer(minLength: 0)
-                if selected {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 10, weight: .bold))
-                }
-            }
-            .foregroundColor(selected ? AppTheme.sidebarActive : (dark ? Color.white.opacity(0.84) : Color(hex: "374151")))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(selected ? popupSurface2 : Color.clear)
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
+
 
     private var accentPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -223,7 +190,7 @@ struct TopNavDropdownOverlay: View {
             .padding(.horizontal, 4)
         }
         .padding(10)
-        .frame(width: 220, alignment: .leading)
+        .frame(width: 258, alignment: .leading)
         .background(popupSurface)
         .cornerRadius(8)
         .overlay(

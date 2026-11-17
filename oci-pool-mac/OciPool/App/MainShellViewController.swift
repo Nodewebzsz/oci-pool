@@ -112,6 +112,12 @@ final class MainShellViewController: NSViewController {
 
         layoutChildren()
 
+        appearance.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateAppearance() }
+            .store(in: &cancellables)
+        updateAppearance()
+
         navigation.$sidebarCollapsed
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
@@ -134,6 +140,12 @@ final class MainShellViewController: NSViewController {
     override func viewDidLayout() {
         super.viewDidLayout()
         layoutChildren()
+    }
+
+    private func updateAppearance() {
+        let dark = appearance.isDarkEffective
+        view.layer?.backgroundColor = NSColor(AppTheme.pageBg(dark)).cgColor
+        divider.layer?.backgroundColor = NSColor(AppTheme.border(dark)).cgColor
     }
 
     private func layoutChildren() {

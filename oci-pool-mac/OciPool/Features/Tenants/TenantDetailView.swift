@@ -20,10 +20,10 @@ struct TenantDetailView: View {
     private var activeRow: TenantItem? { model.activeRegionRow }
 
     private var primaryText: Color {
-        dark ? Color(hex: "cdd9e5") : Color(hex: "1a202c")
+        (AppTheme.isClaude ? AppTheme.navIcon(dark) : (dark ? Color(hex: "cdd9e5") : Color(hex: "1a202c")))
     }
     private var mutedText: Color {
-        dark ? Color(hex: "768390") : Color(hex: "64748b")
+        (AppTheme.isClaude ? AppTheme.textSecondary(dark) : (dark ? Color(hex: "768390") : Color(hex: "64748b")))
     }
 
     private var displayName: String {

@@ -853,8 +853,8 @@ function useAddBootModal() {
                       <span className="mono" style={{
                         display: 'inline-block',
                         padding: '1px 6px',
-                        background: active ? 'var(--accent)' : 'oklch(0.30 0.10 155)',
-                        color: 'var(--accent-fg)',
+                        background: active ? 'var(--accent)' : 'var(--accent-soft)',
+                        color: active ? 'var(--accent-fg)' : 'var(--accent)',
                         fontSize: 9, fontWeight: 700,
                         borderRadius: 3,
                       }}>{tpl.badge}</span>
@@ -882,7 +882,7 @@ function useAddBootModal() {
                       key={tpl.id}
                       style={{
                         padding: 10, cursor: 'pointer',
-                        background: active ? 'oklch(0.20 0.05 240 / 0.4)' : 'var(--bg-1)',
+                        background: active ? 'var(--info-soft)' : 'var(--bg-1)',
                         border: `1.5px solid ${active ? 'var(--info)' : 'var(--border)'}`,
                         borderRadius: 6,
                         display: 'block',
@@ -907,8 +907,8 @@ function useAddBootModal() {
                       <span className="mono" style={{
                         display: 'inline-block',
                         padding: '1px 6px',
-                        background: active ? 'var(--info)' : 'oklch(0.30 0.06 240)',
-                        color: 'var(--info-fg, #fff)',
+                        background: active ? 'var(--info)' : 'var(--info-soft)',
+                        color: active ? 'var(--info-fg, #fff)' : 'var(--info)',
                         fontSize: 9, fontWeight: 700,
                         borderRadius: 3,
                       }}>{tpl.badge}</span>
@@ -1851,7 +1851,7 @@ function useApiImportModal() {
                 }}
                 placeholder={tr('tenant.96e1cb')}
                 style={{
-                  background: 'oklch(0.10 0.008 240 / 0.4)',
+                  background: 'color-mix(in srgb, var(--surface-code) 40%, transparent)',
                   fontSize: 11,
                   lineHeight: 1.5,
                 }}
@@ -7308,18 +7308,18 @@ function useUpdateAccountModal() {
                 style={{
                   height: 340, overflowY: 'auto',
                   padding: 14,
-                  background: '#0a0f14',
+                  background: 'var(--surface-code)',
                   border: '1px solid var(--border-strong)',
                   borderRadius: 6,
                   fontFamily: 'var(--font-mono)',
                   fontSize: 11.5,
                   lineHeight: 1.7,
-                  color: '#c9d1d9',
+                  color: 'var(--on-dark)',
                   whiteSpace: 'pre-wrap',
                 }}
               >
                 {state.lines.map((line, i) => {
-                  let color = '#c9d1d9';
+                  let color = 'var(--on-dark)';
                   if (line.startsWith('[System]') || line.startsWith('正在连接')) color = '#7ee787';
                   else if (line.startsWith('→')) color = '#79c0ff';
                   else if (line.trim().startsWith('✓')) color = '#7ee787';
@@ -7867,8 +7867,8 @@ function useExportTenantModal() {
                 <pre style={{
                   margin: 0,
                   padding: 12,
-                  background: '#0a0f14',
-                  color: '#c9d1d9',
+                  background: 'var(--surface-code)',
+                  color: 'var(--on-dark)',
                   border: '1px solid var(--border-strong)',
                   borderRadius: 6,
                   fontFamily: 'var(--font-mono)',

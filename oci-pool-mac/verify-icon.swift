@@ -29,18 +29,19 @@ func color(atX x: Double, y: Double) -> NSColor {
 }
 
 let upperBackground = color(atX: 0.50, y: 0.10)
-guard upperBackground.greenComponent > upperBackground.blueComponent + 0.12 else {
-    fail("图标左上区域不是品牌绿色，仍可能是旧版蓝色图标")
+guard upperBackground.redComponent < 0.25, upperBackground.redComponent > upperBackground.blueComponent else {
+    fail("图标底色应为暖黑色")
 }
 
-let lowerBackground = color(atX: 0.78, y: 0.90)
-guard lowerBackground.greenComponent > 0.60, lowerBackground.blueComponent > 0.55 else {
-    fail("图标右下区域不是品牌青色渐变")
+let resource = color(atX: 0.50, y: 0.555)
+guard resource.redComponent > 0.65, resource.greenComponent > 0.30, resource.greenComponent < 0.65, resource.blueComponent < 0.55 else {
+    fail("图标缺少珊瑚色资源层")
 }
 
-let bolt = color(atX: 18.5 / 36.0, y: 16.5 / 36.0)
-guard bolt.redComponent > 0.85, bolt.greenComponent > 0.85, bolt.blueComponent > 0.85 else {
-    fail("图标缺少纯白高能闪电核心")
+let cloud = color(atX: 0.48, y: 0.24)
+guard cloud.redComponent > 0.85, cloud.greenComponent > 0.85, cloud.blueComponent > 0.85 else {
+    fail("图标缺少奶白色云轮廓")
 }
 
-print("图标品牌色与纯白高能闪电核心检查通过")
+guard color(atX: 0.01, y: 0.01).alphaComponent < 0.01 else { fail("图标四周应保留透明留白") }
+print("图标检查通过：暖黑底、白色云轮廓、珊瑚色资源层、透明留白")

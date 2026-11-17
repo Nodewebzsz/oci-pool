@@ -5,7 +5,7 @@ const buildNav = (tr) => [
   id: 'service',
   label: tr('nav.service'),
   icon: 'layers',
-  color: 'var(--accent)',
+  color: 'var(--nav-service)',
   items: [
   { id: 'monitor', label: tr('nav.monitor'), icon: 'activity' },
   { id: 'regions', label: tr('nav.regions'), icon: 'globe' },
@@ -23,7 +23,7 @@ const buildNav = (tr) => [
   id: 'proxy',
   label: tr('nav.proxy'),
   icon: 'shuffle',
-  color: 'var(--cyan)',
+  color: 'var(--nav-proxy)',
   items: [
   // 严格对齐原项目"代理管理":秘钥配置 / CF管理 / EO管理
   // (API Token 的"秘钥配置"归属"开发配置"分组,见下方 devConfig)
@@ -36,7 +36,7 @@ const buildNav = (tr) => [
   id: 'resource',
   label: tr('nav.resource'),
   icon: 'package',
-  color: 'var(--violet)',
+  color: 'var(--nav-resource)',
   // 严格对齐原项目 sidebar.vps.management → 只有一项"资源列表"
   items: [
   { id: 'resList', label: tr('nav.resList'), icon: 'server' }]
@@ -46,7 +46,7 @@ const buildNav = (tr) => [
   id: 'system',
   label: tr('nav.system'),
   icon: 'settings',
-  color: 'var(--orange)',
+  color: 'var(--nav-system)',
   // 严格对齐原项目"系统管理"4 子项
   items: [
   { id: 'sysIpQuality', label: tr('nav.sysIpQuality'), icon: 'shield' },
@@ -60,7 +60,7 @@ const buildNav = (tr) => [
   id: 'myTools',
   label: tr('nav.myTools'),
   icon: 'wrench',
-  color: 'var(--info)',
+  color: 'var(--nav-tools)',
   items: [
   { id: 'notifyMgmt', label: tr('nav.notifyMgmt'), icon: 'bell' },
   { id: 'memPage',    label: tr('nav.memPage'),    icon: 'book-open' },
@@ -74,7 +74,7 @@ const buildNav = (tr) => [
   id: 'devConfig',
   label: tr('nav.devConfig'),
   icon: 'code-2',
-  color: 'var(--violet)',
+  color: 'var(--nav-developer)',
   items: [
   { id: 'keyConfig', label: tr('nav.keyConfig'), icon: 'key' }]
 
@@ -360,33 +360,21 @@ function MenuSearch({ nav, onNavigate, placeholder }) {
 }
 
 
+function PoolBrandGlyph({ color = '#faf9f5', resourceColor = color }) {
+  return (
+    <g fill="none" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 44h-2a9 9 0 0 1-1-17.94A14 14 0 0 1 44 24a10 10 0 0 1 2 19.8h-2" stroke={color} />
+      <path d="m32 30 11 6-11 6-11-6Z" fill={resourceColor} />
+      <path d="m22 42 10 5.5L42 42m-20 7 10 5.5L42 49" stroke={resourceColor} />
+    </g>
+  );
+}
+
 function PoolBrandMark({ size = 30 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 36 36" role="img" aria-label={tr('layout.2e9579')}>
-      <defs>
-        <linearGradient id="pool-brand-gradient" x1="4" y1="3" x2="31" y2="33">
-          <stop stopColor="var(--accent)" />
-          <stop offset="1" stopColor="var(--cyan)" />
-        </linearGradient>
-      </defs>
-      <rect x="1" y="1" width="34" height="34" rx="10" fill="url(#pool-brand-gradient)" />
-      {/* 科技云朵外轮廓（纯白、上移2px居中） */}
-      <path
-        d="M7.5 23a4.8 4.8 0 0 1 2.2-8.5 7 7 0 0 1 13.8 1.5 4.8 4.8 0 0 1 3.5 9H7.5z"
-        fill="none"
-        stroke="#ffffff"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {/* 居中高能折角闪电核（纯白） */}
-      <polygon
-        points="18.5,11.2 14.2,16.5 17.5,16.5 15.8,21.8 21.8,15.2 18.2,15.2"
-        fill="#ffffff"
-        stroke="#ffffff"
-        strokeWidth="0.8"
-        strokeLinejoin="round"
-      />
+    <svg width={size} height={size} viewBox="0 0 64 64" role="img" aria-label={tr('layout.2e9579')} style={{ display: 'block', flexShrink: 0 }}>
+      <rect x="1" y="1" width="62" height="62" rx="17" fill="var(--brand-bg)" stroke="var(--brand-border)" />
+      <PoolBrandGlyph color="var(--brand-cloud)" resourceColor="var(--brand-resource)" />
     </svg>
   );
 }
@@ -404,9 +392,9 @@ function UserAvatar({ userName, size = 26 }) {
   return (
     <div aria-label={label ? tr('layout.30fccd') + label : tr('layout.18dc83')} style={{
       width: size, height: size, borderRadius: '50%',
-      background: 'linear-gradient(135deg, var(--accent), var(--cyan))',
+      background: 'var(--accent)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      color: 'oklch(0.14 0.02 155)',
+      color: '#ffffff',
       fontSize: size >= 32 ? 12 : 10.5, fontWeight: 700, letterSpacing: -0.2,
       flexShrink: 0,
     }}>
@@ -870,7 +858,7 @@ function Sidebar({ activePage, onNavigate, collapsed = false, tabletOverlay = fa
   const width = collapsed ? 'var(--sidebar-w-collapsed)' : 'var(--sidebar-w)';
 
   return (
-    <aside className={tabletOverlay ? 'sidebar sidebar--tablet-overlay' : 'sidebar'} style={{
+    <aside className={tabletOverlay ? 'sidebar sidebar--tablet-overlay' : 'sidebar'} data-collapsed={collapsed} style={{
       width,
       flexShrink: 0,
       background: 'var(--bg-1)',
@@ -893,11 +881,11 @@ function Sidebar({ activePage, onNavigate, collapsed = false, tabletOverlay = fa
         justifyContent: collapsed ? 'center' : 'flex-start',
         borderBottom: '1px solid var(--border)'
       }}>
-        <PoolBrandMark size={30} />
+        <PoolBrandMark size={32} />
         {!collapsed &&
         <div style={{ minWidth: 0, marginLeft: 1 }}>
             <div style={{ fontSize: 13, lineHeight: 1.1, fontWeight: 700, color: 'var(--fg-0)', letterSpacing: -0.1 }}>{tr('brand.name')}</div>
-            <div style={{ marginTop: 5, fontSize: 10, lineHeight: 1.2, color: 'var(--fg-3)', letterSpacing: 0.4 }}>{tr('brand.tagline')}</div>
+            <div style={{ marginTop: 5, fontSize: 10, lineHeight: 1.2, color: 'var(--fg-2)', letterSpacing: 0.4 }}>{tr('brand.tagline')}</div>
           </div>
         }
       </div>
@@ -995,7 +983,7 @@ function Sidebar({ activePage, onNavigate, collapsed = false, tabletOverlay = fa
                         alignItems: 'center',
                         justifyContent: collapsed ? 'center' : 'flex-start',
                         gap: 10,
-                        color: isActive ? 'var(--accent)' : 'var(--fg-1)',
+                        color: isActive ? 'var(--nav-active-fg)' : 'var(--fg-1)',
                         fontFamily: 'inherit',
                         fontSize: 12.5,
                         fontWeight: isActive ? 600 : 400,
@@ -1007,21 +995,8 @@ function Sidebar({ activePage, onNavigate, collapsed = false, tabletOverlay = fa
                       }}
                       >
                       
-                        {isActive && !collapsed &&
-                      <span style={{
-                        position: 'absolute', left: 8, top: 8, bottom: 8, width: 3,
-                        background: 'var(--accent)', borderRadius: 999
-                      }} />
-                      }
                         <Icon name={item.icon} size={14} />
                         {!collapsed && <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>}
-                        {!collapsed && isActive &&
-                      <span style={{
-                        width: 6, height: 6, borderRadius: '50%',
-                        background: 'var(--orange)',
-                        animation: 'pulse-dot 1.8s infinite'
-                      }} />
-                      }
                       </a>);
 
                 })}
@@ -1200,7 +1175,7 @@ function AccentSwitcher({ value, onChange }) {
       </div>
       <div style={{ display: 'flex', gap: 8, padding: '2px 4px 4px' }}>
         {keys.map(k => {
-          const color = `oklch(0.72 0.16 ${presets[k].hue})`;
+          const color = window.getAccentColor ? window.getAccentColor(k) : `oklch(0.72 0.16 ${presets[k].hue})`;
           const on = k === cur;
           return (
             <button key={k}
@@ -1221,7 +1196,7 @@ function AccentSwitcher({ value, onChange }) {
             >
               {on && (
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                  <path d="M20 6L9 17l-5-5" stroke="oklch(0.14 0.02 155)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M20 6L9 17l-5-5" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               )}
             </button>
@@ -1903,7 +1878,7 @@ function UserMenuButton() {
 }
 
 
-function ThemeMenuButton({ theme, onChangeTheme }) {
+function ThemeMenuButton({ theme, onChangeTheme, design = 'claude', onChangeDesign }) {
   const { t: tr } = useT();
   const [open, setOpen] = React.useState(false);
   const [rect, setRect] = React.useState(null);
@@ -1949,8 +1924,10 @@ function ThemeMenuButton({ theme, onChangeTheme }) {
   return (
     <>
       <button ref={btnRef}
+        type="button"
         onClick={toggle}
         title={tr('theme.title')}
+        aria-expanded={open}
         style={{
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
           width: 30, height: 30, padding: 0,
@@ -1968,7 +1945,7 @@ function ThemeMenuButton({ theme, onChangeTheme }) {
             position: 'fixed',
             top: rect.bottom + 8,
             right: Math.max(8, window.innerWidth - rect.right),
-            width: 148,
+            width: 196,
             zIndex: 200,
             background: 'var(--bg-1)',
             border: '1px solid var(--border-strong)',
@@ -1978,11 +1955,36 @@ function ThemeMenuButton({ theme, onChangeTheme }) {
             animation: 'fade-in 120ms ease',
           }}
         >
-          <div style={{ padding: 4 }}>
+          <div role="group" aria-label={tr('appearance.design')} style={{ padding: 4, borderBottom: '1px solid var(--border)' }}>
+            <div style={{ padding: '6px 10px', fontSize: 11, color: 'var(--fg-2)' }}>{tr('appearance.design')}</div>
+            {[
+              { id: 'claude', label: tr('appearance.claude'), icon: 'type' },
+              { id: 'classic', label: tr('appearance.classic'), icon: 'layout-dashboard' },
+            ].map((option) => (
+              <button key={option.id} type="button" aria-pressed={design === option.id}
+                onClick={() => { if (onChangeDesign) onChangeDesign(option.id); setOpen(false); }}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 9,
+                  padding: '7px 10px', background: design === option.id ? 'var(--bg-2)' : 'transparent',
+                  border: 'none', borderRadius: 5, color: design === option.id ? 'var(--accent)' : 'var(--fg-1)',
+                  fontFamily: 'inherit', fontSize: 12, fontWeight: design === option.id ? 600 : 500,
+                  cursor: 'pointer', textAlign: 'left',
+                }}
+                onMouseEnter={(event) => { event.currentTarget.style.background = 'var(--bg-2)'; }}
+                onMouseLeave={(event) => { event.currentTarget.style.background = design === option.id ? 'var(--bg-2)' : 'transparent'; }}>
+                <Icon name={option.icon} size={13} />
+                <span style={{ flex: 1 }}>{option.label}</span>
+                {design === option.id && <Icon name="check" size={13} />}
+              </button>
+            ))}
+          </div>
+          <div role="group" aria-label={tr('appearance.mode')} style={{ padding: 4 }}>
+            <div style={{ padding: '6px 10px', fontSize: 11, color: 'var(--fg-2)' }}>{tr('appearance.mode')}</div>
             {THEMES.map((t) => (
               <button
                 key={t.id}
                 type="button"
+                aria-pressed={current === t.id}
                 onClick={() => choose(t.id)}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 9,
@@ -2009,7 +2011,7 @@ function ThemeMenuButton({ theme, onChangeTheme }) {
 }
 
 // Topbar — minimal, with time / theme / lang
-function Topbar({ theme, onChangeTheme, lang, onToggleLang, collapsed, onToggleCollapse, currentTime, accent, onChangeAccent, density, onToggleDensity }) {
+function Topbar({ theme, onChangeTheme, design, onChangeDesign, lang, onToggleLang, collapsed, onToggleCollapse, currentTime, accent, onChangeAccent, density, onToggleDensity }) {
   const { t: tr } = useT();
   const showEngineStatus = useEngineStatusPopover();
   return (
@@ -2063,7 +2065,7 @@ function Topbar({ theme, onChangeTheme, lang, onToggleLang, collapsed, onToggleC
       </button>
 
       {/* Theme menu: dark / light / system */}
-      <ThemeMenuButton theme={theme} onChangeTheme={onChangeTheme} />
+      <ThemeMenuButton theme={theme} onChangeTheme={onChangeTheme} design={design} onChangeDesign={onChangeDesign} />
 
       {/* Accent switcher — 强调色 5 色快速切换 */}
       <AccentSwitcher value={accent} onChange={onChangeAccent} />

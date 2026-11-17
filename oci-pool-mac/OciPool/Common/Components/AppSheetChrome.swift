@@ -5,15 +5,16 @@ import SwiftUI
 /// Color tokens aligned with Web tenant modals (`--surface`, `--text-primary`, …).
 enum AppSheetSurface {
     static func surface(_ dark: Bool) -> Color {
-        dark ? Color(hex: "22262b") : Color.white
+        if AppTheme.isClaude { return AppTheme.sidebarBg(dark) }
+        return dark ? Color(hex: "22262b") : Color.white
     }
 
     static func surface2(_ dark: Bool) -> Color {
-        dark ? Color(hex: "292d32") : Color(hex: "f8fafc")
+        AppTheme.isClaude ? AppTheme.sidebarHover(dark) : (dark ? Color(hex: "292d32") : Color(hex: "f8fafc"))
     }
 
     static func panelBg(_ dark: Bool) -> Color {
-        dark ? Color(hex: "2d3138") : Color(hex: "f1f5f9") // --hover-bg
+        AppTheme.isClaude ? AppTheme.bg3(dark) : (dark ? Color(hex: "2d3138") : Color(hex: "f1f5f9"))
     }
 
     static func rowHover(_ dark: Bool) -> Color {
@@ -21,25 +22,25 @@ enum AppSheetSurface {
     }
 
     static func primaryText(_ dark: Bool) -> Color {
-        dark ? Color(hex: "cdd9e5") : Color(hex: "1a202c")
+        AppTheme.isClaude ? AppTheme.navIcon(dark) : (dark ? Color(hex: "cdd9e5") : Color(hex: "1a202c"))
     }
 
     static func mutedText(_ dark: Bool) -> Color {
-        dark ? Color(hex: "768390") : Color(hex: "64748b")
+        AppTheme.isClaude ? AppTheme.textSecondary(dark) : (dark ? Color(hex: "768390") : Color(hex: "64748b"))
     }
 
     static func border(_ dark: Bool) -> Color {
-        dark ? Color(hex: "31363d") : Color(hex: "dde3ec")
+        AppTheme.isClaude ? AppTheme.border(dark) : (dark ? Color(hex: "31363d") : Color(hex: "dde3ec"))
     }
 
     static func cardBg(_ dark: Bool) -> Color { surface(dark) }
 
     static func accentBlue(_ dark: Bool) -> Color {
-        dark ? AppTheme.info : Color(hex: "2563eb")
+        AppTheme.isClaude ? AppTheme.sidebarActive : (dark ? AppTheme.info : Color(hex: "2563eb"))
     }
 
     static func accentGreen(_ dark: Bool) -> Color {
-        dark ? AppTheme.sidebarActive : AppTheme.sidebarActive
+        AppTheme.success
     }
 
     static func accentRed(_ dark: Bool) -> Color {

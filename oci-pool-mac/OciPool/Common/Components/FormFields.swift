@@ -12,6 +12,7 @@ enum AppInputStyle {
     static let hPad: CGFloat = 12
 
     static func fill(_ dark: Bool, focused: Bool = false) -> Color {
+        if AppTheme.isClaude { return focused ? AppTheme.sidebarBg(dark) : AppTheme.sidebarHover(dark) }
         if focused {
             return dark ? Color(hex: "1a1d21") : Color.white
         }
@@ -19,6 +20,7 @@ enum AppInputStyle {
     }
 
     static func border(_ dark: Bool, focused: Bool = false, hovering: Bool = false) -> Color {
+        if AppTheme.isClaude { return focused ? AppTheme.sidebarActive : hovering ? AppTheme.sidebarActive.opacity(0.45) : AppTheme.border(dark) }
         if focused {
             return dark ? AppTheme.info : AppTheme.sidebarActive
         }
@@ -30,21 +32,22 @@ enum AppInputStyle {
 
     static func glow(_ dark: Bool, focused: Bool) -> Color {
         guard focused else { return .clear }
+        if AppTheme.isClaude { return AppTheme.sidebarActive.opacity(0.16) }
         return dark
             ? AppTheme.info.opacity(0.18)
             : AppTheme.sidebarActive.opacity(0.14)
     }
 
     static func text(_ dark: Bool) -> Color {
-        dark ? Color(hex: "cdd9e5") : Color(hex: "2c3e50")
+        AppTheme.isClaude ? AppTheme.sidebarText(dark) : (dark ? Color(hex: "cdd9e5") : Color(hex: "2c3e50"))
     }
 
     static func placeholder(_ dark: Bool) -> Color {
-        dark ? Color(hex: "768390") : Color(hex: "999999")
+        AppTheme.isClaude ? AppTheme.textSecondary(dark) : (dark ? Color(hex: "768390") : Color(hex: "999999"))
     }
 
     static func icon(_ dark: Bool) -> Color {
-        dark ? Color(hex: "768390") : Color(hex: "6b7280")
+        AppTheme.isClaude ? AppTheme.textSecondary(dark) : (dark ? Color(hex: "768390") : Color(hex: "6b7280"))
     }
 }
 

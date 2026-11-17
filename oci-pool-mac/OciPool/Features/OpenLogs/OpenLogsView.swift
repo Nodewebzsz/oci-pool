@@ -78,7 +78,7 @@ struct OpenLogsView: View {
 
     private var connectionColor: Color {
         switch model.connection {
-        case .connected: return AppTheme.sidebarActive
+        case .connected: return AppTheme.success
         case .connecting: return AccentPreset.orange.color
         case .disconnected: return Color(hex: "f05653")
         }
@@ -185,7 +185,7 @@ struct OpenLogsView: View {
             terminalFooter
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black)
+        .background(AppTheme.codeSurface(dark))
         .overlay(
             RoundedRectangle(cornerRadius: 6)
                 .stroke(AppTheme.border(dark), lineWidth: 1)
@@ -218,7 +218,7 @@ struct OpenLogsView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(Color(hex: "0a0a0a"))
+        .background(AppTheme.codeSurface(dark))
         .overlay(
             Rectangle()
                 .frame(height: 1)
@@ -257,7 +257,7 @@ struct OpenLogsView: View {
                 .padding(.vertical, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .background(Color.black)
+            .background(AppTheme.codeSurface(dark))
             .onChange(of: model.scrollToken) { _ in
                 guard model.autoScroll else { return }
                 withAnimation(.easeOut(duration: 0.15)) {
@@ -312,7 +312,7 @@ struct OpenLogsView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(Color(hex: "0a0a0a"))
+        .background(AppTheme.codeSurface(dark))
         .overlay(
             Rectangle()
                 .frame(height: 1)

@@ -115,13 +115,13 @@ private struct SelectMenuPanelView: View {
 
     private var dark: Bool { state.dark }
     private var accent: Color {
-        dark ? AppTheme.info : Color(hex: "2563eb")
+        (AppTheme.isClaude ? AppTheme.sidebarActive : (dark ? AppTheme.info : Color(hex: "2563eb")))
     }
     private var panelBg: Color {
-        dark ? Color(hex: "22262b") : Color.white
+        (AppTheme.isClaude ? AppTheme.sidebarBg(dark) : (dark ? Color(hex: "22262b") : Color.white))
     }
     private var softDivider: Color {
-        dark ? Color(hex: "31363d") : Color(hex: "e8eef5")
+        AppTheme.isClaude ? AppTheme.borderStrong(dark) : (dark ? Color(hex: "31363d") : Color(hex: "e8eef5"))
     }
 
     private var filteredOptions: [SelectOption] {
@@ -215,7 +215,7 @@ private struct SelectMenuPanelView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(dark ? Color(hex: "292d32") : Color(hex: "f8fafc"))
+        .background(AppTheme.isClaude ? AppTheme.sidebarHover(dark) : (dark ? Color(hex: "292d32") : Color(hex: "f8fafc")))
     }
 
     private func row(
@@ -502,7 +502,7 @@ struct SelectMenu: View {
     @StateObject private var panelState = SelectMenuPanelState()
 
     private var accent: Color {
-        dark ? AppTheme.info : Color(hex: "2563eb")
+        (AppTheme.isClaude ? AppTheme.sidebarActive : (dark ? AppTheme.info : Color(hex: "2563eb")))
     }
 
     private var resolvedWidth: CGFloat { width ?? 160 }

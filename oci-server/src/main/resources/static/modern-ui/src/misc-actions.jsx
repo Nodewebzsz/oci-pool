@@ -594,12 +594,12 @@ function useLogDetailDrawer() {
           <SectionLabel>{tr('log.section.message')}</SectionLabel>
           <div style={{
             padding: 14,
-            background: 'oklch(0.10 0.008 240)',
+            background: 'var(--surface-code)',
             border: `1px solid ${logColor(log.level).fg}`,
             borderRadius: 6,
             fontFamily: 'var(--font-mono)',
             fontSize: 12,
-            color: 'oklch(0.86 0.008 240)',
+            color: 'var(--on-dark)',
             lineHeight: 1.6,
           }}>
             <span style={{ color: logColor(log.level).fg, fontWeight: 700 }}>[{log.level}]</span>{' '}
@@ -628,12 +628,12 @@ function useLogDetailDrawer() {
               </div>
               <div style={{
                 padding: 12,
-                background: 'oklch(0.10 0.008 240)',
+                background: 'var(--surface-code)',
                 border: '1px solid var(--border)',
                 borderRadius: 6,
                 fontFamily: 'var(--font-mono)',
                 fontSize: 11.5,
-                color: 'oklch(0.72 0.05 240)',
+                color: 'var(--on-dark-soft)',
                 overflowX: 'auto',
                 lineHeight: 1.6,
               }}>
@@ -647,16 +647,16 @@ function useLogDetailDrawer() {
               <SectionLabel style={{ marginTop: 18 }}>{tr('log.section.stack')}</SectionLabel>
               <div style={{
                 padding: 12,
-                background: 'oklch(0.10 0.008 240)',
+                background: 'var(--surface-code)',
                 border: '1px solid var(--border)',
                 borderRadius: 6,
                 fontFamily: 'var(--font-mono)',
                 fontSize: 11,
-                color: 'oklch(0.72 0.05 240)',
+                color: 'var(--on-dark-soft)',
                 lineHeight: 1.7,
               }}>
                 {stack.map((line, i) => (
-                  <div key={i} style={{ color: i === 0 ? 'oklch(0.72 0.05 240)' : 'oklch(0.55 0.05 240)' }}>{line}</div>
+                  <div key={i} style={{ color: i === 0 ? 'var(--on-dark-soft)' : 'var(--on-dark-mute)' }}>{line}</div>
                 ))}
               </div>
             </>

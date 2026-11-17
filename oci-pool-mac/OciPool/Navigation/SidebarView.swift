@@ -104,7 +104,7 @@ struct SidebarView: View {
     // Web sidebar 顶部品牌区:logo mark + 名称 + tagline;折叠时仅居中 mark
     private var brandHeader: some View {
         HStack(spacing: 10) {
-            SidebarBrandMark(size: 30, accent: AppTheme.sidebarActive, cyan: Color(hex: "2fd0cc"))
+            BrandMarkView(size: 32, dark: dark)
             if !collapsed {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(session.siteName)
@@ -376,7 +376,7 @@ struct SidebarView: View {
                     MenuGlyph(
                         name: item.nav.lucideIcon,
                         size: 14,
-                        color: selected ? AppTheme.sidebarActive : AppTheme.sidebarText(dark)
+                        color: selected ? (AppTheme.isClaude ? AppTheme.navIcon(dark) : AppTheme.sidebarActive) : AppTheme.sidebarText(dark)
                     )
                         .frame(width: 16)
                     if !collapsed {
@@ -384,7 +384,7 @@ struct SidebarView: View {
                             .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
                             .lineLimit(1)
                         Spacer(minLength: 0)
-                        if selected {
+                        if selected && !AppTheme.isClaude {
                             PulseDot(color: AppTheme.orange)
                         }
                     }
@@ -393,9 +393,9 @@ struct SidebarView: View {
                 .padding(.trailing, collapsed ? 0 : 10)
                 .padding(.vertical, 6)
                 .frame(maxWidth: .infinity, alignment: collapsed ? .center : .leading)
-                .foregroundColor(selected ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
+                .foregroundColor(selected ? (AppTheme.isClaude ? AppTheme.navIcon(dark) : AppTheme.sidebarActive) : AppTheme.sidebarText(dark))
 
-                if selected && !collapsed {
+                if selected && !collapsed && !AppTheme.isClaude {
                     RoundedRectangle(cornerRadius: 999)
                         .fill(AppTheme.sidebarActive)
                         .frame(width: 3)
@@ -407,7 +407,7 @@ struct SidebarView: View {
             .background(
                 // Web: .sidebar-item:not(.active):hover { background: var(--bg-2) }
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(hoveredItem == item.nav && !selected ? AppTheme.sidebarHover(dark) : Color.clear)
+                    .fill(selected && AppTheme.isClaude ? AppTheme.bg3(dark) : (hoveredItem == item.nav && !selected ? AppTheme.sidebarHover(dark) : Color.clear))
             )
             .contentShape(Rectangle())
         }
@@ -422,7 +422,7 @@ struct SidebarView: View {
     private var statusFooter: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
-                PulseDot(color: AppTheme.sidebarActive)
+                PulseDot(color: AppTheme.success)
                 Text("后端服务运行中")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(AppTheme.navIcon(dark))
@@ -473,6 +473,7 @@ struct SidebarView: View {
 
     // Web sidebar 各分部图标色:服务=accent 代理=cyan 资源=violet 系统=orange 工具=info 开发=violet
     private func sectionColor(_ section: NavSection) -> Color {
+        if AppTheme.isClaude { return AppTheme.textSecondary(dark) }
         switch section {
         case .service: return AppTheme.sidebarActive
         case .proxy: return Color(hex: "2fd0cc")
@@ -498,65 +499,5 @@ private struct PulseDot: View {
             .opacity(pulse ? 1.0 : 0.55)
             .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
             .onAppear { pulse = true }
-    }
-}
-
-// Web PoolBrandMark: 渐变圆角方块 + 云中高能闪电核（纯白、上移2px）
-private struct SidebarBrandMark: View {
-    var size: CGFloat
-    var accent: Color
-    var cyan: Color
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: size * 0.28)
-                .fill(LinearGradient(gradient: Gradient(colors: [accent, cyan]),
-                                     startPoint: .topLeading, endPoint: .bottomTrailing))
-                .frame(width: size, height: size)
-            PoolCloudOutlineShape()
-                .stroke(Color.white,
-                        style: StrokeStyle(lineWidth: size * (2.2 / 36.0), lineCap: .round, lineJoin: .round))
-            PoolLightningBoltShape()
-                .fill(Color.white)
-        }
-        .frame(width: size, height: size)
-    }
-}
-
-// 科技云朵外轮廓（纯白、上移2px居中）
-private struct PoolCloudOutlineShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        let sx = rect.width / 36.0
-        let sy = rect.height / 36.0
-        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-            CGPoint(x: rect.minX + x * sx, y: rect.minY + y * sy)
-        }
-        var path = Path()
-        path.move(to: p(7.5, 23.0))
-        path.addCurve(to: p(9.7, 14.5), control1: p(6.5, 18.8), control2: p(7.4, 15.8))
-        path.addCurve(to: p(23.5, 16.0), control1: p(12.5, 7.8), control2: p(21.0, 8.2))
-        path.addCurve(to: p(27.0, 23.0), control1: p(26.2, 16.5), control2: p(28.2, 19.8))
-        path.addLine(to: p(7.5, 23.0))
-        return path
-    }
-}
-
-// 居中高能折角闪电核（纯白、上移2px）
-private struct PoolLightningBoltShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        let sx = rect.width / 36.0
-        let sy = rect.height / 36.0
-        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-            CGPoint(x: rect.minX + x * sx, y: rect.minY + y * sy)
-        }
-        var path = Path()
-        path.move(to: p(18.5, 11.2))
-        path.addLine(to: p(14.2, 16.5))
-        path.addLine(to: p(17.5, 16.5))
-        path.addLine(to: p(15.8, 21.8))
-        path.addLine(to: p(21.8, 15.2))
-        path.addLine(to: p(18.2, 15.2))
-        path.closeSubpath()
-        return path
     }
 }

@@ -2099,7 +2099,7 @@ function AiChatPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{
             width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-            background: 'linear-gradient(135deg, var(--accent) 0%, var(--violet) 100%)',
+            background: 'var(--accent)',
             boxShadow: '0 3px 10px color-mix(in oklab, var(--accent) 35%, transparent)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
           }}>
@@ -2153,7 +2153,7 @@ function AiChatPage() {
               <div style={{
                 width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
                 background: selected
-                  ? 'linear-gradient(135deg, var(--accent) 0%, var(--violet) 90%)'
+                  ? 'var(--accent)'
                   : 'var(--bg-3)',
                 color: selected ? '#fff' : 'var(--fg-2)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -2214,7 +2214,7 @@ function AiChatPage() {
           >
             <div style={{
               width: 34, height: 34, borderRadius: '50%',
-              background: 'linear-gradient(135deg, var(--accent) 0%, var(--violet) 100%)',
+              background: 'var(--accent)',
               color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700,
             }}>
               {selectedTenant ? (selectedTenant.name || '?').charAt(0).toUpperCase() : <Icon name="users" size={13} />}
@@ -2291,7 +2291,7 @@ function AiChatPage() {
                   }} />
                   <div style={{
                     width: 64, height: 64, borderRadius: '50%',
-                    background: 'linear-gradient(135deg, var(--accent) 0%, var(--violet) 100%)',
+                    background: 'var(--accent)',
                     boxShadow: '0 6px 16px color-mix(in oklab, var(--accent) 40%, transparent)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
                   }}>
@@ -2924,7 +2924,7 @@ function LinkPage() {
             <div style={{ height: 4, background: 'var(--bg-3)', borderRadius: 2, overflow: 'hidden' }}>
               <div style={{
                 width: `${progress}%`, height: '100%',
-                background: 'linear-gradient(90deg, var(--info), var(--cyan))',
+                background: 'var(--info)',
                 transition: 'width 300ms',
               }} />
             </div>
@@ -4154,7 +4154,7 @@ function SysLogsPage() {
     WARN:  '#f2cc60',
     ERROR: '#ff7b72',
     DEBUG: '#8b949e',
-  }[lv] || '#c9d1d9');
+  }[lv] || 'var(--on-dark)');
 
   const clearLogs = () => {
     shell.openConfirm({
@@ -4183,7 +4183,7 @@ function SysLogsPage() {
       <div style={{
         flex: 1, minHeight: 0,
         display: 'flex', flexDirection: 'column',
-        background: 'oklch(0.10 0.008 240)',
+        background: 'var(--surface-code)',
         border: '1px solid var(--border-strong)',
         borderRadius: 'var(--radius)',
         overflow: 'hidden',
@@ -4193,7 +4193,7 @@ function SysLogsPage() {
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '10px 16px',
-          background: 'oklch(0.13 0.010 240)',
+          background: 'var(--surface-code-2)',
           borderBottom: '1px solid var(--border)',
         }}>
           <h2 style={{
@@ -4238,9 +4238,9 @@ function SysLogsPage() {
           )}
           {logs.map((l, i) => (
             <div key={i} style={{ display: 'flex', gap: 10, padding: '2px 0' }}>
-              <span style={{ color: 'oklch(0.55 0.05 240)', flexShrink: 0 }}>{l.time}</span>
+              <span style={{ color: 'var(--on-dark-mute)', flexShrink: 0 }}>{l.time}</span>
               <span style={{ color: levelColor(l.level), fontWeight: 700, minWidth: 55, flexShrink: 0 }}>[{l.level}]</span>
-              <span style={{ color: 'oklch(0.86 0.008 240)', flex: 1, wordBreak: 'break-all' }}>{l.msg}</span>
+              <span style={{ color: 'var(--on-dark)', flex: 1, wordBreak: 'break-all' }}>{l.msg}</span>
             </div>
           ))}
         </div>
@@ -4249,7 +4249,7 @@ function SysLogsPage() {
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '8px 16px',
-          background: 'oklch(0.13 0.010 240)',
+          background: 'var(--surface-code-2)',
           borderTop: '1px solid var(--border)',
           fontSize: 11,
         }}>

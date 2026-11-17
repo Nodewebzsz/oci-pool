@@ -315,7 +315,7 @@ struct InstancesView: View {
         HStack(alignment: .top, spacing: 12) {
             instanceKpiCard(icon: "server.rack", color: AppTheme.cyan, label: "总实例数",
                             value: "\(model.pageState.totalElements)")
-            instanceKpiCard(icon: "play.circle", color: AppTheme.sidebarActive, label: "运行中",
+            instanceKpiCard(icon: "play.circle", color: AppTheme.success, label: "运行中",
                             value: "\(model.runningCount)")
             instanceKpiCard(icon: "cpu", color: AppTheme.info, label: "ARM 架构",
                             value: "\(model.armCount)")
