@@ -11,8 +11,8 @@ struct KeyConfigView: View {
 
     var body: some View {
         PageScaffold(
-            title: "Token 配置",
-            subtitle: "域名服务商配置 · 管理 DNS/CDN 服务商的 API 秘钥",
+            title: "密钥配置",
+            subtitle: "域名服务商配置 · 管理 Cloudflare、EdgeOne 等 DNS/CDN 服务商的 API 密钥",
             systemImage: "key",
             iconColor: AppTheme.orange,
             toolbar: { toolbar },

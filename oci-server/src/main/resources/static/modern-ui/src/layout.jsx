@@ -20,13 +20,24 @@ const buildNav = (tr) => [
 
 },
 {
-  id: 'proxy',
-  label: tr('nav.proxy'),
+  // 一级菜单(无子项展开):点击直接进入代理池页面
+  id: 'proxyPool',
+  label: tr('nav.proxyPool'),
   icon: 'shuffle',
   color: 'var(--nav-proxy)',
+  leaf: true,
   items: [
-  // 严格对齐原项目"代理管理":秘钥配置 / CF管理 / EO管理
-  // (API Token 的"秘钥配置"归属"开发配置"分组,见下方 devConfig)
+  { id: 'sysVpnProxy', label: tr('nav.sysVpnProxy'), icon: 'shuffle' }]
+
+},
+{
+  id: 'proxy',
+  label: tr('nav.proxy'),
+  icon: 'earth',
+  color: 'var(--nav-proxy)',
+  items: [
+  // "域名与 CDN"分组:密钥配置 / CF管理 / EO管理
+  // (API Token 的"Token 配置"归属"开发配置"分组,见下方 devConfig)
   { id: 'proxyKeyConfig', label: tr('nav.proxyKeyConfig'), icon: 'key' },
   { id: 'cfManage',       label: tr('nav.cfManage'),       icon: 'cloud' },
   { id: 'eoManage',       label: tr('nav.eoManage'),       icon: 'network' }]
@@ -47,12 +58,11 @@ const buildNav = (tr) => [
   label: tr('nav.system'),
   icon: 'settings',
   color: 'var(--nav-system)',
-  // 严格对齐原项目"系统管理"4 子项
+  // 系统管理 3 子项(代理池已提升为一级菜单)
   items: [
   { id: 'sysIpQuality', label: tr('nav.sysIpQuality'), icon: 'shield' },
   { id: 'sysLogs',      label: tr('nav.sysLogs'),      icon: 'file-text' },
-  { id: 'sysSetting',   label: tr('nav.sysSetting'),   icon: 'shield-check' },
-  { id: 'sysVpnProxy',  label: tr('nav.sysVpnProxy'),  icon: 'shuffle' }]
+  { id: 'sysSetting',   label: tr('nav.sysSetting'),   icon: 'shield-check' }]
 
 },
 {
@@ -70,7 +80,7 @@ const buildNav = (tr) => [
 
 },
 {
-  // 严格对齐原项目"开发配置" sidebar.dev.config · 目前仅"秘钥配置"1 子项
+  // 严格对齐原项目"开发配置" sidebar.dev.config · 目前仅"Token 配置"1 子项
   id: 'devConfig',
   label: tr('nav.devConfig'),
   icon: 'code-2',
@@ -901,6 +911,44 @@ function Sidebar({ activePage, onNavigate, collapsed = false, tabletOverlay = fa
       <nav style={{ flex: 1, overflowY: 'auto', padding: '6px 8px' }}>
         {NAV.map((sec) => {
           const isExpanded = collapsed ? true : expanded[sec.id];
+          if (sec.leaf) {
+            const target = sec.items[0];
+            const isActive = target && target.id === activePage;
+            return (
+              <div key={sec.id} style={{ marginBottom: 4 }}>
+                <a
+                  className={(collapsed ? '' : 'sidebar-section-hoverable') + (isActive ? ' sidebar-item-active' : '')}
+                  title={collapsed ? sec.label : undefined}
+                  href={target ? (window.ociRouter ? "\#" + window.ociRouter.href(target.id) : "\#" + target.id) : undefined}
+                  onClick={(e) => { e.preventDefault(); if (target) selectPage(target.id); }}
+                  style={{
+                    width: '100%',
+                    padding: collapsed ? '10px 0' : '8px 10px',
+                    background: 'transparent',
+                    border: 'none',
+                    textDecoration: 'none',
+                    borderRadius: 'var(--radius-sm)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: collapsed ? 'center' : 'flex-start',
+                    gap: 8,
+                    color: isActive ? 'var(--nav-active-fg)' : 'var(--fg-0)',
+                    fontFamily: 'inherit',
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    boxSizing: 'border-box',
+                    position: 'relative',
+                    transition: 'background 100ms'
+                  }}
+                >
+                  <span style={{ color: isActive ? 'inherit' : sec.color, display: 'inline-flex' }}>
+                    <Icon name={sec.icon} size={15} />
+                  </span>
+                  {!collapsed && sec.label}
+                </a>
+              </div>);
+          }
           return (
             <div key={sec.id} style={{ marginBottom: 4 }}>
               {/* Section header */}

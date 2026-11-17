@@ -204,6 +204,9 @@
 
   /* 侧边栏菜单 hover 用纯 CSS,避免直接改 DOM 后 React 重渲染无法清理残留灰底 */
   .sidebar-section-hoverable:hover { background: var(--bg-2) !important; }
+  .proxy-pool-row:hover > td { background: var(--bg-2); }
+  .proxy-pool-actions button:hover:not(:disabled) { background: var(--bg-3, var(--bg-2)) !important; color: var(--hover-color) !important; }
+  .proxy-pool-actions button:disabled { opacity: .45; cursor: default !important; }
   .sidebar-item:not(.sidebar-item-active):hover { background: var(--bg-2) !important; }
   .sidebar-item:focus-visible { background: var(--bg-2); outline: none; }
   .auth-recovery-link:hover { text-decoration: underline; text-underline-offset: 3px; }

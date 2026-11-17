@@ -119,6 +119,7 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
             record.setLastCheckedAt(null);
             record.setLastCheckError(null);
             record.setLastExitIp(null);
+            record.setLastLatencyMs(null);
         }
         if (request.getAvailableStatus() != null) {
             record.setAvailableStatus(request.getAvailableStatus());
@@ -261,6 +262,7 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
         record.setAvailableStatus(connected ? 1 : 0);
         record.setLastCheckedAt(LocalDateTime.now());
         record.setLastCheckError(connected ? null : message);
+        record.setLastLatencyMs(connected ? checkResult.getLatencyMs() : null);
         if (connected && StringUtils.isNotBlank(checkResult.getExitIp())) {
             record.setLastExitIp(checkResult.getExitIp().trim());
         }
@@ -288,6 +290,8 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
         data.put("message", message);
         data.put("lastCheckedAt", record.getLastCheckedAt());
         data.put("lastExitIp", record.getLastExitIp());
+        data.put("lastCheckError", record.getLastCheckError());
+        data.put("lastLatencyMs", record.getLastLatencyMs());
         if (checkResult.getLatencyMs() != null) {
             data.put("latency", checkResult.getLatencyMs());
         }

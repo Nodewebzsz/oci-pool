@@ -6,7 +6,7 @@ import Combine
 final class ProxyConfigViewModel: ObservableObject {
 
     @Published private(set) var items: [VpnProxyItem] = []
-    @Published var pageState = PageState(page: 0, size: 20)
+    @Published var pageState = PageState(page: 0, size: 100)
     @Published private(set) var isLoading = false
     @Published private(set) var hasLoadedOnce = false
     @Published private(set) var isSaving = false
@@ -274,6 +274,14 @@ final class ProxyConfigViewModel: ObservableObject {
             if let loc = result.location, !loc.isEmpty {
                 items[idx].location = loc
             }
+            if !result.lastCheckedAt.isEmpty {
+                items[idx].lastCheckedAt = result.lastCheckedAt
+            }
+            items[idx].lastCheckError = result.lastCheckError
+            if !result.lastExitIp.isEmpty {
+                items[idx].lastExitIp = result.lastExitIp
+            }
+            items[idx].lastLatencyMs = result.lastLatencyMs
         }
     }
 

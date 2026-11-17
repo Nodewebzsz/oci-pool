@@ -55,7 +55,7 @@ struct CloudflareView: View {
 
     private var hasZone: Bool { !(model.selectedZoneId ?? "").isEmpty }
 
-    /// Web 页头 actions：域名: label + zone 下拉 220 + 秘钥配置(orange) + 添加记录(primary) + 同步记录(info) + 刷新列表(outline)
+    /// Web 页头 actions：域名: label + zone 下拉 220 + 密钥配置(orange) + 添加记录(primary) + 同步记录(info) + 刷新列表(outline)
     private var toolbar: some View {
         HStack(spacing: 8) {
             Text("域名:")
@@ -72,7 +72,7 @@ struct CloudflareView: View {
                 allowClear: true,
                 searchable: true
             )
-            AppButton(title: "秘钥配置", systemImage: "key", kind: .orange) {
+            AppButton(title: "密钥配置", systemImage: "key", kind: .orange) {
                 model.openConfig()
             }
             AppButton(title: "添加记录", systemImage: "plus", kind: .primary, enabled: hasZone) {

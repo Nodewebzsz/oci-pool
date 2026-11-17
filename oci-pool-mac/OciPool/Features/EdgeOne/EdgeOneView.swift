@@ -53,7 +53,7 @@ struct EdgeOneView: View {
 
     private var hasZone: Bool { !(model.selectedZoneId ?? "").isEmpty }
 
-    /// Web 页头 actions：域名: label + zone 下拉 220 + 秘钥配置(orange) + 添加记录 + 同步(primary) + 刷新
+    /// Web 页头 actions：域名: label + zone 下拉 220 + 密钥配置(orange) + 添加记录 + 同步(primary) + 刷新
     private var toolbar: some View {
         HStack(spacing: 8) {
             Text("域名:")
@@ -71,7 +71,7 @@ struct EdgeOneView: View {
                 allowClear: true,
                 searchable: true
             )
-            AppButton(title: "秘钥配置", systemImage: "key", kind: .orange) {
+            AppButton(title: "密钥配置", systemImage: "key", kind: .orange) {
                 model.openConfig()
             }
             if model.mode == .dns {

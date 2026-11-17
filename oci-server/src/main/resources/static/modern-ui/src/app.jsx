@@ -333,7 +333,7 @@ function AppInner() {
     grab: GrabPage,
     regions: RegionsPage,
     logs: LogsPage,
-    // 代理管理 3 子菜单 · 秘钥配置(域名服务商) / CF / EO
+    // 域名与 CDN 3 子菜单 · 密钥配置(域名服务商) / CF / EO
     proxyKeyConfig: ProxyKeyConfigPage,
     cfManage:       CFManagePage,
     eoManage:       EOManagePage,

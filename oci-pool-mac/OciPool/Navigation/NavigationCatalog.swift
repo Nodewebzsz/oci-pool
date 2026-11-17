@@ -37,8 +37,11 @@ enum NavigationCatalog {
             item(.awsLambda, "AWS Lambda", "f.circle", "/aws/lambda", [4]),
             item(.awsRds, "AWS RDS", "cylinder", "/aws/rds", [4])
         ]),
+        (.proxyPool, [
+            item(.proxyConfig, "代理池", "shuffle", "/vpnProxy/page")
+        ]),
         (.proxy, [
-            item(.keyConfig, "秘钥配置", "key", "/system/domainSettings"),
+            item(.keyConfig, "密钥配置", "key", "/system/domainSettings"),
             item(.cloudflare, "CF 管理", "globe", "/dns/cloudflare"),
             item(.edgeOne, "EO 管理", "globe", "/dns/edgeone")
         ]),
@@ -48,8 +51,7 @@ enum NavigationCatalog {
         (.system, [
             item(.ipQuality, "IP 质量管理", "shield", "/system/ipSettings", [1]),
             item(.systemLogs, "系统日志", "doc.plaintext", "/system/logs"),
-            item(.settings, "安全管理", "slider.horizontal.3", "/system/settings"),
-            item(.proxyConfig, "代理配置", "arrow.left.arrow.right", "/vpnProxy/page")
+            item(.settings, "安全管理", "slider.horizontal.3", "/system/settings")
         ]),
         (.tools, [
             item(.aiChat, "AI 对话", "bubble.left.and.bubble.right", "/ai/chat"),
