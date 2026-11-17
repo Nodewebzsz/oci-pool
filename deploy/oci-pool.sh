@@ -12,7 +12,7 @@
 #   ./oci-pool.sh status     查看运行状态
 #   ./oci-pool.sh update     升级（源码模式 git pull + Maven 重打包 / 独立模式重新下载 release jar）
 #   ./oci-pool.sh uninstall  卸载（停止并清理 data / logs / pid）
-#   ./oci-pool.sh uninstall --purge  彻底卸载（额外清理 .env 与 .env.example）
+#   ./oci-pool.sh uninstall --purge  彻底卸载（额外清理 .env、.env.example 与 Redis 会话/状态键）
 #
 set -euo pipefail
 
@@ -145,7 +145,61 @@ stop_pid() {
   local pid="$1"
   kill "$pid" 2>/dev/null || true
   for _ in $(seq 1 10); do kill -0 "$pid" >/dev/null 2>&1 || break; sleep 1; done
-  kill -0 "$pid" >/dev/null 2>&1 && kill -9 "$pid" 2>/dev/null || true
+  if kill -0 "$pid" >/dev/null 2>&1; then
+    kill -9 "$pid" 2>/dev/null || true
+    for _ in $(seq 1 3); do kill -0 "$pid" >/dev/null 2>&1 || break; sleep 1; done
+  fi
+}
+
+load_port_from_env() {
+  if [ -f "$APP_ROOT/.env" ]; then
+    set -a; . "$APP_ROOT/.env"; set +a
+    PORT="${OCI_PORT:-$PORT}"
+  fi
+}
+
+clean_redis_keys() {
+  have_redis || return 0
+  local count=0
+  local pattern key
+  for pattern in "satoken:*" "oci:*"; do
+    while IFS= read -r key; do
+      [ -n "$key" ] || continue
+      redis-cli del "$key" >/dev/null 2>&1 || true
+      count=$((count + 1))
+    done < <(redis-cli --scan --pattern "$pattern" 2>/dev/null || true)
+  done
+  if [ "$count" -gt 0 ]; then
+    warn "已清理 Redis 中残留的 OCI-Pool 会话/状态键（共 ${count} 条）"
+  else
+    ok "Redis 中无残留 OCI-Pool 会话/状态键"
+  fi
+}
+
+verify_port_released() {
+  local remaining_pids; remaining_pids="$(find_port_pids "$PORT" || true)"
+  if [ -z "$remaining_pids" ] && ! curl -sf "http://127.0.0.1:$PORT/actuator/health" >/dev/null 2>&1; then
+    ok "端口 $PORT 已释放"
+    return 0
+  fi
+  local rpid cmdline has_oci=0
+  for rpid in $remaining_pids; do
+    cmdline="$(ps -p "$rpid" -o args= 2>/dev/null || true)"
+    if is_oci_pool_pid "$rpid"; then
+      has_oci=1
+      err "端口 $PORT 仍被 OCI-Pool 进程占用（pid $rpid）：$cmdline"
+    else
+      warn "端口 $PORT 仍被其他进程占用（pid $rpid）：${cmdline:-unknown}"
+    fi
+  done
+  if [ -z "$remaining_pids" ]; then
+    warn "端口 $PORT 仍有健康检查响应（可能是 Docker 容器或无权限查看的进程占用）"
+  fi
+  if command -v docker >/dev/null 2>&1; then
+    local docker_hits; docker_hits="$(docker ps --format '{{.Names}} ({{.Ports}})' 2>/dev/null | grep -E "(:|->)${PORT}\b|oci-pool" || true)"
+    [ -n "$docker_hits" ] && warn "检测到相关 Docker 容器：$docker_hits（如需清理请执行 docker compose down 或 docker rm -f）"
+  fi
+  [ "$has_oci" -eq 0 ]
 }
 
 load_env() {
@@ -181,10 +235,7 @@ EOF
       warn "检测到已有数据库 $DATA_DIR/vps_db.mv.db，本次生成的 .env 未覆盖管理员密码"
     fi
   fi
-  if [ -f "$APP_ROOT/.env" ]; then
-    set -a; . "$APP_ROOT/.env"; set +a
-    PORT="${OCI_PORT:-$PORT}"
-  fi
+  load_port_from_env
 }
 
 cmd_start() {
@@ -201,7 +252,9 @@ cmd_start() {
     warn "请先停止占用端口的旧进程或 Docker 容器（例如: ./oci-pool.sh stop、docker ps、ss -ltnp | grep :$PORT），再重新启动。"
     exit 1
   fi
-  ( cd "$APP_ROOT" && nohup java \
+  (
+    cd "$APP_ROOT"
+    nohup java \
       -XX:+UseG1GC \
       -XX:+HeapDumpOnOutOfMemoryError \
       -Duser.timezone=Asia/Shanghai \
@@ -210,7 +263,9 @@ cmd_start() {
       -DDB_PASSWORD="${DB_PASSWORD:-}" \
       -DADMIN_USERNAME="${ADMIN_USERNAME:-admin}" \
       -DADMIN_PASSWORD="${ADMIN_PASSWORD:-}" \
-      -jar "$JAR_TO_RUN" > "$LOG_DIR/console.log" 2>&1 & echo $! > "$PID_FILE" )
+      -jar "$JAR_TO_RUN" > "$LOG_DIR/console.log" 2>&1 < /dev/null &
+    echo $! > "$PID_FILE"
+  )
   ok "已启动（pid $(cat "$PID_FILE")）· http://localhost:$PORT"
   info "等待健康检查（最多 60s）..."
   for i in $(seq 1 20); do
@@ -255,33 +310,32 @@ cmd_start() {
 
 cmd_stop() {
   info "stop"
+  load_port_from_env
   if is_running; then
     local pid; pid="$(cat "$PID_FILE")"
     stop_pid "$pid"
     ok "已停止（pid $pid）"
   else
     warn "未运行（无有效 pid 文件）"
-    if [ -f "$APP_ROOT/.env" ]; then
-      set -a; . "$APP_ROOT/.env"; set +a
-      PORT="${OCI_PORT:-$PORT}"
-    fi
-    local orphan_pids; orphan_pids="$(find_port_pids "$PORT" || true)"
-    for opid in $orphan_pids; do
-      if is_oci_pool_pid "$opid"; then
-        warn "发现占用端口 $PORT 的残留 OCI-Pool 进程（pid $opid），正在停止..."
-        stop_pid "$opid"
-        ok "已停止残留进程（pid $opid）"
-      else
-        warn "端口 $PORT 正被其他进程占用（pid $opid），请确认是否为 Docker 容器或其他服务"
-      fi
-    done
   fi
   rm -f "$PID_FILE"
+
+  local orphan_pids; orphan_pids="$(find_port_pids "$PORT" || true)"
+  for opid in $orphan_pids; do
+    if is_oci_pool_pid "$opid"; then
+      warn "发现占用端口 $PORT 的残留 OCI-Pool 进程（pid $opid），正在停止..."
+      stop_pid "$opid"
+      ok "已停止残留进程（pid $opid）"
+    fi
+  done
+
+  verify_port_released || { err "无法完全释放端口 $PORT，请手动结束上述 OCI-Pool 进程后重试。"; exit 1; }
 }
 
 cmd_restart() { cmd_stop; cmd_start; }
 
 cmd_status() {
+  load_port_from_env
   if is_running; then
     local pid; pid="$(cat "$PID_FILE")"
     ok "运行中（pid $pid）· http://localhost:$PORT"
@@ -320,10 +374,12 @@ cmd_uninstall() {
   if [ "$purge" = "--purge" ] || [ "$purge" = "--all" ]; then
     [ -f "$APP_ROOT/.env" ] && rm -f "$APP_ROOT/.env" && warn "已删除配置文件: $APP_ROOT/.env"
     [ -f "$APP_ROOT/.env.example" ] && rm -f "$APP_ROOT/.env.example"
+    clean_redis_keys
   elif [ -f "$APP_ROOT/.env" ]; then
     warn "已保留配置文件: $APP_ROOT/.env（若需彻底重置密码与配置，请执行 ./oci-pool.sh uninstall --purge）"
   fi
-  ok "已卸载"
+  warn "说明：系统软件包（JDK 17、redis-server）及其他目录/Docker 部署不会被当前脚本自动卸载"
+  ok "已卸载完成"
 }
 
 usage() {
@@ -337,7 +393,7 @@ usage() {
   echo "  status             查看运行状态"
   echo "  update             升级（源码重打包 / 重新下载 release jar）"
   echo "  uninstall          卸载（停止并清理 data / logs / pid，保留 .env）"
-  echo "  uninstall --purge  彻底卸载（额外清理 .env 与 .env.example）"
+  echo "  uninstall --purge  彻底卸载（额外清理 .env、.env.example 与 Redis 会话/状态键）"
   echo
   echo "环境变量: OCI_PORT（默认 9856）、OCI_POOL_HOME（部署根目录）"
 }
