@@ -54,6 +54,8 @@ final class TenantsViewModel: ObservableObject {
     @Published var policyEnableExpiry = false
     @Published var policyExpiryDays = "120"
     @Published var policyInfoLines: [String] = []
+    @Published var policyList: [TenantPasswordPolicy] = []
+    @Published var policyLoading = false
     // Notifications
     @Published var notifyEmails: [String] = []
     @Published var notifyEmailsLoading = false
@@ -1230,20 +1232,33 @@ final class TenantsViewModel: ObservableObject {
         showPasswordPolicy = true
         policyEnableExpiry = false
         policyExpiryDays = "120"
+        policyList = []
         policyInfoLines = ["加载中…"]
+        policyLoading = true
         Task {
             do {
                 let list = try await service.getPasswordPolicy(tenantId: item.id)
+                policyList = list.sorted { ($0.priority ?? 999) < ($1.priority ?? 999) }
+                // 以可修改的 Custom 策略同步开关与天数（与 Web 聚合口径一致）
+                let customList = list.filter { $0.passwordStrength.lowercased() == "custom" }
+                if let active = customList.first(where: { $0.isEnabled }) {
+                    policyEnableExpiry = true
+                    policyExpiryDays = "\(active.expiryDays)"
+                } else {
+                    policyEnableExpiry = false
+                    policyExpiryDays = "120"
+                }
                 if list.isEmpty {
                     policyInfoLines = ["当前无密码策略信息"]
                 } else {
-                    policyInfoLines = list.map { p in
-                        "\(p.name): \(p.isEnabled ? "已启用" : "未启用") \(p.description)"
+                    policyInfoLines = policyList.map { p in
+                        "\(p.name) · 强度 \(p.passwordStrength.isEmpty ? "-" : p.passwordStrength) · 优先级 \(p.priority.map(String.init) ?? "-") · \(p.expiryText)"
                     }
                 }
             } catch {
                 policyInfoLines = ["加载失败: \(error.localizedDescription)"]
             }
+            policyLoading = false
         }
     }
 

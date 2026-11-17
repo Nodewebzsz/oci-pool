@@ -2383,161 +2383,153 @@ public class OciUtils {
     }
 
 
+    /** 身份域密码策略 SCIM schema URN，新建策略时必填 */
+    private static final String PASSWORD_POLICY_SCHEMA =
+            "urn:ietf:params:scim:schemas:oracle:idcs:PasswordPolicy";
+
+    /** 由本项目自动创建/托管的密码策略名称 */
+    public static final String MANAGED_PASSWORD_POLICY_NAME = "OCI-POOL Password Policy";
+
     /**
-     * 关闭三个月强制修改密码功能
-     * 通过Identity Domains API设置密码策略来禁用密码过期
+     * 关闭强制修改密码功能（设置密码永不过期）
+     * 通过Identity Domains API把可编辑的 Custom 策略的过期天数置 0；
+     * 若租户当前没有可编辑的 Custom 策略，则自动新建一条并置顶。
      *
      * @param tenant 租户信息
      * @return 操作结果，true表示成功，false表示失败
      */
     public static boolean disablePasswordExpirationWithAutoDomain(Tenant tenant) {
-        com.nodewebzsz.ociserver.service.permissions.OciPermissions.require(tenant, "PASSWORD_POLICY");
-        log.debug("开始自动获取Domain URL并禁用密码过期功能");
-        try (IdentityDomainsClient identityDomainsClient = SignOnPolicyUtils.initIdentityDomainsClient(tenant)) {
-
-            // 获取现有密码策略
-            ListPasswordPoliciesRequest listRequest =
-                    ListPasswordPoliciesRequest.builder()
-                            .build();
-
-            ListPasswordPoliciesResponse listResponse =
-                    identityDomainsClient.listPasswordPolicies(listRequest);
-
-            List<com.oracle.bmc.identitydomains.model.PasswordPolicy> passwordPolicies =
-                    listResponse.getPasswordPolicies().getResources();
-
-            if (passwordPolicies == null || passwordPolicies.isEmpty()) {
-                log.warn("未找到任何密码策略");
-                return false;
-            }
-
-            // 更新第一个密码策略
-            for (PasswordPolicy currentPolicy : passwordPolicies) {
-                log.debug("当前密码策略: {}", JSON.toJSONString(currentPolicy));
-                Integer passwordExpiresAfter = currentPolicy.getPasswordExpiresAfter();
-                PasswordPolicy.PasswordStrength passwordStrength = currentPolicy.getPasswordStrength();
-                if (passwordExpiresAfter == null || passwordExpiresAfter == 0 || !passwordStrength.equals(PasswordPolicy.PasswordStrength.Custom)){
-                    log.debug("{}当前策略不支持修改",currentPolicy.getName());
-                    continue;
-                }
-                String policyId = currentPolicy.getId();
-
-                log.info("更新密码策略: {}, 当前过期设置: {} 天",
-                        currentPolicy.getName(), currentPolicy.getPasswordExpiresAfter());
-
-                // 创建更新的密码策略 - 禁用过期
-                com.oracle.bmc.identitydomains.model.PasswordPolicy.Builder policyBuilder =
-                        com.oracle.bmc.identitydomains.model.PasswordPolicy.builder();
-                policyBuilder.copy(currentPolicy)
-                        .passwordExpiresAfter(0)  // 永不过期
-                        .forcePasswordReset(false)  // 关闭强制重置
-                        .passwordExpireWarning(7)  // 关闭过期警告
-                        .build();
-
-
-                // 执行更新
-                com.oracle.bmc.identitydomains.requests.PutPasswordPolicyRequest updateRequest =
-                        com.oracle.bmc.identitydomains.requests.PutPasswordPolicyRequest.builder()
-                                .passwordPolicyId(policyId)
-                                .passwordPolicy(policyBuilder.build())
-                                .build();
-
-                com.oracle.bmc.identitydomains.responses.PutPasswordPolicyResponse updateResponse =
-                        identityDomainsClient.putPasswordPolicy(updateRequest);
-
-                if (updateResponse.getPasswordPolicy() != null) {
-                    log.info("{} 成功关闭三个月强制修改密码功能",currentPolicy.getName());
-                }
-            }
-            return true;
-        } catch (Exception e) {
-            log.error("自动禁用密码过期功能时发生异常: {}", e.getMessage(), e);
-        }
-        return false;
+        return applyPasswordExpiryWithAutoDomain(tenant, 0);
     }
-
 
     /**
      * 自动启用密码过期功能
-     * 这是一个完全自动化的方法，无需手动提供Domain Endpoint
+     * 这是一个完全自动化的方法，无需手动提供Domain Endpoint。
+     * 若租户当前没有可编辑的 Custom 策略，则自动新建一条并置顶。
      *
      * @param tenant 租户信息
-     * @param expirationDays 密码过期天数，默认120天
+     * @param expirationDays 密码过期天数，默认120天；传 0 表示永不过期
      * @return 操作结果
      */
     public static boolean enablePasswordExpirationWithAutoDomain(Tenant tenant, Integer expirationDays) {
-        com.nodewebzsz.ociserver.service.permissions.OciPermissions.require(tenant, "PASSWORD_POLICY");
-        log.info("开始自动获取Domain URL并启用密码过期功能");
-
         int expireDays = expirationDays != null ? expirationDays : 120;
-
-        try (IdentityDomainsClient identityDomainsClient = SignOnPolicyUtils.initIdentityDomainsClient(tenant)) {
-
-            // 获取现有密码策略
-            com.oracle.bmc.identitydomains.requests.ListPasswordPoliciesRequest listRequest =
-                        com.oracle.bmc.identitydomains.requests.ListPasswordPoliciesRequest.builder()
-                                .build();
-
-            com.oracle.bmc.identitydomains.responses.ListPasswordPoliciesResponse listResponse =
-                        identityDomainsClient.listPasswordPolicies(listRequest);
-
-            List<com.oracle.bmc.identitydomains.model.PasswordPolicy> passwordPolicies =
-                        listResponse.getPasswordPolicies().getResources();
-
-            if (passwordPolicies == null || passwordPolicies.isEmpty()) {
-                log.warn("未找到任何密码策略");
-                return false;
-            }
-            // 更新第一个密码策略
-            for (PasswordPolicy currentPolicy : passwordPolicies) {
-                log.info("正在处理密码策略: {}", JSON.toJSONString(currentPolicy));
-                String policyId = currentPolicy.getId();
-                PasswordPolicy.PasswordStrength passwordStrength = currentPolicy.getPasswordStrength();
-                if (!passwordStrength.equals(PasswordPolicy.PasswordStrength.Custom)){
-                    log.debug("{}当前策略不支持修改",currentPolicy.getName());
-                    continue;
-                }
-                log.info("更新密码策略: {}, 设置过期天数: {} 天",
-                        currentPolicy.getName(), expireDays);
-
-                // 创建更新的密码策略 - 启用过期
-                com.oracle.bmc.identitydomains.model.PasswordPolicy.Builder policyBuilder =
-                        com.oracle.bmc.identitydomains.model.PasswordPolicy.builder();
-                policyBuilder.copy(currentPolicy)
-                        .passwordExpiresAfter(expireDays)  // 设置过期天数
-                        .forcePasswordReset(false)  // 通常不强制立即重置
-                        .passwordExpireWarning(7);  // 提前7天警告
-
-                // 执行更新
-                com.oracle.bmc.identitydomains.requests.PutPasswordPolicyRequest updateRequest =
-                        com.oracle.bmc.identitydomains.requests.PutPasswordPolicyRequest.builder()
-                                .passwordPolicyId(policyId)
-                                .passwordPolicy(policyBuilder.build())
-                                .build();
-
-                com.oracle.bmc.identitydomains.responses.PutPasswordPolicyResponse updateResponse =
-                        identityDomainsClient.putPasswordPolicy(updateRequest);
-
-                if (updateResponse.getPasswordPolicy() != null) {
-                    log.info("{}成功启用密码过期功能，过期天数: {} 天", currentPolicy.getName(),expireDays);
-                }
-            }
-            return true;
-        } catch (Exception e) {
-            log.error("自动启用密码过期功能时发生异常: {}", e.getMessage(), e);
-        }
-
-        return false;
+        return applyPasswordExpiryWithAutoDomain(tenant, expireDays);
     }
 
     /**
-     * 启用默认的90天密码过期策略
+     * 启用默认的密码过期策略（120天，与界面默认值一致）
      *
      * @param tenant 租户信息
      * @return 操作结果
      */
     public static boolean enablePasswordExpirationWithAutoDomain(Tenant tenant) {
-        return enablePasswordExpirationWithAutoDomain(tenant, 90);
+        return enablePasswordExpirationWithAutoDomain(tenant, 120);
+    }
+
+    /**
+     * 统一设置租户密码过期天数。
+     * 规则：
+     * 1. 优先修改已存在且可被替换的 Custom 策略（保留其复杂度配置，仅改过期相关字段）。
+     * 2. 若没有可编辑的 Custom 策略（例如租户仍在用系统 Simple/Standard 策略，这类策略不可变），
+     *    则以现有最高优先级策略为模板新建一条 Custom 策略并置顶(priority=1)，使其生效。
+     *
+     * @param tenant     租户信息
+     * @param expireDays 过期天数；<=0 表示永不过期
+     * @return 操作结果
+     */
+    private static boolean applyPasswordExpiryWithAutoDomain(Tenant tenant, int expireDays) {
+        com.nodewebzsz.ociserver.service.permissions.OciPermissions.require(tenant, "PASSWORD_POLICY");
+        int targetExpiry = Math.max(expireDays, 0);
+        boolean neverExpire = targetExpiry == 0;
+        log.info("开始设置租户密码过期策略, 目标过期天数={} ({})", targetExpiry, neverExpire ? "永不过期" : "启用过期");
+
+        try (IdentityDomainsClient identityDomainsClient = SignOnPolicyUtils.initIdentityDomainsClient(tenant)) {
+
+            List<com.oracle.bmc.identitydomains.model.PasswordPolicy> passwordPolicies =
+                    identityDomainsClient.listPasswordPolicies(
+                            ListPasswordPoliciesRequest.builder().build())
+                            .getPasswordPolicies().getResources();
+            if (passwordPolicies == null) {
+                passwordPolicies = new ArrayList<>();
+            }
+
+            // 1) 优先修改已存在且可替换的 Custom 策略
+            PasswordPolicy editableCustom = null;
+            for (PasswordPolicy policy : passwordPolicies) {
+                if (PasswordPolicy.PasswordStrength.Custom.equals(policy.getPasswordStrength())
+                        && isPasswordPolicyReplaceable(policy)) {
+                    editableCustom = policy;
+                    break;
+                }
+            }
+
+            if (editableCustom != null) {
+                com.oracle.bmc.identitydomains.model.PasswordPolicy updated =
+                        com.oracle.bmc.identitydomains.model.PasswordPolicy.builder()
+                                .copy(editableCustom)
+                                .passwordExpiresAfter(targetExpiry)
+                                .forcePasswordReset(false)
+                                .passwordExpireWarning(7)
+                                .build();
+                identityDomainsClient.putPasswordPolicy(
+                        com.oracle.bmc.identitydomains.requests.PutPasswordPolicyRequest.builder()
+                                .passwordPolicyId(editableCustom.getId())
+                                .passwordPolicy(updated)
+                                .build());
+                log.info("已更新 Custom 密码策略[{}], 过期天数={}", editableCustom.getName(), targetExpiry);
+                return true;
+            }
+
+            // 2) 没有可编辑的 Custom 策略：以现有最高优先级策略为模板新建一条 Custom 策略并置顶
+            PasswordPolicy template = passwordPolicies.isEmpty() ? null : passwordPolicies.get(0);
+            com.oracle.bmc.identitydomains.model.PasswordPolicy.Builder builder =
+                    (template != null)
+                            ? com.oracle.bmc.identitydomains.model.PasswordPolicy.builder().copy(template)
+                            : com.oracle.bmc.identitydomains.model.PasswordPolicy.builder();
+            // 清除仅服务端维护或会导致冲突的字段
+            builder.id(null)
+                    .ocid(null)
+                    .meta(null)
+                    .idcsCreatedBy(null)
+                    .idcsLastModifiedBy(null)
+                    .idcsPreventedOperations(null)
+                    .groups(null)
+                    .configuredPasswordPolicyRules(null)
+                    .schemas(java.util.Collections.singletonList(PASSWORD_POLICY_SCHEMA))
+                    .name(MANAGED_PASSWORD_POLICY_NAME)
+                    .passwordStrength(PasswordPolicy.PasswordStrength.Custom)
+                    .priority(1)
+                    .forcePasswordReset(false)
+                    .passwordExpireWarning(7)
+                    .passwordExpiresAfter(targetExpiry);
+            // 兜底复杂度，避免新建 Custom 策略在模板无复杂度时弱于系统默认
+            if (template == null || template.getMinLength() == null) {
+                builder.minLength(8).maxLength(40);
+            }
+
+            com.oracle.bmc.identitydomains.model.PasswordPolicy created =
+                    identityDomainsClient.createPasswordPolicy(
+                            com.oracle.bmc.identitydomains.requests.CreatePasswordPolicyRequest.builder()
+                                    .passwordPolicy(builder.build())
+                                    .build())
+                            .getPasswordPolicy();
+            log.info("租户无可编辑 Custom 策略，已新建并置顶 Custom 密码策略[{}], 过期天数={}",
+                    created != null ? created.getName() : "?", targetExpiry);
+            return created != null;
+        } catch (Exception e) {
+            log.error("设置密码过期策略时发生异常: {}", e.getMessage(), e);
+        }
+        return false;
+    }
+
+    /** 判断某条密码策略是否允许被替换（系统内置 Simple/Standard 通常禁止 Replace） */
+    public static boolean isPasswordPolicyReplaceable(PasswordPolicy policy) {
+        List<com.oracle.bmc.identitydomains.model.IdcsPreventedOperations> prevented =
+                policy.getIdcsPreventedOperations();
+        if (prevented == null) {
+            return true;
+        }
+        return !prevented.contains(com.oracle.bmc.identitydomains.model.IdcsPreventedOperations.Replace);
     }
 
     //获取当前密码策略

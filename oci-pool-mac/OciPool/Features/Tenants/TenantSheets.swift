@@ -1039,7 +1039,7 @@ struct TenantSheetHost: View {
                         Image(systemName: "info.circle")
                             .foregroundColor(AppTheme.cyan)
                             .font(.system(size: 13))
-                        Text("当前密码策略状态: \(model.policyEnableExpiry ? "已启用 (\(model.policyExpiryDays)天)" : "未启用")")
+                        Text("当前密码策略状态: \(model.policyLoading ? "加载中…" : (model.policyEnableExpiry ? "已启用 (\(model.policyExpiryDays)天)" : "未启用"))")
                             .font(.system(size: 12))
                             .foregroundColor(AppTheme.cyan)
                         Spacer()
@@ -1049,6 +1049,76 @@ struct TenantSheetHost: View {
                     .background(AppTheme.cyan.opacity(dark ? 0.12 : 0.08))
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(AppTheme.cyan.opacity(0.35), lineWidth: 1))
                     .cornerRadius(6)
+
+                    // 身份域密码策略列表（app 内核对策略名/强度/优先级，无需切到 OCI 控制台）
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("当前身份域密码策略")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(primaryText)
+                        if model.policyLoading {
+                            HStack(spacing: 8) {
+                                ProgressView().controlSize(.small)
+                                Text("加载中…")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(mutedText)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 12).padding(.vertical, 10)
+                            .background(dark ? Color.white.opacity(0.03) : Color.black.opacity(0.02))
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(border.opacity(0.6), lineWidth: 1))
+                            .cornerRadius(6)
+                        } else if model.policyList.isEmpty {
+                            Text("暂无密码策略")
+                                .font(.system(size: 12))
+                                .foregroundColor(mutedText)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 12).padding(.vertical, 10)
+                                .background(dark ? Color.white.opacity(0.03) : Color.black.opacity(0.02))
+                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(border.opacity(0.6), lineWidth: 1))
+                                .cornerRadius(6)
+                        } else {
+                            ScrollView {
+                                VStack(spacing: 6) {
+                                    ForEach(model.policyList) { p in
+                                        HStack(spacing: 8) {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                HStack(spacing: 6) {
+                                                    Text(p.name.isEmpty ? "(未命名)" : p.name)
+                                                        .font(.system(size: 12, weight: .semibold))
+                                                        .foregroundColor(primaryText)
+                                                        .lineLimit(1)
+                                                    if p.managed {
+                                                        Text("本项目托管")
+                                                            .font(.system(size: 9.5))
+                                                            .padding(.horizontal, 6).padding(.vertical, 1)
+                                                            .background(AppTheme.sidebarActive.opacity(0.15))
+                                                            .foregroundColor(AppTheme.sidebarActive)
+                                                            .cornerRadius(4)
+                                                    }
+                                                }
+                                                Text("强度 \(p.passwordStrength.isEmpty ? "-" : p.passwordStrength) · 优先级 \(p.priority.map(String.init) ?? "-") · \(p.expiryText)")
+                                                    .font(.system(size: 10.5))
+                                                    .foregroundColor(mutedText)
+                                                    .lineLimit(1)
+                                            }
+                                            Spacer()
+                                            Text(p.editable ? "可修改" : "只读")
+                                                .font(.system(size: 9.5))
+                                                .padding(.horizontal, 8).padding(.vertical, 2)
+                                                .background((p.editable ? AppTheme.sidebarActive : mutedText).opacity(0.15))
+                                                .foregroundColor(p.editable ? AppTheme.sidebarActive : mutedText)
+                                                .cornerRadius(4)
+                                        }
+                                        .padding(.horizontal, 12).padding(.vertical, 8)
+                                        .background(dark ? Color.white.opacity(0.03) : Color.black.opacity(0.02))
+                                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(p.managed ? AppTheme.sidebarActive.opacity(0.5) : border.opacity(0.6), lineWidth: 1))
+                                        .cornerRadius(6)
+                                    }
+                                }
+                            }
+                            .frame(maxHeight: 120)
+                        }
+                    }
 
                     // 启用强制修改密码 (可点击卡片 + Checkbox)
                     VStack(alignment: .leading, spacing: 6) {
@@ -1117,7 +1187,7 @@ struct TenantSheetHost: View {
                 .padding(.vertical, 12)
                 .overlay(Rectangle().fill(border.opacity(0.6)).frame(height: 1), alignment: .top)
             }
-            .frame(width: 540, height: 380)
+            .frame(width: 540, height: 480)
             .background(AppTheme.pageBg(dark))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(border.opacity(0.9), lineWidth: 1))
             .cornerRadius(10)
