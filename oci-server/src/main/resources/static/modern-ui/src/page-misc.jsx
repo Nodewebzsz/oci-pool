@@ -4994,7 +4994,7 @@ function ProxyFormBody({ existing, parentTenants = [], bodyRef, onSave }) {
     proxyHost: (existing && existing.proxyHost) || '',
     proxyPort: existing && existing.proxyPort != null ? Number(existing.proxyPort) : 8080,
     proxyUsername: (existing && existing.proxyUsername) || '',
-    proxyPassword: (existing && existing.proxyPassword) || '',
+    proxyPassword: '',
     availableStatus: existing && existing.availableStatus != null ? Number(existing.availableStatus) : 1,
     forceProxy: existing && existing.forceProxy != null ? Number(existing.forceProxy) : 0,
     tenantIds: Array.isArray(existing && existing.tenantIds) && existing.tenantIds.length
@@ -5085,6 +5085,7 @@ function ProxyFormBody({ existing, parentTenants = [], bodyRef, onSave }) {
       location: form.location.trim() || null,
       tenantIds: tenantIds,
       tenantId: tenantIds.length ? tenantIds[0] : null,
+      expectedBindingRevision: existing && existing.bindingRevision,
     };
     setSaving(true);
     try {
@@ -5200,7 +5201,7 @@ function ProxyFormBody({ existing, parentTenants = [], bodyRef, onSave }) {
               type="password"
               value={form.proxyPassword}
               onChange={v => set('proxyPassword', v)}
-              placeholder="留空表示无鉴权"
+              placeholder={existing && existing.hasPassword ? '已设置，留空保留原密码' : '留空表示无鉴权'}
             />
           </FormRow>
         </div>
@@ -5240,7 +5241,7 @@ function ProxyFormBody({ existing, parentTenants = [], bodyRef, onSave }) {
           <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>
             {Number(form.forceProxy) === 1
               ? '已开启强制：代理不通时拒绝向云厂商发起请求'
-              : '非强制：代理不通时可回退直连'}
+              : '非强制：代理不通时切换到代理池其他节点，不会直连'}
           </span>
         </div>
       </div>
@@ -5554,12 +5555,12 @@ function SysVpnProxyPage() {
       proxyHost: p.proxyHost,
       proxyPort: p.proxyPort,
       proxyUsername: p.proxyUsername,
-      proxyPassword: p.proxyPassword,
       availableStatus: p.availableStatus,
       forceProxy: next,
       customName: p.customName,
       tenantIds: tIds,
       tenantId: tIds.length ? tIds[0] : null,
+      expectedBindingRevision: p.bindingRevision,
     };
     try {
       const res = await window.ociServices.proxy.saveOrUpdate(body);
@@ -5569,6 +5570,21 @@ function SysVpnProxyPage() {
     } catch (e) {
       shell.showToast(e.message || tr('pageMisc.2d5fba'), { kind: 'error' });
     }
+  };
+
+  const checkInfo = (record) => {
+    const raw = record.lastCheckedAt;
+    let text = '';
+    if (Array.isArray(raw) && raw.length >= 5) {
+      const pad = n => String(n).padStart(2, '0');
+      text = `${pad(raw[1])}-${pad(raw[2])} ${pad(raw[3])}:${pad(raw[4])}`;
+    } else if (typeof raw === 'string' && raw.length >= 16) {
+      text = raw.replace('T', ' ').slice(5, 16);
+    }
+    const error = record.lastCheckError || '';
+    if (!text) return { text: '未检测', title: '尚未检测，代理池选路时会实时检测', color: 'var(--fg-3)' };
+    if (error) return { text: `检测失败 ${text}`, title: error, color: 'var(--danger)' };
+    return { text: `检测于 ${text}`, title: record.lastExitIp ? `出口 IP：${record.lastExitIp}` : '', color: 'var(--fg-3)' };
   };
 
   const statusCfg = (record) => {
@@ -5700,7 +5716,7 @@ function SysVpnProxyPage() {
                         <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>{p.proxyUsername || '—'}</span>
                       </td>
                       <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
-                        <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{p.proxyPassword ? '••••••' : '—'}</span>
+                        <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{p.hasPassword ? '••••••' : '—'}</span>
                       </td>
                       <td style={{ padding: '9px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <span style={{ fontSize: 11.5, color: tenantIds.length ? 'var(--fg-1)' : 'var(--fg-3)' }}>{tenantLabel}</span>
@@ -5720,6 +5736,12 @@ function SysVpnProxyPage() {
                           <Icon name={st.icon} size={9} />
                           <span>{st.label}</span>
                         </span>
+                        {(() => {
+                          const ci = checkInfo(p);
+                          return (
+                            <div title={ci.title} style={{ marginTop: 3, fontSize: 10, color: ci.color, whiteSpace: 'nowrap' }}>{ci.text}</div>
+                          );
+                        })()}
                       </td>
                       <td style={{ padding: '6px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
                         <div style={{ display: 'inline-flex', gap: 4 }}>

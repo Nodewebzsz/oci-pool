@@ -362,14 +362,9 @@ public class BootInstanceServiceImpl implements BootInstanceService {
 
     @Override
     public List<ImageInfoRes> querySystemImage(ImageInfoReq imageInfoReq) {
-        try {
-            return tenantRepository.findById(Long.valueOf(imageInfoReq.getTenantId()))
-                    .map(tenant -> OciImageUtils.listImagesByShape(tenant, imageInfoReq.getShapeType()))
-                    .orElse(Collections.emptyList());
-        } catch (Exception e) {
-            log.warn("query system image fail, reason: {}", e.getMessage());
-            return Collections.emptyList();
-        }
+        Tenant tenant = tenantRepository.findById(Long.valueOf(imageInfoReq.getTenantId()))
+                .orElseThrow(() -> new IllegalStateException("获取镜像失败：租户不存在或已被删除"));
+        return OciImageUtils.listImagesByShape(tenant, imageInfoReq.getShapeType());
     }
 
     @Override

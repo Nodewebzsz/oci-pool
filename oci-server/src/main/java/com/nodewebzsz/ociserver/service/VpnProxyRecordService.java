@@ -35,7 +35,7 @@ public interface VpnProxyRecordService {
      * 租户快捷绑定：将父租户绑定到指定代理；proxyId 为空则解绑。
      * 同一租户只会保留一条绑定。
      */
-    void bindTenant(Long tenantId, Long proxyId);
+    void bindTenant(Long tenantId, Long proxyId, String expectedBindingRevision);
 
     /**
      * 查询租户当前绑定的代理（含子区域继承父账号）；无则 null。

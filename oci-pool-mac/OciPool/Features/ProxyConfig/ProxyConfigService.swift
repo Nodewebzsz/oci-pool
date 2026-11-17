@@ -48,14 +48,20 @@ struct ProxyConfigService {
         } else {
             body["tenantId"] = NSNull()
         }
+        if !form.bindingRevision.isEmpty {
+            body["expectedBindingRevision"] = form.bindingRevision
+        }
         let url = try client.makeURL(baseURL, path: "/vpnProxy/saveOrUpdate")
         let raw = try await client.postJSON(url, body: body)
         try ProxyConfigJSON.ensureSuccess(raw, fallback: "保存代理失败")
     }
 
     /// POST `/vpnProxy/bindTenant` · proxyId nil = 解绑
-    func bindTenant(tenantId: Int64, proxyId: Int64?) async throws {
+    func bindTenant(tenantId: Int64, proxyId: Int64?, expectedBindingRevision: String = "") async throws {
         var body: [String: Any] = ["tenantId": tenantId]
+        if !expectedBindingRevision.isEmpty {
+            body["expectedBindingRevision"] = expectedBindingRevision
+        }
         if let pid = proxyId, pid > 0 {
             body["id"] = pid
         } else {

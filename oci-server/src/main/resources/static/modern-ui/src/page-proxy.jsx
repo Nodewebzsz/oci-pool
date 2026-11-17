@@ -68,11 +68,11 @@ function ProxyPage({ density }) {
               proxyHost: proxy.proxyHost,
               proxyPort: proxy.proxyPort,
               proxyUsername: proxy.proxyUsername,
-              proxyPassword: proxy.proxyPassword,
               availableStatus: Number(proxy.availableStatus) === 1 ? 0 : 1,
               forceProxy: proxy.forceProxy,
               tenantIds: proxy.tenantIds || (proxy.tenantId == null ? [] : [proxy.tenantId]),
               customName: proxy.customName,
+              expectedBindingRevision: proxy.bindingRevision,
             });
             if (result && result.success === false) throw new Error(result.message || tr('proxy.status.fail'));
             await load(); shell.showToast(tr('proxy.status.toggled').replace('{name}', proxy.name), { kind: 'info' });

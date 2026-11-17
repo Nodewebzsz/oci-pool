@@ -3,10 +3,13 @@ package com.nodewebzsz.dao.repository;
 import com.nodewebzsz.dao.entity.VpnProxyRecord;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -27,6 +30,14 @@ public interface VpnProxyRecordRepository
             + "AND NOT EXISTS (SELECT 1 FROM vpn_proxy_tenant_bind b WHERE b.proxy_id = p.id) "
             + "ORDER BY RAND() LIMIT 1", nativeQuery = true)
     VpnProxyRecord findRandomAvailableGlobal(@Param("status") Integer status);
+
+    /**
+     * 全局代理池全部可用节点（未绑定租户），供请求链路按健康状态与粘性顺序逐个尝试。
+     */
+    @Query(value = "SELECT * FROM vpn_proxy_record p WHERE p.available_status = :status "
+            + "AND p.tenant_id IS NULL "
+            + "AND NOT EXISTS (SELECT 1 FROM vpn_proxy_tenant_bind b WHERE b.proxy_id = p.id)", nativeQuery = true)
+    List<VpnProxyRecord> findAllAvailableGlobal(@Param("status") Integer status);
 
     /**
      * 兼容旧调用：任意可用代理随机一条（含已绑定租户的）
@@ -78,4 +89,22 @@ public interface VpnProxyRecordRepository
      */
     @Query("SELECT v FROM VpnProxyRecord v WHERE v.tenantId IS NOT NULL")
     List<VpnProxyRecord> findAllBoundRecords();
+
+    /**
+     * 只更新检测结果字段，避免请求链路用旧实体整行覆盖用户刚保存的配置。
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE VpnProxyRecord v SET v.lastCheckedAt = :checkedAt, v.lastCheckError = :error WHERE v.id = :id")
+    int updateCheckResult(@Param("id") Long id, @Param("checkedAt") LocalDateTime checkedAt, @Param("error") String error);
+
+    /**
+     * 只更新可用状态与检测结果字段。
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE VpnProxyRecord v SET v.availableStatus = :status, v.lastCheckedAt = :checkedAt, "
+            + "v.lastCheckError = :error WHERE v.id = :id")
+    int updateAvailability(@Param("id") Long id, @Param("status") Integer status,
+                           @Param("checkedAt") LocalDateTime checkedAt, @Param("error") String error);
 }

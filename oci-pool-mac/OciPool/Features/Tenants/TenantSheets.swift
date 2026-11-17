@@ -2168,7 +2168,7 @@ struct TenantSheetHost: View {
                     field("root 密码", text: $model.bootRootPassword)
                     labeledSelect("操作系统", width: 280) {
                         if model.bootOSList.isEmpty {
-                            Text("加载镜像中或暂无镜像…")
+                            Text(model.bootImagesLoading ? "正在加载镜像…" : (model.bootImagesError ?? "暂无可用镜像"))
                                 .font(.system(size: 12))
                                 .foregroundColor(mutedText)
                                 .frame(height: AppInputStyle.height, alignment: .leading)

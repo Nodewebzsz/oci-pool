@@ -469,8 +469,39 @@ struct TenantBootCreateView: View {
             VStack(alignment: .leading, spacing: 12) {
                 // 1. 操作系统镜像 *
                 FormFieldRow(label: "操作系统镜像", required: true) {
-                    if model.bootOSList.isEmpty {
-                        Text(model.bootImages.isEmpty ? "正在实时探测该区域镜像…" : "暂无可用镜像")
+                    if model.bootImagesLoading {
+                        HStack(spacing: 8) {
+                            ProgressView().controlSize(.small)
+                            Text("正在实时探测该区域镜像…")
+                                .font(.system(size: 12))
+                                .foregroundColor(mutedText)
+                        }
+                        .frame(height: 32)
+                    } else if let error = model.bootImagesError {
+                        HStack(alignment: .center, spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(AppTheme.danger)
+                            Text(error)
+                                .font(.system(size: 12))
+                                .foregroundColor(AppTheme.danger)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            AppButton(title: "重试", systemImage: "arrow.clockwise", kind: .secondary) {
+                                Task {
+                                    let tid = Int64(model.bootSelectedRegionTenantId) ?? (tenant?.id ?? 0)
+                                    await model.loadBootImages(tenantId: tid)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(AppTheme.dangerSoft(dark))
+                        )
+                    } else if model.bootOSList.isEmpty {
+                        Text("该区域暂无可用镜像")
                             .font(.system(size: 12))
                             .foregroundColor(mutedText)
                             .frame(height: 32)

@@ -554,7 +554,14 @@ public class TenantController extends BaseController{
     @PostMapping(value = "/querySystemImages")
     @ResponseBody
     public ApiResponse querySystemImages(@RequestBody @Valid ImageInfoReq imageInfoReq) {
-        return ApiResponse.success(bootInstanceService.querySystemImage(imageInfoReq));
+        try {
+            return ApiResponse.success(bootInstanceService.querySystemImage(imageInfoReq));
+        } catch (OciPermissionDeniedException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("查询系统镜像失败 tenantId={}: {}", imageInfoReq.getTenantId(), e.getMessage());
+            return ApiResponse.error(e.getMessage() == null ? "获取镜像失败" : e.getMessage());
+        }
     }
 
 

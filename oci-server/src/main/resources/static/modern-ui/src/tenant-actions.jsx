@@ -67,6 +67,7 @@ function useTenantProxyQuickModal() {
         const allData = unwrap(allRes) || {};
         state.proxies = Array.isArray(allData.content) ? allData.content : [];
         const bound = unwrap(boundRes);
+        state.bindingRevision = state.proxies[0]?.bindingRevision || bound?.bindingRevision || '';
         const fallback = state.proxies.find(p => Array.isArray(p.tenantIds) && p.tenantIds.map(String).includes(String(tenantId)));
         state.selectedId = bound?.id != null ? String(bound.id) : (fallback?.id != null ? String(fallback.id) : '');
       } catch (e) {
@@ -82,7 +83,7 @@ function useTenantProxyQuickModal() {
       state.saving = true;
       try {
         if (state.mode === 'bind') {
-          const result = await window.ociServices.system.vpnBindTenant({ tenantId, id: state.selectedId || null });
+          const result = await window.ociServices.system.vpnBindTenant({ tenantId, id: state.selectedId || null, expectedBindingRevision: state.bindingRevision });
           if (!result?.success) throw new Error(result?.message || tr('tenant.d1299e'));
         } else {
           if (!state.proxyHost.trim() || !state.proxyPort) throw new Error(tr('tenant.e31434'));
@@ -91,6 +92,7 @@ function useTenantProxyQuickModal() {
             proxyUsername: state.proxyUsername || '', proxyPassword: state.proxyPassword || '',
             availableStatus: 1, forceProxy: Number(state.forceProxy) === 1 ? 1 : 0,
             customName: state.customName.trim(), tenantId, tenantIds: [tenantId],
+            expectedBindingRevision: state.bindingRevision,
           });
           if (!result?.success) throw new Error(result?.message || tr('tenant.c0249d'));
         }
@@ -326,7 +328,7 @@ function useTenantProxyQuickModal() {
                   <span>
                     {Number(state.forceProxy) === 1
                       ? '已开启强制：代理不通时不回退，拒绝向云厂商发起请求'
-                      : '非强制：代理不通时允许系统自动平滑回退直连'}
+                      : '非强制：代理不通时自动切换到全局代理池其他节点，不会直连'}
                   </span>
                 </div>
               </div>
