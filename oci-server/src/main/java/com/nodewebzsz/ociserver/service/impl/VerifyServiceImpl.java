@@ -266,7 +266,9 @@ public class VerifyServiceImpl implements VerifyService {
         DingTalkConfig ding = systemConfigService.getDingTalkConfig();
         FeishuConfig feishu = systemConfigService.getFeishuConfig();
 
-        if (tg != null && tg.isEnabled() && org.apache.commons.lang3.StringUtils.isNotBlank(tg.getBotToken())) {
+        if (tg != null && tg.isEnabled()
+                && org.apache.commons.lang3.StringUtils.isNotBlank(tg.getBotToken())
+                && org.apache.commons.lang3.StringUtils.isNotBlank(tg.getChatId())) {
             try { messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplateText(message); } catch (Exception ignored) {}
         }
         if (bark != null && bark.isEnabled() && org.apache.commons.lang3.StringUtils.isNotBlank(bark.getDeviceKey())) {
@@ -329,8 +331,18 @@ public class VerifyServiceImpl implements VerifyService {
         // 1. 检查用户是否存在
         Optional<LoginUser> loginUserOptional = loginUserRepository.findByUsername(username);
         if (!loginUserOptional.isPresent()) {
-            final String clientIpAddress = getClientIpAddress(request).replace('.', '_');
-            sendMaliciousLoginAlertIfAllowed(request, username, clientIpAddress);
+            java.util.List<LoginUser> existingUsers = loginUserRepository.findAll();
+            if (existingUsers != null && !existingUsers.isEmpty()) {
+                String names = existingUsers.stream()
+                        .map(LoginUser::getUsername)
+                        .collect(java.util.stream.Collectors.joining(", "));
+                log.warn("密码重置失败：未找到用户 [{}]，当前数据库已注册管理员账号为: [{}]", username, names);
+            }
+            String rawIp = getClientIpAddress(request);
+            if (!"127.0.0.1".equals(rawIp) && !"0:0:0:0:0:0:0:1".equals(rawIp) && !"localhost".equalsIgnoreCase(rawIp)) {
+                final String clientIpAddress = rawIp.replace('.', '_');
+                sendMaliciousLoginAlertIfAllowed(request, username, clientIpAddress);
+            }
             throw new IllegalStateException("用户名或密码错误");
         }
 
@@ -341,7 +353,13 @@ public class VerifyServiceImpl implements VerifyService {
         String rateLimitKey = "reset_rate_limit_" + username;
         String lastSendTime = verificationCodeCache.getIfPresent(rateLimitKey);
         if (lastSendTime != null) {
-            throw new IllegalStateException("请稍后再试，不要频繁发送验证码");
+            try {
+                if (System.currentTimeMillis() - Long.parseLong(lastSendTime) < 60_000L) {
+                    throw new IllegalStateException("请稍后再试，不要频繁发送验证码");
+                }
+            } catch (NumberFormatException ignored) {
+                throw new IllegalStateException("请稍后再试，不要频繁发送验证码");
+            }
         }
 
         // 3. 生成6位随机验证码
@@ -428,6 +446,10 @@ public class VerifyServiceImpl implements VerifyService {
 
         // 5. 删除重置token
         resetTokenCache.invalidate(tokenKey);
+        verificationCodeCache.invalidate("reset_rate_limit_" + username);
+        if (authSecurityService != null) {
+            authSecurityService.clearLoginLockAfterPasswordReset(username);
+        }
 
         //如果开启了mfa,禁用
         MfaConfig mfaConfig = systemConfigService.getMfaConfig();
@@ -439,12 +461,8 @@ public class VerifyServiceImpl implements VerifyService {
         }
 
         // 6. 发送新密码到通知终端
-        try {
-            messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplate(String.format(MESSAGE_NEW_PASSWORD_TEMPLATE,username, newPassword));
-            log.info("用户:{} 密码:{}重置成功", username, newPassword);
-        } catch (Exception e) {
-            log.error("新密码通知发送失败，用户:{}, 错误:{}", username, e.getMessage(), e);
-        }
+        log.info("用户:{} 密码:{}重置成功", username, newPassword);
+        sendToActiveChannels(String.format(MESSAGE_NEW_PASSWORD_TEMPLATE, username, newPassword));
 
         return "";
     }

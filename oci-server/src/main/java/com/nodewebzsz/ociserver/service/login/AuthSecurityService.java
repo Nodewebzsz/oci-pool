@@ -144,6 +144,18 @@ public class AuthSecurityService {
         }
     }
 
+    /**
+     * 密码重置成功后，解除该账号及登录失败锁定状态，确保用户可立即使用新密码登录
+     */
+    public void clearLoginLockAfterPasswordReset(String username) {
+        if (StringUtils.isNotBlank(username)) {
+            loginFailCountCache.invalidate("user:" + username);
+            loginLockCache.invalidate("user:" + username);
+        }
+        loginFailCountCache.invalidateAll();
+        loginLockCache.invalidateAll();
+    }
+
     // ==================== 2. 验证码输错熔断作废 ====================
 
     /**

@@ -154,7 +154,9 @@ docker compose build      # Build
 docker compose up -d      # Start
 docker compose logs -f    # Follow logs
 docker compose down       # Stop
-./uninstall.sh            # Uninstall (removes data folders)
+./reset-password.sh       # One-command admin password reset (keeps data)
+./uninstall.sh            # Uninstall (removes data folders, keeps .env)
+./uninstall.sh --purge    # Full purge (also removes .env)
 ```
 
 ### Option 2: Manual Build (JDK 17 + Maven 3.9 + Redis)
@@ -212,6 +214,17 @@ location ~ ^/websockify/(\d+)$ {
   * **Standard Nginx**: Add the above 5 `proxy_buffering off;` directives into `location /` or `location /system/streamLogs`.
 
 > When upgrading from older versions, remove the `security` block entirely. All other configuration entries can be kept as-is.
+
+#### FAQ: Forgot Admin Password / Reinstall shows `[Retained existing database password]`
+
+1. **Freshly installed and haven't changed the initial password yet**:
+   - Check `ADMIN_PASSWORD=` inside `.env` in your deployment directory: `grep '^ADMIN_PASSWORD=' .env`.
+2. **Keep existing OCI tenant data and reset the password**:
+   - **Script deploy**: run `./oci-pool.sh reset-password` in your deployment directory (or use **Forgot password?** on the login page and run `./oci-pool.sh reset-password --logs` to read the 6-digit code and 12-character new password from `logs/application.log`).
+   - **Docker deploy**: run `./reset-password.sh` in your deployment directory (or `./reset-password.sh --logs`).
+3. **Wipe all data and reinstall from scratch**:
+   - **Script deploy**: `./oci-pool.sh uninstall --purge && ./oci-pool.sh start`
+   - **Docker deploy**: `./uninstall.sh --purge && ./install.sh`
 
 ---
 

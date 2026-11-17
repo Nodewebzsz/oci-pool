@@ -12,6 +12,7 @@ RAW="https://raw.githubusercontent.com/Nodewebzsz/oci-pool/master/deploy"
 COMPOSE_PULL="docker-compose.pull.yml"
 ENV_EXAMPLE=".env.example"
 UNINSTALL="uninstall.sh"
+RESET_PW="reset-password.sh"
 
 gen_random_alnum() {
   local len="${1:-16}"
@@ -175,6 +176,12 @@ fi
 if [ ! -f "$UNINSTALL" ]; then
   curl -L --fail -sS -o "$UNINSTALL" "$RAW/$UNINSTALL" 2>/dev/null && chmod +x "$UNINSTALL" || true
 fi
+if [ ! -f "$RESET_PW" ]; then
+  curl -L --fail -sS -o "$RESET_PW" "$RAW/$RESET_PW" 2>/dev/null && chmod +x "$RESET_PW" || true
+fi
+
+HAD_EXISTING_DB=0
+[ -f "./data/vps_db.mv.db" ] && HAD_EXISTING_DB=1
 
 # 首次安装自动生成 .env（默认值即可运行；已有 .env 则绝不动用户配置）
 if [ ! -f .env ] && [ -f "$ENV_EXAMPLE" ]; then
@@ -229,13 +236,16 @@ echo -e "${G}🎉 OCI-Pool 部署完成！请妥善保存您的初始管理凭�
 echo -e "${G}===================================================================${N}"
 echo -e "  管理入口:   ${C}http://localhost:${OCI_WEB_PORT:-9857}/${N}"
 echo -e "  管理员账号: ${Y}${ADMIN_USERNAME:-admin}${N}"
-if [ -n "${ADMIN_PASSWORD:-}" ]; then
+if [ -n "${ADMIN_PASSWORD:-}" ] && [ "$HAD_EXISTING_DB" -eq 0 ]; then
   echo -e "  初始强密码: ${Y}${ADMIN_PASSWORD}${N}"
   echo -e "  ${Y}⚠️  安全提示: 初始密码已加密存入数据库，登录后请前往「系统设置」及时修改密码！${N}"
+elif [ -n "${ADMIN_PASSWORD:-}" ] && [ "$HAD_EXISTING_DB" -eq 1 ]; then
+  echo -e "  当前记录密码: ${Y}${ADMIN_PASSWORD}${N} ${C}(若已在网页端修改过密码，请以修改后为准)${N}"
+  echo -e "  ${Y}💡 如忘记密码: 直接执行 ${C}./reset-password.sh${Y} 即可一键重置${N}"
 elif [ -f "./data/vps_db.mv.db" ]; then
   echo -e "  初始密码:   [已保留数据库中原密码]"
-  echo -e "  ${Y}💡 如忘记密码: 在登录页点「忘记密码」，然后从容器日志获取验证码与新密码：${N}"
-  echo -e "  ${C}   docker compose -f $COMPOSE_PULL logs app | grep -E \"密码重置验证码|重置成功\"${N}"
+  echo -e "  ${Y}💡 如忘记密码: 执行 ${C}./reset-password.sh${Y} 一键重置，或在登录页点「忘记密码」后查看日志：${N}"
+  echo -e "  ${C}   ./reset-password.sh --logs${N}"
 else
   echo -e "  初始密码:   [未设置 ADMIN_PASSWORD，请访问页面 /register 注册首个管理员]"
 fi
