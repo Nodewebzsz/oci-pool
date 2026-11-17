@@ -19,6 +19,8 @@ import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 
 /**
  * @version 1.2.0
@@ -36,6 +38,8 @@ public class SocksProxyUtils {
      * 单次连接握手超时（毫秒）
      */
     private static final int TIMEOUT_MS = 6000;
+
+    private static final String TUNNEL_NOT_FORWARDING = "代理返回连接成功但未放行流量（可能流量耗尽、账号鉴权失败或目标被拦截）";
 
     /**
      * TCP 连通性探测备选目标（优先 Oracle，备选全球高可用节点）
@@ -244,8 +248,16 @@ public class SocksProxyUtils {
                 skipBndAddress(in, atyp);
 
                 if (repVer == 0x05 && repStatus == 0x00) {
-                    long latency = System.currentTimeMillis() - startTime;
-                    log.info("SOCKS5 代理连通成功: {}:{} -> {}:{} ({}ms)", host, port, targetHost, targetPort, latency);
+                    long latency;
+                    try {
+                        latency = measureTlsLatency(socket, targetHost, targetPort);
+                    } catch (IOException e) {
+                        lastError = TUNNEL_NOT_FORWARDING;
+                        log.debug("代理隧道 TLS 握手失败: {}:{} -> {}:{} {}", host, port, targetHost, targetPort, e.getMessage());
+                        continue;
+                    }
+                    log.info("SOCKS5 代理连通成功: {}:{} -> {}:{} (延时 {}ms, 总耗时 {}ms)", host, port, targetHost, targetPort,
+                            latency, System.currentTimeMillis() - startTime);
 
                     // 4. 连通成功后，通过代理探测真实公网出口 IP（方案 A）
                     String exitIp = resolveExit ? resolveSocks5ExitIp(host, port, username, password) : null;
@@ -312,8 +324,16 @@ public class SocksProxyUtils {
                     String response = new String(buffer, 0, read, StandardCharsets.UTF_8);
                     if (response.startsWith("HTTP/1.1 200") || response.startsWith("HTTP/1.0 200")
                             || response.contains("200 Connection established") || response.contains("200 OK")) {
-                        long latency = System.currentTimeMillis() - startTime;
-                        log.info("HTTP 代理连通成功: {}:{} -> {}:{} ({}ms)", host, port, targetHost, targetPort, latency);
+                        long latency;
+                        try {
+                            latency = measureTlsLatency(socket, targetHost, targetPort);
+                        } catch (IOException e) {
+                            lastError = TUNNEL_NOT_FORWARDING;
+                            log.debug("代理隧道 TLS 握手失败: {}:{} -> {}:{} {}", host, port, targetHost, targetPort, e.getMessage());
+                            continue;
+                        }
+                        log.info("HTTP 代理连通成功: {}:{} -> {}:{} (延时 {}ms, 总耗时 {}ms)", host, port, targetHost, targetPort,
+                                latency, System.currentTimeMillis() - startTime);
 
                         // 通过 HTTP 代理隧道探测真实公网出口 IP（方案 A）
                         String exitIp = resolveExit ? resolveHttpExitIp(host, port, username, password) : null;
@@ -349,6 +369,20 @@ public class SocksProxyUtils {
 
         log.warn("HTTP 代理不可用: {}:{} -> {}", host, port, lastError);
         return new ProxyCheckResult(false, "HTTP 代理不可用: " + (lastError != null ? lastError : "无法连通"));
+    }
+
+    /**
+     * 在已建立的代理隧道上与目标完成一次 TLS 握手，返回握手耗时作为代理延时。
+     * 握手必须真实到达目标，可排除本地 TUN/网关提前返回 CONNECT 成功造成的虚假低延时，并让 HTTP 与 SOCKS5 口径一致。
+     */
+    private static long measureTlsLatency(Socket tunnel, String targetHost, int targetPort) throws IOException {
+        SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+        long begin = System.currentTimeMillis();
+        try (SSLSocket ssl = (SSLSocket) factory.createSocket(tunnel, targetHost, targetPort, false)) {
+            ssl.setSoTimeout(TIMEOUT_MS);
+            ssl.startHandshake();
+            return System.currentTimeMillis() - begin;
+        }
     }
 
     /**
