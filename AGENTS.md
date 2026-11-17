@@ -75,7 +75,7 @@ flowchart TD
    - 同步 `dev` 远端：`git push origin dev`；
    - 保证后续新需求继续在 `dev` 分支上稳健推进。
 6. **第 6 步（本地发布 Release）**：
-   - 执行 `bash scripts/release_local.sh`：脚本会等待「镜像构建与推送」完成，读取 `origin/master` 自增后的 `VERSION`，在临时 git worktree 中构建 server JAR 与 DMG，生成 `SHA256SUMS.txt`，先建草稿 Release 上传再发布，Telegram 通知由 `release-notify.yml` 在 CI 发送；
+   - 执行 `bash scripts/release_local.sh`：脚本会等待「镜像构建与推送」完成，读取 `origin/master` 自增后的 `VERSION`，在临时 git worktree 中构建 server JAR 与 DMG，生成 `SHA256SUMS.txt`，先建草稿 Release 上传再发布，Telegram 通知由 `main.yml`（Release Notification）在 Release 发布后自动发送；
    - 需要 `gh auth login`，以及 `MAXMIND_LICENSE_KEY`（写入 `~/.config/oci-pool/release.env`，不要提交）；产物保存在 `~/Downloads/OciPool-releases/v<版本>/`；
    - 上传中断时直接重跑脚本，会复用草稿 Release；可先用 `--dry-run` 检查版本与目标；
    - 如需回到云端构建：设置仓库变量 `RELEASE_MODE=ci`，或在 Actions 手动运行 `release.yml`。
