@@ -1,3 +1,163 @@
+// ─── 开机规格归一化与实时美元费用估算纯函数 (无 DOM / React 依赖) ─────────────
+function normalizeBootShapeSpec(input) {
+  const cfg = input || {};
+  const shape = String(cfg.shape || 'VM.Standard.A1.Flex');
+  const rawOcpu = Number(cfg.ocpu);
+  const rawMem = Number(cfg.memoryGb);
+  const rawVol = (cfg.bootVolumeGb === undefined || cfg.bootVolumeGb === null || cfg.bootVolumeGb === '')
+    ? 50
+    : Number(cfg.bootVolumeGb);
+
+  const volIsInt = Number.isInteger(rawVol);
+  const volInBounds = volIsInt && rawVol >= 47 && rawVol <= 32768;
+  const normalizedVol = Number.isFinite(rawVol)
+    ? Math.min(32768, Math.max(47, Math.round(rawVol)))
+    : 50;
+
+  if (shape === 'VM.Standard.E2.1.Micro') {
+    const microErrors = [];
+    if (!volIsInt) microErrors.push('引导卷大小必须为整数');
+    else if (!volInBounds) microErrors.push('引导卷大小需在 47 ~ 32768 GB 之间');
+    return {
+      shape: 'VM.Standard.E2.1.Micro',
+      ocpu: 1,
+      memoryGb: 1,
+      bootVolumeGb: normalizedVol,
+      locked: true,
+      isFreeFixed: true,
+      isFlex: false,
+      isIntegerValid: volIsInt,
+      isRatioValid: true,
+      valid: microErrors.length === 0,
+      errors: microErrors,
+    };
+  }
+
+  const flexShapes = {
+    'VM.Standard.A1.Flex': true,
+    'VM.Standard.A2.Flex': true,
+    'VM.Standard.E4.Flex': true,
+    'VM.Standard.E5.Flex': true,
+    'VM.Standard3.Flex': true,
+    'VM.Optimized3.Flex': true,
+  };
+  const isFlex = Boolean(flexShapes[shape] || shape.slice(-5) === '.Flex');
+  const ocpuIsInt = Number.isInteger(rawOcpu);
+  const memIsInt = Number.isInteger(rawMem);
+  const ocpuInBounds = ocpuIsInt && rawOcpu >= 1 && rawOcpu <= 80;
+  const memInBounds = memIsInt && rawMem >= 1 && rawMem <= 512;
+
+  const clampedOcpu = Number.isFinite(rawOcpu)
+    ? Math.min(80, Math.max(1, Math.round(rawOcpu)))
+    : 1;
+  const minMem = clampedOcpu;
+  const maxMem = Math.min(512, clampedOcpu * 64);
+  const defaultMem = shape === 'VM.Standard.A1.Flex'
+    ? Math.min(512, clampedOcpu * 6)
+    : Math.min(512, clampedOcpu * 4);
+  const clampedMem = Number.isFinite(rawMem)
+    ? Math.min(maxMem, Math.max(minMem, Math.round(rawMem)))
+    : defaultMem;
+
+  const ratio = (rawOcpu > 0 && Number.isFinite(rawMem)) ? (rawMem / rawOcpu) : 0;
+  const ratioInBounds = rawOcpu > 0 && ratio >= 1 && ratio <= 64;
+
+  const errors = [];
+  if (!ocpuIsInt) errors.push('OCPU 核心数必须为整数');
+  else if (!ocpuInBounds) errors.push('OCPU 核心数范围需在 1 ~ 80 之间');
+
+  if (!memIsInt) errors.push('内存容量必须为整数');
+  else if (!memInBounds) errors.push('内存容量范围需在 1 ~ 512 GB 之间');
+  else if (!ratioInBounds) errors.push('单核内存比需在 1 ~ 64 GB/OCPU 之间');
+
+  if (!volIsInt) errors.push('引导卷大小必须为整数');
+  else if (!volInBounds) errors.push('引导卷大小需在 47 ~ 32768 GB 之间');
+
+  return {
+    shape,
+    ocpu: clampedOcpu,
+    memoryGb: clampedMem,
+    bootVolumeGb: normalizedVol,
+    locked: false,
+    isFreeFixed: false,
+    isFlex,
+    isIntegerValid: ocpuIsInt && memIsInt && volIsInt,
+    isRatioValid: ratioInBounds,
+    valid: errors.length === 0,
+    errors,
+  };
+}
+
+function estimateBootMonthlyCost(input) {
+  const normalized = normalizeBootShapeSpec(input);
+  const shape = normalized.shape;
+  const ocpu = normalized.ocpu;
+  const memoryGb = normalized.memoryGb;
+  const bootVolumeGb = normalized.bootVolumeGb;
+
+  const HOURS_PER_MONTH = 720;
+  const FREE_VOLUME_POOL_GB = 200;
+  const VOLUME_RATE_PER_GB_MONTH = 0.0255;
+
+  let computeHourlyRaw = 0;
+  if (shape === 'VM.Standard.E2.1.Micro') {
+    computeHourlyRaw = 0;
+  } else if (shape === 'VM.Standard.A1.Flex') {
+    const billableOcpu = Math.max(0, ocpu - 4);
+    const billableMemGb = Math.max(0, memoryGb - 24);
+    computeHourlyRaw = billableOcpu * 0.01 + billableMemGb * 0.0015;
+  } else if (shape === 'VM.Standard.A2.Flex') {
+    computeHourlyRaw = ocpu * 0.02 + memoryGb * 0.0015;
+  } else if (shape === 'VM.Standard.E4.Flex') {
+    computeHourlyRaw = ocpu * 0.025 + memoryGb * 0.0015;
+  } else if (shape === 'VM.Standard.E5.Flex') {
+    computeHourlyRaw = ocpu * 0.03 + memoryGb * 0.002;
+  } else if (shape === 'VM.Standard3.Flex') {
+    computeHourlyRaw = ocpu * 0.04 + memoryGb * 0.0015;
+  } else if (shape === 'VM.Optimized3.Flex') {
+    computeHourlyRaw = ocpu * 0.054 + memoryGb * 0.0015;
+  } else {
+    computeHourlyRaw = ocpu * 0.03 + memoryGb * 0.0015;
+  }
+
+  const billableVolumeGb = Math.max(0, bootVolumeGb - FREE_VOLUME_POOL_GB);
+  const storageMonthlyRaw = billableVolumeGb * VOLUME_RATE_PER_GB_MONTH;
+  const computeMonthlyRaw = computeHourlyRaw * HOURS_PER_MONTH;
+  const totalMonthlyRaw = computeMonthlyRaw + storageMonthlyRaw;
+  const totalHourlyRaw = computeHourlyRaw + (storageMonthlyRaw / HOURS_PER_MONTH);
+
+  const round2 = function(n) { return Math.round(n * 100) / 100; };
+  const round4 = function(n) { return Math.round(n * 10000) / 10000; };
+
+  const hourlyUsd = round4(totalHourlyRaw);
+  const computeHourlyUsd = round4(computeHourlyRaw);
+  const computeMonthlyUsd = round2(computeMonthlyRaw);
+  const storageMonthlyUsd = round2(storageMonthlyRaw);
+  const volumeMonthlyUsd = storageMonthlyUsd;
+  const totalMonthlyUsd = round2(totalMonthlyRaw);
+  const isAlwaysFree = totalMonthlyUsd === 0;
+  const tierBadge = isAlwaysFree
+    ? 'Always Free'
+    : ('$' + hourlyUsd.toFixed(4).replace(/0+$/, '').replace(/\.$/, '.00') + '/h · ~$' + totalMonthlyUsd.toFixed(2) + '/mo');
+
+  return {
+    shape,
+    ocpu,
+    memoryGb,
+    bootVolumeGb,
+    billableVolumeGb,
+    hourlyUsd,
+    computeHourlyUsd,
+    computeMonthlyUsd,
+    storageMonthlyUsd,
+    volumeMonthlyUsd,
+    totalMonthlyUsd,
+    isAlwaysFree,
+    tierBadge,
+  };
+}
+// --- END BOOT PRICING HELPERS ---
+
 // ─── 创建开机任务 · 独立工作台整页 (TenantBootCreatePage) ─────────────
 // 替代原局促 Modal 弹窗，严格对齐客户端 TenantBootCreateView 与 UI_STANDARD.md 标准：
 // - 顶部页头：带面包屑导航 (租户管理 / 创建开机任务)、返回按钮、保存按钮
@@ -11,19 +171,64 @@
 
   const { useState, useMemo, useEffect, useCallback } = React;
 
+  function bootTx(tr, lang, key, zh, en) {
+    const v = tr ? tr(key) : key;
+    return (v && v !== key) ? v : (lang === 'en' ? en : zh);
+  }
+
   const BOOT_TEMPLATES_ARM = [
-    { id: 'arm-base',  label: 'ARM Base',     ocpu: 1, memory: 6,  disk: 50,  tag: '免费', paid: false },
-    { id: 'arm-std',   label: 'ARM Standard', ocpu: 2, memory: 12, disk: 50,  tag: '免费', paid: false },
-    { id: 'arm-high',  label: 'ARM High',     ocpu: 4, memory: 24, disk: 50,  tag: '免费', paid: false },
-    { id: 'arm-a2',    label: 'ARM A2',       ocpu: 4, memory: 24, disk: 200, tag: '付费', paid: true  },
+    { id: 'arm-base',  label: 'ARM Base',     shape: 'VM.Standard.A1.Flex', archCode: 'ARM',         ocpu: 1, memory: 6,  disk: 50,  tag: '免费', paid: false },
+    { id: 'arm-std',   label: 'ARM Standard', shape: 'VM.Standard.A1.Flex', archCode: 'ARM',         ocpu: 2, memory: 12, disk: 50,  tag: '免费', paid: false },
+    { id: 'arm-high',  label: 'ARM High',     shape: 'VM.Standard.A1.Flex', archCode: 'ARM',         ocpu: 4, memory: 24, disk: 50,  tag: '免费', paid: false },
+    { id: 'arm-a2',    label: 'ARM A2',       shape: 'VM.Standard.A2.Flex', archCode: 'ARM_PAID_A2', ocpu: 4, memory: 24, disk: 200, tag: '付费', paid: true  },
   ];
 
   const BOOT_TEMPLATES_AMD = [
-    { id: 'amd-base',  label: 'AMD Base',     ocpu: 1, memory: 1,  disk: 50,  tag: '免费', paid: false },
-    { id: 'amd-e3',    label: 'AMD E3',       ocpu: 4, memory: 24, disk: 50,  tag: '付费', paid: true  },
-    { id: 'amd-e4',    label: 'AMD E4',       ocpu: 4, memory: 24, disk: 50,  tag: '付费', paid: true  },
-    { id: 'amd-e5',    label: 'AMD E5',       ocpu: 4, memory: 24, disk: 50,  tag: '付费', paid: true  },
+    { id: 'amd-base',  label: 'AMD Base',     shape: 'VM.Standard.E2.1.Micro', archCode: 'AMD',         ocpu: 1, memory: 1,  disk: 50,  tag: '免费', paid: false },
+    { id: 'amd-e3',    label: 'AMD E3',       shape: 'VM.Standard3.Flex',      archCode: 'AMD_PAID_E3', ocpu: 4, memory: 24, disk: 50,  tag: '付费', paid: true  },
+    { id: 'amd-e4',    label: 'AMD E4',       shape: 'VM.Standard.E4.Flex',    archCode: 'AMD_PAID_E4', ocpu: 4, memory: 24, disk: 50,  tag: '付费', paid: true  },
+    { id: 'amd-e5',    label: 'AMD E5',       shape: 'VM.Standard.E5.Flex',    archCode: 'AMD_PAID_E5', ocpu: 4, memory: 24, disk: 50,  tag: '付费', paid: true  },
   ];
+
+  const SHAPE_OPTIONS_BY_ARCH = {
+    ARM: [
+      { value: 'VM.Standard.A1.Flex', label: 'VM.Standard.A1.Flex (Ampere Always Free 弹性)', archCode: 'ARM' },
+      { value: 'VM.Standard.A2.Flex', label: 'VM.Standard.A2.Flex (Ampere 付费弹性)', archCode: 'ARM_PAID_A2' },
+    ],
+    AMD: [
+      { value: 'VM.Standard.E2.1.Micro', label: 'VM.Standard.E2.1.Micro (Always Free 固定 1C 1G)', archCode: 'AMD' },
+      { value: 'VM.Standard.E4.Flex',    label: 'VM.Standard.E4.Flex (AMD EPYC E4 弹性)', archCode: 'AMD_PAID_E4' },
+      { value: 'VM.Standard.E5.Flex',    label: 'VM.Standard.E5.Flex (AMD EPYC E5 弹性)', archCode: 'AMD_PAID_E5' },
+      { value: 'VM.Standard3.Flex',      label: 'VM.Standard3.Flex (Intel Xeon 弹性)', archCode: 'AMD_PAID_E3' },
+      { value: 'VM.Optimized3.Flex',     label: 'VM.Optimized3.Flex (高频计算优化弹性)', archCode: 'AMD_PAID_E3' },
+    ],
+  };
+
+  function BootSpecIntInput({ value, onChange, min, max, disabled = false }) {
+    return (
+      <input
+        type="number"
+        value={value}
+        disabled={disabled}
+        min={min}
+        max={max}
+        step={1}
+        onChange={e => onChange(e.target.value)}
+        style={{
+          width: '100%',
+          padding: '7px 10px',
+          background: disabled ? 'var(--bg-3)' : 'var(--bg-2)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-sm)',
+          color: disabled ? 'var(--fg-3)' : 'var(--fg-0)',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 12,
+          cursor: disabled ? 'not-allowed' : 'text',
+          opacity: disabled ? 0.8 : 1,
+        }}
+      />
+    );
+  }
 
   const LOOP_TIME_PRESETS = [
     { label: '10s', value: 10 },
@@ -71,10 +276,16 @@
 
     // 配置参数状态
     const [architecture, setArchitecture] = useState('ARM'); // ARM | AMD
+    const [shape, setShape] = useState('VM.Standard.A1.Flex');
+    const [lastTemplate, setLastTemplate] = useState(() => BOOT_TEMPLATES_ARM[2]);
     const [selectedTemplateId, setSelectedTemplateId] = useState('arm-high');
     const [ocpu, setOcpu] = useState(4);
     const [memory, setMemory] = useState(24);
     const [disk, setDisk] = useState(50);
+    const [ocpuRaw, setOcpuRaw] = useState('4');
+    const [memoryRaw, setMemoryRaw] = useState('24');
+    const [diskRaw, setDiskRaw] = useState('50');
+    const [billingRiskOpen, setBillingRiskOpen] = useState(false);
     const [instanceCount, setInstanceCount] = useState(1);
     const [loopTime, setLoopTime] = useState(60);
     const [dayGap, setDayGap] = useState('');
@@ -228,12 +439,69 @@
 
     // 应用规格模板
     const applyTemplate = (tpl) => {
+      const norm = normalizeBootShapeSpec({
+        shape: tpl.shape,
+        ocpu: tpl.ocpu,
+        memoryGb: tpl.memory,
+        bootVolumeGb: tpl.disk,
+      });
+      setLastTemplate(tpl);
       setSelectedTemplateId(tpl.id);
-      setOcpu(tpl.ocpu);
-      setMemory(tpl.memory);
-      setDisk(tpl.disk);
+      setShape(norm.shape);
+      setOcpu(norm.ocpu);
+      setMemory(norm.memoryGb);
+      setDisk(norm.bootVolumeGb);
+      setOcpuRaw(String(norm.ocpu));
+      setMemoryRaw(String(norm.memoryGb));
+      setDiskRaw(String(norm.bootVolumeGb));
       const tname = tenant?.tenancyName || tenant?.name || 'tenant';
       setRemark(`${tname}-${tpl.id}`);
+    };
+
+    // 恢复当前预设模板默认规格
+    const resetToTemplateDefault = () => {
+      if (!lastTemplate) return;
+      const norm = normalizeBootShapeSpec({
+        shape: lastTemplate.shape,
+        ocpu: lastTemplate.ocpu,
+        memoryGb: lastTemplate.memory,
+        bootVolumeGb: lastTemplate.disk,
+      });
+      setSelectedTemplateId(lastTemplate.id);
+      setShape(norm.shape);
+      setOcpu(norm.ocpu);
+      setMemory(norm.memoryGb);
+      setDisk(norm.bootVolumeGb);
+      setOcpuRaw(String(norm.ocpu));
+      setMemoryRaw(String(norm.memoryGb));
+      setDiskRaw(String(norm.bootVolumeGb));
+      shell.showToast(
+        bootTx(tr, lang, 'boot.spec.resetDone', `已恢复「${lastTemplate.label}」默认规格`, `Restored ${lastTemplate.label} defaults`),
+        { kind: 'info', duration: 1500 }
+      );
+    };
+
+    // Shape 切换联动 (VM.Standard.E2.1.Micro 自动锁定 1 OCPU / 1 GB)
+    const handleShapeChange = (nextShape) => {
+      setShape(nextShape);
+      setSelectedTemplateId('');
+      if (nextShape === 'VM.Standard.E2.1.Micro') {
+        setOcpu(1);
+        setMemory(1);
+        setOcpuRaw('1');
+        setMemoryRaw('1');
+      } else {
+        const norm = normalizeBootShapeSpec({
+          shape: nextShape,
+          ocpu: Number(ocpuRaw) || ocpu,
+          memoryGb: Number(memoryRaw) || memory,
+          bootVolumeGb: Number(diskRaw) || disk,
+        });
+        setOcpu(norm.ocpu);
+        setMemory(norm.memoryGb);
+        setOcpuRaw(String(norm.ocpu));
+        setMemoryRaw(String(norm.memoryGb));
+      }
     };
 
     // 架构切换联动
@@ -248,6 +516,29 @@
 
     // 防呆与校验
     const isArm = architecture === 'ARM';
+    const parsedOcpuNum = ocpuRaw.trim() === '' ? NaN : Number(ocpuRaw);
+    const parsedMemNum = memoryRaw.trim() === '' ? NaN : Number(memoryRaw);
+    const parsedDiskNum = diskRaw.trim() === '' ? NaN : Number(diskRaw);
+    const specValidation = useMemo(() => normalizeBootShapeSpec({
+      shape,
+      ocpu: parsedOcpuNum,
+      memoryGb: parsedMemNum,
+      bootVolumeGb: parsedDiskNum,
+    }), [shape, parsedOcpuNum, parsedMemNum, parsedDiskNum]);
+    const costEstimate = useMemo(() => estimateBootMonthlyCost({
+      shape,
+      ocpu: specValidation.ocpu,
+      memoryGb: specValidation.memoryGb,
+      bootVolumeGb: specValidation.bootVolumeGb,
+    }), [shape, specValidation.ocpu, specValidation.memoryGb, specValidation.bootVolumeGb]);
+    const isDeviatedFromTemplate = Boolean(
+      lastTemplate && (
+        shape !== lastTemplate.shape ||
+        parsedOcpuNum !== lastTemplate.ocpu ||
+        parsedMemNum !== lastTemplate.memory ||
+        parsedDiskNum !== lastTemplate.disk
+      )
+    );
     const armRatioOk = !isArm || (ocpu > 0 && Math.round((memory / ocpu) * 10) / 10 === 6);
     const armExceedsFree = isArm && (ocpu > 4 || memory > 24 || disk > 200);
 
@@ -302,11 +593,22 @@
         shell.showToast('请完整填写 OCPU、内存与磁盘配置', { kind: 'warn' });
         return;
       }
+      if (!specValidation.valid) {
+        shell.showToast(specValidation.errors[0] || '计算规格参数不合法，请检查整数与配比范围', { kind: 'warn' });
+        return;
+      }
+
+      const shapeOpts = SHAPE_OPTIONS_BY_ARCH[architecture] || [];
+      const matchedShapeOpt = shapeOpts.find(opt => opt.value === shape);
+      const submitArchCode = matchedShapeOpt ? matchedShapeOpt.archCode : architecture;
+      const finalOcpu = specValidation.ocpu;
+      const finalMemory = specValidation.memoryGb;
+      const finalDisk = specValidation.bootVolumeGb;
 
       // 触发强风控二次确认对话框 (对齐客户端 confirmOracleApiBootRisk)
       shell.openConfirm({
         title: '⚠️ 确认下发 API 开机任务？',
-        message: `您即将向目标区域下发抢机任务：${ocpu}C ${memory}G · ${disk}GB · ${selectedOS} ${selectedVersion}。\n\nOracle 近期已全面收紧对 API 频繁抢机的风控检测，过度频繁的轮询可能触发封号风险。\n是否已知悉风险并确认启动该任务？`,
+        message: `您即将向目标区域下发抢机任务：${shape} (${finalOcpu}C ${finalMemory}G · ${finalDisk}GB) · ${selectedOS} ${selectedVersion}。\n\nOracle 近期已全面收紧对 API 频繁抢机的风控检测，过度频繁的轮询可能触发封号风险。\n是否已知悉风险并确认启动该任务？`,
         confirmText: '已知晓风险，确认下发',
         danger: true,
         onConfirm: async () => {
@@ -314,10 +616,10 @@
           try {
             const body = {
               tenantId: activeTenantId,
-              architecture,
-              ocpu,
-              memory,
-              disk,
+              architecture: submitArchCode,
+              ocpu: finalOcpu,
+              memory: finalMemory,
+              disk: finalDisk,
               instanceCount: Number(instanceCount) || 1,
               loopTime: Number(loopTime) || 60,
               operatingSystem: selectedOS,
@@ -408,8 +710,8 @@
         {/* ─── 1. API 开机风控警示横幅 (对齐客户端 apiRiskBanner) ─── */}
         <div style={{
           display: 'flex', alignItems: 'flex-start', gap: 12,
-          padding: '12px 16px', borderRadius: 8,
-          background: 'var(--danger-soft)', border: '1px solid oklch(from var(--danger) l c h / 0.3)',
+          padding: '12px 16px', borderRadius: 'var(--radius)',
+          background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, var(--border))',
         }}>
           <Icon name="alert-triangle" size={16} style={{ color: 'var(--danger)', marginTop: 2, flexShrink: 0 }} />
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -451,8 +753,8 @@
                     type="button"
                     onClick={() => handleArchChange('ARM')}
                     style={{
-                      padding: '10px', borderRadius: 8, cursor: 'pointer',
-                      background: isArm ? 'color-mix(in oklab, var(--accent) 12%, transparent)' : 'var(--bg-2)',
+                      padding: '10px', borderRadius: 'var(--radius)', cursor: 'pointer', fontFamily: 'inherit',
+                      background: isArm ? 'var(--accent-soft)' : 'var(--bg-2)',
                       border: '1.5px solid ' + (isArm ? 'var(--accent)' : 'var(--border)'),
                       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
                       transition: 'all 120ms',
@@ -460,7 +762,7 @@
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: isArm ? 'var(--accent)' : 'var(--fg-0)' }}>Ampere ARM</span>
-                      <span style={{ fontSize: 9.5, padding: '1px 5px', borderRadius: 3, background: 'var(--accent-soft)', color: 'var(--accent)', fontWeight: 600 }}>推荐</span>
+                      <span style={{ fontSize: 9.5, padding: '1px 5px', borderRadius: 'var(--radius-sm)', background: 'var(--bg-1)', border: '1px solid color-mix(in srgb, var(--accent) 35%, var(--border))', color: 'var(--accent)', fontWeight: 600 }}>推荐</span>
                     </div>
                     <span style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>最高可享 4C 24G 免费额度</span>
                   </button>
@@ -469,8 +771,8 @@
                     type="button"
                     onClick={() => handleArchChange('AMD')}
                     style={{
-                      padding: '10px', borderRadius: 8, cursor: 'pointer',
-                      background: !isArm ? 'color-mix(in oklab, var(--info) 12%, transparent)' : 'var(--bg-2)',
+                      padding: '10px', borderRadius: 'var(--radius)', cursor: 'pointer', fontFamily: 'inherit',
+                      background: !isArm ? 'var(--info-soft)' : 'var(--bg-2)',
                       border: '1.5px solid ' + (!isArm ? 'var(--info)' : 'var(--border)'),
                       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
                       transition: 'all 120ms',
@@ -535,8 +837,8 @@
                         key={tpl.id}
                         onClick={() => applyTemplate(tpl)}
                         style={{
-                          padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                          background: active ? 'color-mix(in oklab, var(--accent) 12%, transparent)' : 'var(--bg-2)',
+                          padding: '10px 12px', borderRadius: 'var(--radius)', cursor: 'pointer',
+                          background: active ? 'var(--accent-soft)' : 'var(--bg-2)',
                           border: '1.5px solid ' + (active ? 'var(--accent)' : 'var(--border)'),
                           display: 'flex', flexDirection: 'column', gap: 4,
                           transition: 'all 100ms',
@@ -547,7 +849,7 @@
                             {tpl.label}
                           </span>
                           <span style={{
-                            fontSize: 9.5, padding: '1px 5px', borderRadius: 3,
+                            fontSize: 9.5, padding: '1px 5px', borderRadius: 'var(--radius-sm)',
                             background: tpl.paid ? 'var(--orange-soft)' : 'var(--accent-soft)',
                             color: tpl.paid ? 'var(--orange)' : 'var(--accent)',
                             fontWeight: 600,
@@ -578,45 +880,120 @@
                 borderRadius: 'var(--radius)', padding: '16px 18px',
                 display: 'flex', flexDirection: 'column', gap: 12,
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{
-                    width: 28, height: 28, borderRadius: 6,
-                    background: 'var(--info-soft)', color: 'var(--info)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  }}>
-                    <Icon name="sliders" size={14} />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: 6,
+                      background: 'var(--info-soft)', color: 'var(--info)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>
+                      <Icon name="sliders" size={14} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-0)' }}>计算与部署参数</div>
+                      <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>实例 Shape、整数核心内存校验与轮询周期</div>
+                    </div>
                   </div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-0)' }}>计算与部署参数</div>
-                    <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>核心、内存、磁盘与轮询周期</div>
-                  </div>
+                  <Button
+                    type="button"
+                    variant={isDeviatedFromTemplate ? 'outline' : 'ghost'}
+                    size="sm"
+                    icon="rotate-ccw"
+                    disabled={!isDeviatedFromTemplate}
+                    onClick={resetToTemplateDefault}
+                    style={isDeviatedFromTemplate ? { borderColor: 'var(--accent)', color: 'var(--accent)', background: 'var(--accent-soft)' } : {}}
+                  >
+                    {bootTx(tr, lang, 'boot.spec.resetBtn', '恢复模板默认规格', 'Reset to Template')}
+                  </Button>
                 </div>
+
+                {/* 实例 Shape 选择 */}
+                <FormRow label={bootTx(tr, lang, 'boot.spec.shapeLabel', '实例规格 (Shape)', 'Instance Shape')} required>
+                  <CustomDropdown
+                    value={shape}
+                    onChange={handleShapeChange}
+                    height={34}
+                    width="100%"
+                  >
+                    {(SHAPE_OPTIONS_BY_ARCH[architecture] || []).map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </CustomDropdown>
+                </FormRow>
+
+                {/* VM.Standard.E2.1.Micro 固定锁定提示 */}
+                {specValidation.locked && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '6px 10px', borderRadius: 'var(--radius-sm)',
+                    background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 40%, var(--border))',
+                    fontSize: 11, color: 'var(--info)',
+                  }}>
+                    <Icon name="lock" size={12} style={{ flexShrink: 0 }} />
+                    <span>
+                      {bootTx(
+                        tr,
+                        lang,
+                        'boot.spec.microLocked',
+                        'VM.Standard.E2.1.Micro 为固定微型规格，已自动锁定为 1 OCPU / 1 GB 内存（Always Free 最多 2 台）',
+                        'VM.Standard.E2.1.Micro is fixed at 1 OCPU / 1 GB RAM (Always Free up to 2 instances)'
+                      )}
+                    </span>
+                  </div>
+                )}
 
                 {/* OCPU + 内存 (并排双列) */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <FormRow label="OCPU (核心数)" required>
-                    <NumberInput
-                      value={ocpu}
-                      onChange={v => { setOcpu(Math.max(1, v)); setSelectedTemplateId(''); }}
-                      min={1} max={128}
+                  <FormRow label={specValidation.locked ? 'OCPU (已锁定 1C)' : 'OCPU (核心数 · 1~80 整数)'} required>
+                    <BootSpecIntInput
+                      value={specValidation.locked ? '1' : ocpuRaw}
+                      disabled={specValidation.locked}
+                      onChange={raw => {
+                        setOcpuRaw(raw);
+                        const n = Number(raw);
+                        if (Number.isFinite(n) && n >= 1) setOcpu(Math.min(80, Math.round(n)));
+                        setSelectedTemplateId('');
+                      }}
+                      min={1}
+                      max={80}
                     />
                   </FormRow>
-                  <FormRow label="内存容量 (GB)" required>
-                    <NumberInput
-                      value={memory}
-                      onChange={v => { setMemory(Math.max(1, v)); setSelectedTemplateId(''); }}
-                      min={1} max={1024}
+                  <FormRow label={specValidation.locked ? '内存容量 (已锁定 1GB)' : '内存容量 (GB · 1~512 整数)'} required>
+                    <BootSpecIntInput
+                      value={specValidation.locked ? '1' : memoryRaw}
+                      disabled={specValidation.locked}
+                      onChange={raw => {
+                        setMemoryRaw(raw);
+                        const n = Number(raw);
+                        if (Number.isFinite(n) && n >= 1) setMemory(Math.min(512, Math.round(n)));
+                        setSelectedTemplateId('');
+                      }}
+                      min={1}
+                      max={512}
                     />
                   </FormRow>
                 </div>
+
+                {/* 整数与范围即时校验提示 */}
+                {!specValidation.valid && specValidation.errors.length > 0 && (
+                  <div style={{
+                    display: 'flex', alignItems: 'flex-start', gap: 6,
+                    padding: '7px 10px', borderRadius: 'var(--radius-sm)',
+                    background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 45%, var(--border))',
+                    fontSize: 11, color: 'var(--danger)', lineHeight: 1.5,
+                  }}>
+                    <Icon name="alert-circle" size={13} style={{ flexShrink: 0, marginTop: 1 }} />
+                    <div>{specValidation.errors.join('；')}</div>
+                  </div>
+                )}
 
                 {/* 核心防呆：ARM 1:6 核心内存比动态校验指示条 */}
                 {isArm && (
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '6px 10px', borderRadius: 6,
+                    padding: '6px 10px', borderRadius: 'var(--radius-sm)',
                     background: armRatioOk ? 'var(--accent-soft)' : 'var(--orange-soft)',
-                    border: '1px solid ' + (armRatioOk ? 'oklch(from var(--accent) l c h / 0.25)' : 'oklch(from var(--orange) l c h / 0.25)'),
+                    border: '1px solid ' + (armRatioOk ? 'color-mix(in srgb, var(--accent) 35%, var(--border))' : 'color-mix(in srgb, var(--orange) 35%, var(--border))'),
                     fontSize: 11, color: armRatioOk ? 'var(--accent)' : 'var(--orange)',
                   }}>
                     <Icon name={armRatioOk ? 'check-circle' : 'alert-circle'} size={12} style={{ flexShrink: 0 }} />
@@ -632,9 +1009,9 @@
                 {armExceedsFree && (
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '6px 10px', borderRadius: 6,
+                    padding: '6px 10px', borderRadius: 'var(--radius-sm)',
                     background: 'var(--orange-soft)',
-                    border: '1px solid oklch(from var(--orange) l c h / 0.25)',
+                    border: '1px solid color-mix(in srgb, var(--orange) 35%, var(--border))',
                     fontSize: 11, color: 'var(--orange)',
                   }}>
                     <Icon name="alert-triangle" size={12} style={{ flexShrink: 0 }} />
@@ -644,10 +1021,16 @@
 
                 {/* 引导卷磁盘大小 */}
                 <FormRow label="引导卷大小 (GB)" required hint="免费账户总块存储配额上限为 200GB">
-                  <NumberInput
-                    value={disk}
-                    onChange={v => { setDisk(Math.max(47, v)); setSelectedTemplateId(''); }}
-                    min={47} max={32768}
+                  <BootSpecIntInput
+                    value={diskRaw}
+                    onChange={raw => {
+                      setDiskRaw(raw);
+                      const n = Number(raw);
+                      if (Number.isFinite(n) && n >= 47) setDisk(Math.min(32768, Math.round(n)));
+                      setSelectedTemplateId('');
+                    }}
+                    min={47}
+                    max={32768}
                   />
                 </FormRow>
 
@@ -660,7 +1043,7 @@
                         type="button"
                         onClick={() => setLoopTime(p.value)}
                         style={{
-                          flex: 1, padding: '6px 0', borderRadius: 6, fontSize: 11.5,
+                          flex: 1, padding: '6px 0', borderRadius: 'var(--button-radius)', fontSize: 11.5, fontFamily: 'inherit',
                           cursor: 'pointer', border: '1px solid ' + (loopTime === p.value ? 'var(--accent)' : 'var(--border)'),
                           background: loopTime === p.value ? 'var(--accent-soft)' : 'var(--bg-2)',
                           color: loopTime === p.value ? 'var(--accent)' : 'var(--fg-1)',
@@ -696,7 +1079,7 @@
                             type="button"
                             onClick={() => setDayGap(p.value)}
                             style={{
-                              flex: 1, padding: '5px 0', borderRadius: 6, fontSize: 11,
+                              flex: 1, padding: '5px 0', borderRadius: 'var(--button-radius)', fontSize: 11, fontFamily: 'inherit',
                               cursor: 'pointer', border: '1px solid ' + (active ? 'var(--accent)' : 'var(--border)'),
                               background: active ? 'var(--accent-soft)' : 'var(--bg-2)',
                               color: active ? 'var(--accent)' : 'var(--fg-1)',
@@ -760,9 +1143,9 @@
                     {/* 实时大白话反馈提示条 */}
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: 6,
-                      padding: '6px 10px', borderRadius: 6,
-                      background: parsedRange.invalid ? 'var(--danger-soft)' : 'color-mix(in oklab, var(--accent) 10%, transparent)',
-                      border: '1px solid ' + (parsedRange.invalid ? 'var(--danger)' : 'oklch(from var(--accent) l c h / 0.2)'),
+                      padding: '6px 10px', borderRadius: 'var(--radius-sm)',
+                      background: parsedRange.invalid ? 'var(--danger-soft)' : 'var(--accent-soft)',
+                      border: '1px solid ' + (parsedRange.invalid ? 'color-mix(in srgb, var(--danger) 45%, var(--border))' : 'color-mix(in srgb, var(--accent) 35%, var(--border))'),
                       fontSize: 11,
                       color: parsedRange.invalid ? 'var(--danger)' : 'var(--accent)',
                     }}>
@@ -923,9 +1306,109 @@
               </div>
             </div>
 
+            {/* ─── 4. 创建规格与实时美元费用预估摘要栏 (含折叠风险说明) ─── */}
+            <div style={{
+              background: 'var(--bg-1)',
+              border: '1px solid ' + (costEstimate.isAlwaysFree ? 'var(--border)' : 'color-mix(in srgb, var(--orange) 55%, var(--border))'),
+              borderRadius: 'var(--radius)',
+              padding: '14px 18px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: 'var(--radius-sm)',
+                    background: costEstimate.isAlwaysFree ? 'var(--success-soft)' : 'var(--orange-soft)',
+                    color: costEstimate.isAlwaysFree ? 'var(--success)' : 'var(--orange)',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>
+                    <Icon name={costEstimate.isAlwaysFree ? 'check-circle-2' : 'dollar-sign'} size={15} />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-0)' }}>
+                        {bootTx(tr, lang, 'boot.cost.title', '实时规格与月度费用预估', 'Live Spec & Monthly USD Estimate')}
+                      </span>
+                      <span className="mono" style={{
+                        padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700,
+                        background: costEstimate.isAlwaysFree ? 'var(--success-soft)' : 'var(--orange-soft)',
+                        color: costEstimate.isAlwaysFree ? 'var(--success)' : 'var(--orange)',
+                        border: '1px solid ' + (costEstimate.isAlwaysFree ? 'color-mix(in srgb, var(--success) 45%, var(--border))' : 'color-mix(in srgb, var(--orange) 45%, var(--border))'),
+                      }}>
+                        {costEstimate.isAlwaysFree
+                          ? bootTx(tr, lang, 'boot.cost.alwaysFreeBadge', 'Always Free 额度内 · $0.00/月', 'Always Free · $0.00/mo')
+                          : `$${costEstimate.hourlyUsd.toFixed(4).replace(/0+$/, '').replace(/\.$/, '.00')} / h · ~$${costEstimate.totalMonthlyUsd.toFixed(2)} / mo`}
+                      </span>
+                    </div>
+                    <div className="mono" style={{ fontSize: 11.5, color: 'var(--fg-2)', marginTop: 3 }}>
+                      {shape} · {specValidation.ocpu} OCPU · {specValidation.memoryGb} GB RAM · {specValidation.bootVolumeGb} GB Boot
+                      {Number(instanceCount) > 1 ? ` × ${Number(instanceCount)} 台` : ''}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                  <div style={{ textAlign: 'right', fontSize: 11.5, color: 'var(--fg-2)' }}>
+                    <div>
+                      {bootTx(tr, lang, 'boot.cost.compute', '计算预估', 'Compute')}:{' '}
+                      <span className="mono num" style={{ fontWeight: 600, color: 'var(--fg-0)' }}>
+                        ${costEstimate.computeMonthlyUsd.toFixed(2)}/mo
+                      </span>
+                    </div>
+                    <div>
+                      {bootTx(tr, lang, 'boot.cost.storage', '超额存储 (>200GB)', 'Storage (>200GB)')}:{' '}
+                      <span className="mono num" style={{ fontWeight: 600, color: 'var(--fg-0)' }}>
+                        ${costEstimate.storageMonthlyUsd.toFixed(2)}/mo
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    aria-expanded={billingRiskOpen}
+                    onClick={() => setBillingRiskOpen(v => !v)}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-3)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-2)'; }}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                      padding: '6px 10px', borderRadius: 'var(--button-radius)',
+                      background: 'var(--bg-2)', color: 'var(--fg-1)',
+                      border: '1px solid ' + (billingRiskOpen ? 'var(--border-strong)' : 'var(--border)'),
+                      fontSize: 11.5, fontWeight: 500,
+                      fontFamily: 'inherit', cursor: 'pointer',
+                      transition: 'background 120ms, border-color 120ms',
+                    }}
+                  >
+                    <Icon name="help-circle" size={13} style={{ color: 'var(--info)' }} />
+                    {bootTx(tr, lang, 'boot.cost.riskToggle', '计费与超额风险说明', 'Billing & Overage Risk')}
+                    <Icon name={billingRiskOpen ? 'chevron-up' : 'chevron-down'} size={13} style={{ color: 'var(--fg-3)' }} />
+                  </button>
+                </div>
+              </div>
+
+              {billingRiskOpen && (
+                <div style={{
+                  padding: '10px 12px', borderRadius: 'var(--radius-sm)',
+                  background: 'var(--bg-2)', border: '1px solid var(--border)',
+                  fontSize: 11.5, color: 'var(--fg-2)', lineHeight: 1.65,
+                  display: 'flex', flexDirection: 'column', gap: 4,
+                }}>
+                  <div>• <strong style={{ color: 'var(--fg-0)' }}>VM.Standard.E2.1.Micro</strong>：固定 1 OCPU / 1 GB，每个主区域账号最多享有 2 台 Always Free 微型实例。</div>
+                  <div>• <strong style={{ color: 'var(--fg-0)' }}>VM.Standard.A1.Flex (ARM)</strong>：整个租户每月共享前 <strong style={{ color: 'var(--fg-0)' }}>4 OCPU (3,000 OCPU·h) + 24 GB (18,000 GB·h)</strong> 免费池；若账号内已有运行中的 ARM 实例，新增实例超出共享池部分按 <span className="mono" style={{ color: 'var(--fg-1)' }}>$0.01/OCPU·h + $0.0015/GB·h</span> 计费。</div>
+                  <div>• <strong style={{ color: 'var(--fg-0)' }}>引导卷与块存储池</strong>：免费账户全租户共享 <strong style={{ color: 'var(--fg-0)' }}>200 GB</strong> 块存储额度（含所有实例引导卷与备份），超出部分按约 <span className="mono" style={{ color: 'var(--fg-1)' }}>$0.0255/GB·月</span> 估算。</div>
+                  <div>• <strong style={{ color: 'var(--fg-0)' }}>付费 Flex 规格 (E4 / E5 / Standard3 / Optimized3)</strong>：无免费额度抵扣，开机后按实际运行小时计费（预估按 <span className="mono" style={{ color: 'var(--fg-1)' }}>720 小时/月</span> 折算，不含公网出站超额流量）。</div>
+                </div>
+              )}
+            </div>
+
       </div>
     );
   }
 
-  global.TenantBootCreatePage = TenantBootCreatePage;
+  Object.assign(global, {
+    TenantBootCreatePage,
+    normalizeBootShapeSpec,
+    estimateBootMonthlyCost,
+  });
 })(typeof window !== 'undefined' ? window : globalThis);

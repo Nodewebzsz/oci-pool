@@ -40,7 +40,40 @@ struct PageScaffold<Toolbar: View, Content: View, Footer: View>: View {
 
     /// Web PageHeader（ui.jsx）：bg-1 卡 · border · radius 8 · padding 14px 20px · 图标 32(18% 底) · 标题 17/600
     private var headerCard: some View {
-        HStack(alignment: .center, spacing: 16) {
+        Group {
+            if #available(macOS 13.0, *) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 16) {
+                        headerTitle.fixedSize(horizontal: true, vertical: false)
+                        Spacer(minLength: 16)
+                        toolbar().fixedSize(horizontal: true, vertical: false)
+                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        headerTitle
+                        toolbar().frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    headerTitle
+                    ScrollView(.horizontal, showsIndicators: true) { toolbar() }
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .background(AppTheme.sidebarBg(dark))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
+        )
+        .cornerRadius(8)
+        .padding(.bottom, 14)
+    }
+
+    private var headerTitle: some View {
             HStack(spacing: 12) {
                 if let systemImage = systemImage {
                     ZStack {
@@ -86,20 +119,8 @@ struct PageScaffold<Toolbar: View, Content: View, Footer: View>: View {
                             .lineLimit(1)
                     }
                 }
+                .lineLimit(1)
             }
-            Spacer(minLength: 16)
-            toolbar()
-                .fixedSize(horizontal: true, vertical: false)
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
-        .background(AppTheme.sidebarBg(dark))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(AppTheme.border(dark), lineWidth: 1)
-        )
-        .cornerRadius(8)
-        .padding(.bottom, 14)
     }
 }
 

@@ -150,12 +150,6 @@ oci:
 ssl:
   staging: false
 
-springdoc:
-  swagger-ui:
-    path: /swagger-ui.html
-    operations-sorter: method
-  packages-to-scan: com.nodewebzsz.ociserver.third.openApi.controller
-
 sa-token:
   token-name: satoken
   timeout: 2592000

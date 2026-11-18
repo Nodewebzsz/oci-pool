@@ -206,4 +206,95 @@ function BarChart({ data, successAt = [], width = 600, height = 180, padding = {
   );
 }
 
-Object.assign(window, { CircularGauge, AreaChart, BarChart });
+// Category distribution bar chart (used for Tenant Portrait age & region count buckets)
+function CategoryBarChart({ items = [], width = 420, height = 148 }) {
+  const padding = { top: 24, right: 14, bottom: 30, left: 32 };
+  const w = width - padding.left - padding.right;
+  const h = height - padding.top - padding.bottom;
+  const safeItems = (items || []).map((item) => ({
+    label: item?.label || '',
+    value: Math.max(0, Number(item?.value) || 0),
+    color: item?.color || 'var(--accent)',
+  }));
+  const total = safeItems.reduce((acc, it) => acc + it.value, 0);
+  const rawMax = safeItems.length ? Math.max(...safeItems.map(it => it.value)) : 0;
+  const max = rawMax > 0 ? Math.ceil(rawMax * 1.18) : 4;
+  const gridLines = 3;
+  const yTicks = Array.from({ length: gridLines + 1 }, (_, i) => Math.round((max / gridLines) * i));
+  const slots = Math.max(1, safeItems.length);
+  const slotWidth = w / slots;
+  const barWidth = Math.min(44, Math.max(18, slotWidth * 0.48));
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${width} ${height}`} style={{ display: 'block', overflow: 'visible' }}>
+      {yTicks.map((tv, i) => {
+        const y = padding.top + h - (tv / max) * h;
+        return (
+          <g key={i}>
+            <line
+              x1={padding.left}
+              x2={padding.left + w}
+              y1={y}
+              y2={y}
+              stroke="var(--border)"
+              strokeWidth="1"
+              strokeDasharray={i === 0 ? '0' : '2 4'}
+            />
+            <text
+              x={padding.left - 7}
+              y={y + 3}
+              textAnchor="end"
+              fontSize="10"
+              fill="var(--fg-3)"
+              fontFamily="var(--font-mono)"
+            >
+              {tv}
+            </text>
+          </g>
+        );
+      })}
+      {safeItems.map((it, idx) => {
+        const xCenter = padding.left + idx * slotWidth + slotWidth / 2;
+        const barX = xCenter - barWidth / 2;
+        const barH = it.value > 0 ? Math.max(4, (it.value / max) * h) : 2;
+        const barY = padding.top + h - barH;
+        const pct = total > 0 ? Math.round((it.value / total) * 100) : 0;
+        return (
+          <g key={idx}>
+            <rect
+              x={barX}
+              y={barY}
+              width={barWidth}
+              height={barH}
+              rx="4"
+              fill={it.value > 0 ? it.color : 'var(--bg-3)'}
+              opacity={it.value > 0 ? '0.88' : '0.6'}
+            />
+            <text
+              x={xCenter}
+              y={barY - 6}
+              textAnchor="middle"
+              fontSize="10.5"
+              fontWeight="600"
+              fill={it.value > 0 ? 'var(--fg-0)' : 'var(--fg-3)'}
+              fontFamily="var(--font-mono)"
+            >
+              {it.value}{total > 0 && it.value > 0 ? ` (${pct}%)` : ''}
+            </text>
+            <text
+              x={xCenter}
+              y={height - 8}
+              textAnchor="middle"
+              fontSize="10.5"
+              fill="var(--fg-2)"
+            >
+              {it.label}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+Object.assign(window, { CircularGauge, AreaChart, BarChart, CategoryBarChart });

@@ -22,4 +22,8 @@ public interface SystemMessageService {
     ApiResponse countUnreadMessage();
 
     ApiResponse deleteMessage(SystemMessageRequest messageRequest);
+
+    ApiResponse deleteMessages(SystemMessageRequest request);
+
+    ApiResponse clearAllMessages();
 }

@@ -24,7 +24,6 @@
         <spring.version>2.7.6</spring.version>
         <web.version>2.7.6</web.version>
         <jackon.version>2.13.3</jackon.version>
-        <druid.version>1.2.16</druid.version>
         <mysql-connector>5.1.47</mysql-connector>
         <mybatis.spring.version>2.2.0</mybatis.spring.version>
         <jwt.version>0.9.1</jwt.version>
@@ -34,7 +33,6 @@
         <oci-java-sdk.version>3.92.0</oci-java-sdk.version>
         <caffeine.version>2.9.2</caffeine.version>
         <disruptor.version>3.4.4</disruptor.version>
-        <openapi.version>1.7.0</openapi.version>
     </properties>
 
     <modules>
@@ -90,12 +88,6 @@
                 <version>1.2.17</version>
             </dependency>
 
-            <dependency>
-                <groupId>com.alibaba</groupId>
-                <artifactId>druid-spring-boot-starter</artifactId>
-                <version>${druid.version}</version>
-            </dependency>
-
             <!-- MySQL 连接驱动依赖 -->
             <dependency>
                 <groupId>mysql</groupId>
@@ -121,18 +113,6 @@
                 <groupId>io.jsonwebtoken</groupId>
                 <artifactId>jjwt</artifactId>
                 <version>${jwt.version}</version>
-            </dependency>
-
-            <!--swagger-->
-            <dependency>
-                <groupId>io.springfox</groupId>
-                <artifactId>springfox-swagger2</artifactId>
-                <version>2.9.2</version>
-            </dependency>
-            <dependency>
-                <groupId>io.springfox</groupId>
-                <artifactId>springfox-swagger-ui</artifactId>
-                <version>2.9.2</version>
             </dependency>
 
             <dependency>
@@ -464,13 +444,6 @@
                 <artifactId>acme4j-utils</artifactId>
                 <version>2.16</version>
             </dependency>
-
-            <dependency>
-                <groupId>org.springdoc</groupId>
-                <artifactId>springdoc-openapi-ui</artifactId>
-                <version>${openapi.version}</version>
-            </dependency>
-
 
         </dependencies>
     </dependencyManagement>

@@ -97,4 +97,21 @@ public class SystemMessageServiceImpl implements SystemMessageService {
         }
         return ApiResponse.success();
     }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ApiResponse deleteMessages(SystemMessageRequest request) {
+        if (request == null || request.getIds() == null || request.getIds().isEmpty()) {
+            return ApiResponse.error("请选择要删除的消息");
+        }
+        messageRepository.deleteAllByIdInBatch(request.getIds());
+        return ApiResponse.success("批量删除消息成功");
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ApiResponse clearAllMessages() {
+        messageRepository.deleteAllInBatch();
+        return ApiResponse.success("已清空全部系统消息");
+    }
 }

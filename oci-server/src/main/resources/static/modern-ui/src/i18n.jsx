@@ -3239,6 +3239,103 @@ const I18N = {
     'audit.emptyTitle':  '该时间范围内没有审计事件',
     'audit.errorTitle':  '查询审计日志失败',
 
+    // Notifications batch cleanup & Social console shortcut
+    'notify.selectAll': '全选',
+    'notify.deleteSelected': '删除已选',
+    'notify.clearAll': '清空全部',
+    'notify.clearAllBtn': '确认清空',
+    'notify.clearConfirmTitle': '清空全部系统消息',
+    'notify.clearConfirmBody': '确定要清空全部系统通知记录吗？清空后历史通知将无法恢复。',
+    'notify.batchDeleted': '已删除 {0} 条通知',
+    'notify.clearedAll': '已清空全部系统消息',
+    'social.googleConsole': 'Google 凭据控制台',
+
+    // Built-in OpenAPI 3.0.3 Docs
+    'apiDocs.openDrawer': '打开内置交互文档',
+    'apiDocs.exportJson': '导出 OpenAPI 3.0.3 JSON',
+    'apiDocs.title': 'OpenAPI 3.0.3 交互文档',
+    'apiDocs.subtitle': '受登录保护的开放接口规范与在线调试面板',
+
+    // Cloudflare Official IPs & Public IP Extractor
+    'cf.officialIpsBtn': 'Cloudflare 回源 IP / Nginx',
+    'cf.extractPublicIpsBtn': '提取公网 IP',
+
+    // Boot Pricing & Spec Validation
+    'bootPrice.alwaysFree': 'Always Free 额度内',
+    'bootPrice.resetTemplate': '恢复模板默认规格',
+    'bootPrice.riskTitle': '计费与超额风险说明',
+
+    // Monitor Main Tenant Portrait
+    'monitor.portrait.title': '号池主账号多维画像',
+    'monitor.portrait.subtitle': '基于主区域租户聚合等级、注册主体、存活账龄与多区订阅分布',
+    'monitor.portrait.mainTotal': '主账号总数',
+    'monitor.portrait.upgradedRatio': '升级号占比',
+    'monitor.portrait.paid': '升级号',
+    'monitor.portrait.free': '免费号',
+    'monitor.portrait.entityMix': '个人 / 企业主体',
+    'monitor.portrait.corpPct': '企业占比',
+    'monitor.portrait.personalPct': '个人占比',
+    'monitor.portrait.unverified': '待同步',
+    'monitor.portrait.veteranRate': '老号存活率 (>180天)',
+    'monitor.portrait.multiRegionRatio': '多区域拓展率',
+    'monitor.portrait.multiRegionSub': '已订阅 ≥2 个区域',
+    'monitor.portrait.ageChartTitle': '账号存活账龄分布',
+    'monitor.portrait.ageChartUnit': '按注册/存活天数分档',
+    'monitor.portrait.regionChartTitle': '主账号订阅区域数分布',
+    'monitor.portrait.regionChartUnit': '主区域 + 子区域总数',
+    'monitor.portrait.age.lt30d': '< 30 天',
+    'monitor.portrait.age.d30To180': '30–180 天',
+    'monitor.portrait.age.d180To365': '180–365 天',
+    'monitor.portrait.age.gt365d': '> 1 年',
+    'monitor.portrait.region.r1': '单区域 (1)',
+    'monitor.portrait.region.r2': '双区域 (2)',
+    'monitor.portrait.region.r3Plus': '3+ 多区域',
+    'monitor.portrait.empty': '当前号池暂无主区域账号数据，添加 OCI 租户后自动生成多维画像',
+    'monitor.portrait.goTenants': '前往租户管理',
+
+    // Regions World Map Dual-Layer Coverage
+    'regions.filter.all': '全部区域',
+    'regions.filter.linked': '我已关联',
+    'regions.filter.uncoveredReleased': '有货未覆盖',
+    'regions.map.filterAll': '全部区域',
+    'regions.map.filterLinked': '我已关联',
+    'regions.map.filterUncovered': '有货未覆盖',
+    'regions.map.badge.linkedActive': '已关联账号覆盖 · 官方已放货',
+    'regions.map.badge.linkedIdle': '已关联账号覆盖 · 暂未放货',
+    'regions.map.badge.uncoveredReleased': '可订阅开拓空白区 · 官方曾放货但尚未关联',
+    'regions.map.badge.uncoveredIdle': '尚未关联账号 · 暂未放货',
+    'regions.map.legend.linkedActive': '已关联 · 已放货',
+    'regions.map.legend.linkedIdle': '已关联 · 待放货',
+    'regions.map.legend.uncoveredReleased': '有货未覆盖 (可订阅开拓)',
+
+    // Token / OpenAPI Docs (page-proxy.jsx)
+    'token.apiDoc.openInteractive': '打开内置交互文档',
+    'token.apiDoc.interactiveSub': '按分组浏览 6 个开放接口、自动带入当前 Token 复制 cURL 并在线调试',
+    'token.apiDoc.exportJson': '导出 OpenAPI 3.0.3 JSON',
+    'token.apiDoc.exportSub': '下载受保护规范文件 oci-pool-openapi-3.0.3.json（支持导入 Postman / Apifox）',
+    'token.apiDoc.protectedNotice': '已关闭匿名公开文档端点，内置交互式文档受平台登录态保护；外部客户端调用 /oci-pool/open-api/v1/** 请携带上方生成的 Bearer Token。',
+    'token.apiDoc.drawerTitle': '内置交互式 OpenAPI 调试文档',
+    'token.apiDoc.drawerSub': 'OpenAPI 3.0.3 · 自动注入当前 Token 生成 Bearer cURL 与在线请求调试',
+
+    // Cloudflare IP Tools (page-proxy.jsx)
+    'dnsp.cf.officialIpsBtn': '回源 IP / Nginx',
+    'dnsp.cf.extractIpsBtn': '提取公网 IP',
+    'dnsp.cf.officialDrawerTitle': 'Cloudflare 官方回源真实 IP / Nginx 配置',
+    'dnsp.cf.officialDrawerSub': '获取 Cloudflare IPv4/IPv6 官方回源网段并一键生成 CF-Connecting-IP 还原配置',
+    'dnsp.cf.extractDrawerTitle': '解析记录公网 IP 聚合提取',
+    'dnsp.cf.extractDrawerSub': '按类型、橙云代理与域名前缀筛选去重',
+
+    // Boot Pricing & Shape Lock (page-tenant-boot-create.jsx)
+    'boot.spec.resetBtn': '恢复模板默认规格',
+    'boot.spec.resetDone': '已恢复默认规格',
+    'boot.spec.shapeLabel': '实例规格 (Shape)',
+    'boot.spec.microLocked': 'VM.Standard.E2.1.Micro 为固定微型规格，已自动锁定为 1 OCPU / 1 GB 内存（Always Free 最多 2 台）',
+    'boot.cost.title': '实时规格与月度费用预估',
+    'boot.cost.alwaysFreeBadge': 'Always Free 额度内 · $0.00/月',
+    'boot.cost.compute': '计算预估',
+    'boot.cost.storage': '超额存储 (>200GB)',
+    'boot.cost.riskToggle': '计费与超额风险说明',
+
   },
   en: {
     'brand.name': 'OCI-POOL',
@@ -6452,6 +6549,103 @@ const I18N = {
     'audit.rangeTooLongN': 'Date range cannot exceed 90 days (currently {n} days)',
     'audit.emptyTitle':  'No audit events in this time range',
     'audit.errorTitle':  'Audit log query failed',
+
+    // Notifications batch cleanup & Social console shortcut
+    'notify.selectAll': 'Select all',
+    'notify.deleteSelected': 'Delete selected',
+    'notify.clearAll': 'Clear all',
+    'notify.clearAllBtn': 'Confirm clear',
+    'notify.clearConfirmTitle': 'Clear All System Messages',
+    'notify.clearConfirmBody': 'Are you sure you want to clear all system notifications? This action cannot be undone.',
+    'notify.batchDeleted': 'Deleted {0} notifications',
+    'notify.clearedAll': 'Cleared all system messages',
+    'social.googleConsole': 'Google Credentials Console',
+
+    // Built-in OpenAPI 3.0.3 Docs
+    'apiDocs.openDrawer': 'Open Interactive API Docs',
+    'apiDocs.exportJson': 'Export OpenAPI 3.0.3 JSON',
+    'apiDocs.title': 'OpenAPI 3.0.3 Interactive Docs',
+    'apiDocs.subtitle': 'Authenticated open API specification and live request tester',
+
+    // Cloudflare Official IPs & Public IP Extractor
+    'cf.officialIpsBtn': 'Cloudflare Origin IPs / Nginx',
+    'cf.extractPublicIpsBtn': 'Extract Public IPs',
+
+    // Boot Pricing & Spec Validation
+    'bootPrice.alwaysFree': 'Within Always Free Tier',
+    'bootPrice.resetTemplate': 'Reset to Template Defaults',
+    'bootPrice.riskTitle': 'Billing & Overage Risk Notes',
+
+    // Monitor Main Tenant Portrait
+    'monitor.portrait.title': 'Main Tenant Pool Portrait',
+    'monitor.portrait.subtitle': 'Aggregated by home-region accounts across tier, entity type, account age, and subscribed regions',
+    'monitor.portrait.mainTotal': 'Main Tenants',
+    'monitor.portrait.upgradedRatio': 'Upgraded Ratio',
+    'monitor.portrait.paid': 'Paid',
+    'monitor.portrait.free': 'Free',
+    'monitor.portrait.entityMix': 'Personal / Corporate',
+    'monitor.portrait.corpPct': 'Corp',
+    'monitor.portrait.personalPct': 'Personal',
+    'monitor.portrait.unverified': 'Unsynced',
+    'monitor.portrait.veteranRate': 'Veteran (>180d)',
+    'monitor.portrait.multiRegionRatio': 'Multi-Region Ratio',
+    'monitor.portrait.multiRegionSub': '≥2 Subscribed Regions',
+    'monitor.portrait.ageChartTitle': 'Account Age Distribution',
+    'monitor.portrait.ageChartUnit': 'Grouped by active days',
+    'monitor.portrait.regionChartTitle': 'Subscribed Regions per Tenant',
+    'monitor.portrait.regionChartUnit': 'Home + subscribed regions',
+    'monitor.portrait.age.lt30d': '< 30d',
+    'monitor.portrait.age.d30To180': '30–180d',
+    'monitor.portrait.age.d180To365': '180–365d',
+    'monitor.portrait.age.gt365d': '> 1 yr',
+    'monitor.portrait.region.r1': '1 Region',
+    'monitor.portrait.region.r2': '2 Regions',
+    'monitor.portrait.region.r3Plus': '3+ Regions',
+    'monitor.portrait.empty': 'No home-region tenants in pool yet. Add OCI tenants to view multi-dimensional portrait.',
+    'monitor.portrait.goTenants': 'Go to Tenants',
+
+    // Regions World Map Dual-Layer Coverage
+    'regions.filter.all': 'All Regions',
+    'regions.filter.linked': 'Linked by Me',
+    'regions.filter.uncoveredReleased': 'Released & Uncovered',
+    'regions.map.filterAll': 'All Regions',
+    'regions.map.filterLinked': 'Linked',
+    'regions.map.filterUncovered': 'Released · Uncovered',
+    'regions.map.badge.linkedActive': 'Linked Tenant · Released',
+    'regions.map.badge.linkedIdle': 'Linked Tenant · Awaiting Release',
+    'regions.map.badge.uncoveredReleased': 'Uncovered Opportunity · Released',
+    'regions.map.badge.uncoveredIdle': 'Unlinked · Not Released',
+    'regions.map.legend.linkedActive': 'Linked · Released',
+    'regions.map.legend.linkedIdle': 'Linked · Idle',
+    'regions.map.legend.uncoveredReleased': 'Released · Uncovered',
+
+    // Token / OpenAPI Docs (page-proxy.jsx)
+    'token.apiDoc.openInteractive': 'Open Built-in Interactive Docs',
+    'token.apiDoc.interactiveSub': 'Browse 6 Open API endpoints, copy Bearer cURL, and run live requests',
+    'token.apiDoc.exportJson': 'Export OpenAPI 3.0.3 JSON',
+    'token.apiDoc.exportSub': 'Download oci-pool-openapi-3.0.3.json for Postman / Apifox',
+    'token.apiDoc.protectedNotice': 'Anonymous public doc endpoints are disabled. Built-in docs require login; external clients calling /oci-pool/open-api/v1/** must send the Bearer Token.',
+    'token.apiDoc.drawerTitle': 'Built-in Interactive OpenAPI Docs',
+    'token.apiDoc.drawerSub': 'OpenAPI 3.0.3 · Auto Bearer cURL & Live Request Runner',
+
+    // Cloudflare IP Tools (page-proxy.jsx)
+    'dnsp.cf.officialIpsBtn': 'Origin IP / Nginx',
+    'dnsp.cf.extractIpsBtn': 'Extract Public IPs',
+    'dnsp.cf.officialDrawerTitle': 'Cloudflare Official Origin Real IP / Nginx',
+    'dnsp.cf.officialDrawerSub': 'Cloudflare IPv4/IPv6 origin CIDRs & nginxRealIpSnippet generator',
+    'dnsp.cf.extractDrawerTitle': 'DNS Public IP Batch Extractor',
+    'dnsp.cf.extractDrawerSub': 'Filter A/AAAA records & deduplicate preserving order',
+
+    // Boot Pricing & Shape Lock (page-tenant-boot-create.jsx)
+    'boot.spec.resetBtn': 'Reset to Template',
+    'boot.spec.resetDone': 'Restored template defaults',
+    'boot.spec.shapeLabel': 'Instance Shape',
+    'boot.spec.microLocked': 'VM.Standard.E2.1.Micro is fixed at 1 OCPU / 1 GB RAM (Always Free up to 2 instances)',
+    'boot.cost.title': 'Live Spec & Monthly USD Estimate',
+    'boot.cost.alwaysFreeBadge': 'Always Free · $0.00/mo',
+    'boot.cost.compute': 'Compute',
+    'boot.cost.storage': 'Storage (>200GB)',
+    'boot.cost.riskToggle': 'Billing & Overage Risk',
 
   },
 };

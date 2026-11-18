@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import AppKit
 
 /// ViewModel for Web `/dns/cloudflare`.
 @MainActor
@@ -14,12 +15,15 @@ final class CloudflareViewModel: ObservableObject {
 
     @Published var dnsForm: CfDnsForm?
     @Published var configForm: CfConfigForm?
+    @Published var officialIpsForm: CfOfficialIpRanges?
+    @Published var publicIpExtractForm: CfPublicIpExtractForm?
     @Published private(set) var isLoading = false
     @Published private(set) var hasLoadedOnce = false
     @Published private(set) var isZonesLoading = false
     @Published private(set) var isSaving = false
     @Published private(set) var isSyncing = false
     @Published private(set) var isConfigSaving = false
+    @Published private(set) var isOfficialIpsLoading = false
     @Published private(set) var errorText: String?
 
     private let session: AppSession
@@ -328,5 +332,59 @@ final class CloudflareViewModel: ObservableObject {
         } catch {
             ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
         }
+    }
+
+    // MARK: - Official Origin Real-IP & Public IP Extractor
+
+    func openOfficialIps() {
+        Task { await reloadOfficialIps() }
+    }
+
+    func reloadOfficialIps() async {
+        isOfficialIpsLoading = true
+        defer { isOfficialIpsLoading = false }
+        do {
+            let result = try await service.fetchOfficialIps()
+            officialIpsForm = result
+        } catch {
+            ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
+        }
+    }
+
+    func closeOfficialIps() {
+        officialIpsForm = nil
+    }
+
+    func openPublicIpExtract() {
+        guard selectedZoneId != nil else {
+            ToastCenter.shared.error("请先选择域名")
+            return
+        }
+        publicIpExtractForm = CfPublicIpExtractForm()
+    }
+
+    func closePublicIpExtract() {
+        publicIpExtractForm = nil
+    }
+
+    var extractedPublicIps: [String] {
+        guard let form = publicIpExtractForm else { return [] }
+        return CloudflareJSON.extractPublicIps(
+            from: records,
+            typeFilter: form.typeFilter,
+            proxyFilter: form.proxyFilter,
+            keyword: form.keyword
+        )
+    }
+
+    func copyToPasteboard(_ text: String, successNotice: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            ToastCenter.shared.error("暂无可复制内容")
+            return
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(trimmed, forType: .string)
+        ToastCenter.shared.success(successNotice)
     }
 }

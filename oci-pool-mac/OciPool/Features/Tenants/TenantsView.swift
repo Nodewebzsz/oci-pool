@@ -144,7 +144,7 @@ struct TenantsView: View {
     // MARK: - Toolbar（对齐 Web page-tenants 页头：搜索 → 眼睛 → API 导入 → 导出 → 导入 → 检测）
 
     private var toolbar: some View {
-        HStack(spacing: 8) {
+        AdaptivePageToolbar {
             SearchField(
                 text: $model.searchText,
                 placeholder: "输入租户名或区域进行搜索...",

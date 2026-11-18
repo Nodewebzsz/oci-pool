@@ -14,6 +14,16 @@ enum StatusTone {
         }
     }
 
+    func softBackground(dark: Bool) -> Color {
+        switch self {
+        case .success: return AppTheme.successSoft(dark)
+        case .warning: return AppTheme.orangeSoft(dark)
+        case .danger:  return AppTheme.dangerSoft(dark)
+        case .info:    return AppTheme.infoSoft(dark)
+        case .neutral: return AppTheme.bg3(dark)
+        }
+    }
+
     /// Map common OCI/instance states.
     static func fromState(_ state: String?) -> StatusTone {
         switch (state ?? "").uppercased() {
@@ -31,7 +41,7 @@ struct StatusBadge: View {
 
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme
-    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
+    private var dark: Bool { appearance.mode == .system ? colorScheme == .dark : (appearance.mode == .dark) }
 
     var body: some View {
         let c = tone.color(dark: dark)
@@ -40,7 +50,7 @@ struct StatusBadge: View {
             .foregroundColor(c)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(c.opacity(0.15))
+            .background(tone.softBackground(dark: dark))
             .cornerRadius(10)
     }
 

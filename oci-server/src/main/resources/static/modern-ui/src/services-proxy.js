@@ -50,6 +50,9 @@
     const o = input || {};
     return api.request('/dns/cloudflare/api/zones/' + id(o.zoneId, 'zoneId') + '/sync', json('POST', { domainName: o.domainName }));
   }, 'POST', '/dns/cloudflare/api/zones/{param}/sync', 'application/json');
+  S.cloudflareOfficialIps = mark(function cloudflareOfficialIps() {
+    return api.request('/dns/cloudflare/api/official-ips');
+  }, 'GET', '/dns/cloudflare/api/official-ips', 'query-string');
 
   S.edgeOneZones = mark(function edgeOneZones() {
     return api.request('/dns/edgeone/api/zones');

@@ -6,7 +6,7 @@ struct SectionCard<Content: View>: View {
 
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme
-    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
+    private var dark: Bool { appearance.mode == .system ? colorScheme == .dark : (appearance.mode == .dark) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {

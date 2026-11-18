@@ -26,8 +26,6 @@ public class SpaErrorViewResolver implements ErrorViewResolver {
             String path = request.getRequestURI();
             if (path != null && !path.startsWith("/api/")
                     && !path.startsWith("/oci-pool/open-api/")
-                    && !path.startsWith("/swagger-ui/")
-                    && !path.startsWith("/v3/api-docs/")
                     && !hasStaticExtension(path)) {
                 return new ModelAndView("forward:" + entry);
             }

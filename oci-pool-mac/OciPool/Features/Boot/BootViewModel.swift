@@ -310,6 +310,7 @@ final class BootViewModel: ObservableObject {
     // MARK: - Row actions
 
     func confirmStart(_ item: BootTaskItem) {
+        guard BootActionAvailability(status: item.status).canStart else { return }
         guard AppAlert.confirm(title: "启动任务", message: "启动 \(item.displayTenant) · \(item.archText) 下未开机任务？") else { return }
         Task {
             LoadingHUD.shared.begin()
@@ -325,6 +326,7 @@ final class BootViewModel: ObservableObject {
     }
 
     func confirmStop(_ item: BootTaskItem) {
+        guard BootActionAvailability(status: item.status).canStop else { return }
         guard AppAlert.confirm(title: "停止任务 \(item.displayTenant)?",
                                message: "已抢到的实例不会被删除，仅停止后续抢机尝试。",
                                confirmTitle: "停止") else { return }
@@ -377,6 +379,8 @@ final class BootViewModel: ObservableObject {
     }
 
     func confirmManual(_ item: BootTaskItem) {
+        let actions = BootActionAvailability(status: item.status)
+        guard actions.canStart || actions.canStop else { return }
         guard AppAlert.confirm(title: "手动抢机", message: "立即执行一次抢机尝试？") else { return }
         Task {
             LoadingHUD.shared.begin()
@@ -552,6 +556,8 @@ final class BootViewModel: ObservableObject {
     // MARK: - Detail actions
 
     func toggleDetailStatus(_ d: BootDetailItem, start: Bool) {
+        let actions = BootActionAvailability(status: d.status)
+        guard start ? actions.canStart : actions.canStop else { return }
         let status = start ? 1 : 0
         let title = start ? "启动" : "停止"
         guard AppAlert.confirm(title: title, message: "确定\(title)该子任务？") else { return }

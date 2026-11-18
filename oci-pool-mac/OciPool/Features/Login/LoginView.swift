@@ -119,7 +119,10 @@ struct LoginView: View {
 
         let mode = await MainActor.run { model.deploymentMode }
         let raw = await MainActor.run { model.serverURL }
-        await MainActor.run { session.serverURL = raw }
+        await MainActor.run {
+            session.serverURL = raw
+            model.serverURL = session.serverURL
+        }
         let target = session.serverURL
 
         if mode == .local, !backend.isReadyForLogin {
@@ -259,19 +262,26 @@ struct LoginView: View {
     func applyServerAndLoadMeta() {
         let raw = model.serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !raw.isEmpty else { return }
+        let normalized = AppSession.normalize(raw)
+        guard !normalized.isEmpty else {
+            model.errorText = model.locale == .enUS
+                ? "Enter a valid HTTP or HTTPS address, e.g. https://example.com or http://192.168.1.100:9856"
+                : "请输入有效的 HTTP 或 HTTPS 地址，例如 https://example.com 或 http://192.168.1.100:9856"
+            return
+        }
 
-        // Remote form but user pasted localhost → flip to local smoothly.
-        if model.deploymentMode == .remote, AppSession.isLocalServerURL(raw) {
+        // Only the embedded backend's port switches to local mode.
+        if model.deploymentMode == .remote, AppSession.isLocalServerURL(normalized) {
             model.serverURL = AppSession.localDefaultURL
             Task { await switchDeploymentMode(.local) }
             return
         }
 
-        model.serverURL = raw
-        session.serverURL = raw
+        model.serverURL = normalized
+        session.serverURL = normalized
         model.resetVerifyState()
         if model.deploymentMode == .remote {
-            session.lastRemoteServerURL = raw
+            session.lastRemoteServerURL = normalized
         }
         withAnimation(.easeInOut(duration: 0.2)) {
             model.errorText = nil

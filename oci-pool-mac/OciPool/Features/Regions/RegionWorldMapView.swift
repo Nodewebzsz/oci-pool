@@ -116,11 +116,16 @@ struct RegionMapNode: Identifiable, Equatable {
     let name: String
     let arch: String
     let released: Bool
+    var isMine: Bool = false
     let totalGrabs: Int
     let todayGrabs: Int
     let firstAt: String
     let lng: Double
     let lat: Double
+
+    var coverageKind: RegionCoverageKind {
+        RegionCoverageKind.classify(isMine: isMine, released: released)
+    }
 
     /// Web：released → max(2.5, min(5.5, 2 + √totalGrabs × 0.3))；未放货 → 2
     var radius: CGFloat {
@@ -129,6 +134,21 @@ struct RegionMapNode: Identifiable, Equatable {
     }
 
     var position: CGPoint { WorldMapData.project(lon: lng, lat: lat) }
+}
+
+/// 45° 旋转菱形标记（用于 `unlinkedReleased` 官方已放货但尚未关联账号覆盖区域）。
+struct DiamondMarkerShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let midX = rect.midX
+        let midY = rect.midY
+        p.move(to: CGPoint(x: midX, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: midY))
+        p.addLine(to: CGPoint(x: midX, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.minX, y: midY))
+        p.closeSubpath()
+        return p
+    }
 }
 
 // MARK: - TopoJSON 解码 + d3 geoNaturalEarth1 投影
@@ -289,6 +309,7 @@ final class WorldMapData: ObservableObject {
 // MARK: - 世界地图视图（对齐 Web RegionMapView）
 
 struct RegionWorldMapView: View {
+    @ObservedObject private var appearance = AppearanceController.shared
     @ObservedObject var world: WorldMapData
     let nodes: [RegionMapNode]
     var dark: Bool
@@ -300,10 +321,10 @@ struct RegionWorldMapView: View {
 
     private var bg0: Color { AppTheme.pageBg(dark) }
     private var landFill: Color { AppTheme.sidebarHover(dark) }
-    private var landStroke: Color { dark ? Color(hex: "363e45") : Color(hex: "bfc5ca") }
-    private var fg3: Color { dark ? Color(hex: "5d646a") : Color(hex: "81878c") }
+    private var landStroke: Color { AppTheme.borderStrong(dark) }
+    private var fg3: Color { AppTheme.textTertiary(dark) }
     private var fg1: Color { AppTheme.sidebarText(dark) }
-    private var fg0: Color { dark ? Color(hex: "f6f9fb") : Color(hex: "0c1217") }
+    private var fg0: Color { AppTheme.navIcon(dark) }
     private var bg2: Color { AppTheme.sidebarHover(dark) }
 
     var body: some View {
@@ -317,7 +338,7 @@ struct RegionWorldMapView: View {
                         ZStack {
                             RadialGradient(colors: [AppTheme.info.opacity(0.18), .clear],
                                            center: UnitPoint(x: 0.3, y: 0.4), startRadius: 10, endRadius: 320)
-                            RadialGradient(colors: [Color(hex: "b484e8").opacity(0.12), .clear],
+                            RadialGradient(colors: [AppTheme.violet.opacity(0.12), .clear],
                                            center: UnitPoint(x: 0.7, y: 0.6), startRadius: 10, endRadius: 360)
                         }
                     )
@@ -325,8 +346,9 @@ struct RegionWorldMapView: View {
 
                 worldPaths(scale: s)
 
+                let labelCodes = nonOverlappingLinkedLabelCodes
                 ForEach(nodes) { node in
-                    nodeView(node, scale: s)
+                    nodeView(node, scale: s, showLinkedLabel: labelCodes.contains(node.code))
                 }
 
                 if let node = nodes.first(where: { $0.code == hoveredCode }) {
@@ -431,29 +453,89 @@ struct RegionWorldMapView: View {
         return path
     }
 
+    /// 对 `linkedActive` 节点计算碰撞避让后的常驻微标签集合，防止密集同城/邻国重叠。
+    private var nonOverlappingLinkedLabelCodes: Set<String> {
+        var accepted: [CGPoint] = []
+        var codes = Set<String>()
+        let candidates = nodes
+            .filter { $0.coverageKind == .linkedActive }
+            .sorted { $0.totalGrabs > $1.totalGrabs }
+        for n in candidates {
+            let pos = n.position
+            let collides = accepted.contains { existing in
+                abs(existing.x - pos.x) < 42 && abs(existing.y - pos.y) < 16
+            }
+            if !collides {
+                accepted.append(pos)
+                codes.insert(n.code)
+            }
+        }
+        return codes
+    }
+
     // MARK: 节点（脉冲光晕 + 主圆 + hover）
 
-    private func nodeView(_ node: RegionMapNode, scale: CGFloat) -> some View {
-        let color = !node.released
-            ? fg3
-            : (node.todayGrabs > 0 ? AppTheme.orange : AppTheme.sidebarActive)
+    private func nodeView(_ node: RegionMapNode, scale: CGFloat, showLinkedLabel: Bool) -> some View {
+        let kind = node.coverageKind
         let r = node.radius * scale
         let isHover = hoveredCode == node.code
         return Group {
-            if node.released {
+            switch kind {
+            case .linkedActive:
+                let color = node.todayGrabs > 0 ? AppTheme.orange : AppTheme.sidebarActive
                 HaloCircle(color: color, radius: r + 2 * scale, opacity: 0.22)
                 if node.todayGrabs > 0 {
                     PulseHaloCircle(color: color, baseRadius: r + 5 * scale)
                 } else {
                     Circle()
-                        .fill(color.opacity(0.08))
-                        .frame(width: (r + 5 * scale) * 2, height: (r + 5 * scale) * 2)
+                        .stroke(color.opacity(0.45), lineWidth: 1.2)
+                        .frame(width: (r + 3.5 * scale) * 2, height: (r + 3.5 * scale) * 2)
                 }
+                Circle()
+                    .fill(color)
+                    .frame(width: r * 2, height: r * 2)
+                    .shadow(color: color.opacity(0.8), radius: 3)
+                if showLinkedLabel && !isHover {
+                    Text(node.name)
+                        .font(.system(size: max(8.5, 9.5 * scale), weight: .semibold))
+                        .foregroundColor(fg0)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(bg2.opacity(dark ? 0.86 : 0.90))
+                        )
+                        .offset(y: -(r + 9 * scale))
+                }
+
+            case .linkedIdle:
+                let color = AppTheme.info
+                Circle()
+                    .stroke(color.opacity(0.55), lineWidth: 1.2)
+                    .frame(width: (r + 3 * scale) * 2, height: (r + 3 * scale) * 2)
+                Circle()
+                    .fill(color)
+                    .frame(width: max(5, r * 2), height: max(5, r * 2))
+
+            case .unlinkedReleased:
+                let diamondColor = node.todayGrabs > 0 ? AppTheme.orange : AppTheme.cyan
+                let side = max(8, (r * 2 + 2.5) * scale)
+                if node.todayGrabs > 0 {
+                    PulseHaloCircle(color: diamondColor, baseRadius: side * 0.85)
+                }
+                DiamondMarkerShape()
+                    .fill(diamondColor.opacity(dark ? 0.28 : 0.20))
+                    .frame(width: side, height: side)
+                DiamondMarkerShape()
+                    .stroke(diamondColor, lineWidth: 1.4)
+                    .frame(width: side, height: side)
+
+            case .unlinkedUnreleased:
+                Circle()
+                    .fill(fg3.opacity(0.5))
+                    .frame(width: max(3.5, 3.8 * scale), height: max(3.5, 3.8 * scale))
             }
-            Circle()
-                .fill(color)
-                .frame(width: r * 2, height: r * 2)
-                .shadow(color: node.released ? color.opacity(0.8) : .clear, radius: 3)
+
             // hover 高亮环
             Circle()
                 .stroke(fg0.opacity(0.7), lineWidth: 1)
@@ -474,7 +556,7 @@ struct RegionWorldMapView: View {
     private func tooltip(_ node: RegionMapNode, scale: CGFloat) -> some View {
         let px = node.position.x * scale
         let py = node.position.y * scale
-        let viewWidth: CGFloat = 230
+        let viewWidth: CGFloat = 248
         let showRight = px / max(WorldMapData.mapW * scale, 1) < 0.7
         let tipX = showRight ? px + 30 : px - viewWidth - 30
         let tipY = max(4, py - 40)
@@ -485,6 +567,8 @@ struct RegionWorldMapView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(fg0)
                     .lineLimit(1)
+                Spacer(minLength: 4)
+                StatusBadge(text: node.coverageKind.badgeText, tone: node.coverageKind.tone)
             }
             Text("\(node.code) · \(node.arch.isEmpty ? "ARM" : node.arch)")
                 .font(.system(size: 10.5, design: .monospaced))
@@ -504,15 +588,32 @@ struct RegionWorldMapView: View {
                 }
             }
             Divider().overlay(Color(hex: dark ? "363e45" : "d9dfe3"))
-            if node.released {
+            switch node.coverageKind {
+            case .linkedActive:
                 HStack(spacing: 4) {
                     Circle().fill(AppTheme.sidebarActive).frame(width: 5, height: 5)
-                    Text("已放货 · 首次 \(node.firstAt)")
+                    Text("已关联账号覆盖 · 首次放货 \(node.firstAt)")
                         .font(.system(size: 10))
                         .foregroundColor(AppTheme.sidebarActive)
                 }
-            } else {
-                Text("尚未放货")
+            case .linkedIdle:
+                HStack(spacing: 4) {
+                    Circle().fill(AppTheme.info).frame(width: 5, height: 5)
+                    Text("已关联账号覆盖 · 暂未监测到放货")
+                        .font(.system(size: 10))
+                        .foregroundColor(AppTheme.info)
+                }
+            case .unlinkedReleased:
+                HStack(spacing: 4) {
+                    DiamondMarkerShape()
+                        .stroke(AppTheme.cyan, lineWidth: 1.2)
+                        .frame(width: 6, height: 6)
+                    Text("官方曾放货 · 尚未关联覆盖（可订阅开拓）")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(AppTheme.cyan)
+                }
+            case .unlinkedUnreleased:
+                Text("未关联 · 尚未放货")
                     .font(.system(size: 10))
                     .foregroundColor(fg3)
             }

@@ -233,6 +233,17 @@
     return api.request('/resource/my-regions');
   }, 'GET', '/resource/my-regions', 'query-string');
 
+  // System messages batch cleanup
+  S.deleteBatchMessages = mark(function deleteBatchMessages(input) {
+    const o = input || {};
+    const ids = Array.isArray(o.ids) ? o.ids : [];
+    return api.request('/sysMessage/delBatch', jsonBody({ ids: ids }));
+  }, 'POST', '/sysMessage/delBatch', 'application/json');
+
+  S.clearMessages = mark(function clearMessages() {
+    return api.request('/sysMessage/clear', { method: 'POST', body: formBody({}) });
+  }, 'POST', '/sysMessage/clear', 'query-string');
+
   global.ociServices = global.ociServices || {};
   global.ociServices.system = Object.freeze(S);
 })(typeof window !== 'undefined' ? window : globalThis);

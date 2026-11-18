@@ -15,6 +15,7 @@ import com.nodewebzsz.ociserver.pojo.response.PasswordPolicyDetail;
 import com.nodewebzsz.ocicommon.param.ApiResponse;
 import com.nodewebzsz.ociserver.pojo.response.BootVolumeRes;
 import com.nodewebzsz.ociserver.pojo.response.OciGroupResp;
+import com.nodewebzsz.ociserver.pojo.response.TenantPortraitVO;
 import com.oracle.bmc.core.responses.UpdateBootVolumeResponse;
 import com.oracle.bmc.identity.model.RegionSubscription;
 import com.oracle.bmc.identity.model.User;
@@ -172,4 +173,6 @@ public interface TenantService {
     void switchRestrictedApiWithSSE(Long tenantId, SseEmitter emitter);
 
     void switchRestrictedApiWithSSE(Long tenantId, String managedUserName, String permissionsJson, String accountScopeJson, SseEmitter emitter);
+
+    TenantPortraitVO getTenantPortrait();
 }

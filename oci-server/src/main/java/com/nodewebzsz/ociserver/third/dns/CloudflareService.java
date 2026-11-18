@@ -24,6 +24,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
@@ -32,10 +33,14 @@ import org.springframework.web.client.RestTemplate;
 import javax.annotation.Resource;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -53,6 +58,34 @@ public class CloudflareService {
     private DnsRecordRepository dnsRecordRepository;
 
     private static final String CLOUDFLARE_API_BASE = "https://api.cloudflare.com/client/v4";
+
+    private static final List<String> FALLBACK_IPV4_CIDRS = Collections.unmodifiableList(Arrays.asList(
+            "173.245.48.0/20",
+            "103.21.244.0/22",
+            "103.22.200.0/22",
+            "103.31.4.0/22",
+            "141.101.64.0/18",
+            "108.162.192.0/18",
+            "190.93.240.0/20",
+            "188.114.96.0/20",
+            "197.234.240.0/22",
+            "198.41.128.0/17",
+            "162.158.0.0/15",
+            "104.16.0.0/13",
+            "104.24.0.0/14",
+            "172.64.0.0/13",
+            "131.0.72.0/22"
+    ));
+
+    private static final List<String> FALLBACK_IPV6_CIDRS = Collections.unmodifiableList(Arrays.asList(
+            "2400:cb00::/32",
+            "2606:4700::/32",
+            "2803:f800::/32",
+            "2405:b500::/32",
+            "2405:8100::/32",
+            "2a06:98c0::/29",
+            "2c0f:f248::/32"
+    ));
 
     /**
      * 获取DNS记录
@@ -1579,5 +1612,76 @@ public class CloudflareService {
         }
     }
 
+    public Map<String, Object> listOfficialIpRanges() {
+        List<String> ipv4 = FALLBACK_IPV4_CIDRS;
+        List<String> ipv6 = FALLBACK_IPV6_CIDRS;
+        String source = "fallback";
+
+        try {
+            Map<String, List<String>> remote = fetchRemoteCloudflareCidrs();
+            if (remote != null) {
+                List<String> remoteV4 = remote.get("ipv4Cidrs");
+                List<String> remoteV6 = remote.get("ipv6Cidrs");
+                if (remoteV4 != null && !remoteV4.isEmpty() && remoteV6 != null && !remoteV6.isEmpty()) {
+                    ipv4 = remoteV4;
+                    ipv6 = remoteV6;
+                    source = "remote";
+                }
+            }
+        } catch (Exception e) {
+            log.warn("从 Cloudflare 官方 API 获取回源网段失败，回退至内置常量: {}", e.getMessage());
+        }
+
+        StringBuilder sb = new StringBuilder("# Cloudflare Official Origin Real IP\n");
+        ipv4.forEach(cidr -> sb.append("set_real_ip_from ").append(cidr).append(";\n"));
+        ipv6.forEach(cidr -> sb.append("set_real_ip_from ").append(cidr).append(";\n"));
+        sb.append("real_ip_header CF-Connecting-IP;\nreal_ip_recursive on;");
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("ipv4Cidrs", ipv4);
+        result.put("ipv6Cidrs", ipv6);
+        result.put("source", source);
+        result.put("fetchedAt", Instant.now().toString());
+        result.put("nginxRealIpSnippet", sb.toString());
+        return result;
+    }
+
+    protected Map<String, List<String>> fetchRemoteCloudflareCidrs() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000);
+        factory.setReadTimeout(5000);
+        RestTemplate restTemplate = new RestTemplate(factory);
+        ResponseEntity<String> response = restTemplate.getForEntity(CLOUDFLARE_API_BASE + "/ips", String.class);
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(response.getBody());
+            if (root == null || !root.path("success").asBoolean()) {
+                throw new IllegalStateException("Cloudflare /ips returned unsuccessful status");
+            }
+            JsonNode resNode = root.path("result");
+            List<String> v4 = new ArrayList<>();
+            if (resNode.path("ipv4_cidrs").isArray()) {
+                resNode.path("ipv4_cidrs").forEach(n -> {
+                    if (StringUtils.isNotBlank(n.asText())) {
+                        v4.add(n.asText().trim());
+                    }
+                });
+            }
+            List<String> v6 = new ArrayList<>();
+            if (resNode.path("ipv6_cidrs").isArray()) {
+                resNode.path("ipv6_cidrs").forEach(n -> {
+                    if (StringUtils.isNotBlank(n.asText())) {
+                        v6.add(n.asText().trim());
+                    }
+                });
+            }
+            Map<String, List<String>> map = new LinkedHashMap<>();
+            map.put("ipv4Cidrs", v4);
+            map.put("ipv6Cidrs", v6);
+            return map;
+        } catch (Exception e) {
+            throw new RuntimeException("解析 Cloudflare 官方 IP 网段失败: " + e.getMessage(), e);
+        }
+    }
 
 }

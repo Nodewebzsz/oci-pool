@@ -43,10 +43,9 @@ final class BackendController: ObservableObject {
 
         guard let javaURL = resolveJava(),
               let jarURL = resolveServerJar() else {
-            // Xcode debug without embedded runtime
             guard epoch == startEpoch else { return }
-            state = .ready
-            appendBackendLog("no embedded jre/jar → external mode ready")
+            state = .failed("未找到本机服务运行组件（Java 或 server.jar），且 9856 端口没有可连接的服务。请使用完整客户端，或切换到「远程」连接已有服务。")
+            appendBackendLog("no embedded jre/jar and port \(defaultPort) unavailable → failed")
             return
         }
 
@@ -345,7 +344,13 @@ final class BackendController: ObservableObject {
 
     /// Runtime data + DB (no spaces in path).
     private func appDataDir() -> URL {
-        FileManager.default.homeDirectoryForCurrentUser
+        // UI previews must not migrate or start tasks from the installed app's database.
+        if Bundle.main.bundleIdentifier == "com.nodewebzsz.ocipool.ui-dev",
+           let path = Bundle.main.object(forInfoDictionaryKey: "OciPoolPreviewDataDirectory") as? String,
+           !path.isEmpty {
+            return URL(fileURLWithPath: path, isDirectory: true)
+        }
+        return FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".ocipool", isDirectory: true)
     }
 

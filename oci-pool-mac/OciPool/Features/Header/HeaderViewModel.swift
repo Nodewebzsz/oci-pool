@@ -8,6 +8,8 @@ final class HeaderViewModel: ObservableObject {
     @Published private(set) var unreadCount: Int = 0
     @Published private(set) var messagePage = SysMessagePage()
     @Published private(set) var messagesLoading = false
+    @Published private(set) var messagesMutating = false
+    @Published var selectedMessageIds: Set<String> = []
     @Published private(set) var version = VersionCheckInfo()
     @Published private(set) var levelBadgeTitle: String = "Lvl.1"
     @Published private(set) var levelBadgeLevel: Int = 1
@@ -114,6 +116,7 @@ final class HeaderViewModel: ObservableObject {
     func openMessages() {
         messageDetail = nil
         selectedMessage = nil
+        selectedMessageIds.removeAll()
         showMessages = true
         Task {
             await loadMessages(page: 1)
@@ -125,6 +128,7 @@ final class HeaderViewModel: ObservableObject {
         showMessages = false
         messageDetail = nil
         selectedMessage = nil
+        selectedMessageIds.removeAll()
     }
 
     func toggleMessages() {
@@ -148,11 +152,92 @@ final class HeaderViewModel: ObservableObject {
             let url = try APIClient.shared.makeURL(session.serverURL, path: "/sysMessage/list")
             let raw = try await APIClient.shared.postJSON(url, body: [
                 "pageNum": page,
-                "pageSize": 12
+                "pageSize": 30
             ])
-            messagePage = parseMessagePage(raw, pageNum: page)
+            let parsed = parseMessagePage(raw, pageNum: page)
+            messagePage = parsed
+            let validIds = Set(parsed.content.map(\.id))
+            selectedMessageIds = selectedMessageIds.intersection(validIds)
         } catch {
             ToastCenter.shared.error(error.localizedDescription)
+        }
+    }
+
+    func toggleMessageSelection(_ item: SysMessageItem) {
+        if selectedMessageIds.contains(item.id) {
+            selectedMessageIds.remove(item.id)
+        } else {
+            selectedMessageIds.insert(item.id)
+        }
+    }
+
+    func toggleSelectAllMessages(in items: [SysMessageItem]) {
+        let visibleIds = Set(items.map(\.id))
+        guard !visibleIds.isEmpty else { return }
+        if visibleIds.isSubset(of: selectedMessageIds) {
+            selectedMessageIds.subtract(visibleIds)
+        } else {
+            selectedMessageIds.formUnion(visibleIds)
+        }
+    }
+
+    func deleteSelectedMessages() async {
+        let selectedItems = messagePage.content.filter { selectedMessageIds.contains($0.id) }
+        guard !selectedItems.isEmpty else {
+            ToastCenter.shared.error("请先勾选要删除的通知")
+            return
+        }
+        messagesMutating = true
+        defer { messagesMutating = false }
+        do {
+            let numericIds = selectedItems.compactMap(\.numericId)
+            if !numericIds.isEmpty {
+                let url = try APIClient.shared.makeURL(session.serverURL, path: "/sysMessage/delBatch")
+                let raw = try await APIClient.shared.postJSON(url, body: ["ids": numericIds])
+                if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
+                   let success = obj["success"] as? Bool, !success {
+                    throw APIError.serverMessage((obj["message"] as? String) ?? "批量删除消息失败")
+                }
+            }
+            let fallbackItems = selectedItems.filter { $0.numericId == nil }
+            for item in fallbackItems {
+                let url = try APIClient.shared.makeURL(session.serverURL, path: "/sysMessage/del")
+                _ = try await APIClient.shared.postJSON(url, body: ["businessId": item.businessId])
+            }
+            selectedMessageIds.removeAll()
+            ToastCenter.shared.success("已删除 \(selectedItems.count) 条通知")
+            await loadMessages(page: 1)
+            await refreshUnread()
+        } catch {
+            ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
+        }
+    }
+
+    func clearAllMessages() async {
+        guard !messagePage.content.isEmpty || unreadCount > 0 else { return }
+        let confirmed = AppAlert.confirm(
+            title: "清空全部通知",
+            message: "确认清空所有系统通知消息吗？此操作不可撤销。",
+            confirmTitle: "确认清空",
+            style: .critical
+        )
+        guard confirmed else { return }
+        messagesMutating = true
+        defer { messagesMutating = false }
+        do {
+            let url = try APIClient.shared.makeURL(session.serverURL, path: "/sysMessage/clear")
+            let raw = try await APIClient.shared.postJSON(url, body: [:])
+            if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
+               let success = obj["success"] as? Bool, !success {
+                throw APIError.serverMessage((obj["message"] as? String) ?? "清空通知失败")
+            }
+            selectedMessageIds.removeAll()
+            unreadCount = 0
+            ToastCenter.shared.success("已清空全部系统通知")
+            await loadMessages(page: 1)
+            await refreshUnread()
+        } catch {
+            ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
         }
     }
 
@@ -509,6 +594,18 @@ final class HeaderViewModel: ObservableObject {
     private func parseMessageDict(_ d: [String: Any]) -> SysMessageItem? {
         let bid = (d["businessId"] as? String) ?? ""
         guard !bid.isEmpty else { return nil }
+        let numId: Int64?
+        if let v = d["id"] as? Int64 {
+            numId = v
+        } else if let v = d["id"] as? Int {
+            numId = Int64(v)
+        } else if let v = d["id"] as? NSNumber {
+            numId = v.int64Value
+        } else if let s = d["id"] as? String, let v = Int64(s) {
+            numId = v
+        } else {
+            numId = nil
+        }
         let typeVal: String
         if let s = d["messageType"] as? String {
             typeVal = s
@@ -526,6 +623,7 @@ final class HeaderViewModel: ObservableObject {
         else if let r = d["readStatus"] as? Int64 { read = Int(r) }
         else { read = 1 }
         return SysMessageItem(
+            numericId: numId,
             businessId: bid,
             subject: (d["subject"] as? String) ?? "",
             content: (d["content"] as? String) ?? "",

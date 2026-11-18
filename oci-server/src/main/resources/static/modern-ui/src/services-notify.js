@@ -21,6 +21,13 @@
     const o = input || {};
     return api.request('/sysMessage/del', json({ businessId: o.businessId, id: o.id }));
   }, 'POST', '/sysMessage/del', 'application/json');
+  S.removeBatch = mark(function removeBatch(input) {
+    const o = input || {};
+    return api.request('/sysMessage/delBatch', jsonBody({ ids: Array.isArray(o.ids) ? o.ids : [] }));
+  }, 'POST', '/sysMessage/delBatch', 'application/json');
+  S.clearAll = mark(function clearAll() {
+    return api.request('/sysMessage/clear', { method: 'POST' });
+  }, 'POST', '/sysMessage/clear', 'query-string');
   S.configs = mark(function configs() { return api.request('/api/system/notifyConfigs'); }, 'GET', '/api/system/notifyConfigs', 'query-string');
   S.updateTelegram = mark(function updateTelegram(input) {
     const o = input || {};

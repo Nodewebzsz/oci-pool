@@ -178,7 +178,7 @@ struct BootView: View {
 
     /// Web 页头 actions：租户/区域 Select 160 + 搜索(primary) + eye 图标钮 + 预开(primary) + 批量停止(orange) + 重置(danger)
     private var toolbar: some View {
-        HStack(spacing: 8) {
+        AdaptivePageToolbar {
             if !tenantSubPage {
                 SelectMenu(
                     options: model.parentTenants.map {
@@ -634,7 +634,7 @@ struct BootView: View {
                 cellText(formatNum(Int64(item.currentAttemptCount)), wNum, cyan: true)
                 cellText(formatNum(Int64(item.failCount)), wNum, danger: true)
                 successCell(item.successCount, wNum)
-                archChip(item.archText)
+                archChip(item.archText, item: item)
                     .frame(width: wArch, alignment: .center)
                     .clipped()
                 cellText(item.createText, wTime, muted: true)
@@ -758,11 +758,22 @@ struct BootView: View {
         .help(item.displayTenant)
     }
 
-    private func archChip(_ text: String) -> some View {
+    private func archChip(_ text: String, item: BootTaskItem) -> some View {
         let t = text.isEmpty || text == "—" ? "—" : text
         // 对齐 Web：ARM=info 蓝 / AMD 等=violet 紫（区分颜色）
         let isARM = t.uppercased() == "ARM"
         let fg = isARM ? AppTheme.info : violetArch
+        let shape = BootPricingEstimator.defaultShape(
+            for: isARM ? "ARM" : "AMD",
+            ocpu: max(1, item.ocpu),
+            memoryGb: max(1, item.memory)
+        )
+        let est = BootPricingEstimator.estimate(
+            shape: shape,
+            ocpu: max(1, item.ocpu),
+            memoryGb: max(1, item.memory),
+            bootVolumeGb: max(50, item.disk)
+        )
         return Text(t)
             .font(.system(size: 10, weight: .semibold, design: .monospaced))
             .foregroundColor(t == "—" ? AppTheme.sidebarText(dark) : fg)
@@ -778,6 +789,9 @@ struct BootView: View {
                     }
                 }
             )
+            .help(item.ocpu > 0
+                  ? "\(shape) · \(item.ocpu)C \(item.memory)G / \(max(50, item.disk))GB · \(est.tierBadge) ($\(String(format: "%.2f", est.totalMonthlyUsd))/mo)"
+                  : t)
     }
 
     private var violetArch: Color { dark ? Color(hex: "a78bfa") : Color(hex: "7c3aed") }
@@ -846,16 +860,15 @@ enum BootActionPanel {
         //   开机启动：仅 status == 0（未开机）可点
         //   开机停止：仅 status == 1（开机中正在循环）可点
         //   手动开机：status == 0 或 1 均可单次尝试（原项目不限制）；仅 status == 2（已开机成功）禁用防多开
-        let isNotStarted = item.status == 0
-        let isOpened = item.status == 2
+        let isNotStarted = BootActionAvailability(status: item.status).canStart
         return [
             make("clone", "克隆开机", "doc.on.doc") { model.confirmClone(item) },
             make("start", "开机启动", "play.fill", disabled: !isNotStarted, tone: .accent) { model.confirmStart(item) },
-            make("stop", "开机停止", "stop.fill", disabled: isNotStarted || isOpened) { model.confirmStop(item) },
+            make("stop", "开机停止", "stop.fill", disabled: !BootActionAvailability(status: item.status).canStop) { model.confirmStop(item) },
             make("detail", "开机详情", "info.circle") { model.openDetail(item) },
             make("cfg", "开机配置", "gearshape") { model.openAddConfig(item) },
             make("instances", "已抢实例 (\(item.successCount))", "server.rack", tone: .info) { model.openDetail(item) },
-            make("manual", "手动开机", "bolt.fill", disabled: isOpened, tone: .orange) { model.confirmManual(item) },
+            make("manual", "手动开机", "bolt.fill", disabled: !(isNotStarted || BootActionAvailability(status: item.status).canStop), tone: .orange) { model.confirmManual(item) },
             make("del", "开机删除", "trash", danger: true) { model.confirmDelete(item) }
         ]
     }

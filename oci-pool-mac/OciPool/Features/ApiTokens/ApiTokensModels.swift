@@ -7,6 +7,23 @@ struct ApiTokenForm: Equatable {
     var allowSwaggerAccess = true
 }
 
+enum TokenAvailability: Equatable {
+    case missing, disabled, expired, unknown, expiring, valid
+
+    var label: String {
+        switch self {
+        case .missing: return "未生成"
+        case .disabled: return "已停用"
+        case .expired: return "已过期"
+        case .unknown: return "有效期未知"
+        case .expiring: return "即将到期"
+        case .valid: return "有效"
+        }
+    }
+
+    var isUsable: Bool { self == .valid || self == .expiring }
+}
+
 struct ApiTokenStatus: Equatable {
     var enabled = false
     var tokenName = ""
@@ -18,6 +35,24 @@ struct ApiTokenStatus: Equatable {
     var createdAt = ""
     var daysUntilExpiration = 0
     var isExpired = false
+
+    func availability(at now: Date = Date()) -> TokenAvailability {
+        guard hasToken else { return .missing }
+        guard enabled else { return .disabled }
+        if isExpired { return .expired }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let local = DateFormatter()
+        local.locale = Locale(identifier: "en_US_POSIX")
+        local.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        let plainIso = ISO8601DateFormatter()
+        guard let expiry = iso.date(from: expiresAt) ?? plainIso.date(from: expiresAt) ?? local.date(from: expiresAt) else {
+            return .unknown
+        }
+        let remaining = expiry.timeIntervalSince(now)
+        if remaining <= 0 { return .expired }
+        return remaining <= 7 * 86400 ? .expiring : .valid
+    }
 }
 
 struct ApiTokenGenerateResult: Equatable {
@@ -25,6 +60,24 @@ struct ApiTokenGenerateResult: Equatable {
     var expiresAt = ""
     var daysUntilExpiration = 0
     var tokenName = ""
+}
+
+struct OpenApiEndpointItem: Identifiable, Equatable {
+    var id: String { "\(method):\(path)" }
+    let method: String
+    let path: String
+    let summary: String
+    let group: String
+    let sampleBody: String?
+}
+
+struct OpenApiSpecPayload: Equatable {
+    var openapi = "3.0.3"
+    var title = "OCI Pool Manager Open API"
+    var version = "1.0.0"
+    var specDescription = ""
+    var endpoints: [OpenApiEndpointItem] = []
+    var exportJSONData = Data()
 }
 
 enum ApiTokensJSON {
@@ -86,6 +139,60 @@ enum ApiTokensJSON {
             throw APIError.serverMessage(str(root["message"]).isEmpty ? "生成 Token 失败" : str(root["message"]))
         }
         return r
+    }
+
+    static func parseOpenApiSpec(_ data: Data) throws -> OpenApiSpecPayload {
+        guard let root = obj(data) else {
+            throw APIError.serverMessage("OpenAPI 规范解析失败")
+        }
+        if let success = root["success"] as? Bool, !success {
+            throw APIError.serverMessage(str(root["message"]).isEmpty ? "获取 OpenAPI 规范失败" : str(root["message"]))
+        }
+        let payload = (root["data"] as? [String: Any]) ?? root
+        var result = OpenApiSpecPayload()
+        let ver = str(payload["openapi"])
+        if !ver.isEmpty { result.openapi = ver }
+        if let info = payload["info"] as? [String: Any] {
+            let t = str(info["title"])
+            if !t.isEmpty { result.title = t }
+            let v = str(info["version"])
+            if !v.isEmpty { result.version = v }
+            result.specDescription = str(info["description"])
+        }
+        if let list = payload["endpoints"] as? [[String: Any]] {
+            result.endpoints = list.compactMap { item in
+                let method = str(item["method"]).uppercased()
+                let path = str(item["path"])
+                guard !method.isEmpty, !path.isEmpty else { return nil }
+                let summary = str(item["summary"])
+                let group = str(item["group"]).isEmpty ? "General" : str(item["group"])
+                let sampleRaw = item["sampleBody"]
+                let sampleBody: String?
+                if let s = sampleRaw as? String, !s.isEmpty {
+                    sampleBody = s
+                } else if let dict = sampleRaw as? [String: Any],
+                          let json = try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys]),
+                          let text = String(data: json, encoding: .utf8) {
+                    sampleBody = text
+                } else {
+                    sampleBody = nil
+                }
+                return OpenApiEndpointItem(
+                    method: method,
+                    path: path,
+                    summary: summary,
+                    group: group,
+                    sampleBody: sampleBody
+                )
+            }
+        }
+        if JSONSerialization.isValidJSONObject(payload),
+           let pretty = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys]) {
+            result.exportJSONData = pretty
+        } else {
+            result.exportJSONData = data
+        }
+        return result
     }
 
     static func ensureOK(_ data: Data, fallback: String) throws {

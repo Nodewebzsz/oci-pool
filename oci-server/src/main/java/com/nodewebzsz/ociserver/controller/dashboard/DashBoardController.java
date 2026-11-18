@@ -6,6 +6,7 @@ import com.nodewebzsz.ociserver.pojo.response.DashboardStats;
 import com.nodewebzsz.ociserver.pojo.response.SystemMetrics;
 import com.nodewebzsz.ocicommon.param.ApiResponse;
 import com.nodewebzsz.ociserver.service.BootTotalInstanceService;
+import com.nodewebzsz.ociserver.service.TenantService;
 import com.nodewebzsz.ociserver.service.monitor.SystemMonitorService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
@@ -41,6 +42,9 @@ public class DashBoardController extends BaseController {
 
     @Resource
     private CreateInstanceTaskV2 createInstanceTaskV2;
+
+    @Resource
+    private TenantService tenantService;
 
     @RequestMapping("/boot/dashboard")
     public String dashboard(Model model){
@@ -103,6 +107,17 @@ public class DashBoardController extends BaseController {
         } catch (Exception e) {
             log.error("Failed to resume grab engine", e);
             return ApiResponse.error("恢复抢机引擎失败: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/boot/tenant-portrait")
+    @ResponseBody
+    public ApiResponse getTenantPortrait() {
+        try {
+            return ApiResponse.success(tenantService.getTenantPortrait());
+        } catch (Exception e) {
+            log.error("Failed to get tenant portrait", e);
+            return ApiResponse.error("获取主账号画像数据失败: " + e.getMessage());
         }
     }
 }

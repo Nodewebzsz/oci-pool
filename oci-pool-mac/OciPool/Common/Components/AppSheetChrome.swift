@@ -44,11 +44,11 @@ enum AppSheetSurface {
     }
 
     static func accentRed(_ dark: Bool) -> Color {
-        dark ? Color(hex: "ff6b6b") : Color(hex: "dc2626")
+        AppTheme.isClaude ? AppTheme.danger : (dark ? Color(hex: "ff6b6b") : Color(hex: "dc2626"))
     }
 
     static func accentOrange(_ dark: Bool) -> Color {
-        dark ? Color(hex: "f78166") : Color(hex: "ea580c")
+        AppTheme.isClaude ? AppTheme.orange : (dark ? Color(hex: "f78166") : Color(hex: "ea580c"))
     }
 }
 
@@ -74,7 +74,7 @@ struct AppSheetChrome<Content: View, Footer: View>: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.presentationMode) private var presentationMode
 
-    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
+    private var dark: Bool { appearance.mode == .system ? colorScheme == .dark : (appearance.mode == .dark) }
 
     init(
         title: String,
@@ -223,7 +223,7 @@ struct AppSheetTabBar: View {
 
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme
-    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
+    private var dark: Bool { appearance.mode == .system ? colorScheme == .dark : (appearance.mode == .dark) }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -261,7 +261,7 @@ struct AppSheetTableHeader: View {
 
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme
-    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
+    private var dark: Bool { appearance.mode == .system ? colorScheme == .dark : (appearance.mode == .dark) }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -302,7 +302,7 @@ struct AppSheetTableRow<Content: View>: View {
 
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme
-    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
+    private var dark: Bool { appearance.mode == .system ? colorScheme == .dark : (appearance.mode == .dark) }
 
     var body: some View {
         content()
@@ -323,7 +323,7 @@ struct AppSheetTableBox<Content: View>: View {
 
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme
-    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
+    private var dark: Bool { appearance.mode == .system ? colorScheme == .dark : (appearance.mode == .dark) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -355,7 +355,7 @@ struct AppSheetFixedTable<Header: View, Rows: View>: View {
 
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme
-    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
+    private var dark: Bool { appearance.mode == .system ? colorScheme == .dark : (appearance.mode == .dark) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -422,7 +422,7 @@ struct AppDetailRow: View {
 
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme
-    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
+    private var dark: Bool { appearance.mode == .system ? colorScheme == .dark : (appearance.mode == .dark) }
 
     var body: some View {
         HStack(alignment: .top, spacing: 15) {
@@ -458,7 +458,7 @@ struct AppTextEditor: View {
 
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme
-    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
+    private var dark: Bool { appearance.mode == .system ? colorScheme == .dark : (appearance.mode == .dark) }
 
     var body: some View {
         TextEditor(text: $text)
@@ -469,7 +469,7 @@ struct AppTextEditor: View {
             .frame(minHeight: minHeight)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(dark ? Color(hex: "161820") : Color.white)
+                    .fill(AppTheme.isClaude ? AppTheme.sidebarHover(dark) : (dark ? Color(hex: "161820") : Color.white))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
@@ -487,7 +487,7 @@ struct AppSheetInfoBox: View {
 
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme
-    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
+    private var dark: Bool { appearance.mode == .system ? colorScheme == .dark : (appearance.mode == .dark) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {

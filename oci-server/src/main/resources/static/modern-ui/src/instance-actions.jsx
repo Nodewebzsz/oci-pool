@@ -554,12 +554,13 @@ function useReinstallModal() {
   return React.useCallback((inst) => {
     const state = { os: 'ubuntu-22.04', cloudInit: 'none', keepData: false };
     const render = () => {
-      shell.openModal({
+      shell.openDrawer({
         title: tr('inst.0dab1f').replace('{0}',inst.name),
         subtitle: tr('inst.88057b'),
         icon: 'refresh-cw',
         iconColor: 'var(--orange)',
-        size: 'md',
+        width: 560,
+        bodyPadding: 0,
         body: (
           <div style={{ padding: 22 }}>
             <div style={{
@@ -608,9 +609,9 @@ function useReinstallModal() {
         ),
         footer: (
           <>
-            <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('inst.625fb2')}</Button>
+            <Button variant="ghost" size="md" onClick={shell.closeDrawer}>{tr('inst.625fb2')}</Button>
             <Button variant="danger" size="md" icon="refresh-cw" onClick={() => {
-              shell.closeModal();
+              shell.closeDrawer();
               shell.openConfirm({
                 title: tr('inst.df0204').replace('{0}',inst.name),
                 body: <div>{tr('inst.a1f3b2')}<br/>{tr('inst.1fa2e6')} <b>{state.os}</b></div>,
@@ -639,12 +640,13 @@ function useSnapshotModal() {
   return React.useCallback((inst) => {
     const state = { name: `${inst.name}-${new Date().toISOString().slice(0, 10)}`, description: '', freezeFs: true };
     const render = () => {
-      shell.openModal({
+      shell.openDrawer({
         title: tr('inst.5196be').replace('{0}',inst.name),
         subtitle: tr('inst.ad3da0'),
         icon: 'camera',
         iconColor: 'var(--info)',
-        size: 'md',
+        width: 560,
+        bodyPadding: 0,
         body: (
           <div style={{ padding: 22 }}>
             <FormRow label={tr('inst.b67cbf')} required>
@@ -665,7 +667,7 @@ function useSnapshotModal() {
         ),
         footer: (
           <>
-            <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('inst.625fb2')}</Button>
+            <Button variant="ghost" size="md" onClick={shell.closeDrawer}>{tr('inst.625fb2')}</Button>
             <Button variant="primary" size="md" icon="camera" onClick={async () => {
               try {
                 const j = await window.ociServices.instance.sysImageBackUp({ instanceId: String(inst.dbId ?? inst.id), tenantId: String(inst.tenantId ?? ''), compartmentId: inst.compartmentId || '' });
@@ -674,7 +676,7 @@ function useSnapshotModal() {
                 if (!j || (j.status !== 'error' && j.success !== false)) {
                   shell.showToast(tr('inst.f6e8b8').replace('{0}',state.name), { kind: 'success' });
                   window.dispatchEvent(new CustomEvent('oci:instances-changed'));
-                  shell.closeModal();
+                  shell.closeDrawer();
                 } else {
                   shell.showToast(tr('inst.ad4401').replace('{0}',j.message || j.error || tr('inst.unknown')), { kind: 'error' });
                 }

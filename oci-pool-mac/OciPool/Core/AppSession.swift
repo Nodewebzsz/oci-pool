@@ -63,7 +63,7 @@ final class AppSession: ObservableObject {
     /// Last non-local URL so switching Local → Remote restores the address.
     var lastRemoteServerURL: String {
         get {
-            let raw = UserDefaults.standard.string(forKey: remoteURLKey) ?? ""
+            let raw = Self.normalize(UserDefaults.standard.string(forKey: remoteURLKey) ?? "")
             if raw.isEmpty || raw == "https://" || raw == "http://" || Self.isLocalServerURL(raw) {
                 return ""
             }
@@ -239,12 +239,12 @@ final class AppSession: ObservableObject {
 
     /// Local embedded backend (localhost) vs remote deployment.
     static func isLocalServerURL(_ raw: String) -> Bool {
-        var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let s = normalize(raw)
         if s.isEmpty { return true }
-        if !s.hasPrefix("http://") && !s.hasPrefix("https://") {
-            s = "http://\(s)"
+        guard let url = URLComponents(string: s), let host = url.host?.lowercased(),
+              url.scheme == "http", url.port == URLComponents(string: localDefaultURL)?.port else {
+            return false
         }
-        guard let host = URL(string: s)?.host?.lowercased() else { return true }
         return host == "localhost"
             || host == "127.0.0.1"
             || host == "0.0.0.0"
@@ -299,27 +299,25 @@ final class AppSession: ObservableObject {
         await auth.loginFactorConfig(baseURL: serverURL)
     }
 
-    private static func normalize(_ raw: String) -> String {
+    static func normalize(_ raw: String) -> String {
         var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if s.isEmpty || s == "http://" || s == "https://" { return "" }
-        if !s.hasPrefix("http://") && !s.hasPrefix("https://") {
+        guard !s.isEmpty, s.rangeOfCharacter(from: .whitespacesAndNewlines) == nil else { return "" }
+        if !s.contains("://") {
             s = "http://\(s)"
         }
-        while s.hasSuffix("/") { s.removeLast() }
+        guard var comps = URLComponents(string: s),
+              let scheme = comps.scheme?.lowercased(), ["http", "https"].contains(scheme),
+              let host = comps.host?.lowercased(), !host.isEmpty,
+              comps.user == nil, comps.password == nil,
+              comps.port.map({ (1...65535).contains($0) }) ?? true else { return "" }
+        comps.scheme = scheme
+        // 兼容历史保存的 localhost.，避免显示、Cookie 与本地模式识别不一致。
+        comps.host = host == "localhost." ? "localhost" : host
         // 用户常从浏览器地址栏粘贴带路径的 URL（/login、/index、/tenants…），
         // 若保留 path，后续 makeURL 会拼成 /tenants/boot/... 导致整站 404 Not Found。
-        if var comps = URLComponents(string: s), comps.host != nil {
-            let path = comps.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            if !path.isEmpty {
-                comps.path = ""
-                comps.query = nil
-                comps.fragment = nil
-                if let rebuilt = comps.string {
-                    s = rebuilt
-                    while s.hasSuffix("/") { s.removeLast() }
-                }
-            }
-        }
-        return s
+        comps.path = ""
+        comps.query = nil
+        comps.fragment = nil
+        return comps.url?.absoluteString ?? ""
     }
 }

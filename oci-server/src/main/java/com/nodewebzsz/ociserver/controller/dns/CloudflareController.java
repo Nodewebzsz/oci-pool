@@ -334,4 +334,18 @@ public class CloudflareController  extends BaseController {
             return ApiResponse.error("批量同步失败: " + e.getMessage());
         }
     }
+
+    /**
+     * API接口：获取 Cloudflare 官方回源 CIDR 与 Nginx real_ip 配置片段
+     */
+    @GetMapping("/api/official-ips")
+    @ResponseBody
+    public ApiResponse getOfficialIpRanges() {
+        try {
+            return ApiResponse.success(cloudflareService.listOfficialIpRanges());
+        } catch (Exception e) {
+            log.error("获取Cloudflare官方回源网段失败", e);
+            return ApiResponse.error("获取Cloudflare官方回源网段失败: " + e.getMessage());
+        }
+    }
 }

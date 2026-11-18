@@ -219,19 +219,28 @@ private struct NotificationDropdownPanel: View {
     private var textPrimary: Color { dark ? Color.white.opacity(0.92) : Color(hex: "111827") }
     private var textSecondary: Color { dark ? Color.white.opacity(0.64) : Color(hex: "4b5563") }
     private var textMuted: Color { dark ? Color.white.opacity(0.42) : Color(hex: "6b7280") }
-    private var visibleMessages: [SysMessageItem] { Array(header.messagePage.content.prefix(6)) }
+    private var visibleMessages: [SysMessageItem] { Array(header.messagePage.content.prefix(20)) }
     private var totalCount: Int { max(header.messagePage.totalElements, visibleMessages.count) }
+    private var selectedVisibleCount: Int {
+        visibleMessages.filter { header.selectedMessageIds.contains($0.id) }.count
+    }
+    private var allVisibleSelected: Bool {
+        !visibleMessages.isEmpty && selectedVisibleCount == visibleMessages.count
+    }
     private var desiredHeight: CGFloat {
-        visibleMessages.isEmpty ? 166 : 78 + CGFloat(visibleMessages.count) * 57
+        visibleMessages.isEmpty ? 166 : min(420, 112 + CGFloat(visibleMessages.count) * 58)
     }
 
     var body: some View {
         VStack(spacing: 0) {
             panelHeader
+            if !visibleMessages.isEmpty {
+                batchToolbar
+            }
             messageList
             panelFooter
         }
-        .frame(width: 340)
+        .frame(width: 380)
         .frame(height: min(maxHeight, desiredHeight))
         .background(surface)
         .cornerRadius(8)
@@ -266,12 +275,64 @@ private struct NotificationDropdownPanel: View {
             .buttonStyle(PlainButtonStyle())
             .font(.system(size: 10.5, weight: .medium))
             .foregroundColor(AppTheme.info)
-            .disabled(header.unreadCount == 0)
+            .disabled(header.unreadCount == 0 || header.messagesMutating)
             .opacity(header.unreadCount == 0 ? 0.55 : 1)
+
+            Button("清空全部") {
+                Task { await header.clearAllMessages() }
+            }
+            .buttonStyle(PlainButtonStyle())
+            .font(.system(size: 10.5, weight: .medium))
+            .foregroundColor(AppTheme.danger)
+            .disabled(totalCount == 0 || header.messagesMutating)
+            .opacity(totalCount == 0 ? 0.45 : 1)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(surface2)
+        .overlay(Rectangle().fill(border).frame(height: 1), alignment: .bottom)
+    }
+
+    private var batchToolbar: some View {
+        HStack(spacing: 8) {
+            Button(action: { header.toggleSelectAllMessages(in: visibleMessages) }) {
+                HStack(spacing: 5) {
+                    Image(systemName: allVisibleSelected ? "checkmark.square.fill" : (selectedVisibleCount > 0 ? "minus.square.fill" : "square"))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(selectedVisibleCount > 0 ? AppTheme.sidebarActive : textMuted)
+                    Text(selectedVisibleCount > 0 ? "已选 \(selectedVisibleCount) 条" : "全选")
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundColor(textSecondary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PlainButtonStyle())
+
+            Spacer(minLength: 0)
+
+            if selectedVisibleCount > 0 {
+                Button(action: {
+                    Task { await header.deleteSelectedMessages() }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("删除所选 (\(selectedVisibleCount))")
+                            .font(.system(size: 10.5, weight: .semibold))
+                    }
+                    .foregroundColor(AppTheme.danger)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(AppTheme.dangerSoft(dark))
+                    .cornerRadius(4)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .disabled(header.messagesMutating)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .background(surface)
         .overlay(Rectangle().fill(border).frame(height: 1), alignment: .bottom)
     }
 
@@ -311,41 +372,59 @@ private struct NotificationDropdownPanel: View {
 
     private func messageRow(_ message: SysMessageItem) -> some View {
         let style = notificationStyle(message)
-        return Button(action: { onOpenMessage(message) }) {
-            HStack(alignment: .top, spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(style.color.opacity(dark ? 0.17 : 0.12))
-                        .frame(width: 24, height: 24)
-                    Image(systemName: style.icon)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(style.color)
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(message.subject.isEmpty ? "通知" : message.subject)
-                            .font(.system(size: 11.5, weight: .semibold))
-                            .foregroundColor(textPrimary)
-                            .lineLimit(1)
-                        Spacer(minLength: 0)
-                        Text(relativeTime(message.createTime))
-                            .font(.system(size: 10))
-                            .foregroundColor(textMuted)
-                            .lineLimit(1)
-                    }
-                    Text(summaryText(message))
-                        .font(.system(size: 11))
-                        .foregroundColor(textSecondary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                }
+        let isSelected = header.selectedMessageIds.contains(message.id)
+        return HStack(alignment: .top, spacing: 8) {
+            Button(action: { header.toggleMessageSelection(message) }) {
+                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundColor(isSelected ? AppTheme.sidebarActive : textMuted)
+                    .frame(width: 20, height: 24)
+                    .contentShape(Rectangle())
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .contentShape(Rectangle())
+            .buttonStyle(PlainButtonStyle())
+
+            Button(action: { onOpenMessage(message) }) {
+                HStack(alignment: .top, spacing: 10) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(style.color.opacity(dark ? 0.17 : 0.12))
+                            .frame(width: 24, height: 24)
+                        Image(systemName: style.icon)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(style.color)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            if message.isUnread {
+                                Circle()
+                                    .fill(AppTheme.orange)
+                                    .frame(width: 5, height: 5)
+                            }
+                            Text(message.subject.isEmpty ? "通知" : message.subject)
+                                .font(.system(size: 11.5, weight: .semibold))
+                                .foregroundColor(textPrimary)
+                                .lineLimit(1)
+                            Spacer(minLength: 0)
+                            Text(relativeTime(message.createTime))
+                                .font(.system(size: 10))
+                                .foregroundColor(textMuted)
+                                .lineLimit(1)
+                        }
+                        Text(summaryText(message))
+                            .font(.system(size: 11))
+                            .foregroundColor(textSecondary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PlainButtonStyle())
         }
-        .buttonStyle(PlainButtonStyle())
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(isSelected ? AppTheme.sidebarActive.opacity(dark ? 0.10 : 0.06) : Color.clear)
     }
 
     private var panelFooter: some View {

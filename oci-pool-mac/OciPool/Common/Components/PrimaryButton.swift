@@ -18,7 +18,8 @@ struct AppButton: View {
 
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme
-    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
+    private var dark: Bool { appearance.mode == .system ? colorScheme == .dark : (appearance.mode == .dark) }
+    private var cornerRadius: CGFloat { AppTheme.isClaude ? 8 : 5 }
 
     var body: some View {
         Button(action: action) {
@@ -38,9 +39,9 @@ struct AppButton: View {
             .padding(.vertical, 7)
             .background(background)
             .foregroundColor(foreground)
-            .cornerRadius(8)
+            .cornerRadius(cornerRadius)
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: cornerRadius)
                     .stroke(borderColor, lineWidth: (!enabled || kind == .secondary) ? 1 : 0)
             )
             .opacity(isLoading ? 0.7 : 1.0)
@@ -59,13 +60,13 @@ struct AppButton: View {
             case .info:
                 return AppTheme.info.opacity(dark ? 0.20 : 0.12)
             case .cyan:
-                return Color(hex: "00b6be").opacity(dark ? 0.20 : 0.12)
+                return AppTheme.cyan.opacity(dark ? 0.20 : 0.12)
             case .orange:
                 return AppTheme.orange.opacity(dark ? 0.20 : 0.12)
             case .danger:
                 return AppTheme.danger.opacity(dark ? 0.20 : 0.12)
             case .secondary:
-                return dark ? Color(hex: "151c21").opacity(0.6) : Color(hex: "f1f4f6").opacity(0.8)
+                return AppTheme.sidebarHover(dark).opacity(dark ? 0.65 : 0.8)
             case .plain:
                 return Color.clear
             }
@@ -90,7 +91,7 @@ struct AppButton: View {
             case .info:
                 return AppTheme.info.opacity(dark ? 0.65 : 0.8)
             case .cyan:
-                return Color(hex: "00b6be").opacity(dark ? 0.65 : 0.8)
+                return AppTheme.cyan.opacity(dark ? 0.65 : 0.8)
             case .orange:
                 return AppTheme.orange.opacity(dark ? 0.65 : 0.85)
             case .danger:
@@ -102,7 +103,8 @@ struct AppButton: View {
             }
         }
         switch kind {
-        case .primary, .danger, .cyan, .info, .orange: return .white
+        case .primary: return appearance.accent.accentFg(dark)
+        case .danger, .cyan, .info, .orange: return .white
         case .secondary: return AppTheme.navIcon(dark)
         case .plain: return AppTheme.sidebarActive
         }
@@ -116,7 +118,7 @@ struct AppButton: View {
             case .info:
                 return AppTheme.info.opacity(dark ? 0.35 : 0.25)
             case .cyan:
-                return Color(hex: "00b6be").opacity(dark ? 0.35 : 0.25)
+                return AppTheme.cyan.opacity(dark ? 0.35 : 0.25)
             case .orange:
                 return AppTheme.orange.opacity(dark ? 0.35 : 0.25)
             case .danger:

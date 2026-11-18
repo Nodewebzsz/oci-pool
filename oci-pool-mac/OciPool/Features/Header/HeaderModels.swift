@@ -4,6 +4,7 @@ import Foundation
 
 struct SysMessageItem: Identifiable, Equatable {
     var id: String { businessId }
+    var numericId: Int64? = nil
     let businessId: String
     let subject: String
     let content: String

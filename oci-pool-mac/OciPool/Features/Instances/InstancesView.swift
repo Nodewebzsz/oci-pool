@@ -177,7 +177,7 @@ struct InstancesView: View {
 
     /// Web 页头 actions：`请选择:` + 租户/区域 Select(160) + eye 图标钮 + 查看实例(primary) + 一键导出(orange)
     private var toolbar: some View {
-        HStack(spacing: 8) {
+        AdaptivePageToolbar {
             if !tenantSubPage {
                 Text("请选择:")
                     .font(.system(size: 12))

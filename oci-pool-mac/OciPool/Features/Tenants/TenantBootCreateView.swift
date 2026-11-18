@@ -1,11 +1,311 @@
 import SwiftUI
 import AppKit
 
+// MARK: - Shared Boot Shape Normalization & Live USD Pricing Estimator
+
+struct BootNormalizedSpec: Equatable {
+    let shape: String
+    let ocpu: Int
+    let memoryGb: Int
+    let bootVolumeGb: Int
+    let locked: Bool
+    let isFreeFixed: Bool
+    let validationError: String?
+}
+
+struct BootCostEstimate: Equatable {
+    let hourlyUsd: Double
+    let computeMonthlyUsd: Double
+    let volumeMonthlyUsd: Double
+    let totalMonthlyUsd: Double
+    let tierBadge: String
+    let isAlwaysFree: Bool
+}
+
+enum BootPricingEstimator {
+    static let microShape = "VM.Standard.E2.1.Micro"
+    static let armFreeFlexShape = "VM.Standard.A1.Flex"
+
+    static func shapes(for arch: String) -> [SelectOption] {
+        if arch.uppercased() == "ARM" {
+            return [
+                SelectOption(id: "VM.Standard.A1.Flex", title: "VM.Standard.A1.Flex (Ampere Always Free / Flex)"),
+                SelectOption(id: "VM.Standard.A2.Flex", title: "VM.Standard.A2.Flex (Ampere Paid Flex)")
+            ]
+        }
+        return [
+            SelectOption(id: "VM.Standard.E2.1.Micro", title: "VM.Standard.E2.1.Micro (Always Free 1C 1G 固定)"),
+            SelectOption(id: "VM.Standard.E4.Flex", title: "VM.Standard.E4.Flex (AMD EPYC Flex)"),
+            SelectOption(id: "VM.Standard.E5.Flex", title: "VM.Standard.E5.Flex (AMD EPYC Gen4 Flex)"),
+            SelectOption(id: "VM.Standard3.Flex", title: "VM.Standard3.Flex (Intel Xeon Flex)"),
+            SelectOption(id: "VM.Optimized3.Flex", title: "VM.Optimized3.Flex (Intel 高频 Flex)")
+        ]
+    }
+
+    static func defaultShape(for arch: String, ocpu: Int, memoryGb: Int) -> String {
+        if arch.uppercased() == "ARM" {
+            return armFreeFlexShape
+        }
+        if ocpu == 1 && memoryGb == 1 {
+            return microShape
+        }
+        return "VM.Standard.E4.Flex"
+    }
+
+    static func normalize(
+        shape: String,
+        ocpuText: String,
+        memoryText: String,
+        diskText: String
+    ) -> BootNormalizedSpec {
+        let trimmedDisk = diskText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parsedDisk = Int(trimmedDisk)
+        let diskVal = parsedDisk ?? 50
+        var diskError: String? = nil
+        if parsedDisk == nil || diskVal < 50 || diskVal > 32768 {
+            diskError = "引导卷容量须为 50 ~ 32768 GB 之间的整数"
+        }
+
+        if shape == microShape {
+            return BootNormalizedSpec(
+                shape: shape,
+                ocpu: 1,
+                memoryGb: 1,
+                bootVolumeGb: max(50, diskVal),
+                locked: true,
+                isFreeFixed: true,
+                validationError: diskError
+            )
+        }
+
+        let trimmedOcpu = ocpuText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedMem = memoryText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let ocpu = Int(trimmedOcpu), !trimmedOcpu.contains(".") else {
+            return BootNormalizedSpec(
+                shape: shape, ocpu: 1, memoryGb: 6, bootVolumeGb: max(50, diskVal),
+                locked: false, isFreeFixed: false,
+                validationError: "Flex 规格 OCPU 必须为 1 ~ 80 的整数"
+            )
+        }
+        guard let mem = Int(trimmedMem), !trimmedMem.contains(".") else {
+            return BootNormalizedSpec(
+                shape: shape, ocpu: ocpu, memoryGb: 6, bootVolumeGb: max(50, diskVal),
+                locked: false, isFreeFixed: false,
+                validationError: "Flex 规格内存容量必须为 1 ~ 512 GB 的整数"
+            )
+        }
+        if ocpu < 1 || ocpu > 80 {
+            return BootNormalizedSpec(
+                shape: shape, ocpu: ocpu, memoryGb: mem, bootVolumeGb: max(50, diskVal),
+                locked: false, isFreeFixed: false,
+                validationError: "OCPU 超出范围：须在 1 ~ 80 核之间"
+            )
+        }
+        if mem < 1 || mem > 512 {
+            return BootNormalizedSpec(
+                shape: shape, ocpu: ocpu, memoryGb: mem, bootVolumeGb: max(50, diskVal),
+                locked: false, isFreeFixed: false,
+                validationError: "内存容量超出范围：须在 1 ~ 512 GB 之间"
+            )
+        }
+        let ratio = Double(mem) / Double(max(1, ocpu))
+        if ratio < 1.0 || ratio > 64.0 {
+            return BootNormalizedSpec(
+                shape: shape, ocpu: ocpu, memoryGb: mem, bootVolumeGb: max(50, diskVal),
+                locked: false, isFreeFixed: false,
+                validationError: "单核内存比须在 1 ~ 64 GB / OCPU 之间"
+            )
+        }
+        return BootNormalizedSpec(
+            shape: shape,
+            ocpu: ocpu,
+            memoryGb: mem,
+            bootVolumeGb: max(50, diskVal),
+            locked: false,
+            isFreeFixed: false,
+            validationError: diskError
+        )
+    }
+
+    static func estimate(
+        shape: String,
+        ocpu: Int,
+        memoryGb: Int,
+        bootVolumeGb: Int,
+        instanceCount: Int = 1
+    ) -> BootCostEstimate {
+        let count = max(1, instanceCount)
+        let totalOcpu = max(1, ocpu) * count
+        let totalMem = max(1, memoryGb) * count
+        let totalDisk = max(50, bootVolumeGb) * count
+
+        let overflowDiskGb = max(0, totalDisk - 200)
+        let volumeMonthly = Double(overflowDiskGb) * 0.0255
+
+        var hourlyCompute = 0.0
+        var badge = "按量计费 Flex"
+
+        switch shape {
+        case microShape:
+            let paidInstances = max(0, count - 2)
+            hourlyCompute = Double(paidInstances) * 0.0085
+            badge = (paidInstances == 0 && overflowDiskGb == 0)
+                ? "Always Free 额度内 $0.00"
+                : "超出免费额度估算"
+        case armFreeFlexShape:
+            let billableOcpu = max(0, totalOcpu - 4)
+            let billableMem = max(0, totalMem - 24)
+            hourlyCompute = Double(billableOcpu) * 0.01 + Double(billableMem) * 0.0015
+            badge = (hourlyCompute == 0 && overflowDiskGb == 0)
+                ? "Always Free 额度内 $0.00"
+                : "超出免费池部分计费"
+        case "VM.Standard.E4.Flex":
+            hourlyCompute = Double(totalOcpu) * 0.025 + Double(totalMem) * 0.0015
+            badge = "付费 AMD E4.Flex"
+        case "VM.Standard.E5.Flex":
+            hourlyCompute = Double(totalOcpu) * 0.030 + Double(totalMem) * 0.0020
+            badge = "付费 AMD E5.Flex"
+        case "VM.Standard3.Flex":
+            hourlyCompute = Double(totalOcpu) * 0.040 + Double(totalMem) * 0.0015
+            badge = "付费 Intel Standard3.Flex"
+        case "VM.Optimized3.Flex":
+            hourlyCompute = Double(totalOcpu) * 0.054 + Double(totalMem) * 0.0015
+            badge = "付费高频 Optimized3.Flex"
+        default:
+            hourlyCompute = Double(totalOcpu) * 0.010 + Double(totalMem) * 0.0015
+            badge = "付费 Flex 规格"
+        }
+
+        let computeMonthly = hourlyCompute * 720.0
+        let totalMonthly = computeMonthly + volumeMonthly
+        let isFree = totalMonthly < 0.0001
+
+        return BootCostEstimate(
+            hourlyUsd: hourlyCompute,
+            computeMonthlyUsd: computeMonthly,
+            volumeMonthlyUsd: volumeMonthly,
+            totalMonthlyUsd: totalMonthly,
+            tierBadge: badge,
+            isAlwaysFree: isFree
+        )
+    }
+}
+
+struct BootPricingEstimateCard: View {
+    let shape: String
+    let ocpuText: String
+    let memoryText: String
+    let diskText: String
+    var countText: String = "1"
+
+    @EnvironmentObject private var appearance: AppearanceController
+    @State private var showRiskNotes = false
+
+    private var dark: Bool { appearance.isDarkEffective }
+
+    var body: some View {
+        let spec = BootPricingEstimator.normalize(
+            shape: shape,
+            ocpuText: ocpuText,
+            memoryText: memoryText,
+            diskText: diskText
+        )
+        let count = max(1, Int(countText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 1)
+        let est = BootPricingEstimator.estimate(
+            shape: spec.shape,
+            ocpu: spec.ocpu,
+            memoryGb: spec.memoryGb,
+            bootVolumeGb: spec.bootVolumeGb,
+            instanceCount: count
+        )
+        let toneColor = est.isAlwaysFree ? AppTheme.success : AppTheme.orange
+
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "dollarsign.circle.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(toneColor)
+                Text("实时费用预估 (USD)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppTheme.navIcon(dark))
+                Spacer(minLength: 4)
+                StatusBadge(
+                    text: est.tierBadge,
+                    tone: est.isAlwaysFree ? .success : .warning
+                )
+            }
+
+            HStack(spacing: 12) {
+                metricPill(
+                    label: "折算月费 (720h)",
+                    value: String(format: "$%.2f / 月", est.totalMonthlyUsd),
+                    highlight: toneColor
+                )
+                metricPill(
+                    label: "计算小时单价",
+                    value: String(format: "$%.4f / h", est.hourlyUsd),
+                    highlight: AppTheme.navIcon(dark)
+                )
+                metricPill(
+                    label: "引导卷超额估算",
+                    value: est.volumeMonthlyUsd > 0
+                        ? String(format: "$%.2f / 月", est.volumeMonthlyUsd)
+                        : "$0.00 (≤200GB)",
+                    highlight: est.volumeMonthlyUsd > 0 ? AppTheme.orange : AppTheme.textSecondary(dark)
+                )
+            }
+
+            DisclosureGroup(isExpanded: $showRiskNotes) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("• Always Free 免费池为租户级共享额度：总计最多 4 OCPU + 24 GB (A1.Flex)、2 台 E2.1.Micro 以及 200 GB 块存储/引导卷。")
+                    Text("• 若该租户名下已有存量实例或残留未删引导卷，叠加后超出免费池的部分将按 Oracle 官方单价扣减试用金或产生 Pay-As-You-Go 账单。")
+                    Text("• 引导卷超 200 GB 免费总额后按基础性能块存储约 $0.0255 / GB·月估算。")
+                }
+                .font(.system(size: 11))
+                .foregroundColor(AppTheme.textSecondary(dark))
+                .padding(.top, 6)
+            } label: {
+                Text("计费口径与超额风险说明")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(AppTheme.info)
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(toneColor.opacity(dark ? 0.10 : 0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(toneColor.opacity(0.32), lineWidth: 1)
+        )
+    }
+
+    private func metricPill(label: String, value: String, highlight: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.system(size: 10))
+                .foregroundColor(AppTheme.textTertiary(dark))
+            Text(value)
+                .font(.system(size: 12.5, weight: .bold, design: .monospaced))
+                .foregroundColor(highlight)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(AppTheme.sidebarBg(dark).opacity(0.85))
+        .cornerRadius(6)
+    }
+}
+
 // MARK: - Boot template model (100% 对齐 Web 端规格模板)
 
 private struct BootTemplate: Identifiable {
     let id: String
     let arch: String
+    let shape: String
     let label: String
     let ocpu: String
     let memory: String
@@ -15,14 +315,14 @@ private struct BootTemplate: Identifiable {
 }
 
 private let bootTemplates: [BootTemplate] = [
-    BootTemplate(id: "arm-base",     arch: "ARM", label: "ARM Base",     ocpu: "1", memory: "6",  disk: "50",  tag: "免费", paid: false),
-    BootTemplate(id: "arm-std",      arch: "ARM", label: "ARM Standard", ocpu: "2", memory: "12", disk: "50",  tag: "免费", paid: false),
-    BootTemplate(id: "arm-high",     arch: "ARM", label: "ARM High",     ocpu: "4", memory: "24", disk: "50",  tag: "免费", paid: false),
-    BootTemplate(id: "arm-a2",       arch: "ARM", label: "ARM A2",       ocpu: "4", memory: "24", disk: "200", tag: "付费", paid: true),
-    BootTemplate(id: "amd-base",     arch: "AMD", label: "AMD Base",     ocpu: "1", memory: "1",  disk: "50",  tag: "免费", paid: false),
-    BootTemplate(id: "amd-e3",       arch: "AMD", label: "AMD E3",       ocpu: "4", memory: "24", disk: "50",  tag: "付费", paid: true),
-    BootTemplate(id: "amd-e4",       arch: "AMD", label: "AMD E4",       ocpu: "4", memory: "24", disk: "50",  tag: "付费", paid: true),
-    BootTemplate(id: "amd-e5",       arch: "AMD", label: "AMD E5",       ocpu: "4", memory: "24", disk: "50",  tag: "付费", paid: true),
+    BootTemplate(id: "arm-base",     arch: "ARM", shape: "VM.Standard.A1.Flex",    label: "ARM Base",     ocpu: "1", memory: "6",  disk: "50",  tag: "免费", paid: false),
+    BootTemplate(id: "arm-std",      arch: "ARM", shape: "VM.Standard.A1.Flex",    label: "ARM Standard", ocpu: "2", memory: "12", disk: "50",  tag: "免费", paid: false),
+    BootTemplate(id: "arm-high",     arch: "ARM", shape: "VM.Standard.A1.Flex",    label: "ARM High",     ocpu: "4", memory: "24", disk: "50",  tag: "免费", paid: false),
+    BootTemplate(id: "arm-a2",       arch: "ARM", shape: "VM.Standard.A2.Flex",    label: "ARM A2",       ocpu: "4", memory: "24", disk: "200", tag: "付费", paid: true),
+    BootTemplate(id: "amd-base",     arch: "AMD", shape: "VM.Standard.E2.1.Micro", label: "AMD Base",     ocpu: "1", memory: "1",  disk: "50",  tag: "免费", paid: false),
+    BootTemplate(id: "amd-e3",       arch: "AMD", shape: "VM.Standard3.Flex",      label: "AMD / X86 S3", ocpu: "4", memory: "24", disk: "50",  tag: "付费", paid: true),
+    BootTemplate(id: "amd-e4",       arch: "AMD", shape: "VM.Standard.E4.Flex",    label: "AMD E4",       ocpu: "4", memory: "24", disk: "50",  tag: "付费", paid: true),
+    BootTemplate(id: "amd-e5",       arch: "AMD", shape: "VM.Standard.E5.Flex",    label: "AMD E5",       ocpu: "4", memory: "24", disk: "50",  tag: "付费", paid: true),
 ]
 
 private let intervalPresets: [(String, String)] = [
@@ -44,10 +344,32 @@ struct TenantBootCreateView: View {
     private var mutedText: Color { AppTheme.sidebarText(dark) }
 
     @State private var selectedTemplateId: String = "arm-high"
+    @State private var lastAppliedTemplateId: String = "arm-high"
+    @State private var selectedShape: String = "VM.Standard.A1.Flex"
     @State private var isPasswordMasked = false
 
     private var visibleTemplates: [BootTemplate] {
         bootTemplates.filter { $0.arch == model.bootArchitecture }
+    }
+
+    private var normalizedSpec: BootNormalizedSpec {
+        BootPricingEstimator.normalize(
+            shape: selectedShape,
+            ocpuText: model.bootOcpu,
+            memoryText: model.bootMemory,
+            diskText: model.bootDisk
+        )
+    }
+
+    private var fallbackTemplate: BootTemplate {
+        bootTemplates.first(where: { $0.id == lastAppliedTemplateId && $0.arch == model.bootArchitecture })
+            ?? visibleTemplates.first
+            ?? bootTemplates[2]
+    }
+
+    private var isCustomModifiedFromTemplate: Bool {
+        let tpl = fallbackTemplate
+        return model.bootOcpu != tpl.ocpu || model.bootMemory != tpl.memory || model.bootDisk != tpl.disk || selectedShape != tpl.shape
     }
 
     private var headerSubtitle: String? {
@@ -75,6 +397,10 @@ struct TenantBootCreateView: View {
 
                     AppButton(title: "保存开机任务", systemImage: "bolt.fill", kind: .primary) {
                         guard let t = tenant else { return }
+                        if let err = normalizedSpec.validationError {
+                            ToastCenter.shared.error(err)
+                            return
+                        }
                         model.submitBoot(t)
                     }
                 }
@@ -303,10 +629,62 @@ struct TenantBootCreateView: View {
             subtitle: "核心、内存、磁盘与轮询周期"
         ) {
             VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Text("实例规格 (Shape) *")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(primaryText)
+                        if normalizedSpec.isFreeFixed {
+                            StatusBadge(text: "Always Free 固定规格", tone: .success)
+                        }
+                        Spacer(minLength: 4)
+                        if isCustomModifiedFromTemplate {
+                            Button(action: { applyTemplate(fallbackTemplate) }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.counterclockwise")
+                                        .font(.system(size: 10, weight: .semibold))
+                                    Text("恢复模板默认")
+                                        .font(.system(size: 11, weight: .medium))
+                                }
+                                .foregroundColor(accent)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+
+                    SelectMenu(
+                        options: BootPricingEstimator.shapes(for: model.bootArchitecture),
+                        selection: Binding(
+                            get: { selectedShape },
+                            set: { newVal in
+                                let nextShape = newVal ?? BootPricingEstimator.shapes(for: model.bootArchitecture).first?.id ?? "VM.Standard.A1.Flex"
+                                handleShapeChange(nextShape)
+                            }
+                        ),
+                        placeholder: "选择实例规格",
+                        allowClear: false
+                    )
+                }
+
                 // OCPU (核心数) + 内存容量 (GB) 双列并排 (去除拥挤的三列)
                 HStack(spacing: 12) {
-                    numField("OCPU (核心数) *", text: $model.bootOcpu)
-                    numField("内存容量 (GB) *", text: $model.bootMemory)
+                    numField("OCPU (核心数) *", text: $model.bootOcpu, disabled: normalizedSpec.locked)
+                    numField("内存容量 (GB) *", text: $model.bootMemory, disabled: normalizedSpec.locked)
+                }
+
+                if let err = normalizedSpec.validationError {
+                    HStack(spacing: 6) {
+                        Image(systemName: "xmark.octagon.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(AppTheme.danger)
+                        Text(err)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(AppTheme.danger)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(AppTheme.dangerSoft(dark)))
                 }
 
                 // ARM 1:6 核心内存比动态防呆守卫条
@@ -357,6 +735,14 @@ struct TenantBootCreateView: View {
 
                 // 引导卷大小 (GB) * 独占整行
                 numField("引导卷大小 (GB) *", text: $model.bootDisk)
+
+                BootPricingEstimateCard(
+                    shape: selectedShape,
+                    ocpuText: model.bootOcpu,
+                    memoryText: model.bootMemory,
+                    diskText: model.bootDisk,
+                    countText: model.bootCount
+                )
 
                 // 轮询抢机周期 (秒) * (纯胶囊按钮，彻底去除多余输入框)
                 FormFieldRow(label: "轮询抢机周期 (秒) *") {
@@ -637,7 +1023,7 @@ struct TenantBootCreateView: View {
     }
 
     // ─── 通用辅助控件 ───────────────────────────────────────────────
-    private func numField(_ label: String, text: Binding<String>) -> some View {
+    private func numField(_ label: String, text: Binding<String>, disabled: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label)
                 .font(.system(size: 11, weight: .semibold))
@@ -646,12 +1032,15 @@ struct TenantBootCreateView: View {
                 text: Binding(
                     get: { text.wrappedValue },
                     set: {
+                        guard !disabled else { return }
                         text.wrappedValue = $0
                         selectedTemplateId = ""
                     }
                 ),
                 placeholder: "0"
             )
+            .disabled(disabled)
+            .opacity(disabled ? 0.65 : 1.0)
         }
         .frame(maxWidth: .infinity)
     }
@@ -693,11 +1082,28 @@ struct TenantBootCreateView: View {
 
     private func applyTemplate(_ tpl: BootTemplate) {
         selectedTemplateId = tpl.id
+        lastAppliedTemplateId = tpl.id
+        selectedShape = tpl.shape
         model.bootOcpu = tpl.ocpu
         model.bootMemory = tpl.memory
         model.bootDisk = tpl.disk
         if let t = tenant {
             model.bootRemark = "\(t.tenantPrimaryName)-\(tpl.id)"
+        }
+    }
+
+    private func handleShapeChange(_ shape: String) {
+        selectedShape = shape
+        if shape == BootPricingEstimator.microShape {
+            model.bootOcpu = "1"
+            model.bootMemory = "1"
+            selectedTemplateId = "amd-base"
+            lastAppliedTemplateId = "amd-base"
+        } else if let match = visibleTemplates.first(where: { $0.shape == shape && $0.ocpu == model.bootOcpu && $0.memory == model.bootMemory }) {
+            selectedTemplateId = match.id
+            lastAppliedTemplateId = match.id
+        } else {
+            selectedTemplateId = ""
         }
     }
 

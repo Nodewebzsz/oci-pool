@@ -276,3 +276,61 @@ struct ActivityLog: Identifiable, Equatable {
 struct OpenLogLinesEnvelope: Decodable {
     let lines: [String]?
 }
+
+// MARK: - /boot/tenant-portrait → TenantPortraitData
+
+struct TenantPortraitData: Decodable, Equatable {
+    var totalMainTenants: Int64 = 0
+    var upgradedCount: Int64 = 0
+    var freeCount: Int64 = 0
+    var corporateCount: Int64 = 0
+    var personalCount: Int64 = 0
+    var unknownEntityCount: Int64 = 0
+    var overHalfYearCount: Int64 = 0
+    var overOneYearCount: Int64 = 0
+    var multiRegionCount: Int64 = 0
+    var ageBuckets: [String: Int64] = [:]
+    var regionCountBuckets: [String: Int64] = [:]
+
+    enum CodingKeys: String, CodingKey {
+        case totalMainTenants, upgradedCount, freeCount
+        case corporateCount, personalCount, unknownEntityCount
+        case overHalfYearCount, overOneYearCount, multiRegionCount
+        case ageBuckets, regionCountBuckets
+    }
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        totalMainTenants = Self.decodeInt64(c, forKey: .totalMainTenants)
+        upgradedCount = Self.decodeInt64(c, forKey: .upgradedCount)
+        freeCount = Self.decodeInt64(c, forKey: .freeCount)
+        corporateCount = Self.decodeInt64(c, forKey: .corporateCount)
+        personalCount = Self.decodeInt64(c, forKey: .personalCount)
+        unknownEntityCount = Self.decodeInt64(c, forKey: .unknownEntityCount)
+        overHalfYearCount = Self.decodeInt64(c, forKey: .overHalfYearCount)
+        overOneYearCount = Self.decodeInt64(c, forKey: .overOneYearCount)
+        multiRegionCount = Self.decodeInt64(c, forKey: .multiRegionCount)
+        ageBuckets = Self.decodeBucketMap(c, forKey: .ageBuckets)
+        regionCountBuckets = Self.decodeBucketMap(c, forKey: .regionCountBuckets)
+    }
+
+    private static func decodeInt64(_ c: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys) -> Int64 {
+        if let v = try? c.decode(Int64.self, forKey: key) { return v }
+        if let v = try? c.decode(Int.self, forKey: key) { return Int64(v) }
+        if let v = try? c.decode(Double.self, forKey: key) { return Int64(v) }
+        return 0
+    }
+
+    private static func decodeBucketMap(_ c: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys) -> [String: Int64] {
+        if let m = try? c.decode([String: Int64].self, forKey: key) { return m }
+        if let m = try? c.decode([String: Int].self, forKey: key) {
+            return m.mapValues { Int64($0) }
+        }
+        if let m = try? c.decode([String: Double].self, forKey: key) {
+            return m.mapValues { Int64($0) }
+        }
+        return [:]
+    }
+}

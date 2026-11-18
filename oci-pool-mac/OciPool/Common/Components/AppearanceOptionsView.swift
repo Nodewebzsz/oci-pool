@@ -6,7 +6,7 @@ struct AppearanceOptionsView: View {
     var english = false
     var onSelect: () -> Void = {}
 
-    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
+    private var dark: Bool { appearance.mode == .system ? colorScheme == .dark : (appearance.mode == .dark) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
