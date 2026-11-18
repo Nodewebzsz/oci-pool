@@ -94,6 +94,7 @@
 		6E22882F9059B159EE5CB5D3 /* TerminalEmulatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B73798FFCF9721AFD46BCE9F /* TerminalEmulatorView.swift */; };
 		6F4FA3073CB6707ADEFCA321 /* LoginHeroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCA100C08F2726ED0159601E /* LoginHeroView.swift */; };
 		731380D27CCDE6D3DC472D97 /* CloudflareService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39C09819BDE296196C789980 /* CloudflareService.swift */; };
+		739D5063D42C02E30BE4CA06 /* AdaptivePageToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D4E09CABB5D0FA3EBECA544 /* AdaptivePageToolbar.swift */; };
 		75EA5D905BD7137807A88FBF /* InstancesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2EAEB6ABC274DAD38CED3A /* InstancesViewModel.swift */; };
 		782A039C7902C1EF3C0BCA7A /* LoginField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 290B5AFC1FBF12586174E363 /* LoginField.swift */; };
 		78E8B5EEBB233111C17E87BD /* NotifyViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD4356519D9FF1C342C127E9 /* NotifyViewModel.swift */; };
@@ -224,6 +225,7 @@
 		290B5AFC1FBF12586174E363 /* LoginField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginField.swift; sourceTree = "<group>"; };
 		2A777D1E64B092657B1EEC09 /* DataList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataList.swift; sourceTree = "<group>"; };
 		2BFD2F1F741E28884631F316 /* URLSession+Compat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "URLSession+Compat.swift"; sourceTree = "<group>"; };
+		2D4E09CABB5D0FA3EBECA544 /* AdaptivePageToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdaptivePageToolbar.swift; sourceTree = "<group>"; };
 		2F057B2EA8D8261D84480667 /* FilterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterBar.swift; sourceTree = "<group>"; };
 		32824657C39B9949AB89F5A0 /* IpQualityModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IpQualityModels.swift; sourceTree = "<group>"; };
 		3303963FDF1FD56D2371F754 /* IpQualityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IpQualityService.swift; sourceTree = "<group>"; };
@@ -722,6 +724,7 @@
 		A7DD92BFD8B92A95D5037C47 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				2D4E09CABB5D0FA3EBECA544 /* AdaptivePageToolbar.swift */,
 				3CBC227991D7DE764B45C965 /* AppAlert.swift */,
 				2472488D13082F8D7F988AC3 /* AppearanceOptionsView.swift */,
 				DE66A84A0B050AE52E5FA497 /* AppNSTextField.swift */,
@@ -954,6 +957,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				DD4597DCA8812D4E3827C4C3 /* APIClient.swift in Sources */,
+				739D5063D42C02E30BE4CA06 /* AdaptivePageToolbar.swift in Sources */,
 				43F008677F980AE84A1ABA4F /* AiChatModels.swift in Sources */,
 				C9F6F70E0298BFA350B38080 /* AiChatService.swift in Sources */,
 				47947DCB19F34A122683DB26 /* AiChatView.swift in Sources */,
@@ -1150,7 +1154,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 32;
+				CURRENT_PROJECT_VERSION = 37;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = OciPool/Info.plist;
@@ -1159,7 +1163,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.1.39;
+				MARKETING_VERSION = 1.1.58;
 				PRODUCT_BUNDLE_IDENTIFIER = com.nodewebzsz.ocipool;
 				PRODUCT_NAME = OciPool;
 				SDKROOT = macosx;
@@ -1232,7 +1236,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 32;
+				CURRENT_PROJECT_VERSION = 37;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = OciPool/Info.plist;
@@ -1241,7 +1245,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.1.39;
+				MARKETING_VERSION = 1.1.58;
 				PRODUCT_BUNDLE_IDENTIFIER = com.nodewebzsz.ocipool;
 				PRODUCT_NAME = OciPool;
 				SDKROOT = macosx;

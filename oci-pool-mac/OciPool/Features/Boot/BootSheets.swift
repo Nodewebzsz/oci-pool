@@ -10,6 +10,9 @@ struct BootSheetHost: View {
     @EnvironmentObject private var session: AppSession
     @Environment(\.presentationMode) private var presentationMode
 
+    @State private var createShape: String = "VM.Standard.A1.Flex"
+    @State private var editShape: String = "VM.Standard.A1.Flex"
+
     private var dark: Bool { appearance.isDarkEffective }
     private var primaryText: Color { AppSheetSurface.primaryText(dark) }
     private var mutedText: Color { AppSheetSurface.mutedText(dark) }
@@ -46,26 +49,81 @@ struct BootSheetHost: View {
     // MARK: - Edit
 
     private var editSheet: some View {
-        chrome(title: "修改开机配置", systemImage: "slider.horizontal.3", width: 440, height: 420, footer: {
+        let spec = BootPricingEstimator.normalize(
+            shape: editShape,
+            ocpuText: model.editOcpu,
+            memoryText: model.editMemory,
+            diskText: model.editDisk
+        )
+        return chrome(title: "修改开机配置", systemImage: "slider.horizontal.3", width: 520, height: 580, footer: {
             HStack(spacing: 10) {
+                AppButton(title: "恢复模板默认", systemImage: "arrow.counterclockwise", kind: .secondary) {
+                    if editShape == BootPricingEstimator.microShape {
+                        model.editOcpu = "1"
+                        model.editMemory = "1"
+                    } else {
+                        model.editOcpu = "4"
+                        model.editMemory = "24"
+                    }
+                    model.editDisk = "50"
+                }
+                Spacer()
                 AppButton(title: "取消", kind: .secondary) {
                     presentationMode.wrappedValue.dismiss()
                 }
-                AppButton(title: "保存", kind: .primary, isLoading: model.formBusy) {
+                AppButton(title: "保存", kind: .primary, isLoading: model.formBusy, enabled: spec.validationError == nil) {
                     model.submitEditDetail()
                 }
             }
         }) {
             VStack(alignment: .leading, spacing: 12) {
+                FormFieldRow(label: "实例规格") {
+                    HStack(spacing: 8) {
+                        SelectMenu(
+                            options: BootPricingEstimator.shapes(for: "ARM") + BootPricingEstimator.shapes(for: "AMD"),
+                            selection: Binding(
+                                get: { editShape },
+                                set: { next in
+                                    let s = next ?? BootPricingEstimator.armFreeFlexShape
+                                    editShape = s
+                                    if s == BootPricingEstimator.microShape {
+                                        model.editOcpu = "1"
+                                        model.editMemory = "1"
+                                    }
+                                }
+                            ),
+                            placeholder: "选择规格",
+                            allowClear: false
+                        )
+                        if spec.isFreeFixed {
+                            StatusBadge(text: "Always Free 固定规格", tone: .success)
+                        }
+                    }
+                }
                 FormFieldRow(label: "OCPU", required: true) {
                     AppTextField(text: $model.editOcpu, placeholder: "1")
+                        .disabled(spec.locked)
+                        .opacity(spec.locked ? 0.65 : 1.0)
                 }
                 FormFieldRow(label: "内存 (GB)", required: true) {
                     AppTextField(text: $model.editMemory, placeholder: "6")
+                        .disabled(spec.locked)
+                        .opacity(spec.locked ? 0.65 : 1.0)
                 }
                 FormFieldRow(label: "磁盘 (GB)", required: true) {
                     AppTextField(text: $model.editDisk, placeholder: "50")
                 }
+                if let vErr = spec.validationError {
+                    Text(vErr)
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundColor(AppSheetSurface.accentRed(dark))
+                }
+                BootPricingEstimateCard(
+                    shape: editShape,
+                    ocpuText: model.editOcpu,
+                    memoryText: model.editMemory,
+                    diskText: model.editDisk
+                )
                 FormFieldRow(label: "循环间隔 (秒)", required: true) {
                     AppTextField(text: $model.editLoopTime, placeholder: "60")
                 }
@@ -82,25 +140,50 @@ struct BootSheetHost: View {
                 }
             }
         }
+        .onAppear {
+            let c = Int(model.editOcpu) ?? 1
+            let m = Int(model.editMemory) ?? 6
+            editShape = (c == 1 && m == 1) ? BootPricingEstimator.microShape : BootPricingEstimator.armFreeFlexShape
+        }
     }
 
     // MARK: - Create config
 
     private func createConfigSheet(_ item: BootTaskItem) -> some View {
-        chrome(
+        let spec = BootPricingEstimator.normalize(
+            shape: createShape,
+            ocpuText: model.createOcpu,
+            memoryText: model.createMemory,
+            diskText: model.createDisk
+        )
+        return chrome(
             title: "添加抢机配置",
             systemImage: "plus.circle",
-            width: 520,
-            height: 580,
+            width: 580,
+            height: 660,
             footer: {
                 HStack {
                     AppButton(title: "取消", kind: .secondary) { presentationMode.wrappedValue.dismiss() }
+                    AppButton(title: "恢复模板默认", systemImage: "arrow.counterclockwise", kind: .secondary) {
+                        if model.createArchitecture == "ARM" {
+                            createShape = BootPricingEstimator.armFreeFlexShape
+                            model.createOcpu = "4"
+                            model.createMemory = "24"
+                            model.createDisk = "50"
+                        } else {
+                            createShape = BootPricingEstimator.microShape
+                            model.createOcpu = "1"
+                            model.createMemory = "1"
+                            model.createDisk = "50"
+                        }
+                    }
                     Spacer()
                     AppButton(
                         title: "保存任务",
                         systemImage: "checkmark",
                         kind: .primary,
-                        isLoading: model.formBusy
+                        isLoading: model.formBusy,
+                        enabled: spec.validationError == nil
                     ) {
                         model.submitCreateConfig()
                     }
@@ -144,10 +227,21 @@ struct BootSheetHost: View {
                 FormFieldRow(label: "架构") {
                     HStack(spacing: 8) {
                         ForEach(["ARM", "AMD", "X86"], id: \.self) { arch in
-                            Button(action: { model.onCreateArchitectureChanged(arch) }) {
+                            Button(action: {
+                                model.onCreateArchitectureChanged(arch)
+                                if arch == "ARM" {
+                                    createShape = BootPricingEstimator.armFreeFlexShape
+                                    model.createOcpu = "4"
+                                    model.createMemory = "24"
+                                } else {
+                                    createShape = BootPricingEstimator.microShape
+                                    model.createOcpu = "1"
+                                    model.createMemory = "1"
+                                }
+                            }) {
                                 Text(arch)
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(model.createArchitecture == arch ? .white : primaryText)
+                                    .foregroundColor(model.createArchitecture == arch ? appearance.accent.accentFg(dark) : primaryText)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 6)
                                     .background(
@@ -166,17 +260,59 @@ struct BootSheetHost: View {
                     }
                 }
 
+                FormFieldRow(label: "实例规格") {
+                    HStack(spacing: 8) {
+                        SelectMenu(
+                            options: BootPricingEstimator.shapes(for: model.createArchitecture),
+                            selection: Binding(
+                                get: { createShape },
+                                set: { next in
+                                    let s = next ?? BootPricingEstimator.shapes(for: model.createArchitecture).first?.id ?? BootPricingEstimator.armFreeFlexShape
+                                    createShape = s
+                                    if s == BootPricingEstimator.microShape {
+                                        model.createOcpu = "1"
+                                        model.createMemory = "1"
+                                    }
+                                }
+                            ),
+                            placeholder: "选择实例规格",
+                            allowClear: false
+                        )
+                        if spec.isFreeFixed {
+                            StatusBadge(text: "Always Free 固定规格", tone: .success)
+                        }
+                    }
+                }
+
                 HStack(spacing: 10) {
                     FormFieldRow(label: "OCPU", required: true) {
                         AppTextField(text: $model.createOcpu, placeholder: "1")
+                            .disabled(spec.locked)
+                            .opacity(spec.locked ? 0.65 : 1.0)
                     }
                     FormFieldRow(label: "内存 GB", required: true) {
                         AppTextField(text: $model.createMemory, placeholder: "6")
+                            .disabled(spec.locked)
+                            .opacity(spec.locked ? 0.65 : 1.0)
                     }
                     FormFieldRow(label: "磁盘 GB", required: true) {
                         AppTextField(text: $model.createDisk, placeholder: "50")
                     }
                 }
+
+                if let vErr = spec.validationError {
+                    Text(vErr)
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundColor(AppSheetSurface.accentRed(dark))
+                }
+
+                BootPricingEstimateCard(
+                    shape: createShape,
+                    ocpuText: model.createOcpu,
+                    memoryText: model.createMemory,
+                    diskText: model.createDisk,
+                    countText: model.createCount
+                )
 
                 HStack(spacing: 10) {
                     FormFieldRow(label: "循环间隔(秒)", required: true) {
@@ -235,6 +371,13 @@ struct BootSheetHost: View {
                         .foregroundColor(AppSheetSurface.accentRed(dark))
                 }
             }
+        }
+        .onAppear {
+            createShape = BootPricingEstimator.defaultShape(
+                for: model.createArchitecture,
+                ocpu: Int(model.createOcpu) ?? 1,
+                memoryGb: Int(model.createMemory) ?? 6
+            )
         }
     }
 }

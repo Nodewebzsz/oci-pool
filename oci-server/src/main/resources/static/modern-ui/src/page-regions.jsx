@@ -2,6 +2,34 @@
 // Tracks which OCI regions have released ARM capacity and historical grab statistics.
 const { useState: useStateR, useMemo: useMemoR, useEffect: useEffectR } = React;
 
+function classifyRegionCoverage(region) {
+  const r = region || {};
+  const mine = Boolean(r.mine);
+  const released = Boolean(r.released);
+  if (mine && released) return 'linked_active';
+  if (mine && !released) return 'linked_idle';
+  if (!mine && released) return 'unlinked_released';
+  return 'unlinked_unreleased';
+}
+
+function filterRegionsByCoverage(regions, coverageFilter) {
+  const list = Array.isArray(regions) ? regions : [];
+  const mode = coverageFilter || 'all';
+  if (mode === 'all') return list;
+  return list.filter(function(r) {
+    const kind = classifyRegionCoverage(r);
+    if (mode === 'linked') return kind === 'linked_active' || kind === 'linked_idle';
+    if (mode === 'uncovered_released' || mode === 'unlinked_released') return kind === 'unlinked_released';
+    return kind === mode;
+  });
+}
+// --- END REGION COVERAGE HELPERS ---
+
+function regionTx(tr, lang, key, zh, en) {
+  const v = tr ? tr(key) : key;
+  return (v && v !== key) ? v : (lang === 'en' ? en : zh);
+}
+
 const CONTINENTS = [
   { id: 'all', key: 'regions.continent.all' },
   { id: 'asia', key: 'regions.continent.asia' },
@@ -351,7 +379,7 @@ function RegionsPage({ density }) {
       {tab === 'map'
         ? (
           <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-            <RegionMapView regions={filtered} lang={lang} />
+            <RegionMapView regions={filtered} lang={lang} onSelectRegion={showRegionDetail} />
           </div>
         )
         : (
@@ -445,7 +473,10 @@ function RegionsPage({ density }) {
 // Simple world-map visualization for regions
 // —— 真实地理数据版:d3-geo 投影 + world-atlas 110m topojson
 // —— OCI 区域经纬度对齐 Oracle 官方数据中心坐标
-function RegionMapView({ regions, lang }) {
+function RegionMapView({ regions, lang, onSelectRegion }) {
+  const { t: tr } = useT();
+  const [coverageFilter, setCoverageFilter] = React.useState('all');
+
   // OCI 45 商业区域 · 真实数据中心经纬度 [lng, lat]
   // 数据源:Oracle Cloud Infrastructure 官方文档
   const LNGLAT = {
@@ -548,8 +579,111 @@ function RegionMapView({ regions, lang }) {
   // hover 状态
   const [hover, setHover] = React.useState(null); // { r, x, y }
 
+  const coverageStats = React.useMemo(() => {
+    const list = Array.isArray(regions) ? regions : [];
+    let linked = 0;
+    let uncoveredReleased = 0;
+    list.forEach(r => {
+      const kind = classifyRegionCoverage(r);
+      if (kind === 'linked_active' || kind === 'linked_idle') linked += 1;
+      else if (kind === 'unlinked_released') uncoveredReleased += 1;
+    });
+    return { all: list.length, linked, uncoveredReleased };
+  }, [regions]);
+
+  const visibleRegions = React.useMemo(
+    () => filterRegionsByCoverage(regions, coverageFilter),
+    [regions, coverageFilter]
+  );
+
+  // 计算带防重叠避让的常驻已关联标签槽位 (优先 linked_active, 其次 linked_idle)
+  const projectedNodes = React.useMemo(() => {
+    const raw = [];
+    visibleRegions.forEach(r => {
+      const loc = projectRegion(r.code);
+      if (!loc) return;
+      const kind = classifyRegionCoverage(r);
+      raw.push({ r, x: loc[0], y: loc[1], kind });
+    });
+    const orderWeight = { unlinked_unreleased: 0, unlinked_released: 1, linked_idle: 2, linked_active: 3 };
+    raw.sort((a, b) => (orderWeight[a.kind] || 0) - (orderWeight[b.kind] || 0));
+
+    const labelBoxes = [];
+    const withLabels = raw.map(node => ({ ...node, showLabel: false }));
+    for (let i = withLabels.length - 1; i >= 0; i -= 1) {
+      const item = withLabels[i];
+      if (item.kind !== 'linked_active' && item.kind !== 'linked_idle') continue;
+      const lx = item.x + 8;
+      const ly = item.y - 6;
+      const overlaps = labelBoxes.some(b => Math.abs(b.x - lx) < 52 && Math.abs(b.y - ly) < 13);
+      if (!overlaps) {
+        item.showLabel = true;
+        labelBoxes.push({ x: lx, y: ly });
+      }
+    }
+    return withLabels;
+  }, [visibleRegions, projectRegion]);
+
+  const filterPills = [
+    {
+      id: 'all',
+      label: `${regionTx(tr, lang, 'regions.map.filterAll', '全部区域', 'All Regions')} (${coverageStats.all})`,
+      activeBg: 'var(--info)',
+      activeFg: '#ffffff',
+    },
+    {
+      id: 'linked',
+      label: `${regionTx(tr, lang, 'regions.map.filterLinked', '我已关联', 'Linked')} (${coverageStats.linked})`,
+      activeBg: 'var(--accent)',
+      activeFg: 'var(--accent-fg)',
+    },
+    {
+      id: 'uncovered_released',
+      label: `${regionTx(tr, lang, 'regions.map.filterUncovered', '有货未覆盖', 'Released · Uncovered')} (${coverageStats.uncoveredReleased})`,
+      activeBg: 'var(--orange)',
+      activeFg: '#ffffff',
+    },
+  ];
+
   return (
-    <Card padding={0} title={tr('regions.map.title')} subtitle={tr('regions.map.subtitle')} headerIcon="map" headerIconColor="var(--info)">
+    <Card
+      padding={0}
+      title={tr('regions.map.title')}
+      subtitle={tr('regions.map.subtitle')}
+      headerIcon="map"
+      headerIconColor="var(--info)"
+      action={
+        <div style={{
+          display: 'inline-flex', gap: 4, padding: 3, borderRadius: 999,
+          background: 'var(--bg-2)', border: '1px solid var(--border)', flexWrap: 'wrap',
+        }}>
+          {filterPills.map(pill => {
+            const active = coverageFilter === pill.id;
+            return (
+              <button
+                key={pill.id}
+                type="button"
+                onClick={() => { setCoverageFilter(pill.id); setHover(null); }}
+                style={{
+                  padding: '4px 11px',
+                  borderRadius: 999,
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  fontFamily: 'inherit',
+                  background: active ? pill.activeBg : 'transparent',
+                  color: active ? pill.activeFg : 'var(--fg-2)',
+                  transition: 'all 120ms',
+                }}
+              >
+                {pill.label}
+              </button>
+            );
+          })}
+        </div>
+      }
+    >
       <div style={{
         padding: 20, position: 'relative',
         background: 'var(--bg-0)',
@@ -601,43 +735,98 @@ function RegionMapView({ regions, lang }) {
           </g>
 
           {/* ── 区域节点 ── */}
-          {regions.map(r => {
-            const loc = projectRegion(r.code);
-            if (!loc) return null;
-            const [x, y] = loc;
-            const size = r.released
-              ? Math.max(2.5, Math.min(5.5, 2 + Math.sqrt(r.totalGrabs || 0) * 0.3))
-              : 2;
+          {projectedNodes.map(({ r, x, y, kind, showLabel }) => {
             const isToday = r.todayGrabs > 0;
-            const isReleased = r.released;
-            const color = !isReleased ? 'var(--fg-3)' : isToday ? 'var(--orange)' : 'var(--accent)';
             const isHover = hover?.r.code === r.code;
+            const shortLabel = lang === 'zh' ? getRegionSimpleName(r) : r.en;
+            const size = kind === 'linked_active'
+              ? Math.max(3.5, Math.min(6, 2.8 + Math.sqrt(r.totalGrabs || 0) * 0.3))
+              : kind === 'linked_idle'
+                ? 3.4
+                : 2.2;
+            const activeColor = isToday ? 'var(--orange)' : 'var(--accent)';
 
             return (
               <g key={r.code}
                 style={{ cursor: 'pointer' }}
                 onMouseEnter={() => setHover({ r, x, y })}
                 onMouseLeave={() => setHover(null)}
+                onClick={() => onSelectRegion && onSelectRegion(r)}
               >
-                {/* 外层脉冲光晕(仅活跃节点)*/}
-                {isReleased && (
+                {/* 1) 已关联且官方已放货: 实心主色圆点 + 外圈光晕 + 常驻简短标签 */}
+                {kind === 'linked_active' && (
                   <>
-                    <circle cx={x} cy={y} r={size + 5} fill={color} opacity="0.08">
+                    <circle cx={x} cy={y} r={size + 5.5} fill={activeColor} opacity="0.12">
                       {isToday && <animate attributeName="r" values={`${size + 3};${size + 9};${size + 3}`} dur="2.4s" repeatCount="indefinite" />}
-                      {isToday && <animate attributeName="opacity" values="0.22;0;0.22" dur="2.4s" repeatCount="indefinite" />}
+                      {isToday && <animate attributeName="opacity" values="0.24;0;0.24" dur="2.4s" repeatCount="indefinite" />}
                     </circle>
-                    <circle cx={x} cy={y} r={size + 2} fill={color} opacity="0.22" />
+                    <circle cx={x} cy={y} r={size + 2.2} fill={activeColor} opacity="0.24" />
+                    <circle cx={x} cy={y} r={size} fill={activeColor} stroke="var(--bg-0)" strokeWidth="1" filter="url(#dot-glow)">
+                      {isToday && <animate attributeName="opacity" values="1;0.6;1" dur="1.6s" repeatCount="indefinite" />}
+                    </circle>
                   </>
                 )}
-                {/* 主节点 */}
-                <circle cx={x} cy={y} r={size} fill={color} filter={isReleased ? 'url(#dot-glow)' : undefined}>
-                  {isToday && <animate attributeName="opacity" values="1;0.55;1" dur="1.6s" repeatCount="indefinite" />}
-                </circle>
+
+                {/* 2) 已关联但暂未放货: 实心次级圆点 + 外圈描边 */}
+                {kind === 'linked_idle' && (
+                  <>
+                    <circle cx={x} cy={y} r={size + 2.4} fill="none" stroke="var(--info)" strokeWidth="1" opacity="0.55" />
+                    <circle cx={x} cy={y} r={size} fill="var(--info)" stroke="var(--bg-0)" strokeWidth="0.9" />
+                  </>
+                )}
+
+                {/* 3) 未关联但官方已放货: 旋转 45° 半透明菱形标记 */}
+                {kind === 'unlinked_released' && (
+                  <>
+                    {isToday && (
+                      <circle cx={x} cy={y} r={8} fill="var(--orange)" opacity="0.14">
+                        <animate attributeName="r" values="6;11;6" dur="2.4s" repeatCount="indefinite" />
+                        <animate attributeName="opacity" values="0.22;0;0.22" dur="2.4s" repeatCount="indefinite" />
+                      </circle>
+                    )}
+                    <rect
+                      width={7}
+                      height={7}
+                      x={x - 3.5}
+                      y={y - 3.5}
+                      rx={1}
+                      transform={`rotate(45 ${x} ${y})`}
+                      fill="color-mix(in oklab, var(--orange) 26%, var(--bg-1))"
+                      stroke="var(--orange)"
+                      strokeWidth="1.35"
+                    />
+                  </>
+                )}
+
+                {/* 4) 未关联且暂未放货: 极淡底色微圆点 */}
+                {kind === 'unlinked_unreleased' && (
+                  <circle cx={x} cy={y} r={size} fill="var(--fg-3)" opacity="0.55" />
+                )}
+
+                {/* 已关联区域常驻简短标签 (防重叠避让) */}
+                {(showLabel || (isHover && kind === 'unlinked_released')) && (
+                  <g pointerEvents="none">
+                    <text
+                      x={x + 7}
+                      y={y + 3}
+                      fontSize="9.5"
+                      fontWeight={kind === 'linked_active' ? '600' : '500'}
+                      fontFamily="var(--font-sans)"
+                      fill={kind === 'unlinked_released' ? 'var(--orange)' : (kind === 'linked_active' ? 'var(--fg-0)' : 'var(--fg-2)')}
+                      stroke="var(--bg-0)"
+                      strokeWidth="2.6"
+                      paintOrder="stroke"
+                    >
+                      {shortLabel}
+                    </text>
+                  </g>
+                )}
+
                 {/* hover 大 hitbox(保持可点区不小于 14px)*/}
                 <circle cx={x} cy={y} r={10} fill="transparent" />
                 {/* hover 时 highlight ring */}
                 {isHover && (
-                  <circle cx={x} cy={y} r={size + 4} fill="none" stroke="var(--fg-0)" strokeWidth="1" opacity="0.7" />
+                  <circle cx={x} cy={y} r={8.5} fill="none" stroke="var(--fg-0)" strokeWidth="1.1" opacity="0.78" />
                 )}
               </g>
             );
@@ -650,6 +839,34 @@ function RegionMapView({ regions, lang }) {
           const px = (t.x / mapW) * 100;   // 百分比定位
           const py = (t.y / mapH) * 100;
           const label = lang === 'zh' ? getRegionSimpleName(t.r) : t.r.en;
+          const covKind = classifyRegionCoverage(t.r);
+          const covMeta = covKind === 'linked_active'
+            ? {
+                bg: 'var(--accent-soft)',
+                fg: 'var(--accent)',
+                border: 'var(--accent)',
+                text: regionTx(tr, lang, 'regions.map.badge.linkedActive', '已关联账号覆盖 · 官方已放货', 'Linked Tenant · Released'),
+              }
+            : covKind === 'linked_idle'
+              ? {
+                  bg: 'var(--info-soft)',
+                  fg: 'var(--info)',
+                  border: 'var(--info)',
+                  text: regionTx(tr, lang, 'regions.map.badge.linkedIdle', '已关联账号覆盖 · 暂未放货', 'Linked Tenant · Awaiting Release'),
+                }
+              : covKind === 'unlinked_released'
+                ? {
+                    bg: 'var(--orange-soft)',
+                    fg: 'var(--orange)',
+                    border: 'var(--orange)',
+                    text: regionTx(tr, lang, 'regions.map.badge.uncoveredReleased', '可订阅开拓空白区 · 官方曾放货但尚未关联', 'Uncovered Opportunity · Released'),
+                  }
+                : {
+                    bg: 'var(--bg-3)',
+                    fg: 'var(--fg-3)',
+                    border: 'var(--border)',
+                    text: regionTx(tr, lang, 'regions.map.badge.uncoveredIdle', '尚未关联账号 · 暂未放货', 'Unlinked · Not Released'),
+                  };
           // 侧位:靠右显示在左,靠左显示在右
           const showRight = px < 70;
           return (
@@ -657,7 +874,7 @@ function RegionMapView({ regions, lang }) {
               position: 'absolute',
               left: `calc(${px}% + 20px + ${showRight ? '10px' : '-260px'})`,
               top: `calc(${py}% + 20px - 40px)`,
-              minWidth: 220,
+              minWidth: 236,
               padding: '10px 12px',
               background: 'var(--bg-2)',
               border: '1px solid var(--border-strong)',
@@ -679,8 +896,17 @@ function RegionMapView({ regions, lang }) {
                   }}>HOT</span>
                 )}
               </div>
-              <div className="mono" style={{ fontSize: 10.5, color: 'var(--fg-3)', marginBottom: 8 }}>
+              <div className="mono" style={{ fontSize: 10.5, color: 'var(--fg-3)', marginBottom: 6 }}>
                 {t.r.code} · {t.r.arch || 'ARM'}
+              </div>
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '2px 7px', borderRadius: 4, marginBottom: 8,
+                background: covMeta.bg, color: covMeta.fg,
+                border: '1px solid ' + covMeta.border,
+                fontSize: 10, fontWeight: 600, lineHeight: 1.35,
+              }}>
+                {covMeta.text}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 10.5 }}>
                 <div>
@@ -715,7 +941,7 @@ function RegionMapView({ regions, lang }) {
 
         {/* Legend */}
         <div style={{
-          display: 'flex', gap: 20, marginTop: 14,
+          display: 'flex', gap: 18, marginTop: 14, flexWrap: 'wrap',
           paddingTop: 14, borderTop: '1px solid var(--border)',
           fontSize: 11, color: 'var(--fg-2)', alignItems: 'center',
         }}>
@@ -724,7 +950,26 @@ function RegionMapView({ regions, lang }) {
               width: 10, height: 10, borderRadius: '50%',
               background: 'var(--accent)',
               boxShadow: '0 0 8px var(--accent)',
-            }} />{tr('regions.map.legend.released')}
+            }} />
+            {regionTx(tr, lang, 'regions.map.legend.linkedActive', '已关联 · 已放货', 'Linked · Released')}
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{
+              width: 9, height: 9, borderRadius: '50%',
+              background: 'var(--info)',
+              boxShadow: '0 0 0 2px color-mix(in oklab, var(--info) 35%, transparent)',
+            }} />
+            {regionTx(tr, lang, 'regions.map.legend.linkedIdle', '已关联 · 待放货', 'Linked · Idle')}
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: 1,
+              background: 'color-mix(in oklab, var(--orange) 26%, var(--bg-1))',
+              border: '1.5px solid var(--orange)',
+              transform: 'rotate(45deg)',
+              display: 'inline-block',
+            }} />
+            {regionTx(tr, lang, 'regions.map.legend.uncoveredReleased', '有货未覆盖 (可订阅开拓)', 'Released · Uncovered')}
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{
@@ -746,4 +991,8 @@ function RegionMapView({ regions, lang }) {
   );
 }
 
-Object.assign(window, { RegionsPage });
+Object.assign(window, {
+  RegionsPage,
+  classifyRegionCoverage,
+  filterRegionsByCoverage,
+});

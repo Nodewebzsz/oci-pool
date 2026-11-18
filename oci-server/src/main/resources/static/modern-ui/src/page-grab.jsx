@@ -226,6 +226,7 @@ function GrabPage({ density }) {
     switch (id) {
       case 'clone':    return cloneTask(task);          // 克隆开机
       case 'start':                                        // 开机启动
+        if (task.status === 'running') return;
         (async () => {
           try {
             // 原项目 Web 端:POST /boot/startBoot?bootId=X
@@ -237,6 +238,7 @@ function GrabPage({ density }) {
         })();
         return;
       case 'stop':                                          // 开机停止
+        if (task.status !== 'running') return;
         return shell.openConfirm({
           title: `${tr('grab.confirm.stopTask.title')}${getTenantName(task)}?`,
           body: <div>{tr('grab.confirm.stopTask.body')}</div>,
@@ -641,8 +643,8 @@ function GrabTaskMenu({ task, anchorEl, onClose, onAction }) {
   // 原项目没有单任务重置接口，因此不展示会伪造成功的“重置统计”。
   const items = [
     { id: 'clone',      label: tr('grab.menu.clone'), icon: 'copy'      },
-    { id: 'start',      label: tr('grab.menu.start'), icon: 'play',       color: 'var(--accent)' },
-    { id: 'stop',       label: tr('grab.menu.stop'), icon: 'square'    },
+    { id: 'start',      label: tr('grab.menu.start'), icon: 'play',       color: 'var(--accent)', disabled: task.status === 'running' },
+    { id: 'stop',       label: tr('grab.menu.stop'), icon: 'square',     disabled: task.status !== 'running' },
     { id: 'detail',     label: tr('grab.menu.detail'), icon: 'info'      },
     { id: 'edit',       label: tr('grab.menu.edit'), icon: 'settings'  },
     { id: 'delete',     label: tr('grab.menu.delete'), icon: 'trash-2',    color: 'var(--danger)' },

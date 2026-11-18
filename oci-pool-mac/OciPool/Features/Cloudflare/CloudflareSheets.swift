@@ -251,3 +251,288 @@ struct CloudflareConfigSheet: View {
         .environmentObject(appearance)
     }
 }
+
+// MARK: - Official Origin CIDR & Nginx real_ip Sheet
+
+struct CloudflareOfficialIpsSheet: View {
+    @ObservedObject var model: CloudflareViewModel
+    @EnvironmentObject private var appearance: AppearanceController
+
+    private var dark: Bool { appearance.isDarkEffective }
+
+    var body: some View {
+        let info = model.officialIpsForm ?? CfOfficialIpRanges()
+        let isRemote = info.source.lowercased() == "remote"
+
+        AppSheetChrome(
+            title: "Cloudflare 回源 IP 与 Nginx 配置",
+            subtitle: "自动生成 CF-Connecting-IP 真实访客还原片段",
+            systemImage: "lock.shield",
+            iconColor: AppTheme.orange,
+            width: 680,
+            height: 580,
+            onClose: { model.closeOfficialIps() },
+            footer: {
+                AdaptivePageToolbar {
+                    StatusBadge(
+                        text: isRemote ? "实时官方网段 (remote)" : "内置兜底网段 (fallback)",
+                        tone: isRemote ? .success : .warning
+                    )
+                    if !info.fetchedAt.isEmpty {
+                        Text("更新：\(info.displayFetchedAt)")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(AppSheetSurface.mutedText(dark))
+                            .lineLimit(1)
+                            .help(info.fetchedAt)
+                    }
+                    AppButton(
+                        title: "刷新网段",
+                        systemImage: "arrow.clockwise",
+                        kind: .secondary,
+                        isLoading: model.isOfficialIpsLoading
+                    ) {
+                        Task { await model.reloadOfficialIps() }
+                    }
+                    AppButton(
+                        title: "复制 Nginx 配置",
+                        systemImage: "doc.on.doc",
+                        kind: .primary
+                    ) {
+                        model.copyToPasteboard(info.nginxRealIpSnippet, successNotice: "Nginx real_ip 配置已复制")
+                    }
+                    AppButton(title: "关闭", kind: .secondary) {
+                        model.closeOfficialIps()
+                    }
+                }
+            },
+            content: {
+                VStack(alignment: .leading, spacing: 14) {
+                    AppSheetInfoBox(
+                        text: "源站安全与真实访客 IP 还原指引",
+                        lines: [
+                            "开启橙云代理后，将以下配置放入 Nginx http {} 或 server {} 块即可通过 CF-Connecting-IP 获取真实客户端 IP。",
+                            "生产环境建议配合源站防火墙仅放行下列 Cloudflare 官方 IPv4 / IPv6 回源网段。"
+                        ]
+                    )
+
+                    HStack(alignment: .top, spacing: 12) {
+                        cidrColumn(
+                            title: "IPv4 回源网段",
+                            cidrs: info.ipv4Cidrs,
+                            copyNotice: "已复制 \(info.ipv4Cidrs.count) 条 IPv4 网段"
+                        )
+                        cidrColumn(
+                            title: "IPv6 回源网段",
+                            cidrs: info.ipv6Cidrs,
+                            copyNotice: "已复制 \(info.ipv6Cidrs.count) 条 IPv6 网段"
+                        )
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Nginx ngx_http_realip_module 配置片段")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(AppSheetSurface.primaryText(dark))
+                            Spacer()
+                            AppButton(title: "一键复制片段", systemImage: "doc.on.doc", kind: .secondary) {
+                                model.copyToPasteboard(info.nginxRealIpSnippet, successNotice: "Nginx real_ip 配置已复制")
+                            }
+                        }
+                        Text(info.nginxRealIpSnippet)
+                            .font(.system(size: 11.5, design: .monospaced))
+                            .foregroundColor(AppSheetSurface.primaryText(dark))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                            .background(AppSheetSurface.panelBg(dark))
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(AppSheetSurface.border(dark), lineWidth: 1)
+                            )
+                    }
+                }
+            }
+        )
+    }
+
+    private func cidrColumn(title: String, cidrs: [String], copyNotice: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppSheetSurface.primaryText(dark))
+                StatusBadge(text: "\(cidrs.count)", tone: .info)
+                Spacer()
+                AppButton(title: "复制", systemImage: "doc.on.doc", kind: .secondary, enabled: !cidrs.isEmpty) {
+                    model.copyToPasteboard(cidrs.joined(separator: "\n"), successNotice: copyNotice)
+                }
+            }
+            Text(cidrs.isEmpty ? "—" : cidrs.joined(separator: "\n"))
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(AppSheetSurface.primaryText(dark))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+                .background(AppSheetSurface.panelBg(dark))
+                .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(AppSheetSurface.border(dark), lineWidth: 1)
+                )
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+}
+
+// MARK: - DNS Public IP Batch Extractor Sheet
+
+struct CloudflarePublicIpExtractSheet: View {
+    @ObservedObject var model: CloudflareViewModel
+    @EnvironmentObject private var appearance: AppearanceController
+
+    private var dark: Bool { appearance.isDarkEffective }
+
+    private let typeFilterOptions: [(id: String, title: String)] = [
+        ("ALL", "全部 (A + AAAA)"),
+        ("A", "仅 IPv4 (A)"),
+        ("AAAA", "仅 IPv6 (AAAA)")
+    ]
+
+    private let proxyFilterOptions: [(id: String, title: String)] = [
+        ("ALL", "全部代理状态"),
+        ("PROXIED", "仅橙云代理"),
+        ("DNS_ONLY", "仅灰云直连")
+    ]
+
+    var body: some View {
+        let ips = model.extractedPublicIps
+
+        AppSheetChrome(
+            title: "提取解析公网 IP",
+            subtitle: model.selectedZoneName.isEmpty ? "从已加载 A / AAAA 记录聚合去重" : "\(model.selectedZoneName) · 当前已加载 \(model.records.count) 条记录",
+            systemImage: "doc.on.clipboard",
+            iconColor: AppTheme.cyan,
+            width: 600,
+            height: 500,
+            onClose: { model.closePublicIpExtract() },
+            footer: {
+                HStack(spacing: 10) {
+                    StatusBadge(text: "去重后共 \(ips.count) 个公网 IP", tone: ips.isEmpty ? .neutral : .success)
+                    Spacer()
+                    AppButton(
+                        title: "按逗号复制",
+                        systemImage: "doc.on.doc",
+                        kind: .secondary,
+                        enabled: !ips.isEmpty
+                    ) {
+                        model.copyToPasteboard(ips.joined(separator: ", "), successNotice: "已按逗号分隔复制 \(ips.count) 个 IP")
+                    }
+                    AppButton(
+                        title: "按换行复制",
+                        systemImage: "doc.on.clipboard",
+                        kind: .primary,
+                        enabled: !ips.isEmpty
+                    ) {
+                        model.copyToPasteboard(ips.joined(separator: "\n"), successNotice: "已按换行分隔复制 \(ips.count) 个 IP")
+                    }
+                    AppButton(title: "关闭", kind: .secondary) {
+                        model.closePublicIpExtract()
+                    }
+                }
+            },
+            content: {
+                if model.publicIpExtractForm != nil {
+                    VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("记录类型")
+                                .font(.system(size: 11.5, weight: .semibold))
+                                .foregroundColor(AppSheetSurface.primaryText(dark))
+                            HStack(spacing: 8) {
+                                ForEach(typeFilterOptions, id: \.id) { opt in
+                                    filterPill(
+                                        title: opt.title,
+                                        active: model.publicIpExtractForm?.typeFilter == opt.id
+                                    ) {
+                                        model.publicIpExtractForm?.typeFilter = opt.id
+                                    }
+                                }
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Cloudflare 代理状态")
+                                .font(.system(size: 11.5, weight: .semibold))
+                                .foregroundColor(AppSheetSurface.primaryText(dark))
+                            HStack(spacing: 8) {
+                                ForEach(proxyFilterOptions, id: \.id) { opt in
+                                    filterPill(
+                                        title: opt.title,
+                                        active: model.publicIpExtractForm?.proxyFilter == opt.id
+                                    ) {
+                                        model.publicIpExtractForm?.proxyFilter = opt.id
+                                    }
+                                }
+                            }
+                        }
+
+                        FormFieldRow(label: "关键字过滤") {
+                            SearchField(
+                                text: Binding(
+                                    get: { model.publicIpExtractForm?.keyword ?? "" },
+                                    set: { model.publicIpExtractForm?.keyword = $0 }
+                                ),
+                                placeholder: "按子域名前缀或 IP 片段过滤…",
+                                fillsWidth: true
+                            )
+                        }
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("提取结果预览（保持记录顺序自动去重）")
+                                .font(.system(size: 11.5, weight: .semibold))
+                                .foregroundColor(AppSheetSurface.primaryText(dark))
+
+                            if ips.isEmpty {
+                                Text("当前筛选条件下没有匹配的 A / AAAA 公网 IP 记录")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(AppSheetSurface.mutedText(dark))
+                                    .frame(maxWidth: .infinity, minHeight: 120)
+                                    .background(AppSheetSurface.panelBg(dark))
+                                    .cornerRadius(8)
+                            } else {
+                                Text(ips.joined(separator: "\n"))
+                                    .font(.system(size: 12, design: .monospaced))
+                                    .foregroundColor(AppSheetSurface.primaryText(dark))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(12)
+                                    .background(AppSheetSurface.panelBg(dark))
+                                    .cornerRadius(8)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(AppSheetSurface.border(dark), lineWidth: 1)
+                                    )
+                            }
+                        }
+                    }
+                }
+            }
+        )
+    }
+
+    private func filterPill(title: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 11.5, weight: active ? .semibold : .regular))
+                .foregroundColor(active ? appearance.accent.accentFg(dark) : AppSheetSurface.primaryText(dark))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(active ? AppTheme.sidebarActive : AppSheetSurface.panelBg(dark))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(active ? AppTheme.sidebarActive : AppSheetSurface.border(dark), lineWidth: 1)
+                )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}

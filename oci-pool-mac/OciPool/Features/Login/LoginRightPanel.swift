@@ -674,7 +674,7 @@ struct LoginRightPanel: View {
             HStack(alignment: .center, spacing: 10) {
                 LoginField(
                     title: "",
-                    placeholder: "http://your-host:9856",
+                    placeholder: "https://example.com",
                     text: $model.serverURL,
                     dark: dark,
                     enabled: !model.isLoadingMeta && !model.isSubmitting,

@@ -1346,6 +1346,8 @@ function NotificationsButton() {
   const [notifs, setNotifs] = React.useState([]);
   const [unreadCount, setUnreadCount] = React.useState(0);
   const [loading, setLoading] = React.useState(false);
+  const [selectedIds, setSelectedIds] = React.useState([]);
+  const [batchBusy, setBatchBusy] = React.useState(false);
 
   // 刷新未读数量
   const refreshUnread = React.useCallback(async () => {
@@ -1388,6 +1390,7 @@ function NotificationsButton() {
                     : type.includes('success') ? 'success' : 'info';
         return {
           id: item?.businessId || item?.id || `msg-${idx}`,
+          dbId: item?.id != null && !Number.isNaN(Number(item.id)) ? Number(item.id) : null,
           businessId: item?.businessId || item?.id,
           level,
           title: item?.subject || tr('notify.system') || '系统通知',
@@ -1397,6 +1400,7 @@ function NotificationsButton() {
         };
       });
       setNotifs(parsed);
+      setSelectedIds(prev => prev.filter(id => parsed.some(p => p.dbId === id)));
     } catch (e) {
       console.warn('加载通知列表失败:', e);
     } finally {
@@ -1414,6 +1418,7 @@ function NotificationsButton() {
   const toggle = () => {
     if (open) { setOpen(false); return; }
     if (btnRef.current) setRect(btnRef.current.getBoundingClientRect());
+    setSelectedIds([]);
     setOpen(true);
     loadNotifs();
     refreshUnread();
@@ -1448,6 +1453,87 @@ function NotificationsButton() {
     }
   };
 
+  const selectableIds = React.useMemo(
+    () => notifs.map(n => n.dbId).filter(id => id != null),
+    [notifs]
+  );
+  const allSelected = selectableIds.length > 0 && selectableIds.every(id => selectedIds.includes(id));
+
+  const toggleSelectOne = (dbId) => {
+    if (dbId == null) return;
+    setSelectedIds(prev => prev.includes(dbId) ? prev.filter(x => x !== dbId) : [...prev, dbId]);
+  };
+
+  const toggleSelectAll = () => {
+    if (allSelected) setSelectedIds([]);
+    else setSelectedIds(selectableIds);
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedIds.length === 0 || batchBusy) return;
+    setBatchBusy(true);
+    try {
+      const svc = window.ociServices?.system?.deleteBatchMessages || window.ociServices?.notify?.removeBatch;
+      if (!svc) throw new Error('批量删除服务未就绪');
+      const res = await svc({ ids: selectedIds });
+      if (res && res.success === false) throw new Error(res.message || '批量删除失败');
+      const deletedCount = selectedIds.length;
+      setSelectedIds([]);
+      await Promise.all([loadNotifs(), refreshUnread()]);
+      shell.showToast((tr('notify.batchDeleted') || '已删除 {0} 条通知').replace('{0}', String(deletedCount)), { kind: 'success' });
+    } catch (e) {
+      shell.showToast(e.message || '批量删除失败', { kind: 'error' });
+    } finally {
+      setBatchBusy(false);
+    }
+  };
+
+  const handleClearAllConfirm = () => {
+    if (notifs.length === 0) return;
+    setOpen(false);
+    shell.openModal({
+      title: tr('notify.clearConfirmTitle') || '清空全部系统消息',
+      icon: 'trash-2',
+      iconColor: 'var(--danger)',
+      size: 'sm',
+      body: (
+        <div style={{ padding: '18px 22px', fontSize: 12.5, color: 'var(--fg-1)', lineHeight: 1.6 }}>
+          {tr('notify.clearConfirmBody') || '确定要清空全部系统通知记录吗？清空后历史通知将无法恢复。'}
+        </div>
+      ),
+      footer: (
+        <>
+          <Button variant="ghost" size="md" onClick={shell.closeModal}>
+            {tr('common.cancel') || '取消'}
+          </Button>
+          <Button
+            variant="danger"
+            size="md"
+            icon="trash-2"
+            onClick={async () => {
+              try {
+                const svc = window.ociServices?.system?.clearMessages || window.ociServices?.notify?.clearAll;
+                if (!svc) throw new Error('清空服务未就绪');
+                const res = await svc();
+                if (res && res.success === false) throw new Error(res.message || '清空消息失败');
+                setNotifs([]);
+                setSelectedIds([]);
+                setUnreadCount(0);
+                shell.closeModal();
+                await refreshUnread();
+                shell.showToast(tr('notify.clearedAll') || '已清空全部系统消息', { kind: 'success' });
+              } catch (e) {
+                shell.showToast(e.message || '清空消息失败', { kind: 'error' });
+              }
+            }}
+          >
+            {tr('notify.clearAllBtn') || '确认清空'}
+          </Button>
+        </>
+      ),
+    });
+  };
+
   // 点击单条通知：关闭通知下拉并弹出保持当前暗色主题风格的消息详情 Modal
   const handleItemClick = (n) => {
     setOpen(false);
@@ -1465,7 +1551,7 @@ function NotificationsButton() {
   };
 
   const styleFor = (level) => {
-    if (level === 'success') return { c: 'var(--accent)', soft: 'var(--accent-soft)', icon: 'check-circle-2' };
+    if (level === 'success') return { c: 'var(--success)', soft: 'var(--success-soft)', icon: 'check-circle-2' };
     if (level === 'warning') return { c: 'var(--orange)', soft: 'var(--orange-soft)', icon: 'alert-triangle' };
     if (level === 'error')   return { c: 'var(--danger)', soft: 'var(--danger-soft)', icon: 'alert-octagon' };
     return { c: 'var(--info)', soft: 'var(--info-soft)', icon: 'info' };
@@ -1478,7 +1564,7 @@ function NotificationsButton() {
         position: 'fixed',
         top: rect.bottom + 8,
         right: Math.max(8, window.innerWidth - rect.right),
-        width: 340,
+        width: 368,
         maxHeight: 'calc(100vh - 80px)',
         zIndex: 200,
         background: 'var(--bg-1)',
@@ -1501,7 +1587,7 @@ function NotificationsButton() {
         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-0)' }}>{tr('layout.3a955e') || '通知中心'}</span>
         <span className="mono" style={{
           fontSize: 10, color: 'var(--fg-2)',
-          padding: '1px 6px', borderRadius: 3,
+          padding: '1px 6px', borderRadius: 'var(--radius-sm)',
           background: 'var(--bg-3)',
         }}>{notifs.length} {tr('layout.cc1bac') || '条'}</span>
         <div style={{ flex: 1 }} />
@@ -1518,6 +1604,71 @@ function NotificationsButton() {
         >{tr('layout.1d1a68') || '全部已读'}</button>
       </div>
 
+      {/* 批量清理操作栏 */}
+      {notifs.length > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '6px 14px',
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--bg-1)',
+          fontSize: 11,
+        }}>
+          <label
+            onClick={(e) => e.stopPropagation()}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--fg-2)', cursor: selectableIds.length ? 'pointer' : 'default', userSelect: 'none' }}
+          >
+            <input
+              type="checkbox"
+              checked={allSelected}
+              disabled={selectableIds.length === 0}
+              onChange={toggleSelectAll}
+              style={{ accentColor: 'var(--accent)', cursor: selectableIds.length ? 'pointer' : 'not-allowed', margin: 0 }}
+            />
+            <span>{tr('notify.selectAll') || '全选'}</span>
+          </label>
+          <div style={{ flex: 1 }} />
+          <button
+            type="button"
+            disabled={selectedIds.length === 0 || batchBusy}
+            onClick={handleBatchDelete}
+            style={{
+              fontSize: 10.5,
+              color: selectedIds.length === 0 ? 'var(--fg-3)' : 'var(--danger)',
+              background: selectedIds.length === 0 ? 'transparent' : 'var(--danger-soft)',
+              border: '1px solid ' + (selectedIds.length === 0 ? 'transparent' : 'color-mix(in srgb, var(--danger) 35%, var(--border))'),
+              borderRadius: 'var(--button-radius)',
+              padding: '2px 8px',
+              cursor: selectedIds.length === 0 || batchBusy ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit',
+              fontWeight: 500,
+              transition: 'all 120ms',
+            }}
+          >
+            {(tr('notify.deleteSelected') || '删除已选')} ({selectedIds.length})
+          </button>
+          <button
+            type="button"
+            disabled={batchBusy}
+            onClick={handleClearAllConfirm}
+            onMouseEnter={e => { if (!batchBusy) e.currentTarget.style.background = 'var(--bg-3)'; }}
+            onMouseLeave={e => { if (!batchBusy) e.currentTarget.style.background = 'var(--bg-2)'; }}
+            style={{
+              fontSize: 10.5,
+              color: 'var(--fg-2)',
+              background: 'var(--bg-2)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--button-radius)',
+              padding: '2px 8px',
+              cursor: batchBusy ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit',
+              transition: 'background 120ms',
+            }}
+          >
+            {tr('notify.clearAll') || '清空全部'}
+          </button>
+        </div>
+      )}
+
       {/* 通知列表 */}
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 120 }}>
         {loading && notifs.length === 0 ? (
@@ -1533,21 +1684,34 @@ function NotificationsButton() {
         ) : (
           notifs.map((n, i) => {
             const s = styleFor(n.level);
+            const checked = n.dbId != null && selectedIds.includes(n.dbId);
+            const baseBg = checked
+              ? 'var(--accent-soft)'
+              : (n.read ? 'transparent' : 'color-mix(in srgb, var(--info-soft) 55%, transparent)');
             return (
               <div key={n.id || i} style={{
                 padding: '10px 14px',
                 borderBottom: i < notifs.length - 1 ? '1px solid var(--border)' : 'none',
                 display: 'flex', gap: 10, alignItems: 'flex-start',
                 cursor: 'pointer',
-                background: n.read ? 'transparent' : 'oklch(from var(--info) l c h / 0.05)',
+                background: baseBg,
                 transition: 'background 100ms',
               }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-2)'}
-                onMouseLeave={e => e.currentTarget.style.background = n.read ? 'transparent' : 'oklch(from var(--info) l c h / 0.05)'}
+                onMouseEnter={e => e.currentTarget.style.background = checked ? 'var(--accent-soft)' : 'var(--bg-2)'}
+                onMouseLeave={e => e.currentTarget.style.background = baseBg}
                 onClick={() => handleItemClick(n)}
               >
+                {n.dbId != null && (
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => toggleSelectOne(n.dbId)}
+                    style={{ marginTop: 5, accentColor: 'var(--accent)', cursor: 'pointer', flexShrink: 0 }}
+                  />
+                )}
                 <div style={{
-                  width: 24, height: 24, borderRadius: 6,
+                  width: 24, height: 24, borderRadius: 'var(--radius-sm)',
                   background: s.soft, color: s.c,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   flexShrink: 0,

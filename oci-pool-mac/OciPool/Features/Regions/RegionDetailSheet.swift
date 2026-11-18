@@ -2,6 +2,7 @@ import SwiftUI
 
 /// 区域详情抽屉（对齐 Web `useRegionDetailDrawer` · 宽 680 · globe/info · statusDot）。
 struct RegionDetailSheet: View {
+    @ObservedObject private var appearance = AppearanceController.shared
     let row: RegionRow
     @ObservedObject var model: RegionsViewModel
     var dark: Bool
@@ -9,13 +10,13 @@ struct RegionDetailSheet: View {
 
     private var accent: Color { AppTheme.sidebarActive }
     private var info: Color { AppTheme.info }
-    private var cyan: Color { Color(hex: "00b6be") }
-    private var fg0: Color { dark ? Color(hex: "f6f9fb") : Color(hex: "0c1217") }
+    private var cyan: Color { AppTheme.cyan }
+    private var fg0: Color { AppTheme.navIcon(dark) }
     private var fg1: Color { AppTheme.sidebarText(dark) }
-    private var fg3: Color { dark ? Color(hex: "5d646a") : Color(hex: "81878c") }
+    private var fg3: Color { AppTheme.textTertiary(dark) }
     private var bg2: Color { AppTheme.sidebarHover(dark) }
-    private var bg3: Color { dark ? Color(hex: "1e252a") : Color(hex: "e7ecef") }
-    private var borderColor: Color { dark ? Color(hex: "363e45") : Color(hex: "bfc5ca") }
+    private var bg3: Color { AppTheme.bg3(dark) }
+    private var borderColor: Color { AppTheme.borderStrong(dark) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -23,6 +24,21 @@ struct RegionDetailSheet: View {
             Divider().overlay(AppTheme.border(dark))
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
+                    if row.coverageKind == .unlinkedReleased {
+                        HStack(spacing: 8) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(AppTheme.orange)
+                            Text("官方已有 ARM 放货记录，但当前号池尚未关联覆盖此区域，可前往「租户管理」订阅开拓空白区。")
+                                .font(.system(size: 12))
+                                .foregroundColor(fg0)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(12)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.orangeSoft(dark)))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.orange.opacity(0.35), lineWidth: 1))
+                    }
+
                     sectionLabel("放货概览")
                     overviewGrid
 
@@ -144,6 +160,7 @@ struct RegionDetailSheet: View {
                     Circle()
                         .fill(row.isOpen ? accent : fg3)
                         .frame(width: 6, height: 6)
+                    StatusBadge(text: row.coverageKind.badgeText, tone: row.coverageKind.tone)
                 }
                 Text(row.regionCode)
                     .font(.system(size: 11, design: .monospaced))

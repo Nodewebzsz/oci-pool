@@ -10,6 +10,7 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * @version 1.0.0
@@ -43,4 +44,6 @@ public class SystemMessageRequest extends BaseRequest{
     private LocalDateTime updateTime;
 
     private LocalDateTime createTime;
+
+    private List<Long> ids;
 }

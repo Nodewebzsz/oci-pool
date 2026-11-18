@@ -80,21 +80,38 @@ function buildMonitorState(m, d) {
 function MonitorPage({ density }) {
   const { t: tr, lang } = useT();
   const [s, setS] = useStateM(() => buildMonitorState({}, {}));
+  const [portrait, setPortrait] = useStateM(null);
+  const [portraitError, setPortraitError] = useStateM('');
   const [activityLogs, setActivityLogs] = useStateM([]);
   const [loadError, setLoadError] = useStateM('');
 
   // 真实后端 · 加载仪表盘统计(GET /boot/dashboard-stats) + 系统指标(GET /boot/stats)
   const loadMonitor = React.useCallback(async () => {
     try {
-      const [dashboardResponse, metricsResponse, logResponse] = await Promise.all([
+      const portraitPromise = (
+        window.ociServices?.boot?.tenantPortrait
+          ? window.ociServices.boot.tenantPortrait()
+          : window.ociApi.request('/boot/tenant-portrait')
+      ).catch(error => ({ success: false, message: error.message }));
+      const [dashboardResponse, metricsResponse, logResponse, portraitResponse] = await Promise.all([
         window.ociApi.request('/boot/dashboard-stats'),
         window.ociApi.request('/boot/stats'),
         window.ociApi.request('/system/openLogs/json'),
+        portraitPromise,
       ]);
       if (!dashboardResponse?.success) throw new Error(dashboardResponse?.message || tr('monitor.err.dashboard'));
       if (!metricsResponse?.success) throw new Error(metricsResponse?.message || tr('monitor.err.metrics'));
       const next = buildMonitorState(metricsResponse.data || {}, dashboardResponse.data || {});
       setS(next);
+      if (portraitResponse?.success && portraitResponse.data) {
+        setPortrait(portraitResponse.data);
+        setPortraitError('');
+      } else if (portraitResponse && typeof portraitResponse.totalMainTenants === 'number') {
+        setPortrait(portraitResponse);
+        setPortraitError('');
+      } else {
+        setPortraitError(lang === 'en' ? 'Tenant portrait could not be loaded. Try again later.' : '主账号画像加载失败，请稍后重试');
+      }
       setActivityLogs((logResponse?.lines || []).slice(0, 10).map(parseLogLine));
       setLoadError('');
     } catch (error) {
@@ -212,6 +229,9 @@ function MonitorPage({ density }) {
         </Card>
       </div>
 
+      {/* 号池主账号多维画像 */}
+      <TenantPortraitSection portrait={portrait} error={portraitError} tr={tr} lang={lang} />
+
       {/* Bottom charts row: Grab trend + activity feed */}
       <div className="monitor-bottom-grid">
         <Card
@@ -278,6 +298,225 @@ function MonitorPage({ density }) {
           </div>
         </Card>
       </div>
+    </div>
+  );
+}
+
+function _trOr(tr, key, zh, en, lang) {
+  const val = tr ? tr(key) : key;
+  if (val && val !== key) return val;
+  return lang === 'en' ? en : zh;
+}
+
+function TenantPortraitSection({ portrait, error, tr, lang }) {
+  const total = Number(portrait?.totalMainTenants || 0);
+  const upgraded = Number(portrait?.upgradedCount || 0);
+  const free = Number(portrait?.freeCount || 0);
+  const corporate = Number(portrait?.corporateCount || 0);
+  const personal = Number(portrait?.personalCount || 0);
+  const unknownEntity = Number(portrait?.unknownEntityCount || 0);
+  const overHalfYear = Number(portrait?.overHalfYearCount || 0);
+  const overOneYear = Number(portrait?.overOneYearCount || 0);
+  const multiRegion = Number(portrait?.multiRegionCount || 0);
+
+  const pct = (num) => (total > 0 ? ((num / total) * 100).toFixed(1) + '%' : '0.0%');
+  const ageBuckets = portrait?.ageBuckets || {};
+  const regionBuckets = portrait?.regionCountBuckets || {};
+
+  const ageChartItems = [
+    { label: _trOr(tr, 'monitor.portrait.age.lt30d', '< 30 天', '< 30d', lang), value: Number(ageBuckets.lt30d || 0), color: 'var(--info)' },
+    { label: _trOr(tr, 'monitor.portrait.age.d30To180', '30–180 天', '30–180d', lang), value: Number(ageBuckets.d30To180 || 0), color: 'var(--cyan)' },
+    { label: _trOr(tr, 'monitor.portrait.age.d180To365', '180–365 天', '180–365d', lang), value: Number(ageBuckets.d180To365 || 0), color: 'var(--accent)' },
+    { label: _trOr(tr, 'monitor.portrait.age.gt365d', '> 1 年', '> 1 yr', lang), value: Number(ageBuckets.gt365d || 0), color: 'var(--violet)' },
+  ];
+
+  const regionChartItems = [
+    { label: _trOr(tr, 'monitor.portrait.region.r1', '单区域 (1)', '1 Region', lang), value: Number(regionBuckets.r1 || 0), color: 'var(--cyan)' },
+    { label: _trOr(tr, 'monitor.portrait.region.r2', '双区域 (2)', '2 Regions', lang), value: Number(regionBuckets.r2 || 0), color: 'var(--accent)' },
+    { label: _trOr(tr, 'monitor.portrait.region.r3Plus', '3+ 多区域', '3+ Regions', lang), value: Number(regionBuckets.r3Plus || 0), color: 'var(--orange)' },
+  ];
+
+  const ratioCards = [
+    {
+      title: _trOr(tr, 'monitor.portrait.upgradedRatio', '升级号占比', 'Upgraded Ratio', lang),
+      main: pct(upgraded),
+      sub: `${_trOr(tr, 'monitor.portrait.paid', '升级号', 'Paid', lang)} ${upgraded} · ${_trOr(tr, 'monitor.portrait.free', '免费号', 'Free', lang)} ${free}`,
+      ratio: total > 0 ? upgraded / total : 0,
+      color: 'var(--accent)',
+      icon: 'award',
+    },
+    {
+      title: _trOr(tr, 'monitor.portrait.entityMix', '个人 / 企业主体', 'Personal / Corporate', lang),
+      main: `${personal} / ${corporate}`,
+      sub: unknownEntity > 0
+        ? `${_trOr(tr, 'monitor.portrait.corpPct', '企业占比', 'Corp', lang)} ${pct(corporate)} · ${_trOr(tr, 'monitor.portrait.unverified', '待同步', 'Unsynced', lang)} ${unknownEntity}`
+        : `${_trOr(tr, 'monitor.portrait.corpPct', '企业占比', 'Corp', lang)} ${pct(corporate)} · ${_trOr(tr, 'monitor.portrait.personalPct', '个人占比', 'Personal', lang)} ${pct(personal)}`,
+      ratio: total > 0 ? (personal + corporate) / total : 0,
+      color: 'var(--violet)',
+      icon: 'building-2',
+    },
+    {
+      title: _trOr(tr, 'monitor.portrait.veteranRate', '老号存活率 (>180天)', 'Veteran (>180d)', lang),
+      main: pct(overHalfYear),
+      sub: `≥180d: ${overHalfYear} · ≥1y: ${overOneYear} (${pct(overOneYear)})`,
+      ratio: total > 0 ? overHalfYear / total : 0,
+      color: 'var(--cyan)',
+      icon: 'shield-check',
+    },
+    {
+      title: _trOr(tr, 'monitor.portrait.multiRegionRatio', '多区域拓展率', 'Multi-Region Ratio', lang),
+      main: pct(multiRegion),
+      sub: `${_trOr(tr, 'monitor.portrait.multiRegionSub', '已订阅 ≥2 个区域', '≥2 Subscribed Regions', lang)}: ${multiRegion} / ${total}`,
+      ratio: total > 0 ? multiRegion / total : 0,
+      color: 'var(--orange)',
+      icon: 'globe',
+    },
+  ];
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <Card
+        title={_trOr(tr, 'monitor.portrait.title', '号池主账号多维画像', 'Main Tenant Pool Portrait', lang)}
+        subtitle={_trOr(tr, 'monitor.portrait.subtitle', '基于主区域租户聚合等级、注册主体、存活账龄与多区订阅分布', 'Aggregated by home-region accounts across tier, entity type, account age, and subscribed regions', lang)}
+        headerIcon="users"
+        headerIconColor="var(--accent)"
+        action={
+          <span className="mono" style={{
+            fontSize: 11, color: 'var(--fg-2)',
+            padding: '3px 9px', borderRadius: 999,
+            background: 'var(--bg-2)', border: '1px solid var(--border)',
+          }}>
+            {_trOr(tr, 'monitor.portrait.mainTotal', '主账号总数', 'Main Tenants', lang)}: <b style={{ color: 'var(--fg-0)' }}>{total}</b>
+          </span>
+        }
+      >
+        {error || !portrait ? (
+          <div role={error ? 'alert' : 'status'} style={{ padding: '20px 16px', color: error ? 'var(--orange)' : 'var(--fg-3)', fontSize: 12 }}>
+            {error || (lang === 'en' ? 'Loading tenant portrait…' : '正在加载主账号画像…')}
+          </div>
+        ) : total === 0 ? (
+          <div style={{
+            padding: '24px 16px',
+            textAlign: 'center',
+            background: 'var(--bg-2)',
+            border: '1px dashed var(--border)',
+            borderRadius: 8,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 8,
+          }}>
+            <Icon name="users" size={22} style={{ color: 'var(--fg-3)', opacity: 0.6 }} />
+            <div style={{ fontSize: 12.5, color: 'var(--fg-2)' }}>
+              {_trOr(tr, 'monitor.portrait.empty', '当前号池暂无主区域账号数据，添加 OCI 租户后自动生成多维画像', 'No home-region tenants in pool yet. Add OCI tenants to view multi-dimensional portrait.', lang)}
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              icon="plus"
+              onClick={() => {
+                if (window.ociRouter?.navigate) window.ociRouter.navigate('/tenants');
+                else window.location.hash = '#/tenants';
+              }}
+            >
+              {_trOr(tr, 'monitor.portrait.goTenants', '前往租户管理', 'Go to Tenants', lang)}
+            </Button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* 顶部四维比例卡片 */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: 12,
+            }}>
+              {ratioCards.map((card, idx) => (
+                <div key={idx} style={{
+                  padding: '12px 14px',
+                  background: 'var(--bg-2)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 8,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                  minWidth: 0,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ fontSize: 11.5, color: 'var(--fg-2)', fontWeight: 500 }}>{card.title}</span>
+                    <span style={{
+                      width: 24, height: 24, borderRadius: 6,
+                      background: `color-mix(in oklab, ${card.color} 15%, transparent)`,
+                      color: card.color,
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0,
+                    }}>
+                      <Icon name={card.icon} size={13} />
+                    </span>
+                  </div>
+                  <div className="num mono" style={{ fontSize: 21, fontWeight: 700, color: 'var(--fg-0)', lineHeight: 1.15 }}>
+                    {card.main}
+                  </div>
+                  <div style={{ height: 4, borderRadius: 999, background: 'var(--bg-3)', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${Math.min(100, Math.max(0, card.ratio * 100))}%`,
+                      height: '100%',
+                      background: card.color,
+                      borderRadius: 999,
+                      transition: 'width 320ms ease',
+                    }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--fg-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={card.sub}>
+                    {card.sub}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 底部双分布柱状图 */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: 12,
+            }}>
+              <div style={{
+                padding: '12px 14px',
+                background: 'var(--bg-2)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                minWidth: 0,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-0)' }}>
+                    {_trOr(tr, 'monitor.portrait.ageChartTitle', '账号存活账龄分布', 'Account Age Distribution', lang)}
+                  </span>
+                  <span style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>
+                    {_trOr(tr, 'monitor.portrait.ageChartUnit', '按注册/存活天数分档', 'Grouped by active days', lang)}
+                  </span>
+                </div>
+                <CategoryBarChart items={ageChartItems} height={148} />
+              </div>
+
+              <div style={{
+                padding: '12px 14px',
+                background: 'var(--bg-2)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                minWidth: 0,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-0)' }}>
+                    {_trOr(tr, 'monitor.portrait.regionChartTitle', '主账号订阅区域数分布', 'Subscribed Regions per Tenant', lang)}
+                  </span>
+                  <span style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>
+                    {_trOr(tr, 'monitor.portrait.regionChartUnit', '主区域 + 子区域总数', 'Home + subscribed regions', lang)}
+                  </span>
+                </div>
+                <CategoryBarChart items={regionChartItems} height={148} />
+              </div>
+            </div>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

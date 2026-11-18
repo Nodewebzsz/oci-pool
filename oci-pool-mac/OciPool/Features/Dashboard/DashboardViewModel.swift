@@ -5,6 +5,8 @@ import Combine
 @MainActor
 final class DashboardViewModel: ObservableObject {
     @Published private(set) var stats = DashboardStats()
+    @Published private(set) var tenantPortrait = TenantPortraitData()
+    @Published private(set) var tenantPortraitError: String?
     @Published private(set) var metrics = SystemMetrics()
     @Published private(set) var networkHistory: [NetworkSample] = []
     @Published private(set) var activityLogs: [ActivityLog] = []
@@ -41,9 +43,10 @@ final class DashboardViewModel: ObservableObject {
         isLoading = true
         errorText = nil
         async let s: () = refreshStats()
+        async let p: () = refreshTenantPortrait()
         async let m: () = refreshMetrics()
         async let l: () = refreshActivity()
-        _ = await (s, m, l)
+        _ = await (s, p, m, l)
         isLoading = false
     }
 
@@ -56,6 +59,16 @@ final class DashboardViewModel: ObservableObject {
             if error is APIError {
                 errorText = error.localizedDescription
             }
+        }
+    }
+
+    func refreshTenantPortrait() async {
+        do {
+            let data = try await fetchEnvelope(path: "/boot/tenant-portrait", as: TenantPortraitData.self)
+            tenantPortrait = data
+            tenantPortraitError = nil
+        } catch {
+            tenantPortraitError = "主账号画像加载失败，请稍后重试"
         }
     }
 

@@ -25,9 +25,18 @@ final class RegionsViewModel: ObservableObject {
     @Published var statusFilter: RegionStatusFilter = .all {
         didSet { refilter() }
     }
+    @Published var coverageFilter: RegionCoverageFilter = .all {
+        didSet { refilter() }
+    }
     @Published var mapMode: RegionsMapViewMode = .arm {
         didSet {
-            if mapMode != oldValue { refilter() }
+            if mapMode != oldValue {
+                if mapMode != .map && coverageFilter != .all {
+                    coverageFilter = .all
+                } else {
+                    refilter()
+                }
+            }
         }
     }
     @Published var showMapBoard = false
@@ -44,6 +53,8 @@ final class RegionsViewModel: ObservableObject {
 
     var totalRegions: Int { KnownRegions.codes.count }
     var openArmCount: Int { openRecords.filter { $0.openCount > 0 }.count }
+    var linkedRegionCount: Int { allRows.filter(\.isMine).count }
+    var unlinkedReleasedCount: Int { allRows.filter { $0.coverageKind == .unlinkedReleased }.count }
     var todayNewCount: Int {
         let cal = Calendar.current
         let start = cal.startOfDay(for: Date())
@@ -352,7 +363,14 @@ final class RegionsViewModel: ObservableObject {
                 case .closed: return !row.isOpen
                 }
             }()
-            return matchQ && matchC && matchS
+            let matchCov: Bool = {
+                switch coverageFilter {
+                case .all: return true
+                case .linked: return row.isMine
+                case .uncoveredReleased: return row.coverageKind == .unlinkedReleased
+                }
+            }()
+            return matchQ && matchC && matchS && matchCov
         }
         pageState.page = 0
         pageState.apply(totalElements: Int64(filteredRows.count))

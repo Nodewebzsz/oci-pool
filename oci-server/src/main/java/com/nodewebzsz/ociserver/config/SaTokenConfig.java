@@ -116,11 +116,6 @@ public class SaTokenConfig implements WebMvcConfigurer {
                         "/script/**",
                         "/",                        // Modern UI SPA entry
                         "/modern-ui/**",            // Modern UI static assets
-                        "/swagger-ui.html",
-                        "/swagger-ui/**",
-                        "/v3/api-docs/**",
-                        "/swagger-resources/**",
-                        "/webjars/**",
                         "/oci-pool/open-api/**",
                         "/favicon.ico",
                         "/favicon.svg",

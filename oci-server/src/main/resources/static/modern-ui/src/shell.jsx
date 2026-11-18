@@ -44,7 +44,7 @@ function ShellProvider({ children }) {
       {children}
       <ToastStack toasts={toasts} />
       {modal && <ModalShell {...modal} onClose={() => { modal.onClose && modal.onClose(); closeModal(); }} />}
-      {drawer && <DrawerShell {...drawer} onClose={() => { drawer.onClose && drawer.onClose(); closeDrawer(); }} />}
+      {drawer && <DrawerShell {...drawer} suspendEscape={Boolean(modal || confirm)} onClose={() => { drawer.onClose && drawer.onClose(); closeDrawer(); }} />}
       {confirm && <ConfirmShell {...confirm} onClose={() => { confirm.onClose && confirm.onClose(); closeConfirm(); }} />}
     </ShellContext.Provider>
   );
@@ -113,7 +113,7 @@ function ModalShell({ title, subtitle, icon, iconColor = 'var(--accent)', size =
     <>
       <div onClick={onClose} style={{
         position: 'fixed', inset: 0,
-        background: 'rgba(20,20,19,0.45)',
+        background: 'rgba(0, 0, 0, 0.48)',
         backdropFilter: 'blur(2px)',
         zIndex: 80, animation: 'fade-in 150ms',
       }} />
@@ -127,7 +127,7 @@ function ModalShell({ title, subtitle, icon, iconColor = 'var(--accent)', size =
         background: 'var(--bg-1)',
         border: '1px solid var(--border-strong)',
         borderRadius: 'var(--radius-lg)',
-        boxShadow: '0 12px 32px rgba(20,20,19,0.18)',
+        boxShadow: 'var(--shadow-md)',
         zIndex: 81,
         display: 'flex', flexDirection: 'column',
         animation: 'fade-in 180ms',
@@ -142,8 +142,8 @@ function ModalShell({ title, subtitle, icon, iconColor = 'var(--accent)', size =
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
               {icon && (
                 <div style={{
-                  width: 32, height: 32, borderRadius: 8,
-                  background: `color-mix(in oklab, ${iconColor} 18%, transparent)`,
+                  width: 32, height: 32, borderRadius: 'var(--radius)',
+                  background: `color-mix(in srgb, ${iconColor} 16%, var(--bg-2))`,
                   color: iconColor,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   flexShrink: 0,
@@ -156,7 +156,7 @@ function ModalShell({ title, subtitle, icon, iconColor = 'var(--accent)', size =
                 {subtitle && <div style={{ fontSize: 12, color: 'var(--fg-3)', marginTop: 2 }}>{subtitle}</div>}
               </div>
             </div>
-            <IconButton icon="x" onClick={onClose} size={28} style={{ border: '1px solid var(--border)' }} />
+            <IconButton icon="x" onClick={onClose} size={28} style={{ border: '1px solid var(--border)', borderRadius: 'var(--button-radius)' }} />
           </div>
         )}
         <div style={{
@@ -181,17 +181,18 @@ function ModalShell({ title, subtitle, icon, iconColor = 'var(--accent)', size =
 }
 
 // ─── Drawer (right side) ────────────────────────────────────────
-function DrawerShell({ title, subtitle, statusDot, icon, iconColor = 'var(--accent)', width = 640, body, actions, onClose }) {
+function DrawerShell({ title, subtitle, statusDot, icon, iconColor = 'var(--accent)', width = 640, body, bodyPadding = 22, footer, actions, suspendEscape = false, onClose }) {
   React.useEffect(() => {
+    if (suspendEscape) return undefined;
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, suspendEscape]);
   return (
     <>
       <div onClick={onClose} style={{
         position: 'fixed', inset: 0,
-        background: 'rgba(20,20,19,0.4)',
+        background: 'rgba(0, 0, 0, 0.45)',
         backdropFilter: 'blur(2px)',
         zIndex: 60, animation: 'fade-in 150ms',
       }} />
@@ -199,9 +200,9 @@ function DrawerShell({ title, subtitle, statusDot, icon, iconColor = 'var(--acce
         position: 'fixed', top: 0, right: 0, bottom: 0,
         width, maxWidth: '92vw',
         background: 'var(--bg-1)',
-        borderLeft: '1px solid var(--border)',
+        borderLeft: '1px solid var(--border-strong)',
         zIndex: 61, overflowY: 'auto',
-        boxShadow: '-8px 0 24px rgba(20,20,19,0.16)',
+        boxShadow: 'var(--shadow-md)',
         animation: 'slide-in-right 220ms cubic-bezier(0.2, 0, 0, 1)',
         display: 'flex', flexDirection: 'column',
       }}>
@@ -214,8 +215,8 @@ function DrawerShell({ title, subtitle, statusDot, icon, iconColor = 'var(--acce
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
             {icon && (
               <div style={{
-                width: 32, height: 32, borderRadius: 8,
-                background: `color-mix(in oklab, ${iconColor} 18%, transparent)`,
+                width: 32, height: 32, borderRadius: 'var(--radius)',
+                background: `color-mix(in srgb, ${iconColor} 16%, var(--bg-2))`,
                 color: iconColor,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexShrink: 0,
@@ -231,16 +232,31 @@ function DrawerShell({ title, subtitle, statusDot, icon, iconColor = 'var(--acce
               {subtitle && <div style={{ fontSize: 12, color: 'var(--fg-3)', marginTop: 2 }}>{subtitle}</div>}
             </div>
           </div>
-          <IconButton icon="x" onClick={onClose} size={28} style={{ border: '1px solid var(--border)' }} />
+          <IconButton icon="x" onClick={onClose} size={28} style={{ border: '1px solid var(--border)', borderRadius: 'var(--button-radius)' }} />
         </div>
         {actions && (
           <div style={{ padding: '12px 22px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {actions}
           </div>
         )}
-        <div style={{ flex: 1, padding: 22 }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: bodyPadding }}>
           {body}
         </div>
+        {footer && (
+          <div style={{
+            padding: '12px 22px',
+            borderTop: '1px solid var(--border)',
+            position: 'sticky',
+            bottom: 0,
+            background: 'var(--bg-1)',
+            zIndex: 1,
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: 8,
+          }}>
+            {footer}
+          </div>
+        )}
       </div>
     </>
   );
@@ -261,7 +277,7 @@ function ConfirmShell({ title, body, danger, requireText, confirmLabel = tr('she
     <>
       <div onClick={onClose} style={{
         position: 'fixed', inset: 0,
-        background: 'rgba(20,20,19,0.5)',
+        background: 'rgba(0, 0, 0, 0.52)',
         backdropFilter: 'blur(2px)',
         zIndex: 90, animation: 'fade-in 150ms',
       }} />
@@ -273,7 +289,7 @@ function ConfirmShell({ title, body, danger, requireText, confirmLabel = tr('she
         background: 'var(--bg-1)',
         border: `1px solid ${danger ? 'var(--danger)' : 'var(--border-strong)'}`,
         borderRadius: 'var(--radius-lg)',
-        boxShadow: '0 12px 32px rgba(20,20,19,0.18)',
+        boxShadow: 'var(--shadow-md)',
         zIndex: 91,
         overflow: 'hidden',
         animation: 'fade-in 180ms',
@@ -376,8 +392,8 @@ function DropdownMenu({ anchor, onClose, sections, width = 240 }) {
         width,
         background: 'var(--bg-1)',
         border: '1px solid var(--border-strong)',
-        borderRadius: 10,
-        boxShadow: '0 8px 24px rgba(20,20,19,0.16)',
+        borderRadius: 'var(--radius)',
+        boxShadow: 'var(--shadow-md)',
         zIndex: 70,
         overflow: 'hidden',
         opacity: pos ? 1 : 0,
@@ -545,9 +561,9 @@ function RowActionMenu({ anchorEl, items, header, columns = 2, width = 280, onCl
       width,
       background: 'var(--bg-1)',
       border: '1px solid var(--border-strong)',
-      borderRadius: 8,
+      borderRadius: 'var(--radius)',
       padding: 4,
-      boxShadow: '0 10px 28px rgba(20,20,19,0.18)',
+      boxShadow: 'var(--shadow-md)',
       zIndex: 1000,
       display: 'grid',
       gridTemplateColumns: columns === 1 ? '1fr' : '1fr 1fr',

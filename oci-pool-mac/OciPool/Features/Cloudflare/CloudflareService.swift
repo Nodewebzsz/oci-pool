@@ -108,4 +108,11 @@ struct CloudflareService {
         ])
         return try CloudflareJSON.parseTestResult(raw)
     }
+
+    /// GET `/dns/cloudflare/api/official-ips`
+    func fetchOfficialIps() async throws -> CfOfficialIpRanges {
+        let url = try client.makeURL(baseURL, path: "/dns/cloudflare/api/official-ips")
+        let raw = try await client.getJSON(url)
+        return try CloudflareJSON.parseOfficialIps(raw)
+    }
 }

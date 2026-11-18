@@ -57,6 +57,32 @@ struct CfConfigForm: Identifiable, Equatable {
     var email = ""
 }
 
+struct CfOfficialIpRanges: Identifiable, Equatable {
+    var id: String = "cf-official-ips"
+    var ipv4Cidrs: [String] = []
+    var ipv6Cidrs: [String] = []
+    var source: String = "fallback"
+    var fetchedAt: String = ""
+    var nginxRealIpSnippet: String = ""
+
+    var displayFetchedAt: String {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let date = iso.date(from: fetchedAt) ?? ISO8601DateFormatter().date(from: fetchedAt) else { return "—" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter.string(from: date)
+    }
+}
+
+struct CfPublicIpExtractForm: Identifiable, Equatable {
+    var id: String = "cf-public-ip-extract"
+    var typeFilter: String = "ALL"   // ALL | A | AAAA
+    var proxyFilter: String = "ALL"  // ALL | PROXIED | DNS_ONLY
+    var keyword: String = ""
+}
+
 enum CloudflareJSON {
     static func parseZones(_ data: Data) throws -> [CfZone] {
         let root = try rootOK(data, fallback: "获取域名列表失败")
@@ -119,6 +145,63 @@ enum CloudflareJSON {
             if !count.isEmpty { return "同步完成，共处理 \(count) 条记录" }
         }
         return "同步完成"
+    }
+
+    static func parseOfficialIps(_ data: Data) throws -> CfOfficialIpRanges {
+        let root = try rootOK(data, fallback: "获取 Cloudflare 官方回源网段失败")
+        let payload = (root["data"] as? [String: Any]) ?? root
+        var res = CfOfficialIpRanges()
+        res.ipv4Cidrs = (payload["ipv4Cidrs"] as? [Any])?.map { str($0) }.filter { !$0.isEmpty } ?? []
+        res.ipv6Cidrs = (payload["ipv6Cidrs"] as? [Any])?.map { str($0) }.filter { !$0.isEmpty } ?? []
+        let src = str(payload["source"])
+        res.source = src.isEmpty ? "fallback" : src
+        res.fetchedAt = str(payload["fetchedAt"])
+        let snippet = str(payload["nginxRealIpSnippet"])
+        if !snippet.isEmpty {
+            res.nginxRealIpSnippet = snippet
+        } else {
+            var lines = ["# Cloudflare Official Origin Real IP"]
+            res.ipv4Cidrs.forEach { lines.append("set_real_ip_from \($0);") }
+            res.ipv6Cidrs.forEach { lines.append("set_real_ip_from \($0);") }
+            lines.append("real_ip_header CF-Connecting-IP;")
+            lines.append("real_ip_recursive on;")
+            res.nginxRealIpSnippet = lines.joined(separator: "\n")
+        }
+        return res
+    }
+
+    /// Pure extractor matching Web `extractCloudflarePublicIps`: only `A` / `AAAA`, filtered & order-preserving deduplicated.
+    static func extractPublicIps(
+        from records: [CfDnsRecord],
+        typeFilter: String = "ALL",
+        proxyFilter: String = "ALL",
+        keyword: String = ""
+    ) -> [String] {
+        let tf = typeFilter.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let pf = proxyFilter.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let kw = keyword.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        var seen = Set<String>()
+        var out: [String] = []
+        for rec in records {
+            let rType = rec.type.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+            guard rType == "A" || rType == "AAAA" else { continue }
+            if tf == "A" && rType != "A" { continue }
+            if tf == "AAAA" && rType != "AAAA" { continue }
+            if pf == "PROXIED" && !rec.proxied { continue }
+            if pf == "DNS_ONLY" && rec.proxied { continue }
+            let ip = rec.content.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !ip.isEmpty else { continue }
+            if !kw.isEmpty {
+                let matchName = rec.name.lowercased().contains(kw)
+                let matchContent = ip.lowercased().contains(kw)
+                guard matchName || matchContent else { continue }
+            }
+            if !seen.contains(ip) {
+                seen.insert(ip)
+                out.append(ip)
+            }
+        }
+        return out
     }
 
     static func rootOK(_ data: Data, fallback: String) throws -> [String: Any] {

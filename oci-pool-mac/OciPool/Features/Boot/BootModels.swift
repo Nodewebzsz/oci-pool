@@ -1,5 +1,11 @@
 import Foundation
 
+struct BootActionAvailability {
+    let status: Int
+    var canStart: Bool { status == 0 }
+    var canStop: Bool { status == 1 }
+}
+
 // MARK: - Sheets
 
 enum BootSheet: Identifiable, Equatable {

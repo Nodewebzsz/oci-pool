@@ -79,6 +79,60 @@ struct RegionRow: Identifiable, Equatable {
     let isMine: Bool
     /// Web：openTime 为今日 → todayGrabs = openCount，否则 0
     let todayGrabs: Int
+
+    var coverageKind: RegionCoverageKind {
+        RegionCoverageKind.classify(isMine: isMine, released: isOpen)
+    }
+}
+
+enum RegionCoverageKind: String, CaseIterable, Equatable {
+    case linkedActive = "linked_active"
+    case linkedIdle = "linked_idle"
+    case unlinkedReleased = "unlinked_released"
+    case unlinkedUnreleased = "unlinked_unreleased"
+
+    static func classify(isMine: Bool, released: Bool) -> RegionCoverageKind {
+        switch (isMine, released) {
+        case (true, true): return .linkedActive
+        case (true, false): return .linkedIdle
+        case (false, true): return .unlinkedReleased
+        case (false, false): return .unlinkedUnreleased
+        }
+    }
+
+    var badgeText: String {
+        switch self {
+        case .linkedActive: return "已关联 · 有放货"
+        case .linkedIdle: return "已关联 · 待放货"
+        case .unlinkedReleased: return "有货未覆盖"
+        case .unlinkedUnreleased: return "未关联 · 未放货"
+        }
+    }
+
+    var tone: StatusTone {
+        switch self {
+        case .linkedActive: return .success
+        case .linkedIdle: return .info
+        case .unlinkedReleased: return .warning
+        case .unlinkedUnreleased: return .neutral
+        }
+    }
+}
+
+enum RegionCoverageFilter: String, CaseIterable, Identifiable {
+    case all = "all"
+    case linked = "linked"
+    case uncoveredReleased = "uncovered_released"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: return "全部"
+        case .linked: return "我已关联"
+        case .uncoveredReleased: return "有货未覆盖"
+        }
+    }
 }
 
 enum RegionContinent: String, CaseIterable, Identifiable {

@@ -19,6 +19,7 @@ struct DashboardView: View {
                     errorBanner(err)
                 }
                 kpiGrid
+                tenantPortraitCard
                 resourceGrid
                 bottomGrid
             }
@@ -156,6 +157,240 @@ struct DashboardView: View {
                 .stroke(AppTheme.border(dark), lineWidth: 1)
         )
         .cornerRadius(8)
+    }
+
+    // MARK: - 号池主账号画像（Web page-monitor.jsx `tenantPortrait`）
+
+    private var tenantPortraitCard: some View {
+        let p = model.tenantPortrait
+        let total = max(0, p.totalMainTenants)
+
+        return SectionCard(title: "号池主账号画像") {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    StatusBadge(
+                        text: "主区域账号 \(total) 个",
+                        tone: total > 0 ? .info : .neutral
+                    )
+                    Text("仅聚合主区域租户（排除子区域映射行），透视升级比例、注册主体、存活账龄与多区扩展")
+                        .font(.system(size: 11.5))
+                        .foregroundColor(AppTheme.textSecondary(dark))
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                }
+
+                if let error = model.tenantPortraitError {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.orange)
+                } else if total == 0 {
+                    VStack(spacing: 12) {
+                        HStack(alignment: .top, spacing: 12) {
+                            ForEach(["升级号占比", "企业 / 个人主体", "老号率 (≥180天)", "多区号占比 (≥2区)"], id: \.self) { label in
+                                portraitTile(
+                                    icon: "circle.dashed",
+                                    color: AppTheme.textTertiary(dark),
+                                    label: label,
+                                    primary: "—",
+                                    detail: "等待数据",
+                                    ratio: nil
+                                )
+                            }
+                        }
+                        .opacity(0.55)
+
+                        HStack(spacing: 10) {
+                            Image(systemName: "person.2")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(AppTheme.textTertiary(dark))
+                            Text("暂无主账号数据，前往「租户管理」添加 OCI 主区域账号后自动生成多维画像")
+                                .font(.system(size: 12))
+                                .foregroundColor(AppTheme.textSecondary(dark))
+                                .lineLimit(2)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(AppTheme.border(dark), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                        )
+                    }
+                } else {
+                    HStack(alignment: .top, spacing: 12) {
+                        portraitTile(
+                            icon: "crown",
+                            color: AppTheme.sidebarActive,
+                            label: "升级号占比",
+                            primary: portraitPercent(p.upgradedCount, total),
+                            detail: "升级 \(p.upgradedCount) · 免费 \(p.freeCount)",
+                            ratio: Double(p.upgradedCount) / Double(total)
+                        )
+                        portraitTile(
+                            icon: "building.2",
+                            color: AppTheme.info,
+                            label: "企业 / 个人主体",
+                            primary: "\(p.corporateCount) / \(p.personalCount)",
+                            detail: p.unknownEntityCount > 0
+                                ? "待同步主体 \(p.unknownEntityCount) 个"
+                                : "主体类型已全部识别",
+                            ratio: Double(p.corporateCount) / Double(max(1, p.corporateCount + p.personalCount))
+                        )
+                        portraitTile(
+                            icon: "clock",
+                            color: AppTheme.success,
+                            label: "老号率 (≥180天)",
+                            primary: portraitPercent(p.overHalfYearCount, total),
+                            detail: "满半年 \(p.overHalfYearCount) · 满一年 \(p.overOneYearCount)",
+                            ratio: Double(p.overHalfYearCount) / Double(total)
+                        )
+                        portraitTile(
+                            icon: "globe",
+                            color: AppTheme.cyan,
+                            label: "多区号占比 (≥2区)",
+                            primary: portraitPercent(p.multiRegionCount, total),
+                            detail: "多区账号 \(p.multiRegionCount) / \(total)",
+                            ratio: Double(p.multiRegionCount) / Double(total)
+                        )
+                    }
+
+                    HStack(alignment: .top, spacing: 14) {
+                        portraitDistributionPanel(
+                            title: "存活账龄分布",
+                            total: total,
+                            bars: [
+                                ("< 30 天", p.ageBuckets["lt30d"] ?? 0, AppTheme.orange),
+                                ("30 ~ 180 天", p.ageBuckets["d30To180"] ?? 0, AppTheme.info),
+                                ("180 ~ 365 天", p.ageBuckets["d180To365"] ?? 0, AppTheme.cyan),
+                                ("> 1 年", p.ageBuckets["gt365d"] ?? 0, AppTheme.success)
+                            ]
+                        )
+
+                        portraitDistributionPanel(
+                            title: "订阅区域数分布",
+                            total: total,
+                            bars: [
+                                ("单区域 (1 区)", p.regionCountBuckets["r1"] ?? 0, AppTheme.info),
+                                ("双区域 (2 区)", p.regionCountBuckets["r2"] ?? 0, AppTheme.cyan),
+                                ("多区域 (3+ 区)", p.regionCountBuckets["r3Plus"] ?? 0, AppTheme.sidebarActive)
+                            ]
+                        )
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    private func portraitPercent(_ part: Int64, _ total: Int64) -> String {
+        guard total > 0 else { return "0%" }
+        let pct = (Double(part) / Double(total)) * 100.0
+        return String(format: "%.0f%%", pct)
+    }
+
+    private func portraitTile(
+        icon: String,
+        color: Color,
+        label: String,
+        primary: String,
+        detail: String,
+        ratio: Double?
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundColor(color)
+                Text(label)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(AppTheme.textSecondary(dark))
+                    .lineLimit(1)
+            }
+            Text(primary)
+                .font(.system(size: 20, weight: .bold, design: .monospaced))
+                .foregroundColor(AppTheme.navIcon(dark))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(AppTheme.bg3(dark))
+                    if let ratio, ratio > 0 {
+                        Capsule().fill(color)
+                            .frame(width: max(4, geo.size.width * CGFloat(min(1, ratio))))
+                    }
+                }
+            }
+            .frame(height: 4)
+            Text(detail)
+                .font(.system(size: 10.5))
+                .foregroundColor(AppTheme.textTertiary(dark))
+                .lineLimit(1)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(AppTheme.sidebarHover(dark))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark).opacity(0.65), lineWidth: 1)
+        )
+    }
+
+    private func portraitDistributionPanel(
+        title: String,
+        total: Int64,
+        bars: [(label: String, count: Int64, color: Color)]
+    ) -> some View {
+        let maxCount = max(1, bars.map(\.count).max() ?? 1)
+        return VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundColor(AppTheme.navIcon(dark))
+
+            VStack(spacing: 7) {
+                ForEach(Array(bars.enumerated()), id: \.offset) { _, bar in
+                    HStack(spacing: 8) {
+                        Text(bar.label)
+                            .font(.system(size: 11))
+                            .foregroundColor(AppTheme.textSecondary(dark))
+                            .frame(width: 88, alignment: .leading)
+
+                        GeometryReader { geo in
+                            let ratio = CGFloat(bar.count) / CGFloat(maxCount)
+                            ZStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(AppTheme.bg3(dark))
+                                    .frame(height: 8)
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(bar.color)
+                                    .frame(width: bar.count > 0 ? max(6, geo.size.width * ratio) : 0, height: 8)
+                            }
+                            .frame(maxHeight: .infinity, alignment: .center)
+                        }
+                        .frame(height: 14)
+
+                        Text("\(bar.count) (\(portraitPercent(bar.count, total)))")
+                            .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+                            .foregroundColor(AppTheme.navIcon(dark))
+                            .frame(width: 72, alignment: .trailing)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(AppTheme.sidebarHover(dark))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark).opacity(0.65), lineWidth: 1)
+        )
     }
 
     // MARK: - 资源仪表（4 列 · gap 14）

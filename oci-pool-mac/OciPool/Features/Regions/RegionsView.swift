@@ -63,7 +63,7 @@ struct RegionsView: View {
                         .foregroundColor(AppTheme.info)
                 }
                 Text("区域管理")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(AppTypography.pageTitle)
                     .foregroundColor(RegionsTheme.text(dark))
                     .tracking(-0.2)
             }
@@ -210,7 +210,7 @@ struct RegionsView: View {
                     .font(.system(size: 12, weight: active ? .medium : .regular))
                     .fixedSize()
             }
-            .foregroundColor(active ? .white : RegionsTheme.text(dark).opacity(0.85))
+            .foregroundColor(active ? appearance.accent.accentFg(dark) : RegionsTheme.text(dark).opacity(0.85))
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(RoundedRectangle(cornerRadius: 4).fill(active ? AppTheme.info : Color.clear))
@@ -235,10 +235,12 @@ struct RegionsView: View {
                     Text("全球放货地图")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(RegionsTheme.text(dark))
-                    Text("节点大小表示历史开机次数;橙色节点表示今日新增放货")
+                    Text("实心圆表示我已关联覆盖区域；菱形 ◆ 表示官方已放货但尚未关联覆盖的空白区")
                         .font(.system(size: 11))
                         .foregroundColor(RegionsTheme.muted(dark))
                 }
+                Spacer(minLength: 8)
+                coverageFilterBar
             }
 
             RegionWorldMapView(
@@ -246,21 +248,35 @@ struct RegionsView: View {
                 nodes: mapNodes,
                 dark: dark,
                 onNodeTap: { node in
-                    if let row = model.filteredRows.first(where: { $0.regionCode == node.code }) {
+                    if let row = model.allRows.first(where: { $0.regionCode == node.code }) {
                         model.openRegionDetail(row)
                     }
                 }
             )
             .aspectRatio(2, contentMode: .fit)
 
-            // Web 图例：已放货=accent 光晕 · 今日新放货=orange 光环 · 未放货=fg-3 小点
+            // Web 双层覆盖图例：已关联有货 · 已关联待货 · 官方有货未覆盖(菱形) · 今日新增 · 未放货
             HStack(spacing: 20) {
                 HStack(spacing: 6) {
                     Circle()
                         .fill(AppTheme.sidebarActive)
                         .frame(width: 10, height: 10)
                         .shadow(color: AppTheme.sidebarActive, radius: 4)
-                    Text("已放货区域").font(.system(size: 11)).foregroundColor(RegionsTheme.text(dark).opacity(0.75))
+                    Text("我已关联 · 有放货").font(.system(size: 11)).foregroundColor(RegionsTheme.text(dark).opacity(0.75))
+                }
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(AppTheme.info)
+                        .frame(width: 8, height: 8)
+                        .overlay(Circle().stroke(AppTheme.info.opacity(0.5), lineWidth: 2))
+                    Text("我已关联 · 待放货").font(.system(size: 11)).foregroundColor(RegionsTheme.text(dark).opacity(0.75))
+                }
+                HStack(spacing: 6) {
+                    DiamondMarkerShape()
+                        .fill(AppTheme.cyan.opacity(0.25))
+                        .frame(width: 10, height: 10)
+                        .overlay(DiamondMarkerShape().stroke(AppTheme.cyan, lineWidth: 1.4))
+                    Text("有货未覆盖").font(.system(size: 11)).foregroundColor(RegionsTheme.text(dark).opacity(0.75))
                 }
                 HStack(spacing: 6) {
                     Circle()
@@ -274,7 +290,7 @@ struct RegionsView: View {
                     Text("未放货区域").font(.system(size: 11)).foregroundColor(RegionsTheme.text(dark).opacity(0.75))
                 }
                 Spacer(minLength: 8)
-                Text("悬停节点查看详情 · 节点半径 ∝ √(历史开机数)")
+                Text("点击上方胶囊过滤覆盖层 · 悬停或点击节点查看详情")
                     .font(.system(size: 10.5))
                     .foregroundColor(RegionsTheme.muted(dark))
             }
@@ -287,6 +303,35 @@ struct RegionsView: View {
         .cornerRadius(8)
     }
 
+    private var coverageFilterBar: some View {
+        let pills: [(filter: RegionCoverageFilter, label: String)] = [
+            (.all, "全部 (\(model.allRows.count))"),
+            (.linked, "我已关联 (\(model.linkedRegionCount))"),
+            (.uncoveredReleased, "有货未覆盖 (\(model.unlinkedReleasedCount))")
+        ]
+        return HStack(spacing: 6) {
+            ForEach(pills, id: \.filter.id) { item in
+                let active = model.coverageFilter == item.filter
+                Button(action: { model.coverageFilter = item.filter }) {
+                    Text(item.label)
+                        .font(.system(size: 11.5, weight: active ? .semibold : .regular))
+                        .foregroundColor(active ? appearance.accent.accentFg(dark) : RegionsTheme.text(dark).opacity(0.86))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(active ? AppTheme.sidebarActive : RegionsTheme.surface2(dark))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(active ? AppTheme.sidebarActive : RegionsTheme.border(dark), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
+    }
+
     /// Web：地图节点来自筛选后的行（搜索/大洲/状态联动）
     private var mapNodes: [RegionMapNode] {
         model.filteredRows.compactMap { row in
@@ -296,6 +341,7 @@ struct RegionsView: View {
                 name: row.name,
                 arch: row.architectureType,
                 released: row.isOpen,
+                isMine: row.isMine,
                 totalGrabs: row.openCount,
                 todayGrabs: row.todayGrabs,
                 firstAt: row.openTime ?? "—",
@@ -616,8 +662,8 @@ enum RegionsTheme {
     static func surface(_ dark: Bool) -> Color { AppTheme.sidebarBg(dark) }
     static func surface2(_ dark: Bool) -> Color { AppTheme.sidebarHover(dark) }
     static func border(_ dark: Bool) -> Color { AppTheme.border(dark) }
-    static func text(_ dark: Bool) -> Color { dark ? Color(hex: "f6f9fb") : Color(hex: "0c1217") }
-    static func muted(_ dark: Bool) -> Color { dark ? Color(hex: "5d646a") : Color(hex: "81878c") }
-    static func orange(_ dark: Bool) -> Color { Color(hex: "ef852e") }
-    static func red(_ dark: Bool) -> Color { Color(hex: "f05653") }
+    static func text(_ dark: Bool) -> Color { AppTheme.navIcon(dark) }
+    static func muted(_ dark: Bool) -> Color { AppTheme.textTertiary(dark) }
+    static func orange(_ dark: Bool) -> Color { AppTheme.orange }
+    static func red(_ dark: Bool) -> Color { AppTheme.danger }
 }

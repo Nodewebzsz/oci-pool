@@ -68,6 +68,10 @@
     return api.request('/boot/stats');
   }, 'GET', '/boot/stats', 'query-string');
 
+  S.tenantPortrait = mark(function tenantPortrait() {
+    return api.request('/boot/tenant-portrait');
+  }, 'GET', '/boot/tenant-portrait', 'query-string');
+
   S.bootDetail = mark(function bootDetail(input) {
     const o = input || {};
     return api.request('/boot/bootDetail?bootId=' + encodeURIComponent(contracts.id(o.bootId, 'bootId')));

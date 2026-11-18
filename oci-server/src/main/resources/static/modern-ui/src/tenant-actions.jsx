@@ -5264,13 +5264,13 @@ function useUserManageModal() {
     };
 
     const render = () => {
-      shell.openModal({
+      shell.openDrawer({
         title: tr('tenant.7d94de'),
         subtitle: <span><span className="mono">{tenantLabel(tenant)}</span><span style={{ margin: '0 6px', color: 'var(--fg-3)' }}>·</span><span>{regionText}</span></span>,
         icon: 'users',
         iconColor: 'var(--accent)',
-        size: 'xl',
-        height: 660,
+        width: 780,
+        bodyPadding: 0,
         body: (
           <div style={{ padding: 16, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
             {/* ── Tab 导航 · 3 个(对齐原项目) ─────────── */}
@@ -6080,7 +6080,7 @@ function useUserManageModal() {
             )}
           </div>
         ),
-        footer: <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('tenant.b15d91')}</Button>,
+        footer: <Button variant="ghost" size="md" onClick={shell.closeDrawer}>{tr('tenant.b15d91')}</Button>,
       });
     };
     render();
@@ -6211,7 +6211,7 @@ function useRegionSubscribeModal() {
         }
       };
 
-      shell.openModal({
+      shell.openDrawer({
         title: tr('tenant.5e286d'),
         subtitle: (
           <span>
@@ -6222,7 +6222,8 @@ function useRegionSubscribeModal() {
         ),
         icon: 'globe',
         iconColor: 'var(--cyan)',
-        size: 'lg',
+        width: 680,
+        bodyPadding: 0,
         body: (
           <div style={{ padding: 16 }}>
             {/* 顶部三项统计卡片 */}
@@ -6486,7 +6487,7 @@ function useRegionSubscribeModal() {
               <Icon name="refresh-cw" size={13} style={{ marginRight: 6 }} />
               刷新
             </Button>
-            <Button variant="ghost" size="md" onClick={shell.closeModal}>
+            <Button variant="ghost" size="md" onClick={shell.closeDrawer}>
               {tr('tenant.b15d91')}
             </Button>
           </div>
@@ -6547,12 +6548,13 @@ function useTrafficAlertModal() {
     };
 
     const render = () => {
-      shell.openModal({
+      shell.openDrawer({
         title: tr('tenant.3746e6'),
         subtitle: <span><span className="mono">{tenantLabel(tenant)}</span><span style={{ margin: '0 6px', color: 'var(--fg-3)' }}>·</span><span>{regionText}</span></span>,
         icon: 'bell',
         iconColor: 'var(--orange)',
-        size: 'md',
+        width: 560,
+        bodyPadding: 0,
         body: (
           <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 18 }}>
             {/* 1. 启用流量统计 · 拟物白勾卡片 */}
@@ -6698,7 +6700,7 @@ function useTrafficAlertModal() {
                 <button
                   type="button"
                   onClick={() => {
-                    shell.closeModal();
+                    shell.closeDrawer();
                     userManageModal(tenant, 'notifications');
                   }}
                   style={{
@@ -6731,7 +6733,7 @@ function useTrafficAlertModal() {
                     size="xs"
                     variant="outline"
                     onClick={() => {
-                      shell.closeModal();
+                      shell.closeDrawer();
                       userManageModal(tenant, 'notifications');
                     }}
                   >
@@ -6766,7 +6768,7 @@ function useTrafficAlertModal() {
         ),
         footer: (
           <>
-            <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('tenant.625fb2')}</Button>
+            <Button variant="ghost" size="md" onClick={shell.closeDrawer}>{tr('tenant.625fb2')}</Button>
             <Button variant="primary" size="md" icon="save" loading={state.saving}
               onClick={async () => {
                 if (!state.threshold || state.threshold <= 0) { shell.showToast(tr('tenant.e0016d'), { kind: 'warn' }); return; }
@@ -6777,7 +6779,7 @@ function useTrafficAlertModal() {
                     body: JSON.stringify({ tenantId: getTenantDbId(tenant), threshold: Number(state.threshold), autoShutdown: state.autoShutdown, enabled: state.enableStats, statisticsEnabled: state.enableStats }),
                   });
                   shell.showToast(tr('tenant.7abb7d').replace('{0}',state.threshold >= 1000 ? (state.threshold/1000).toFixed(1) + ' TB' : state.threshold + ' GB').replace('{1}',state.autoShutdown ? tr('tenant.autoShutdown') : ''), { kind: 'success' });
-                  shell.closeModal();
+                  shell.closeDrawer();
                 } catch (e) {
                   shell.showToast(tr('tenant.40f902') + (e.message || e), { kind: 'error' });
                 } finally {
@@ -6877,7 +6879,7 @@ function useMailModal() {
         });
         if (!result || result.success !== true) throw new Error(result?.message || tr('tenant.af316b'));
         shell.showToast(tr('tenant.f6e99f').replace('{0}',d), { kind: 'success' });
-        shell.closeModal();
+        shell.closeDrawer();
         window.dispatchEvent(new CustomEvent('ocip-refresh-page', { detail: 'tenants' }));
       } catch (e) {
         shell.showToast(tr('tenant.b8cce0') + (e.message || e), { kind: 'error' });
@@ -6888,11 +6890,12 @@ function useMailModal() {
     };
 
     const render = () => {
-      shell.openModal({
+      shell.openDrawer({
         title: tr('tenant.fd823d'),
         icon: 'mail',
         iconColor: 'var(--accent)',
-        size: 'sm',
+        width: 520,
+        bodyPadding: 0,
         body: (
           <div style={{ padding: 20 }}>
             {/* 域名字段 · label 行 */}
@@ -6989,7 +6992,7 @@ function useMailModal() {
               // ═══ isViewOnly=false:编辑态,显示"启用邮件服务" + "取消" ═══
               <Button variant="primary" size="md" icon="mail" loading={state.saving} onClick={confirmEnable}>{tr('tenant.fd823d')}</Button>
             )}
-            <Button variant="ghost" size="md" icon="x" onClick={shell.closeModal}>{tr('tenant.625fb2')}</Button>
+            <Button variant="ghost" size="md" icon="x" onClick={shell.closeDrawer}>{tr('tenant.625fb2')}</Button>
           </>
         ),
       });
@@ -7119,12 +7122,13 @@ function useSocialConfigModal() {
     };
 
     const render = () => {
-      shell.openModal({
+      shell.openDrawer({
         title: tr('tenant.946278'),
         subtitle: <span><span className="mono">{tenantLabel(tenant)}</span> {tr('tenant.569dbc')} <b>{state.configs.length}</b> {tr('tenant.61e795')}</span>,
         icon: 'share-2',
         iconColor: 'var(--violet)',
-        size: 'lg',
+        width: 680,
+        bodyPadding: 0,
         body: (
           <div style={{ padding: 16 }}>
             {state.view === 'list' ? (
@@ -7244,10 +7248,24 @@ function useSocialConfigModal() {
                   border: '1px solid var(--border)', borderRadius: 8,
                 }}>
                   <FormRow label={tr('tenant.226b09')} required>
-                    <CustomDropdown value={state.form.type}
-                      onChange={e => { state.form.type = e; render(); }} height={32} width="100%">
-                      {socialTypes.map(t => <option key={t} value={t}>{t}</option>)}
-                    </CustomDropdown>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <CustomDropdown value={state.form.type}
+                          onChange={e => { state.form.type = e; render(); }} height={32} width="100%">
+                          {socialTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                        </CustomDropdown>
+                      </div>
+                      {String(state.form.type || '').toLowerCase().includes('google') && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          icon="external-link"
+                          onClick={() => window.open('https://console.cloud.google.com/apis/credentials', '_blank', 'noopener,noreferrer')}
+                        >
+                          {tr('social.googleConsole') !== 'social.googleConsole' ? tr('social.googleConsole') : 'Google 凭据控制台'}
+                        </Button>
+                      )}
+                    </div>
                   </FormRow>
 
                   <FormRow label="Client ID" required>
@@ -7290,7 +7308,7 @@ function useSocialConfigModal() {
             )}
           </div>
         ),
-        footer: state.view === 'list' ? <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('tenant.b15d91')}</Button> : null,
+        footer: state.view === 'list' ? <Button variant="ghost" size="md" onClick={shell.closeDrawer}>{tr('tenant.b15d91')}</Button> : null,
       });
     };
     render();

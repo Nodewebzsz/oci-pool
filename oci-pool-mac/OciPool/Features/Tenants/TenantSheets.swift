@@ -1562,16 +1562,39 @@ struct TenantSheetHost: View {
                     VStack(alignment: .leading, spacing: 10) {
                         if !model.socialTypes.isEmpty {
                             sectionLabel("社媒类型 *")
-                            SelectMenu(
-                                options: model.socialTypes.map { SelectOption(id: $0, title: $0) },
-                                selection: Binding(
-                                    get: { model.socialDraft.socialTypeStr.isEmpty ? nil : model.socialDraft.socialTypeStr },
-                                    set: { model.socialDraft.socialTypeStr = $0 ?? "" }
-                                ),
-                                placeholder: "类型",
-                                width: 200,
-                                allowClear: false
-                            )
+                            HStack(spacing: 10) {
+                                SelectMenu(
+                                    options: model.socialTypes.map { SelectOption(id: $0, title: $0) },
+                                    selection: Binding(
+                                        get: { model.socialDraft.socialTypeStr.isEmpty ? nil : model.socialDraft.socialTypeStr },
+                                        set: { model.socialDraft.socialTypeStr = $0 ?? "" }
+                                    ),
+                                    placeholder: "类型",
+                                    width: 200,
+                                    allowClear: false
+                                )
+                                if model.socialDraft.socialTypeStr == "Google" || model.socialDraft.socialTypeStr.caseInsensitiveCompare("Google") == .orderedSame {
+                                    AppButton(
+                                        title: "Google Cloud 凭据台",
+                                        systemImage: "arrow.up.right.square",
+                                        kind: .secondary
+                                    ) {
+                                        if let url = URL(string: "https://console.cloud.google.com/apis/credentials") {
+                                            NSWorkspace.shared.open(url)
+                                        }
+                                    }
+                                }
+                            }
+                        } else if model.socialDraft.socialTypeStr == "Google" || model.socialDraft.socialTypeStr.caseInsensitiveCompare("Google") == .orderedSame {
+                            AppButton(
+                                title: "Google Cloud 凭据台",
+                                systemImage: "arrow.up.right.square",
+                                kind: .secondary
+                            ) {
+                                if let url = URL(string: "https://console.cloud.google.com/apis/credentials") {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            }
                         }
                         field("Client ID *", text: Binding(get: { model.socialDraft.clientId }, set: { model.socialDraft.clientId = $0 }))
                         field("Client Secret *", text: Binding(get: { model.socialDraft.clientSecret }, set: { model.socialDraft.clientSecret = $0 }))

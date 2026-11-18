@@ -2,6 +2,16 @@
 (function installOciTokenServices(global) {
   'use strict';
   const api = global.ociApi;
+  global.ociTokenAvailability = function tokenAvailability(status, now = Date.now()) {
+    if (!status?.hasToken) return 'missing';
+    if (!status.enabled) return 'disabled';
+    if (status.isExpired) return 'expired';
+    if (!status.expiresAt) return 'unknown';
+    const expiry = new Date(typeof status.expiresAt === 'string' ? status.expiresAt.replace(' ', 'T') : status.expiresAt).getTime();
+    if (!Number.isFinite(expiry)) return 'unknown';
+    if (expiry <= now) return 'expired';
+    return expiry - now <= 7 * 86400000 ? 'expiring' : 'valid';
+  };
   const S = {};
   function mark(fn, method, path, encoding) { fn.endpoint = { method, path, encoding }; return fn; }
   function json(input) {
@@ -20,6 +30,7 @@
   }
   S.configs = mark(function configs() { return api.request('/api/system/apiTokenConfigs'); }, 'GET', '/api/system/apiTokenConfigs', 'query-string');
   S.status = mark(function status() { return api.request('/api/system/apiTokenStatus'); }, 'GET', '/api/system/apiTokenStatus', 'query-string');
+  S.openApiSpec = mark(function openApiSpec() { return api.request('/api/system/openApiSpec'); }, 'GET', '/api/system/openApiSpec', 'query-string');
   S.generate = mark(function generate(input) { return api.request('/api/system/generateApiToken', json(input)); }, 'POST', '/api/system/generateApiToken', 'application/json');
   S.revoke = mark(function revoke() { return api.request('/api/system/revokeApiToken', { method: 'POST' }); }, 'POST', '/api/system/revokeApiToken', 'query-string');
   global.ociServices = global.ociServices || {};

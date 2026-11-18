@@ -66,6 +66,7 @@ import com.nodewebzsz.ociserver.pojo.response.AccountCheckRes;
 import com.nodewebzsz.ocicommon.param.ApiResponse;
 import com.nodewebzsz.ociserver.pojo.response.BootVolumeRes;
 import com.nodewebzsz.ociserver.pojo.response.OciGroupResp;
+import com.nodewebzsz.ociserver.pojo.response.TenantPortraitVO;
 import com.nodewebzsz.ociserver.service.BootInstanceService;
 import com.nodewebzsz.ociserver.service.RegisterDetailService;
 import com.nodewebzsz.ociserver.service.TenantService;
@@ -160,9 +161,11 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -3017,5 +3020,196 @@ public class TenantServiceImpl implements TenantService {
         data.put("detail", detail);
         data.put("elapsed", elapsedSeconds);
         sendSseEvent(emitter, "step", JSONUtil.toJsonStr(data));
+    }
+
+    @Override
+    public TenantPortraitVO getTenantPortrait() {
+        List<Tenant> allTenants = tenantRepository.findAll();
+        if (allTenants != null && !allTenants.isEmpty() && registerDetailRepository != null) {
+            List<Tenant> mainTenants = allTenants.stream()
+                    .filter(TenantServiceImpl::isPortraitMainTenant)
+                    .collect(Collectors.toList());
+            List<String> tenantIds = mainTenants.stream()
+                    .map(Tenant::getTenantId)
+                    .filter(StringUtils::isNotBlank)
+                    .distinct()
+                    .collect(Collectors.toList());
+            Map<String, RegisterDetail> byOcid = tenantIds.isEmpty()
+                    ? Collections.emptyMap()
+                    : registerDetailRepository.findByTenantIdIn(tenantIds).stream()
+                            .filter(d -> d != null && StringUtils.isNotBlank(d.getTenantId()))
+                            .collect(Collectors.toMap(RegisterDetail::getTenantId, d -> d, (a, b) -> a));
+
+            List<Long> localIds = mainTenants.stream()
+                    .map(Tenant::getId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+            Map<Long, RegisterDetail> byPrvId = localIds.isEmpty()
+                    ? Collections.emptyMap()
+                    : registerDetailRepository.findByTenantPrvIdIn(localIds).stream()
+                            .filter(d -> d != null && d.getTenantPrvId() != null)
+                            .collect(Collectors.toMap(RegisterDetail::getTenantPrvId, d -> d,
+                                    (a, b) -> (a.getId() != null && b.getId() != null && a.getId() >= b.getId()) ? a : b));
+
+            for (Tenant main : mainTenants) {
+                if (main.getRegisterDetail() == null) {
+                    RegisterDetail detail = byPrvId.getOrDefault(main.getId(), byOcid.get(main.getTenantId()));
+                    if (detail != null) {
+                        main.setRegisterDetail(detail);
+                    }
+                }
+            }
+        }
+        return computeTenantPortrait(allTenants);
+    }
+
+    private static boolean isPortraitMainTenant(Tenant tenant) {
+        return tenant != null && (tenant.getParenId() == null || tenant.getParenId() == 0L)
+                && !Boolean.FALSE.equals(tenant.getIsHomeRegion());
+    }
+
+    public static TenantPortraitVO computeTenantPortrait(List<Tenant> allTenants) {
+        TenantPortraitVO vo = new TenantPortraitVO();
+        Map<String, Long> ageBuckets = new LinkedHashMap<>();
+        ageBuckets.put("lt30d", 0L);
+        ageBuckets.put("d30To180", 0L);
+        ageBuckets.put("d180To365", 0L);
+        ageBuckets.put("gt365d", 0L);
+
+        Map<String, Long> regionBuckets = new LinkedHashMap<>();
+        regionBuckets.put("r1", 0L);
+        regionBuckets.put("r2", 0L);
+        regionBuckets.put("r3Plus", 0L);
+
+        vo.setAgeBuckets(ageBuckets);
+        vo.setRegionCountBuckets(regionBuckets);
+
+        if (allTenants == null || allTenants.isEmpty()) {
+            return vo;
+        }
+
+        Map<Long, Long> childCountByParent = new HashMap<>();
+        List<Tenant> mainTenants = new ArrayList<>();
+        for (Tenant t : allTenants) {
+            if (t == null) {
+                continue;
+            }
+            if (isPortraitMainTenant(t)) {
+                mainTenants.add(t);
+            } else if (t.getParenId() != null && t.getParenId() > 0L) {
+                childCountByParent.merge(t.getParenId(), 1L, Long::sum);
+            }
+        }
+
+        long upgraded = 0L;
+        long free = 0L;
+        long corporate = 0L;
+        long personal = 0L;
+        long unknownEntity = 0L;
+        long overHalfYear = 0L;
+        long overOneYear = 0L;
+        long multiRegion = 0L;
+
+        for (Tenant main : mainTenants) {
+            if (isUpgradedAccount(main)) {
+                upgraded++;
+            } else {
+                free++;
+            }
+
+            RegisterDetail rd = main.getRegisterDetail();
+            Subscription.AccountType entityType = rd != null ? rd.getAccountType() : null;
+            if (entityType == Subscription.AccountType.Corporate
+                    || entityType == Subscription.AccountType.CorporateSubmitted) {
+                corporate++;
+            } else if (entityType == Subscription.AccountType.Personal) {
+                personal++;
+            } else {
+                unknownEntity++;
+            }
+
+            long days = resolveTenantAgeDays(main, rd);
+            if (days >= 180L) {
+                overHalfYear++;
+            }
+            if (days >= 365L) {
+                overOneYear++;
+            }
+            if (days < 30L) {
+                ageBuckets.merge("lt30d", 1L, Long::sum);
+            } else if (days < 180L) {
+                ageBuckets.merge("d30To180", 1L, Long::sum);
+            } else if (days < 365L) {
+                ageBuckets.merge("d180To365", 1L, Long::sum);
+            } else {
+                ageBuckets.merge("gt365d", 1L, Long::sum);
+            }
+
+            long childCount = main.getId() != null ? childCountByParent.getOrDefault(main.getId(), 0L) : 0L;
+            long regionCount = 1L + childCount;
+            if (regionCount >= 2L) {
+                multiRegion++;
+            }
+            if (regionCount <= 1L) {
+                regionBuckets.merge("r1", 1L, Long::sum);
+            } else if (regionCount == 2L) {
+                regionBuckets.merge("r2", 1L, Long::sum);
+            } else {
+                regionBuckets.merge("r3Plus", 1L, Long::sum);
+            }
+        }
+
+        vo.setTotalMainTenants(mainTenants.size());
+        vo.setUpgradedCount(upgraded);
+        vo.setFreeCount(free);
+        vo.setCorporateCount(corporate);
+        vo.setPersonalCount(personal);
+        vo.setUnknownEntityCount(unknownEntity);
+        vo.setOverHalfYearCount(overHalfYear);
+        vo.setOverOneYearCount(overOneYear);
+        vo.setMultiRegionCount(multiRegion);
+        return vo;
+    }
+
+    private static boolean isUpgradedAccount(Tenant tenant) {
+        String raw = tenant.getAccountType();
+        if (StringUtils.isNotBlank(raw)) {
+            String upper = raw.trim().toUpperCase(Locale.ROOT);
+            if ("PAID".equals(upper)
+                    || "PAYG".equals(upper)
+                    || "UPGRADE_ACCOUNT".equals(upper)
+                    || raw.contains("升级")) {
+                return true;
+            }
+            if (upper.contains("FREE") || upper.contains("TRIAL") || raw.contains("免费") || raw.contains("试用")) {
+                return false;
+            }
+        }
+        RegisterDetail rd = tenant.getRegisterDetail();
+        return rd != null && rd.getPlanType() == Subscription.PlanType.Payg;
+    }
+
+    private static long resolveTenantAgeDays(Tenant tenant, RegisterDetail rd) {
+        String activeDays = tenant.getActiveDays();
+        if (StringUtils.isNotBlank(activeDays)) {
+            String digits = activeDays.replaceAll("[^0-9-]", "").trim();
+            if (StringUtils.isNotBlank(digits)) {
+                try {
+                    return Math.max(0L, Long.parseLong(digits));
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        if (rd != null && rd.getRegisterTime() != null) {
+            long days = java.time.temporal.ChronoUnit.DAYS.between(
+                    rd.getRegisterTime().toInstant(), java.time.Instant.now());
+            return Math.max(0L, days);
+        }
+        if (tenant.getCreatedAt() != null) {
+            long days = java.time.temporal.ChronoUnit.DAYS.between(
+                    tenant.getCreatedAt(), LocalDateTime.now());
+            return Math.max(0L, days);
+        }
+        return 0L;
     }
 }

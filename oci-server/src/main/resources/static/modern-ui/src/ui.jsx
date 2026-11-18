@@ -135,7 +135,7 @@ function Card({ children, style = {}, className = '', title, subtitle, action, p
 // Button
 function Button({ children, variant = 'ghost', size = 'md', onClick, style = {}, icon, iconRight, disabled, loading = false }) {
   const variants = {
-    primary: { background: 'var(--accent)', color: '#ffffff', border: '1px solid var(--accent)' },
+    primary: { background: 'var(--accent)', color: 'var(--accent-fg)', border: '1px solid var(--accent)' },
     secondary: { background: 'var(--bg-2)', color: 'var(--fg-0)', border: '1px solid var(--border-strong)' },
     ghost: { background: 'transparent', color: 'var(--fg-1)', border: '1px solid transparent' },
     outline: { background: 'transparent', color: 'var(--fg-1)', border: '1px solid var(--border-strong)' },
@@ -887,6 +887,13 @@ function ActionButton({ icon = 'more-horizontal', onClick, variant = 'default' }
 }
 
 // PageHeader
+function formatLocalTimestamp(value) {
+  const date = new Date(value);
+  if (!value || !Number.isFinite(date.getTime())) return '—';
+  const pad = n => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
 function PageHeader({ title, subtitle, icon, iconColor = 'var(--accent)', actions, children }) {
   return (
     <div style={{
@@ -919,7 +926,7 @@ function PageHeader({ title, subtitle, icon, iconColor = 'var(--accent)', action
         </div>
       </div>
       {children}
-      {actions && <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>{actions}</div>}
+      {actions && <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>{actions}</div>}
     </div>);
 
 }

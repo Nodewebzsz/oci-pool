@@ -351,10 +351,12 @@ struct BootDetailCardView: View {
                 AppButton(
                     title: detail.status == 1 ? "停止" : "启动",
                     systemImage: detail.status == 1 ? "stop.fill" : "play.fill",
-                    kind: detail.status == 1 ? .secondary : .primary
+                    kind: detail.status == 1 ? .secondary : .primary,
+                    enabled: BootActionAvailability(status: detail.status).canStart || BootActionAvailability(status: detail.status).canStop
                 ) {
                     model.toggleDetailStatus(detail, start: detail.status != 1)
                 }
+                .help(detail.status == 2 ? "该任务已开机成功，无需重复启动" : "仅未开机任务可启动，运行中任务可停止")
                 AppButton(
                     title: logActive ? "日志中" : "开机日志",
                     systemImage: "text.alignleft",

@@ -48,6 +48,14 @@ struct CloudflareView: View {
             CloudflareConfigSheet(model: model)
                 .environmentObject(appearance)
         }
+        .sheet(item: $model.officialIpsForm) { _ in
+            CloudflareOfficialIpsSheet(model: model)
+                .environmentObject(appearance)
+        }
+        .sheet(item: $model.publicIpExtractForm) { _ in
+            CloudflarePublicIpExtractSheet(model: model)
+                .environmentObject(appearance)
+        }
         .environmentObject(appearance)
     }
 
@@ -57,7 +65,7 @@ struct CloudflareView: View {
 
     /// Web 页头 actions：域名: label + zone 下拉 220 + 密钥配置(orange) + 添加记录(primary) + 同步记录(info) + 刷新列表(outline)
     private var toolbar: some View {
-        HStack(spacing: 8) {
+        AdaptivePageToolbar {
             Text("域名:")
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.textTertiary(dark))
@@ -74,6 +82,22 @@ struct CloudflareView: View {
             )
             AppButton(title: "密钥配置", systemImage: "key", kind: .orange) {
                 model.openConfig()
+            }
+            AppButton(
+                title: "回源 IP / Nginx",
+                systemImage: "lock.shield",
+                kind: .secondary,
+                isLoading: model.isOfficialIpsLoading
+            ) {
+                model.openOfficialIps()
+            }
+            AppButton(
+                title: "提取公网 IP",
+                systemImage: "doc.on.clipboard",
+                kind: .secondary,
+                enabled: hasZone
+            ) {
+                model.openPublicIpExtract()
             }
             AppButton(title: "添加记录", systemImage: "plus", kind: .primary, enabled: hasZone) {
                 model.openAdd()
