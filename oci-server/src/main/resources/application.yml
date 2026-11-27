@@ -80,7 +80,7 @@ spring:
   profiles:
     active: release
 server:
-  #forward-headers-strategy: native
+  forward-headers-strategy: none
   max-http-header-size: 81920
   port: 9856
   compression:
@@ -164,3 +164,6 @@ modern-ui:
   entry: /modern-ui/index.html
   # 模拟数据开关：库无数据时列表接口返回构造的 demo 数据（仅开发/演示用）
   mock-data: false
+
+client-ip:
+  trusted-proxies: ${CLIENT_IP_TRUSTED_PROXIES:}

@@ -7507,7 +7507,7 @@ function useExportTenantModal() {
 
     const state = {
       step: 1,               // 1: 确认  2: 验证码  3: 完成
-      codeInput: ['', '', '', '', '', ''],
+      codeInput: ['', '', '', '', '', '', '', ''],
       codeError: '',
       codeSentAt: 0,
       remaining: 0,
@@ -7580,9 +7580,9 @@ function useExportTenantModal() {
     const computeStats = () => ({ size: state.size, sha: state.sha });
 
     const verifyAndBuild = async () => {
-      const code = state.codeInput.join('');
-      if (code.length !== 6) { state.codeError = tr('tenant.558bd4'); render(); return; }
-      if (!/^\d{6}$/.test(code)) { state.codeError = tr('tenant.1d7257'); render(); return; }
+      const code = state.codeInput.join('').trim().toUpperCase();
+      if (code.length !== 8) { state.codeError = tr('tenant.558bd4'); render(); return; }
+      if (!/^[A-Z0-9]{8}$/.test(code)) { state.codeError = tr('tenant.1d7257'); render(); return; }
       state.codeError = '';
       render();
       try {
@@ -7595,24 +7595,24 @@ function useExportTenantModal() {
         render();
         recomputeStats();
       } catch (e) {
-        state.codeError = (e.status === 403 ? tr('tenant.ef0f97') : (tr('tenant.2e0d8c') + (e.message || e)));
+        state.codeError = (e.message || (e.status === 403 ? tr('tenant.ef0f97') : (tr('tenant.2e0d8c') + e)));
         render();
       }
     };
 
-    // 6 格 OTP 输入
+    // 8 格大写字母+数字验证码输入
     const OtpInput = () => (
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 8 }}>
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginBottom: 8 }}>
         {state.codeInput.map((d, i) => (
           <input key={i}
             id={`otp-${i}`}
-            type="text" inputMode="numeric" maxLength={1}
+            type="text" maxLength={1}
             value={d}
             onChange={e => {
-              const v = e.target.value.replace(/\D/g, '').slice(-1);
+              const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(-1);
               state.codeInput[i] = v;
               state.codeError = '';
-              if (v && i < 5) document.getElementById(`otp-${i + 1}`)?.focus();
+              if (v && i < 7) document.getElementById(`otp-${i + 1}`)?.focus();
               render();
             }}
             onKeyDown={e => {
@@ -7622,17 +7622,17 @@ function useExportTenantModal() {
               if (e.key === 'Enter' && state.codeInput.every(x => x)) verifyAndBuild();
             }}
             onPaste={e => {
-              const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+              const paste = e.clipboardData.getData('text').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
               if (paste) {
                 e.preventDefault();
                 paste.split('').forEach((c, j) => { state.codeInput[j] = c; });
                 render();
-                document.getElementById(`otp-${Math.min(5, paste.length - 1)}`)?.focus();
+                document.getElementById(`otp-${Math.min(7, paste.length - 1)}`)?.focus();
               }
             }}
             style={{
-              width: 42, height: 50,
-              textAlign: 'center', fontSize: 20, fontWeight: 600,
+              width: 38, height: 48,
+              textAlign: 'center', fontSize: 18, fontWeight: 600, textTransform: 'uppercase',
               background: 'var(--bg-2)',
               color: 'var(--fg-0)',
               border: `1.5px solid ${state.codeError ? 'var(--danger)' : d ? 'var(--accent)' : 'var(--border)'}`,

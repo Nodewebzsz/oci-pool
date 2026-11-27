@@ -2,8 +2,8 @@
 
 # ================= 动态配置区域 =================
 # 这些变量将由 Java 后端动态替换
-SERVER_URL="{{SERVER_URL}}"
-TOKEN="{{TOKEN}}"
+SERVER_URL={{SERVER_URL}}
+TOKEN={{TOKEN}}
 INTERVAL={{INTERVAL}}
 DEBUG=false
 # ===========================================

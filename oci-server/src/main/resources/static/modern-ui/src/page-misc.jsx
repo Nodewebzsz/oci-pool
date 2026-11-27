@@ -3108,24 +3108,48 @@ function ProxyPoolPage() {
 //     │  CPU/内存/硬盘 进度 + 网络 + SSH/安装/卸载) │
 //     └────────────────────────────────────────────┘
 // ═══════════════════════════════════════════════════════════════════════
-function ResListPage() {
+function ResListPage({ density = 'compact' }) {
   const { t: tr, lang } = useT();
   const shell = useShell();
 
-  // ─── 真实 OCI 实例 → VPS 卡片数据 ──────────────────────
-  // ─── 真实 OCI 实例 → VPS 卡片数据 ───────
-  const buildCards = (instances) => {
+  const metricsByTokenRef = React.useRef({});
+
+  const formatNetSpeed = (bytesPerSec) => {
+    const val = Number(bytesPerSec) || 0;
+    if (val <= 0) return '0 B/s';
+    if (val < 1024) return `${Math.round(val)} B/s`;
+    if (val < 1024 * 1024) return `${(val / 1024).toFixed(1)} KB/s`;
+    return `${(val / (1024 * 1024)).toFixed(2)} MB/s`;
+  };
+
+  const parseHeartbeatMs = (raw) => {
+    if (raw == null || raw === '') return 0;
+    if (typeof raw === 'number' && Number.isFinite(raw)) {
+      return raw < 1e12 ? Math.round(raw * 1000) : Math.round(raw);
+    }
+    const num = Number(raw);
+    if (Number.isFinite(num) && num > 0) {
+      return num < 1e12 ? Math.round(num * 1000) : Math.round(num);
+    }
+    const parsed = Date.parse(String(raw));
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const buildCards = React.useCallback((instances) => {
+    const list = Array.isArray(instances) ? instances : [];
     const regionMap = Object.fromEntries((REGIONS || []).map(r => [r.code, r]));
-    return instances.map((inst, i) => {
+    return list.map((inst, i) => {
       const region = regionMap[inst.region];
       const uid = i + 1;
-      const seed = uid * 31 + 7;
-      const rand = (n) => { const x = Math.sin(seed * n) * 10000; return x - Math.floor(x); };
       const online = inst.status === 'running';
-      const monitorInstalled = online && rand(5) > 0.4;
+      const instanceId = inst.ocid || `ocid1.instance..${btoa(String(uid) + inst.name).slice(0, 16).toLowerCase()}`;
+      const live = metricsByTokenRef.current[instanceId];
+      const monitorInstalled = !!inst.monitorInstalled || !!(live && live.hasLiveMetrics);
+      const lastBeatMs = (live && live.lastBeatMs) || inst.lastHeartbeatMs || 0;
       return {
         id: uid,
-        instanceId: `ocid1.instance..${btoa(String(uid) + inst.name).slice(0, 16).toLowerCase()}`,
+        dbId: inst.id ? String(inst.id) : '',
+        instanceId,
         cloudType: 1,
         publicIp: getInstanceIp(inst),
         regionCode: inst.region,
@@ -3139,44 +3163,169 @@ function ResListPage() {
         tenantCustom: inst.tenantCustom || '',
         online,
         monitorInstalled,
-        cpuPct: online ? Math.round(rand(11) * 90) : 0,
-        memPct: online ? Math.round(20 + rand(13) * 70) : 0,
-        diskPct: online ? Math.round(15 + rand(17) * 60) : 0,
-        netRx: online ? (rand(19) * 5).toFixed(2) + ' MB/s' : '0 B/s',
-        netTx: online ? (rand(23) * 3).toFixed(2) + ' MB/s' : '0 B/s',
+        hasLiveMetrics: !!(live && live.hasLiveMetrics),
+        lastBeatMs,
+        monitorWarning: false,
+        cpuPct: live ? live.cpuPct : 0,
+        memPct: live ? live.memPct : 0,
+        diskPct: live ? live.diskPct : 0,
+        netRx: live ? live.netRx : '0 B/s',
+        netTx: live ? live.netTx : '0 B/s',
+        load: live ? live.load : '',
         latency: null,
         latencyStatus: null,
       };
     });
-  };
+  }, [lang]);
 
   const [cards, setCards] = React.useState([]);
   const [vpsLoading, setVpsLoading] = React.useState(true);
+  const [nqOverview, setNqOverview] = React.useState(null);
+  const [agentBusyId, setAgentBusyId] = React.useState('');
+
+  const loadNqOverview = React.useCallback(async () => {
+    try {
+      const res = await window.ociServices.system.networkQualityOverview();
+      if (res && res.success && res.data) {
+        setNqOverview(res.data);
+      }
+    } catch (_) {}
+  }, []);
+
+  const reloadAll = React.useCallback(async (showLoading = false) => {
+    if (showLoading) setVpsLoading(true);
+    const normInst = (i) => ({
+      id: i.id,
+      ocid: i.instanceId || '',
+      monitorInstalled: !!i.monitorInstalled,
+      lastHeartbeatMs: parseHeartbeatMs(i.lastHeartbeat),
+      tenantId: String(i.tenantIdStr || i.tenantId || ''),
+      name: i.displayName || '',
+      status: (i.state || '').toLowerCase(),
+      ocpu: i.ocpus,
+      memory: i.memoryInGBs,
+      disk: i.bootVolumeSizeInGBs,
+      publicIp: i.publicIps || '',
+      architecture: i.architecture,
+      region: i.regionCode || i.regionName || '',
+      tenantName: i.tenancyName || i.userName || '',
+    });
+    try {
+      const pageData = await window.ociApi.getPage('/oci/list/json', { page: 0, size: 500 });
+      setCards(buildCards((pageData.content || []).map(normInst)));
+    } catch (_) {
+      setCards([]);
+    }
+    await loadNqOverview();
+    if (showLoading) setVpsLoading(false);
+  }, [buildCards, loadNqOverview]);
+
+  React.useEffect(() => {
+    reloadAll(true);
+  }, [reloadAll]);
+
   React.useEffect(() => {
     let alive = true;
-    setVpsLoading(true);
-    (async () => {
-      const normInst = (i) => ({
-        id: i.id,
-        tenantId: String(i.tenantIdStr || i.tenantId || ''),
-        name: i.displayName || '',
-        status: (i.state || '').toLowerCase(),
-        ocpu: i.ocpus,
-        memory: i.memoryInGBs,
-        disk: i.bootVolumeSizeInGBs,
-        publicIp: i.publicIps || '',
-        architecture: i.architecture,
-        region: i.regionCode || i.regionName || '',
-        tenantName: i.tenancyName || i.userName || '',
-      });
+    let ws = null;
+    let reconnectTimer = null;
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${proto}//${window.location.host}/ws/monitor`;
+
+    const connect = () => {
+      if (!alive) return;
       try {
-        const pageData = await window.ociApi.getPage('/oci/list/json', { page: 0, size: 500 });
-        if (alive) setCards(buildCards((pageData.content || []).map(normInst)));
-      } catch (_) { if (alive) setCards([]); }
-      if (alive) setVpsLoading(false);
-    })();
-    return () => { alive = false; };
-  }, [lang]);
+        ws = new WebSocket(wsUrl);
+      } catch (_) {
+        reconnectTimer = setTimeout(connect, 3000);
+        return;
+      }
+      ws.onmessage = (evt) => {
+        if (!alive || !evt || !evt.data) return;
+        try {
+          const msg = JSON.parse(evt.data);
+          const token = msg && msg.token ? String(msg.token) : '';
+          if (!token) return;
+          const cpuUsage = msg.cpu && msg.cpu.usage != null ? Math.max(0, Math.min(100, Math.round(Number(msg.cpu.usage)))) : 0;
+          const memTotal = msg.memory && Number(msg.memory.total) > 0 ? Number(msg.memory.total) : 0;
+          const memUsed = msg.memory && Number(msg.memory.used) >= 0 ? Number(msg.memory.used) : 0;
+          const memPct = memTotal > 0 ? Math.max(0, Math.min(100, Math.round((memUsed / memTotal) * 100))) : 0;
+          const diskTotal = msg.disk && Number(msg.disk.total) > 0 ? Number(msg.disk.total) : 0;
+          const diskUsed = msg.disk && Number(msg.disk.used) >= 0 ? Number(msg.disk.used) : 0;
+          const diskPct = diskTotal > 0 ? Math.max(0, Math.min(100, Math.round((diskUsed / diskTotal) * 100))) : 0;
+          const rxRate = msg.network ? (msg.network.rx_rate ?? msg.network.rxRate ?? 0) : 0;
+          const txRate = msg.network ? (msg.network.tx_rate ?? msg.network.txRate ?? 0) : 0;
+          const loadVal = msg.cpu && Array.isArray(msg.cpu.load) && msg.cpu.load.length > 0 ? String(msg.cpu.load[0]) : '';
+          const nextMetrics = {
+            hasLiveMetrics: true,
+            lastBeatMs: Date.now(),
+            cpuPct: cpuUsage,
+            memPct,
+            diskPct,
+            netRx: formatNetSpeed(rxRate),
+            netTx: formatNetSpeed(txRate),
+            load: loadVal,
+          };
+          metricsByTokenRef.current[token] = nextMetrics;
+          setCards(prev => prev.map(card => card.instanceId === token
+            ? { ...card, ...nextMetrics, monitorInstalled: true, monitorWarning: false }
+            : card));
+        } catch (_) {}
+      };
+      ws.onclose = () => {
+        if (!alive) return;
+        reconnectTimer = setTimeout(connect, 3000);
+      };
+      ws.onerror = () => {
+        try { ws && ws.close(); } catch (_) {}
+      };
+    };
+
+    connect();
+    const watchdog = setInterval(() => {
+      const now = Date.now();
+      setCards(prev => {
+        let changed = false;
+        const next = prev.map(card => {
+          const shouldWarn = Boolean(card.online && card.monitorInstalled && card.lastBeatMs > 0 && (now - card.lastBeatMs > 12000));
+          if (card.monitorWarning !== shouldWarn) {
+            changed = true;
+            return { ...card, monitorWarning: shouldWarn };
+          }
+          return card;
+        });
+        return changed ? next : prev;
+      });
+    }, 3000);
+
+    return () => {
+      alive = false;
+      clearInterval(watchdog);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      try { ws && ws.close(); } catch (_) {}
+    };
+  }, []);
+
+  const agentMap = React.useMemo(() => {
+    const map = {};
+    ((nqOverview && nqOverview.agents) || []).forEach(a => { map[String(a.instanceId || a.id)] = a; });
+    return map;
+  }, [nqOverview]);
+
+  const taskMap = React.useMemo(() => {
+    const map = {};
+    ((nqOverview && nqOverview.tasks) || []).forEach(t => { map[String(t.id)] = t; });
+    return map;
+  }, [nqOverview]);
+
+  const samplesByInstance = React.useMemo(() => {
+    const map = {};
+    ((nqOverview && nqOverview.latest) || []).forEach(s => {
+      const k = String(s.instanceId);
+      if (!map[k]) map[k] = [];
+      map[k].push(s);
+    });
+    return map;
+  }, [nqOverview]);
 
   // ─── UI 状态 ───────────────────────────
   const [search, setSearch] = React.useState('');
@@ -3410,11 +3559,59 @@ function ResListPage() {
                 padding: 4, zIndex: 30,
               }}>
                 {[
-                  { icon: 'play',        color: 'var(--accent)', label: tr('pageMisc.defc17'), onClick: () => shell.showToast(tr('pageMisc.280f08'), { kind: 'success' }) },
-                  { icon: 'square',      color: 'var(--danger)', label: tr('pageMisc.4d47c3'), onClick: () => shell.showToast(tr('pageMisc.427221'), { kind: 'warn' }) },
-                  { icon: 'target',      color: 'var(--info)',   label: tr('pageMisc.a86d27'), onClick: runLatencyTest },
+                  {
+                    icon: 'play',
+                    color: 'var(--accent)',
+                    label: tr('pageMisc.defc17'),
+                    onClick: async () => {
+                      try {
+                        const res = await window.ociServices.system.vpsEnablePing();
+                        if (res && res.success === false) throw new Error(res.message || '开启自动 Ping 失败');
+                        shell.showToast(res?.message || tr('pageMisc.280f08'), { kind: 'success' });
+                      } catch (e) {
+                        shell.showToast(e.message || '开启自动 Ping 失败', { kind: 'error' });
+                      }
+                    },
+                  },
+                  {
+                    icon: 'square',
+                    color: 'var(--danger)',
+                    label: tr('pageMisc.4d47c3'),
+                    onClick: async () => {
+                      try {
+                        const res = await window.ociServices.system.vpsDisablePing();
+                        if (res && res.success === false) throw new Error(res.message || '停止自动 Ping 失败');
+                        shell.showToast(res?.message || tr('pageMisc.427221'), { kind: 'warn' });
+                      } catch (e) {
+                        shell.showToast(e.message || '停止自动 Ping 失败', { kind: 'error' });
+                      }
+                    },
+                  },
+                  {
+                    icon: 'target',
+                    color: 'var(--info)',
+                    label: tr('pageMisc.a86d27'),
+                    onClick: async () => {
+                      try {
+                        const res = await window.ociServices.system.vpsManualPing();
+                        if (res && res.success === false) throw new Error(res.message || '手动 Ping 检测失败');
+                        shell.showToast(res?.message || 'Ping 检测已下发', { kind: 'info' });
+                        setTimeout(() => reloadAll(false), 1500);
+                      } catch (e) {
+                        shell.showToast(e.message || '手动 Ping 检测失败', { kind: 'error' });
+                      }
+                    },
+                  },
                   { divider: true },
-                  { icon: 'refresh-cw',  color: 'var(--fg-2)',   label: tr('pageMisc.39e107'), onClick: () => { setCards(buildCards()); shell.showToast(tr('pageMisc.6d8718'), { kind: 'info' }); } },
+                  {
+                    icon: 'refresh-cw',
+                    color: 'var(--fg-2)',
+                    label: tr('pageMisc.39e107'),
+                    onClick: async () => {
+                      await reloadAll(false);
+                      shell.showToast(tr('pageMisc.6d8718'), { kind: 'info' });
+                    },
+                  },
                 ].map((item, i) => item.divider ? (
                   <div key={i} style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
                 ) : (
@@ -3531,7 +3728,7 @@ function ResListPage() {
                                   flexShrink: 1, minWidth: 0,
                                 }}>
                                 <Icon name="user" size={9} style={{ color: showTenant ? 'var(--info)' : 'var(--fg-3)', flexShrink: 0 }} />
-                                <span className="mono" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{showTenant ? c.tenancyName.replace('***', 'user') : c.tenancyName}</span>
+                                <span className="mono" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{showTenant ? c.tenancyName : maskTenant(c.tenancyName)}</span>
                               </span>
                             )}
                             {/* 延迟 */}
@@ -3603,7 +3800,7 @@ function ResListPage() {
                     </div>
 
                     {/* 网络速率 */}
-                    <div style={{ display: 'flex', gap: 12, fontSize: 10.5, color: 'var(--fg-2)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 10.5, color: 'var(--fg-2)' }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                         <Icon name="arrow-down" size={10} style={{ color: 'var(--accent)' }} />
                         <span className="num mono">{c.netRx}</span>
@@ -3612,10 +3809,58 @@ function ResListPage() {
                         <Icon name="arrow-up" size={10} style={{ color: 'var(--orange)' }} />
                         <span className="num mono">{c.netTx}</span>
                       </span>
+                      <div style={{ flex: 1 }} />
+                      {c.monitorWarning ? (
+                        <span style={{ fontSize: 10, color: 'var(--orange)', fontWeight: 600 }}>心跳超时</span>
+                      ) : !c.hasLiveMetrics && c.online ? (
+                        <span style={{ fontSize: 10, color: 'var(--fg-3)' }}>{c.monitorInstalled ? '等待上报' : '未装探针'}</span>
+                      ) : null}
                     </div>
                   </div>
 
                   {/* Card actions */}
+                  {(() => {
+                    const agent = c.dbId ? agentMap[c.dbId] : null;
+                    const latestList = (c.dbId ? samplesByInstance[c.dbId] : null) || [];
+                    const qStatus = agent ? agent.qualityStatus : (c.monitorInstalled ? 'upgrade_required' : 'not_installed');
+                    if (!agent && latestList.length === 0) return null;
+                    const stTone = qStatus === 'online'
+                      ? { fg: 'var(--success)', bg: 'var(--success-soft)' }
+                      : qStatus === 'offline'
+                      ? { fg: 'var(--danger)', bg: 'var(--danger-soft)' }
+                      : qStatus === 'upgrade_required'
+                      ? { fg: 'var(--orange)', bg: 'var(--orange-soft)' }
+                      : { fg: 'var(--fg-2)', bg: 'var(--bg-3)' };
+                    const stLabel = qStatus === 'online' ? tr('nq.statusOnline') : qStatus === 'offline' ? tr('nq.statusOffline') : qStatus === 'upgrade_required' ? tr('nq.statusUpgrade') : tr('nq.statusNotInstalled');
+                    return (
+                      <div style={{ padding: '6px 14px', borderTop: '1px dashed var(--border)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, background: 'var(--bg-1)' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 600, color: stTone.fg, padding: '2px 7px', borderRadius: 999, background: stTone.bg }}>
+                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: stTone.fg }} />
+                          {stLabel}
+                        </span>
+                        {latestList.slice(0, 3).map((s, idx) => {
+                          const tk = taskMap[String(s.taskId)];
+                          const loss = s.attempts > 0 ? Math.round(((s.attempts - s.successful) / s.attempts) * 100) : null;
+                          const tone = s.status === 'success'
+                            ? { fg: 'var(--success)', bg: 'var(--success-soft)' }
+                            : s.status === 'partial'
+                            ? { fg: 'var(--orange)', bg: 'var(--orange-soft)' }
+                            : { fg: 'var(--danger)', bg: 'var(--danger-soft)' };
+                          return (
+                            <button key={idx} type="button"
+                              onClick={() => tk && openNetworkQualityHistoryModal(shell, { instanceId: c.dbId, instanceName: c.tenancyName || c.publicIp, task: tk, tr, density })}
+                              style={{
+                                padding: '2px 8px', borderRadius: 'var(--button-radius)', fontSize: 10.5,
+                                fontFamily: 'var(--font-mono)', cursor: tk ? 'pointer' : 'default',
+                                border: '1px solid var(--border)', background: tone.bg, color: tone.fg, fontWeight: 600,
+                              }}>
+                              {(tk ? tk.name : ('#' + s.taskId))}: {s.avgMs != null ? `${Number(s.avgMs).toFixed(0)}ms` : s.status}{loss != null && loss > 0 ? ` · ${loss}%` : ''}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                   <div style={{
                     display: 'flex', gap: 6,
                     padding: '8px 14px',
@@ -3632,41 +3877,74 @@ function ResListPage() {
                       }}>
                       <Icon name="terminal" size={10} />SSH
                     </button>
-                    {c.online && !c.monitorInstalled && (
-                      <button onClick={() => {
-                        setCards(prev => prev.map(x => x.id === c.id ? { ...x, monitorInstalled: true } : x));
-                        shell.showToast(tr('pageMisc.24361c').replace('{0}',c.publicIp), { kind: 'success' });
-                      }}
-                        style={{
-                          padding: '4px 10px', background: 'var(--info)',
-                          color: 'white', border: 'none',
-                          borderRadius: 3, cursor: 'pointer',
-                          fontSize: 11, fontFamily: 'inherit', fontWeight: 500,
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                        }}>
-                        <Icon name="download" size={10} />{tr('pageMisc.76907a')}
-                      </button>
-                    )}
-                    {c.monitorInstalled && (
-                      <button onClick={() => shell.openConfirm({
-                        title: tr('pageMisc.1f2ea6').replace('{0}',c.publicIp),
-                        body: <div>{tr('pageMisc.e7357c')}</div>,
-                        danger: true, confirmLabel: tr('pageMisc.81824c'),
-                        onConfirm: () => {
-                          setCards(prev => prev.map(x => x.id === c.id ? { ...x, monitorInstalled: false } : x));
-                          shell.showToast(tr('pageMisc.f45226').replace('{0}',c.publicIp), { kind: 'warn' });
-                        },
-                      })}
-                        style={{
-                          padding: '4px 10px', background: 'var(--bg-1)',
-                          color: 'var(--danger)', border: '1px solid var(--border)',
-                          borderRadius: 3, cursor: 'pointer',
-                          fontSize: 11, fontFamily: 'inherit', fontWeight: 500,
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                        }}>
-                        <Icon name="trash-2" size={10} />{tr('pageMisc.81824c')}
-                      </button>
-                    )}
+                    {(() => {
+                      const agent = c.dbId ? agentMap[c.dbId] : null;
+                      const installed = agent ? !!agent.monitorInstalled : c.monitorInstalled;
+                      const needsUpgrade = agent && agent.qualityStatus === 'upgrade_required';
+                      const busy = agentBusyId === c.dbId;
+                      return (
+                        <>
+                          {c.online && (!installed || needsUpgrade) && (
+                            <button disabled={busy || !c.dbId} onClick={async () => {
+                              if (!c.dbId) return;
+                              setAgentBusyId(c.dbId);
+                              try {
+                                const res = await window.ociServices.system.monitorInstallAgent(c.dbId);
+                                if (res && res.success === false) throw new Error(res.message || '安装失败');
+                                setCards(prev => prev.map(x => x.id === c.id ? { ...x, monitorInstalled: true } : x));
+                                shell.showToast(res?.message || tr('pageMisc.24361c').replace('{0}', c.publicIp), { kind: 'success' });
+                                await loadNqOverview();
+                              } catch (e) {
+                                shell.showToast(e.message || '探针安装失败', { kind: 'error' });
+                              } finally {
+                                setAgentBusyId('');
+                              }
+                            }}
+                              style={{
+                                padding: '4px 10px', background: needsUpgrade ? 'var(--orange)' : 'var(--info)',
+                                color: '#ffffff', border: 'none',
+                                borderRadius: 'var(--button-radius)', cursor: busy ? 'wait' : 'pointer',
+                                fontSize: 11, fontFamily: 'inherit', fontWeight: 500,
+                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                              }}>
+                              <Icon name={busy ? 'loader-2' : 'download'} size={10} className={busy ? 'spin' : ''} />
+                              {needsUpgrade ? tr('nq.upgradeAgent') : tr('pageMisc.76907a')}
+                            </button>
+                          )}
+                          {installed && (
+                            <button disabled={busy || !c.dbId} onClick={() => shell.openConfirm({
+                              title: tr('pageMisc.1f2ea6').replace('{0}', c.publicIp),
+                              body: <div>{tr('pageMisc.e7357c')}</div>,
+                              danger: true, confirmLabel: tr('pageMisc.81824c'),
+                              onConfirm: async () => {
+                                if (!c.dbId) return;
+                                setAgentBusyId(c.dbId);
+                                try {
+                                  const res = await window.ociServices.system.monitorUninstallAgent(c.dbId);
+                                  if (res && res.success === false) throw new Error(res.message || '卸载失败');
+                                  setCards(prev => prev.map(x => x.id === c.id ? { ...x, monitorInstalled: false } : x));
+                                  shell.showToast(res?.message || tr('pageMisc.f45226').replace('{0}', c.publicIp), { kind: 'warn' });
+                                  await loadNqOverview();
+                                } catch (e) {
+                                  shell.showToast(e.message || '卸载失败', { kind: 'error' });
+                                } finally {
+                                  setAgentBusyId('');
+                                }
+                              },
+                            })}
+                              style={{
+                                padding: '4px 10px', background: 'var(--bg-1)',
+                                color: 'var(--danger)', border: '1px solid var(--border)',
+                                borderRadius: 'var(--button-radius)', cursor: busy ? 'wait' : 'pointer',
+                                fontSize: 11, fontFamily: 'inherit', fontWeight: 500,
+                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                              }}>
+                              <Icon name="trash-2" size={10} />{tr('pageMisc.81824c')}
+                            </button>
+                          )}
+                        </>
+                      );
+                    })()}
                     <div style={{ flex: 1 }} />
                     <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', alignSelf: 'center' }} title={c.instanceId}>
                       {c.instanceId.slice(-8)}
@@ -3723,16 +4001,17 @@ function NotifyPage() {
 // ═══════════════════════════════════════════════════════════════════════
 
 // ─── 通用小组件:设置卡片 ────────────────────────
-function SettingsCard({ title, icon, iconColor = 'var(--fg-2)', actions, children, footer }) {
+function SettingsCard({ title, icon, iconColor = 'var(--fg-2)', actions, children, footer, collapsed = false, style = {} }) {
   return (
     <div style={{
       background: 'var(--bg-1)', border: '1px solid var(--border)',
-      borderRadius: 8, display: 'flex', flexDirection: 'column',
+      borderRadius: 'var(--radius)', display: 'flex', flexDirection: 'column',
+      ...style,
     }}>
       <div style={{
-        padding: '10px 14px', borderBottom: '1px solid var(--border)', background: 'var(--bg-2)',
+        padding: '10px 14px', borderBottom: collapsed ? 'none' : '1px solid var(--border)', background: 'var(--bg-2)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        borderRadius: '7px 7px 0 0',
+        borderRadius: collapsed ? 'var(--radius)' : '7px 7px 0 0',
       }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-0)', display: 'flex', alignItems: 'center', gap: 6 }}>
           {icon && <Icon name={icon} size={13} style={{ color: iconColor }} />}
@@ -3740,8 +4019,8 @@ function SettingsCard({ title, icon, iconColor = 'var(--fg-2)', actions, childre
         </div>
         {actions}
       </div>
-      <div style={{ padding: 14, flex: 1, display: 'flex', flexDirection: 'column' }}>{children}</div>
-      {footer && (
+      {!collapsed && <div style={{ padding: 14, flex: 1, display: 'flex', flexDirection: 'column' }}>{children}</div>}
+      {!collapsed && footer && (
         <div style={{
           padding: '10px 14px', borderTop: '1px solid var(--border)', background: 'var(--bg-2)',
           display: 'flex', gap: 8, justifyContent: 'flex-end',
@@ -3895,9 +4174,656 @@ function SysIpQualityCarrierCard({ name, subtitle, flag, config, setter, iconCol
   );
 }
 
-function SysIpQualityPage() {
+// ─── 独立网络质量探针历史趋势弹窗与工作台 (P1.1) ──────────────────────
+function NetworkQualityHistoryBody({ instanceId, task, tr, density = 'compact' }) {
+  const [hours, setHours] = React.useState(24);
+  const [loading, setLoading] = React.useState(true);
+  const [data, setData] = React.useState(null);
+  const [error, setError] = React.useState('');
+
+  const load = React.useCallback(async (h) => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await window.ociServices.system.networkQualityHistory({
+        instanceId,
+        taskId: task.id,
+        revision: task.version,
+        hours: h,
+      });
+      if (!res || !res.success) throw new Error(res?.message || '加载失败');
+      setData(res.data || null);
+    } catch (e) {
+      setError(e.message || '加载历史数据失败');
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [instanceId, task.id, task.version]);
+
+  React.useEffect(() => { load(hours); }, [hours, load]);
+
+  const points = (data && data.points) || [];
+  const stats = (data && data.stats) || {};
+  const validPoints = points.filter(p => typeof p.avgMs === 'number');
+  const maxMs = validPoints.length ? Math.max(...validPoints.map(p => p.avgMs), 10) : 100;
+  const svgW = 620, svgH = 150, pad = 20;
+  const poly = validPoints.length > 1
+    ? validPoints.map((p, idx) => {
+        const x = pad + (idx / (validPoints.length - 1)) * (svgW - pad * 2);
+        const y = svgH - pad - (p.avgMs / maxMs) * (svgH - pad * 2);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(' ')
+    : '';
+  const areaPoly = poly ? `${pad},${svgH - pad} ${poly} ${svgW - pad},${svgH - pad}` : '';
+  const rowPy = density === 'comfortable' ? 10 : 7;
+
+  const fmtTime = (ms) => ms ? new Date(ms).toLocaleString() : '—';
+
+  return (
+    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'inline-flex', gap: 4, background: 'var(--bg-2)', padding: 3, borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+          {[1, 6, 24, 168].map(h => (
+            <button key={h} type="button" onClick={() => setHours(h)}
+              style={{
+                padding: '4px 10px', borderRadius: 'var(--button-radius)', border: 'none', cursor: 'pointer',
+                fontFamily: 'inherit', fontSize: 11.5, fontWeight: 600, transition: 'all 120ms',
+                background: hours === h ? 'var(--accent)' : 'transparent',
+                color: hours === h ? 'var(--accent-fg)' : 'var(--fg-2)',
+              }}>
+              {h === 168 ? '7d' : `${h}h`}
+            </button>
+          ))}
+        </div>
+        <div style={{ fontSize: 11.5, color: 'var(--fg-3)' }} className="mono">
+          {task.type?.toUpperCase()} · {task.target}
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ padding: 32, textAlign: 'center', color: 'var(--fg-3)', fontSize: 12 }}>
+          <Icon name="loader-2" size={16} className="spin" style={{ verticalAlign: 'middle', marginRight: 6 }} />Loading…
+        </div>
+      ) : error ? (
+        <div style={{ padding: 14, borderRadius: 'var(--radius)', background: 'var(--danger-soft)', border: '1px solid var(--danger)', color: 'var(--danger)', fontSize: 12 }}>
+          {error}
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+            {[
+              { label: tr('nq.avgMs'), value: stats.avgMs != null ? `${Number(stats.avgMs).toFixed(1)} ms` : '—', color: 'var(--accent)' },
+              { label: 'Min / Max', value: stats.minMs != null ? `${Number(stats.minMs).toFixed(0)} / ${Number(stats.maxMs).toFixed(0)} ms` : '—', color: 'var(--info)' },
+              { label: tr('nq.loss'), value: stats.lossPercent != null ? `${Number(stats.lossPercent).toFixed(1)}%` : '—', color: (stats.lossPercent || 0) > 5 ? 'var(--danger)' : 'var(--success)' },
+              { label: tr('nq.samples'), value: `${stats.count || 0}`, color: 'var(--fg-0)' },
+            ].map((k, i) => (
+              <div key={i} style={{ padding: '10px 12px', borderRadius: 'var(--radius)', background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 4 }}>{k.label}</div>
+                <div className="mono" style={{ fontSize: 15, fontWeight: 700, color: k.color }}>{k.value}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 10 }}>
+            {validPoints.length > 1 ? (
+              <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{ width: '100%', height: 150, display: 'block' }}>
+                <line x1={pad} y1={svgH - pad} x2={svgW - pad} y2={svgH - pad} stroke="var(--border)" strokeWidth="1" />
+                <line x1={pad} y1={pad} x2={svgW - pad} y2={pad} stroke="var(--border)" strokeDasharray="3 3" strokeWidth="1" />
+                <polygon fill="var(--accent)" fillOpacity="0.14" points={areaPoly} />
+                <polyline fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={poly} />
+                <text x={pad} y={pad - 5} fill="var(--fg-3)" fontSize="10">{maxMs.toFixed(0)} ms</text>
+                <text x={pad} y={svgH - 5} fill="var(--fg-3)" fontSize="10">0 ms</text>
+              </svg>
+            ) : (
+              <div style={{ padding: 24, textAlign: 'center', fontSize: 12, color: 'var(--fg-3)' }}>
+                {tr('nq.noSample')}
+              </div>
+            )}
+          </div>
+
+          <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+            {points.length === 0 ? (
+              <EmptyState icon="activity" title={tr('nq.noSample')} />
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-2)', color: 'var(--fg-3)', textAlign: 'left' }}>
+                    <th style={{ padding: `${rowPy}px 10px`, fontWeight: 600 }}>时间</th>
+                    <th style={{ padding: `${rowPy}px 10px`, fontWeight: 600 }}>状态</th>
+                    <th style={{ padding: `${rowPy}px 10px`, fontWeight: 600 }}>Avg / Min / Max</th>
+                    <th style={{ padding: `${rowPy}px 10px`, fontWeight: 600 }}>成功/总数</th>
+                    <th style={{ padding: `${rowPy}px 10px`, fontWeight: 600 }}>备注</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {points.slice().reverse().slice(0, 50).map((p, idx) => (
+                    <tr key={idx} className="proxy-pool-row" style={{ borderTop: '1px solid var(--border)' }}>
+                      <td className="mono" style={{ padding: `${rowPy}px 10px`, color: 'var(--fg-2)' }}>{fmtTime(p.updatedAt)}</td>
+                      <td style={{ padding: `${rowPy}px 10px` }}>
+                        <StatusPill status={p.status === 'success' ? 'success' : p.status === 'partial' ? 'warning' : 'danger'} label={p.status} size="sm" />
+                      </td>
+                      <td className="mono" style={{ padding: `${rowPy}px 10px`, color: 'var(--fg-0)' }}>
+                        {p.avgMs != null ? `${Number(p.avgMs).toFixed(1)} / ${Number(p.minMs).toFixed(1)} / ${Number(p.maxMs).toFixed(1)} ms` : '—'}
+                      </td>
+                      <td className="mono" style={{ padding: `${rowPy}px 10px`, color: 'var(--fg-2)' }}>{p.successful ?? 0}/{p.attempts ?? 0}</td>
+                      <td style={{ padding: `${rowPy}px 10px`, color: 'var(--fg-3)' }}>{p.errorMessage || (p.httpStatus ? `HTTP ${p.httpStatus}` : '—')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function openNetworkQualityHistoryModal(shell, { instanceId, instanceName, task, tr, density = 'compact' }) {
+  shell.openModal({
+    title: `${task.name} · ${tr('nq.history')}`,
+    subtitle: `${instanceName || ('#' + instanceId)} · ${task.type?.toUpperCase()} ${task.target}`,
+    icon: 'activity',
+    iconColor: 'var(--accent)',
+    size: 'lg',
+    body: <NetworkQualityHistoryBody instanceId={instanceId} task={task} tr={tr} density={density} />,
+    footer: <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('common.close') || '关闭'}</Button>,
+  });
+}
+
+function NetworkQualityTaskForm({ existing, agents, onSave, onCancel, tr }) {
+  const [name, setName] = React.useState(existing?.name || '');
+  const [operator, setOperator] = React.useState(existing?.operator || 'telecom');
+  const [region, setRegion] = React.useState(existing?.region || '');
+  const [type, setType] = React.useState(existing?.type || 'tcp');
+  const [target, setTarget] = React.useState(existing?.target || '');
+  const [intervalSeconds, setIntervalSeconds] = React.useState(existing?.intervalSeconds || 60);
+  const [sampleCount, setSampleCount] = React.useState(existing?.sampleCount || 3);
+  const [enabled, setEnabled] = React.useState(existing ? !!existing.enabled : true);
+  const [selectedIds, setSelectedIds] = React.useState(() => {
+    if (existing && Array.isArray(existing.instanceIds)) return existing.instanceIds.map(String);
+    return agents.filter(a => a.qualityStatus === 'online' || a.monitorInstalled).map(a => String(a.instanceId || a.id));
+  });
+  const [saving, setSaving] = React.useState(false);
+
+  const toggleId = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const handleSubmit = async () => {
+    if (!name.trim() || !target.trim() || selectedIds.length === 0) return;
+    setSaving(true);
+    try {
+      const payload = {
+        name: name.trim(),
+        operator,
+        region: region.trim() || operator,
+        type,
+        target: target.trim(),
+        intervalSeconds: Math.max(30, Math.min(86400, Number(intervalSeconds) || 60)),
+        sampleCount: Math.max(1, Math.min(10, Number(sampleCount) || 3)),
+        enabled,
+        instanceIds: selectedIds,
+      };
+      if (existing) payload.version = String(existing.version);
+      await onSave(payload);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const operatorOptions = [
+    { value: 'telecom', label: tr('nq.opTelecom') },
+    { value: 'unicom', label: tr('nq.opUnicom') },
+    { value: 'mobile', label: tr('nq.opMobile') },
+    { value: 'custom', label: tr('nq.opCustom') },
+  ];
+  const typeOptions = [
+    { value: 'icmp', label: 'ICMP (Ping)' },
+    { value: 'tcp', label: 'TCP (host:port)' },
+    { value: 'http', label: 'HTTP / HTTPS URL' },
+  ];
+
+  return (
+    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <FormRow label="任务名称" required style={{ marginBottom: 0 }}>
+          <TextInput value={name} onChange={setName} placeholder="如：上海电信 TCP" />
+        </FormRow>
+        <FormRow label="运营商分组" style={{ marginBottom: 0 }}>
+          <Select value={operator} onChange={setOperator} options={operatorOptions} width="100%" />
+        </FormRow>
+        <FormRow label="地区标签" style={{ marginBottom: 0 }}>
+          <TextInput value={region} onChange={setRegion} placeholder="如：上海 / 广州 / 东京" />
+        </FormRow>
+        <FormRow label="探测协议" style={{ marginBottom: 0 }}>
+          <Select value={type} onChange={setType} options={typeOptions} width="100%" />
+        </FormRow>
+      </div>
+
+      <FormRow
+        label="探测目标"
+        required
+        hint={type === 'icmp' ? 'IP 或域名' : type === 'tcp' ? 'host:port 例如 1.1.1.1:443' : '完整 http(s):// URL'}
+        style={{ marginBottom: 0 }}
+      >
+        <TextInput
+          mono
+          value={target}
+          onChange={setTarget}
+          placeholder={type === 'icmp' ? '223.5.5.5' : type === 'tcp' ? '1.1.1.1:443' : 'https://www.cloudflare.com/cdn-cgi/trace'}
+        />
+      </FormRow>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, alignItems: 'end' }}>
+        <FormRow label="探测周期 (秒, 30-86400)" style={{ marginBottom: 0 }}>
+          <TextInput type="number" mono allowClear={false} value={String(intervalSeconds)} onChange={setIntervalSeconds} />
+        </FormRow>
+        <FormRow label="单次采样数 (1-10)" style={{ marginBottom: 0 }}>
+          <TextInput type="number" mono allowClear={false} value={String(sampleCount)} onChange={setSampleCount} />
+        </FormRow>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--fg-1)', cursor: 'pointer', height: 32 }}>
+          <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
+          <span>{enabled ? tr('nq.enabled') : tr('nq.paused')}</span>
+        </label>
+      </div>
+
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          <span style={{ fontSize: 11.5, color: 'var(--fg-1)', fontWeight: 500 }}>关联执行探针 ({selectedIds.length}/{agents.length}) <span style={{ color: 'var(--danger)' }}>*</span></span>
+          <div style={{ display: 'inline-flex', gap: 8 }}>
+            <button type="button" onClick={() => setSelectedIds(agents.map(a => String(a.instanceId || a.id)))}
+              style={{ border: 'none', background: 'transparent', color: 'var(--accent)', fontSize: 11, fontFamily: 'inherit', fontWeight: 500, cursor: 'pointer' }}>全选</button>
+            <button type="button" onClick={() => setSelectedIds([])}
+              style={{ border: 'none', background: 'transparent', color: 'var(--fg-3)', fontSize: 11, fontFamily: 'inherit', cursor: 'pointer' }}>清空</button>
+          </div>
+        </div>
+        <div style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 8, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, background: 'var(--bg-2)' }}>
+          {agents.map(a => {
+            const id = String(a.instanceId || a.id);
+            const checked = selectedIds.includes(id);
+            return (
+              <label key={id} style={{
+                display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5,
+                color: checked ? 'var(--fg-0)' : 'var(--fg-1)',
+                cursor: 'pointer', padding: '5px 8px', borderRadius: 'var(--radius-sm)',
+                background: checked ? 'var(--accent-soft)' : 'transparent',
+                border: `1px solid ${checked ? 'var(--accent)' : 'transparent'}`,
+                transition: 'all 120ms',
+              }}>
+                <input type="checkbox" checked={checked} onChange={() => toggleId(id)} style={{ accentColor: 'var(--accent)' }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.displayName || a.publicIps || id}</span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 6, borderTop: '1px solid var(--border)' }}>
+        <Button variant="ghost" size="md" onClick={onCancel}>{tr('common.cancel')}</Button>
+        <Button variant="primary" size="md" loading={saving} disabled={!name.trim() || !target.trim() || selectedIds.length === 0} onClick={handleSubmit}>
+          {existing ? '保存修改' : '创建任务'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function NetworkQualityWorkbench({ overview, loading, onReload, shell, tr, density = 'compact' }) {
+  const [busyAgentId, setBusyAgentId] = React.useState('');
+  const [busyTaskId, setBusyTaskId] = React.useState('');
+  const [agentsCollapsed, setAgentsCollapsed] = React.useState(false);
+  const [showAllAgents, setShowAllAgents] = React.useState(false);
+
+  const agents = (overview && overview.agents) || [];
+  const tasks = (overview && overview.tasks) || [];
+  const latest = (overview && overview.latest) || [];
+  const PREVIEW_LIMIT = 6;
+
+  const sortedAgents = React.useMemo(() => {
+    const rank = (status) => status === 'online' ? 0 : status === 'upgrade_required' ? 1 : status === 'offline' ? 2 : 3;
+    return agents.slice().sort((a, b) => rank(a.qualityStatus) - rank(b.qualityStatus));
+  }, [agents]);
+  const visibleAgents = showAllAgents || sortedAgents.length <= PREVIEW_LIMIT
+    ? sortedAgents
+    : sortedAgents.slice(0, PREVIEW_LIMIT);
+  const hiddenAgentCount = Math.max(0, sortedAgents.length - visibleAgents.length);
+
+  const agentById = React.useMemo(() => {
+    const m = {};
+    agents.forEach(a => { m[String(a.instanceId || a.id)] = a; });
+    return m;
+  }, [agents]);
+
+  const sampleByPair = React.useMemo(() => {
+    const m = {};
+    latest.forEach(s => { m[`${s.taskId}:${s.instanceId}`] = s; });
+    return m;
+  }, [latest]);
+
+  const installOrUpgrade = async (agent) => {
+    const id = String(agent.instanceId || agent.id);
+    setBusyAgentId(id);
+    try {
+      const res = await window.ociServices.system.monitorInstallAgent(id);
+      if (res && res.success === false) throw new Error(res.message || '安装失败');
+      shell.showToast(res?.message || '探针部署成功', { kind: 'success' });
+      await onReload();
+    } catch (e) {
+      shell.showToast(e.message || '探针部署失败', { kind: 'error' });
+    } finally {
+      setBusyAgentId('');
+    }
+  };
+
+  const uninstall = (agent) => {
+    const id = String(agent.instanceId || agent.id);
+    shell.openConfirm({
+      title: `卸载探针 · ${agent.displayName || agent.publicIps}`,
+      body: '将停止并移除该 VPS 上的资源监控探针与网络质量探针，同时撤销网络探针凭据。',
+      danger: true,
+      confirmLabel: tr('nq.uninstallAgent'),
+      onConfirm: async () => {
+        setBusyAgentId(id);
+        try {
+          const res = await window.ociServices.system.monitorUninstallAgent(id);
+          if (res && res.success === false) throw new Error(res.message || '卸载失败');
+          shell.showToast(res?.message || '已卸载探针', { kind: 'warn' });
+          await onReload();
+        } catch (e) {
+          shell.showToast(e.message || '卸载失败', { kind: 'error' });
+        } finally {
+          setBusyAgentId('');
+        }
+      },
+    });
+  };
+
+  const openTaskModal = (existing) => {
+    shell.openModal({
+      title: existing ? tr('nq.editTask') : tr('nq.newTask'),
+      subtitle: '由受控 VPS 探针主动拉取任务执行 ICMP / TCP / HTTP 采样并回传',
+      icon: 'activity',
+      iconColor: 'var(--accent)',
+      size: 'md',
+      body: (
+        <NetworkQualityTaskForm
+          existing={existing}
+          agents={agents}
+          tr={tr}
+          onCancel={shell.closeModal}
+          onSave={async (payload) => {
+            try {
+              const res = existing
+                ? await window.ociServices.system.networkQualityUpdateTask(existing.id, payload)
+                : await window.ociServices.system.networkQualityCreateTask(payload);
+              if (!res || !res.success) throw new Error(res?.message || '保存失败');
+              shell.closeModal();
+              shell.showToast(existing ? '任务已更新' : '任务已创建', { kind: 'success' });
+              await onReload();
+            } catch (e) {
+              shell.showToast(e.message || '保存失败', { kind: 'error' });
+            }
+          }}
+        />
+      ),
+    });
+  };
+
+  const toggleTaskEnabled = async (task) => {
+    setBusyTaskId(String(task.id));
+    try {
+      const res = await window.ociServices.system.networkQualityUpdateTask(task.id, {
+        version: String(task.version),
+        name: task.name,
+        operator: task.operator,
+        region: task.region,
+        type: task.type,
+        target: task.target,
+        intervalSeconds: task.intervalSeconds,
+        sampleCount: task.sampleCount,
+        enabled: !task.enabled,
+        instanceIds: task.instanceIds || [],
+      });
+      if (!res || !res.success) throw new Error(res?.message || '更新失败');
+      await onReload();
+    } catch (e) {
+      shell.showToast(e.message || '切换失败', { kind: 'error' });
+    } finally {
+      setBusyTaskId('');
+    }
+  };
+
+  const runTaskNow = async (task) => {
+    setBusyTaskId(String(task.id));
+    try {
+      const res = await window.ociServices.system.networkQualityRunTask(task.id, { version: String(task.version) });
+      if (!res || !res.success) throw new Error(res?.message || '触发失败');
+      const d = res.data || {};
+      shell.showToast(`已下发立即探测：入队 ${d.queued ?? 0} 台（运行中 ${d.alreadyRunning ?? 0}）`, { kind: 'success' });
+      await onReload();
+    } catch (e) {
+      shell.showToast(e.message || '触发失败', { kind: 'error' });
+    } finally {
+      setBusyTaskId('');
+    }
+  };
+
+  const removeTask = (task) => {
+    shell.openConfirm({
+      title: `删除任务「${task.name}」？`,
+      body: '删除后将同步清理该任务关联的 7 天采样历史记录。',
+      danger: true,
+      confirmLabel: '删除',
+      onConfirm: async () => {
+        setBusyTaskId(String(task.id));
+        try {
+          const res = await window.ociServices.system.networkQualityDeleteTask(task.id, task.version);
+          if (!res || !res.success) throw new Error(res?.message || '删除失败');
+          shell.showToast('任务已删除', { kind: 'warn' });
+          await onReload();
+        } catch (e) {
+          shell.showToast(e.message || '删除失败', { kind: 'error' });
+        } finally {
+          setBusyTaskId('');
+        }
+      },
+    });
+  };
+
+  const statusBadge = (st) => {
+    const mapped = st === 'online'
+      ? { status: 'success', label: tr('nq.statusOnline') }
+      : st === 'offline'
+      ? { status: 'danger', label: tr('nq.statusOffline') }
+      : st === 'upgrade_required'
+      ? { status: 'warning', label: tr('nq.statusUpgrade') }
+      : { status: 'idle', label: tr('nq.statusNotInstalled') };
+    return <StatusPill status={mapped.status} label={mapped.label} size="md" />;
+  };
+
+  const opLabel = (op) => op === 'telecom' ? tr('nq.opTelecom') : op === 'unicom' ? tr('nq.opUnicom') : op === 'mobile' ? tr('nq.opMobile') : tr('nq.opCustom');
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <SettingsCard
+        title={`${tr('nq.agentsTitle')} (${agents.length})`}
+        icon="cpu"
+        iconColor="var(--info)"
+        collapsed={agentsCollapsed}
+        actions={
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+              在线 {agents.filter(a => a.qualityStatus === 'online').length} / {agents.length}
+            </span>
+            {agents.length > 0 && (
+              <Button
+                variant="ghost"
+                size="xs"
+                icon={agentsCollapsed ? 'chevron-down' : 'chevron-up'}
+                onClick={() => setAgentsCollapsed(v => !v)}
+              >
+                {agentsCollapsed ? '展开节点' : '收起节点'}
+              </Button>
+            )}
+          </div>
+        }
+      >
+        {agents.length === 0 ? (
+          <EmptyState icon="cpu" title={tr('nq.emptyAgents')} />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
+              {visibleAgents.map(a => {
+                const id = String(a.instanceId || a.id);
+                const busy = busyAgentId === id;
+                return (
+                  <div key={id} style={{ padding: 11, borderRadius: 'var(--radius)', background: 'var(--bg-2)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--fg-0)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.displayName || id}</div>
+                        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{a.publicIps || '—'} · {a.regionName || '—'}</div>
+                      </div>
+                      {statusBadge(a.qualityStatus)}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                      <span style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>
+                        {a.lastSeen ? `上次心跳 ${new Date(a.lastSeen).toLocaleTimeString()}` : '尚未上报'}
+                      </span>
+                      <div style={{ display: 'inline-flex', gap: 6 }}>
+                        {a.qualityStatus !== 'online' && (
+                          <Button variant={a.qualityStatus === 'upgrade_required' ? 'orange' : 'primary'} size="sm" loading={busy} onClick={() => installOrUpgrade(a)}>
+                            {a.qualityStatus === 'upgrade_required' ? tr('nq.upgradeAgent') : tr('nq.installAgent')}
+                          </Button>
+                        )}
+                        {a.monitorInstalled && (
+                          <Button variant="ghost" size="sm" disabled={busy} onClick={() => uninstall(a)}>
+                            {tr('nq.uninstallAgent')}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {sortedAgents.length > PREVIEW_LIMIT && (
+              <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 2 }}>
+                <Button
+                  variant="outline"
+                  size="xs"
+                  icon={showAllAgents ? 'chevron-up' : 'chevron-down'}
+                  onClick={() => setShowAllAgents(v => !v)}
+                >
+                  {showAllAgents ? `收起至前 ${PREVIEW_LIMIT} 台` : `展开其余 ${hiddenAgentCount} 台节点（共 ${sortedAgents.length} 台）`}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </SettingsCard>
+
+      <SettingsCard
+        title={`${tr('nq.tasksTitle')} (${tasks.length})`}
+        icon="activity"
+        iconColor="var(--accent)"
+        actions={
+          <Button variant="primary" size="sm" icon="plus" onClick={() => openTaskModal(null)} disabled={agents.length === 0}>
+            {tr('nq.newTask')}
+          </Button>
+        }
+      >
+        {loading && tasks.length === 0 ? (
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--fg-3)', fontSize: 12 }}>Loading…</div>
+        ) : tasks.length === 0 ? (
+          <EmptyState icon="activity" title={tr('nq.emptyTasks')} actionLabel={agents.length > 0 ? tr('nq.newTask') : undefined} onAction={agents.length > 0 ? () => openTaskModal(null) : undefined} />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {tasks.map(task => {
+              const busy = busyTaskId === String(task.id);
+              return (
+                <div key={task.id} style={{ padding: 12, borderRadius: 'var(--radius)', background: 'var(--bg-2)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--fg-0)' }}>{task.name}</span>
+                      <span style={{ fontSize: 10.5, padding: '2px 7px', borderRadius: 'var(--radius-sm)', background: 'var(--info-soft)', color: 'var(--info)', fontWeight: 600 }}>
+                        {opLabel(task.operator)} · {task.region}
+                      </span>
+                      <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>
+                        {String(task.type || '').toUpperCase()} {task.target}
+                      </span>
+                      <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+                        每 {task.intervalSeconds}s · {task.sampleCount} 次采样
+                      </span>
+                      <StatusPill status={task.enabled ? 'enabled' : 'paused'} label={task.enabled ? tr('nq.enabled') : tr('nq.paused')} size="sm" />
+                    </div>
+                    <div style={{ display: 'inline-flex', gap: 6 }}>
+                      <Button variant="outline" size="sm" icon="play" loading={busy} onClick={() => runTaskNow(task)}>{tr('nq.runNow')}</Button>
+                      <Button variant="ghost" size="sm" disabled={busy} onClick={() => toggleTaskEnabled(task)}>{task.enabled ? '暂停' : '启用'}</Button>
+                      <Button variant="ghost" size="sm" disabled={busy} onClick={() => openTaskModal(task)}>编辑</Button>
+                      <Button variant="ghost" size="sm" disabled={busy} onClick={() => removeTask(task)} style={{ color: 'var(--danger)' }}>删除</Button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {(task.instanceIds || []).map(instId => {
+                      const a = agentById[String(instId)];
+                      const s = sampleByPair[`${task.id}:${instId}`];
+                      const loss = s && s.attempts > 0 ? Math.round(((s.attempts - s.successful) / s.attempts) * 100) : null;
+                      const tone = !s ? 'var(--fg-3)' : s.status === 'success' ? 'var(--success)' : s.status === 'partial' ? 'var(--orange)' : 'var(--danger)';
+                      return (
+                        <button key={instId} type="button"
+                          onClick={() => openNetworkQualityHistoryModal(shell, { instanceId: String(instId), instanceName: a?.displayName || a?.publicIps || instId, task, tr, density })}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 'var(--button-radius)',
+                            background: 'var(--bg-1)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'inherit',
+                            fontSize: 11.5, color: 'var(--fg-0)', transition: 'border-color 120ms, background 120ms',
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.background = 'var(--bg-3)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-1)'; }}>
+                          <span style={{ fontWeight: 600 }}>{a?.displayName || a?.publicIps || `#${instId}`}</span>
+                          <span className="mono" style={{ color: tone, fontWeight: 600 }}>
+                            {s ? (s.avgMs != null ? `${Number(s.avgMs).toFixed(1)} ms` : s.status) : tr('nq.noSample')}
+                          </span>
+                          {loss != null && <span className="mono" style={{ fontSize: 10.5, color: loss > 0 ? 'var(--orange)' : 'var(--fg-3)' }}>丢包 {loss}%</span>}
+                          <Icon name="chevron-right" size={11} style={{ color: 'var(--fg-3)' }} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </SettingsCard>
+    </div>
+  );
+}
+
+function SysIpQualityPage({ density = 'compact' }) {
   const { t: tr } = useT();
   const shell = useShell();
+  const [mode, setMode] = React.useState('probe');
+  const [nqOverview, setNqOverview] = React.useState(null);
+  const [nqLoading, setNqLoading] = React.useState(true);
+
+  const loadNqOverview = React.useCallback(async () => {
+    setNqLoading(true);
+    try {
+      const res = await window.ociServices.system.networkQualityOverview();
+      if (res && res.success) setNqOverview(res.data || null);
+    } catch (e) {
+      shell.showToast(e.message || '加载探针网络质量失败', { kind: 'error' });
+    } finally {
+      setNqLoading(false);
+    }
+  }, [shell]);
+
+  React.useEffect(() => {
+    loadNqOverview();
+  }, [loadNqOverview]);
 
   // 检测配置（对齐真实后端接口：启用状态 + 周期小时）
   const [checkCfg, setCheckCfg] = React.useState({ enabled: false, intervalHours: 6 });
@@ -3979,12 +4905,35 @@ function SysIpQualityPage() {
         icon="shield"
         iconColor="var(--info)"
         actions={
-          <Button variant="outline" size="md" icon="refresh-cw" loading={loading} onClick={loadSettings}>
-            刷新
-          </Button>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'inline-flex', padding: 3, borderRadius: 'var(--radius)', background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
+              {[
+                { id: 'probe', label: tr('nq.modeProbe') },
+                { id: 'legacy', label: tr('nq.modeLegacy') },
+              ].map(tab => (
+                <button key={tab.id} type="button" onClick={() => setMode(tab.id)}
+                  style={{
+                    padding: '4px 12px', borderRadius: 'var(--button-radius)', border: 'none', cursor: 'pointer',
+                    fontFamily: 'inherit', fontSize: 12, fontWeight: 600, transition: 'all 120ms',
+                    background: mode === tab.id ? 'var(--accent)' : 'transparent',
+                    color: mode === tab.id ? 'var(--accent-fg)' : 'var(--fg-2)',
+                  }}>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <Button variant="outline" size="md" icon="refresh-cw" loading={mode === 'probe' ? nqLoading : loading}
+              onClick={mode === 'probe' ? loadNqOverview : loadSettings}>
+              刷新
+            </Button>
+          </div>
         }
       />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 2, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {mode === 'probe' ? (
+          <NetworkQualityWorkbench overview={nqOverview} loading={nqLoading} onReload={loadNqOverview} shell={shell} tr={tr} density={density} />
+        ) : (
+          <>
         {/* 1. IP 质量检测全局配置通栏卡片（对齐客户端标准） */}
         <div style={{
           display: 'flex', flexDirection: 'column',
@@ -4100,6 +5049,8 @@ function SysIpQualityPage() {
             onSaveToast={() => saveCarrier('mobile', mobile, setMobile)}
           />
         </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -4277,9 +5228,194 @@ function SysLogsPage() {
   );
 }
 
+// ─── IP 封禁管理卡片 (P0) ──────────────────────────────────────────────
+function IpBanManagementCard({ shell, tr, density = 'compact' }) {
+  const [items, setItems] = React.useState([]);
+  const [total, setTotal] = React.useState(0);
+  const [page, setPage] = React.useState(1);
+  const [size] = React.useState(10);
+  const [statusFilter, setStatusFilter] = React.useState('');
+  const [ipSearch, setIpSearch] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [banIp, setBanIp] = React.useState('');
+  const [banReason, setBanReason] = React.useState('');
+  const [banning, setBanning] = React.useState(false);
+  const [unbanningId, setUnbanningId] = React.useState('');
+
+  const loadBans = React.useCallback(async (targetPage = page) => {
+    setLoading(true);
+    try {
+      const res = await window.ociServices.system.ipBansList({
+        page: targetPage,
+        size,
+        status: statusFilter === '' ? undefined : Number(statusFilter),
+        ip: ipSearch,
+      });
+      if (res && res.success && res.data) {
+        setItems(res.data.items || []);
+        setTotal(Number(res.data.total || 0));
+      }
+    } catch (e) {
+      shell.showToast(e.message || '加载 IP 封禁记录失败', { kind: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  }, [page, size, statusFilter, ipSearch, shell]);
+
+  React.useEffect(() => { loadBans(page); }, [page, statusFilter]);
+
+  const handleManualBan = async () => {
+    if (!banIp.trim()) return;
+    setBanning(true);
+    try {
+      const res = await window.ociServices.system.ipBanCreate({ ip: banIp.trim(), reason: banReason.trim() });
+      if (!res || !res.success) throw new Error(res?.message || '封禁失败');
+      shell.showToast(res.data?.message || '已封禁 IP', { kind: 'success' });
+      setBanIp('');
+      setBanReason('');
+      setPage(1);
+      await loadBans(1);
+    } catch (e) {
+      shell.showToast(e.message || '封禁失败', { kind: 'error' });
+    } finally {
+      setBanning(false);
+    }
+  };
+
+  const handleUnban = (row) => {
+    shell.openConfirm({
+      title: tr('ipBan.unbanConfirmTitle').replace('{ip}', row.ipAddress),
+      body: tr('ipBan.unbanConfirmBody'),
+      confirmLabel: tr('ipBan.unban'),
+      onConfirm: async () => {
+        setUnbanningId(String(row.id));
+        try {
+          const res = await window.ociServices.system.ipBanUnban(row.id);
+          if (!res || !res.success) throw new Error(res?.message || '解封失败');
+          shell.showToast(res.data?.message || '已解除封禁', { kind: 'success' });
+          await loadBans(page);
+        } catch (e) {
+          shell.showToast(e.message || '解封失败', { kind: 'error' });
+        } finally {
+          setUnbanningId('');
+        }
+      },
+    });
+  };
+
+  const rowPy = density === 'comfortable' ? 12 : 9;
+  const statusOptions = [
+    { value: '', label: tr('ipBan.statusAll') },
+    { value: '1', label: tr('ipBan.statusActive') },
+    { value: '0', label: tr('ipBan.statusReleased') },
+  ];
+
+  return (
+    <SettingsCard
+      title={tr('ipBan.title')}
+      icon="shield-alert"
+      iconColor="var(--danger)"
+      style={{ gridColumn: '1 / -1' }}
+      actions={
+        <Button variant="outline" size="sm" icon="refresh-cw" loading={loading} onClick={() => loadBans(page)}>
+          刷新
+        </Button>
+      }
+    >
+      <div style={{ fontSize: 11.5, color: 'var(--fg-3)', marginBottom: 12 }}>{tr('ipBan.subtitle')}</div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12, alignItems: 'center' }}>
+        <Select
+          value={statusFilter}
+          onChange={(v) => { setPage(1); setStatusFilter(v); }}
+          options={statusOptions}
+          width={126}
+          size="sm"
+        />
+        <SearchInput
+          value={ipSearch}
+          onChange={setIpSearch}
+          placeholder={tr('ipBan.searchPh')}
+          width={200}
+          size="sm"
+        />
+        <Button variant="outline" size="sm" icon="search" onClick={() => { setPage(1); loadBans(1); }}>搜索</Button>
+        <div style={{ flex: 1 }} />
+        <TextInput value={banIp} onChange={setBanIp} placeholder={tr('ipBan.ipPh')} mono style={{ width: 175 }} />
+        <TextInput value={banReason} onChange={setBanReason} placeholder={tr('ipBan.reasonPh')} style={{ width: 175 }} />
+        <Button variant="danger" size="sm" icon="ban" loading={banning} disabled={!banIp.trim()} onClick={handleManualBan}>
+          {tr('ipBan.confirmBan')}
+        </Button>
+      </div>
+
+      <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflowX: 'auto' }}>
+        {items.length === 0 ? (
+          <EmptyState icon="shield-check" title={tr('ipBan.empty')} />
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: 'var(--bg-2)', color: 'var(--fg-3)', textAlign: 'left' }}>
+                <th style={{ padding: `${rowPy}px 12px`, fontWeight: 600 }}>{tr('ipBan.colIp')}</th>
+                <th style={{ padding: `${rowPy}px 12px`, fontWeight: 600 }}>{tr('ipBan.colStatus')}</th>
+                <th style={{ padding: `${rowPy}px 12px`, fontWeight: 600 }}>{tr('ipBan.colSource')}</th>
+                <th style={{ padding: `${rowPy}px 12px`, fontWeight: 600 }}>{tr('ipBan.colReason')}</th>
+                <th style={{ padding: `${rowPy}px 12px`, fontWeight: 600 }}>{tr('ipBan.colTime')}</th>
+                <th style={{ padding: `${rowPy}px 12px`, fontWeight: 600, textAlign: 'right' }}>{tr('ipBan.colAction')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((row, idx) => {
+                const active = Number(row.status) === 1;
+                return (
+                  <tr key={row.id} className="proxy-pool-row" style={{
+                    borderTop: '1px solid var(--border)',
+                    background: idx % 2 === 1 ? 'color-mix(in oklab, var(--bg-2) 40%, transparent)' : 'transparent',
+                  }}>
+                    <td className="mono" style={{ padding: `${rowPy}px 12px`, fontWeight: 600, color: 'var(--fg-0)' }}>{row.ipAddress}</td>
+                    <td style={{ padding: `${rowPy}px 12px` }}>
+                      <StatusPill status={active ? 'danger' : 'success'} label={active ? tr('ipBan.statusActive') : tr('ipBan.statusReleased')} size="md" />
+                    </td>
+                    <td style={{ padding: `${rowPy}px 12px`, color: 'var(--fg-2)' }}>
+                      <div>{row.source || '—'}</div>
+                      <div style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>{row.operatorName || 'system'}</div>
+                    </td>
+                    <td style={{ padding: `${rowPy}px 12px`, color: 'var(--fg-2)', maxWidth: 260 }}>
+                      <div>{row.reason || '—'}</div>
+                      {!active && row.unbanReason && (
+                        <div style={{ fontSize: 10.5, color: 'var(--fg-3)' }}>解封：{row.unbanReason} ({row.unbanOperatorName || 'system'})</div>
+                      )}
+                    </td>
+                    <td className="mono" style={{ padding: `${rowPy}px 12px`, fontSize: 11, color: 'var(--fg-3)' }}>
+                      <div>封禁：{row.createTime || '—'}</div>
+                      {row.unbanTime && <div>解封：{row.unbanTime}</div>}
+                    </td>
+                    <td style={{ padding: `${rowPy}px 12px`, textAlign: 'right' }}>
+                      {active ? (
+                        <Button variant="outline" size="sm" loading={unbanningId === String(row.id)} onClick={() => handleUnban(row)}>
+                          {tr('ipBan.unban')}
+                        </Button>
+                      ) : <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>—</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {total > size && (
+        <div style={{ marginTop: 10 }}>
+          <Pagination total={total} page={page} perPage={size} onPageChange={setPage} t={tr} />
+        </div>
+      )}
+    </SettingsCard>
+  );
+}
+
 // ─── 3. 系统设置 ─────────────────────────────
 // 对齐原项目 system_settings.ftl · 账号 + GitHub OAuth + Google OAuth + MFA + Turnstile 五卡
-function SysSettingPage() {
+function SysSettingPage({ density = 'compact' }) {
   const { t: tr } = useT();
   const shell = useShell();
 
@@ -4979,6 +6115,9 @@ function SysSettingPage() {
             {tr('pageMisc.a950b3')} <b style={{ color: channelNotify.enabled ? '#9b59b6' : 'var(--fg-3)' }}>{channelNotify.enabled ? tr('pageMisc.1eefe8') : tr('pageMisc.da97c3')}</b>
           </div>
         </SettingsCard>
+
+        {/* IP 封禁管理 (P0) */}
+        <IpBanManagementCard shell={shell} tr={tr} density={density} />
       </div>
     </div>
   );

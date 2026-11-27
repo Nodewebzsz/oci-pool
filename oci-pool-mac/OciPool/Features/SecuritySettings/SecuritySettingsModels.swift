@@ -44,6 +44,46 @@ struct SecuritySettingsSnapshot: Equatable {
     var channelNotifyEnabled: Bool = false
 }
 
+// MARK: - IP Ban Management (align `/api/system/ip-bans`)
+
+enum IpBanStatusFilter: String, CaseIterable, Identifiable {
+    case all = ""
+    case active = "1"
+    case released = "0"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .all: return "全部状态"
+        case .active: return "封禁中"
+        case .released: return "已解封"
+        }
+    }
+}
+
+struct IpBanRecord: Identifiable, Equatable {
+    var id: String
+    var ipAddress: String
+    var source: String
+    var operatorName: String
+    var reason: String
+    var status: Int
+    var createTime: String
+    var unbanTime: String
+    var unbanReason: String
+    var unbanOperatorName: String
+
+    var isActive: Bool { status == 1 }
+}
+
+struct IpBanPage: Equatable {
+    var items: [IpBanRecord] = []
+    var total: Int = 0
+    var page: Int = 1
+    var size: Int = 10
+}
+
 enum SecuritySettingsJSON {
     static func parse(_ data: Data) throws -> SecuritySettingsSnapshot {
         guard let root = obj(data) else {
@@ -141,6 +181,59 @@ enum SecuritySettingsJSON {
 
     static func firstNonEmpty(_ values: String...) -> String {
         for v in values where !v.isEmpty { return v }
+        return ""
+    }
+
+    static func parseIpBanPage(_ data: Data) throws -> IpBanPage {
+        guard let root = obj(data) else {
+            throw APIError.serverMessage("IP 封禁记录解析失败")
+        }
+        if let success = root["success"] as? Bool, !success {
+            throw APIError.serverMessage(firstNonEmpty(str(root["message"]), str(root["msg"]), "读取封禁记录失败"))
+        }
+        let payload = (root["data"] as? [String: Any]) ?? root
+        let rawItems = (payload["items"] as? [[String: Any]]) ?? []
+        let items: [IpBanRecord] = rawItems.map { row in
+            IpBanRecord(
+                id: str(row["id"]),
+                ipAddress: str(row["ipAddress"]),
+                source: str(row["source"]),
+                operatorName: str(row["operatorName"]),
+                reason: str(row["reason"]),
+                status: intVal(row["status"], fallback: 0),
+                createTime: dateText(row["createTime"]),
+                unbanTime: dateText(row["unbanTime"]),
+                unbanReason: str(row["unbanReason"]),
+                unbanOperatorName: str(row["unbanOperatorName"])
+            )
+        }
+        return IpBanPage(
+            items: items,
+            total: intVal(payload["total"], fallback: items.count),
+            page: max(1, intVal(payload["page"], fallback: 1)),
+            size: max(1, intVal(payload["size"], fallback: 10))
+        )
+    }
+
+    static func intVal(_ value: Any?, fallback: Int) -> Int {
+        if let num = value as? NSNumber { return num.intValue }
+        if let text = value as? String, let parsed = Int(text) { return parsed }
+        return fallback
+    }
+
+    static func dateText(_ value: Any?) -> String {
+        if let text = value as? String {
+            return text.replacingOccurrences(of: "T", with: " ").prefix(19).description
+        }
+        if let arr = value as? [NSNumber], arr.count >= 5 {
+            let y = arr[0].intValue
+            let mo = arr[1].intValue
+            let d = arr[2].intValue
+            let h = arr[3].intValue
+            let mi = arr[4].intValue
+            let sec = arr.count >= 6 ? arr[5].intValue : 0
+            return String(format: "%04d-%02d-%02d %02d:%02d:%02d", y, mo, d, h, mi, sec)
+        }
         return ""
     }
 }

@@ -244,6 +244,86 @@
     return api.request('/sysMessage/clear', { method: 'POST', body: formBody({}) });
   }, 'POST', '/sysMessage/clear', 'query-string');
 
+  // IP Ban Management (P0)
+  S.ipBansList = mark(function ipBansList(input) {
+    const o = input || {};
+    const params = new URLSearchParams();
+    if (o.page !== undefined && o.page !== null) params.set('page', String(o.page));
+    if (o.size !== undefined && o.size !== null) params.set('size', String(o.size));
+    if (o.status !== undefined && o.status !== null && o.status !== '') params.set('status', String(o.status));
+    if (o.ip && String(o.ip).trim()) params.set('ip', String(o.ip).trim());
+    const qs = params.toString();
+    return api.request('/api/system/ip-bans' + (qs ? '?' + qs : ''));
+  }, 'GET', '/api/system/ip-bans', 'query-string');
+
+  S.ipBanCreate = mark(function ipBanCreate(input) {
+    const o = input || {};
+    return api.request('/api/system/ip-bans/ban', jsonBody({ ip: o.ip, reason: o.reason }));
+  }, 'POST', '/api/system/ip-bans/ban', 'application/json');
+
+  S.ipBanUnban = mark(function ipBanUnban(id) {
+    return api.request('/api/system/ip-bans/' + encodeURIComponent(String(id)) + '/unban', { method: 'POST' });
+  }, 'POST', '/api/system/ip-bans/{id}/unban', 'application/json');
+
+  // Network Quality Probe (P1.1)
+  S.networkQualityOverview = mark(function networkQualityOverview() {
+    return api.request('/api/network-quality/overview');
+  }, 'GET', '/api/network-quality/overview', 'query-string');
+
+  S.networkQualityHistory = mark(function networkQualityHistory(input) {
+    const o = input || {};
+    const params = new URLSearchParams();
+    params.set('instanceId', String(o.instanceId));
+    params.set('taskId', String(o.taskId));
+    params.set('revision', String(o.revision));
+    params.set('hours', String(o.hours || 24));
+    return api.request('/api/network-quality/history?' + params.toString());
+  }, 'GET', '/api/network-quality/history', 'query-string');
+
+  S.networkQualityCreateTask = mark(function networkQualityCreateTask(payload) {
+    return api.request('/api/network-quality/tasks', jsonBody(payload || {}));
+  }, 'POST', '/api/network-quality/tasks', 'application/json');
+
+  S.networkQualityUpdateTask = mark(function networkQualityUpdateTask(id, payload) {
+    return api.request('/api/network-quality/tasks/' + encodeURIComponent(String(id)), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload || {}),
+    });
+  }, 'PUT', '/api/network-quality/tasks/{id}', 'application/json');
+
+  S.networkQualityDeleteTask = mark(function networkQualityDeleteTask(id, version) {
+    return api.request('/api/network-quality/tasks/' + encodeURIComponent(String(id)) + '?version=' + encodeURIComponent(String(version)), {
+      method: 'DELETE',
+    });
+  }, 'DELETE', '/api/network-quality/tasks/{id}', 'query-string');
+
+  S.networkQualityRunTask = mark(function networkQualityRunTask(id, payload) {
+    return api.request('/api/network-quality/tasks/' + encodeURIComponent(String(id)) + '/run', jsonBody(payload || {}));
+  }, 'POST', '/api/network-quality/tasks/{id}/run', 'application/json');
+
+  // Monitor Agent Install / Uninstall
+  S.monitorInstallAgent = mark(function monitorInstallAgent(vpsId) {
+    return api.request('/api/monitor/install?vpsId=' + encodeURIComponent(String(vpsId)), { method: 'POST' });
+  }, 'POST', '/api/monitor/install', 'query-string');
+
+  S.monitorUninstallAgent = mark(function monitorUninstallAgent(vpsId) {
+    return api.request('/api/monitor/uninstall?vpsId=' + encodeURIComponent(String(vpsId)), { method: 'POST' });
+  }, 'POST', '/api/monitor/uninstall', 'query-string');
+
+  // VPS Ping Control
+  S.vpsEnablePing = mark(function vpsEnablePing() {
+    return api.request('/vps/instances/enablePing', { method: 'POST' });
+  }, 'POST', '/vps/instances/enablePing', 'query-string');
+
+  S.vpsDisablePing = mark(function vpsDisablePing() {
+    return api.request('/vps/instances/disablePing', { method: 'POST' });
+  }, 'POST', '/vps/instances/disablePing', 'query-string');
+
+  S.vpsManualPing = mark(function vpsManualPing() {
+    return api.request('/vps/instances/ping', { method: 'POST' });
+  }, 'POST', '/vps/instances/ping', 'query-string');
+
   global.ociServices = global.ociServices || {};
   global.ociServices.system = Object.freeze(S);
 })(typeof window !== 'undefined' ? window : globalThis);

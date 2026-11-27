@@ -183,6 +183,10 @@
 		EE5DD805B2041DEEA972B068 /* TenantsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7749564DA59E1339249E3C0 /* TenantsService.swift */; };
 		F296D86435E1396A7E7C4049 /* FloatingMenuDismiss.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC5E812017E74594E635D239 /* FloatingMenuDismiss.swift */; };
 		F5EFBB1C54F9513BBD0165A9 /* IpQualityModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32824657C39B9949AB89F5A0 /* IpQualityModels.swift */; };
+		A1B2C3D40100000100000001 /* NetworkQualityModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40200000100000001 /* NetworkQualityModels.swift */; };
+		A1B2C3D40100000200000002 /* NetworkQualityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40200000200000002 /* NetworkQualityService.swift */; };
+		A1B2C3D40100000300000003 /* NetworkQualityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40200000300000003 /* NetworkQualityView.swift */; };
+		A1B2C3D40100000400000004 /* NetworkQualityViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40200000400000004 /* NetworkQualityViewModel.swift */; };
 		F611F59DD2776E27958530C4 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA518EB4034A1E323D1004A1 /* AppDelegate.swift */; };
 		F902C0693CE86DB105A8C35C /* MemoModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00F550AC8574A0D4AE259845 /* MemoModels.swift */; };
 		FA0071DF67A30FCA26A136C9 /* HeaderModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F7F0F41AD51B7CB32E3488F /* HeaderModels.swift */; };
@@ -229,6 +233,10 @@
 		2F057B2EA8D8261D84480667 /* FilterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterBar.swift; sourceTree = "<group>"; };
 		32824657C39B9949AB89F5A0 /* IpQualityModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IpQualityModels.swift; sourceTree = "<group>"; };
 		3303963FDF1FD56D2371F754 /* IpQualityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IpQualityService.swift; sourceTree = "<group>"; };
+		A1B2C3D40200000100000001 /* NetworkQualityModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkQualityModels.swift; sourceTree = "<group>"; };
+		A1B2C3D40200000200000002 /* NetworkQualityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkQualityService.swift; sourceTree = "<group>"; };
+		A1B2C3D40200000300000003 /* NetworkQualityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkQualityView.swift; sourceTree = "<group>"; };
+		A1B2C3D40200000400000004 /* NetworkQualityViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkQualityViewModel.swift; sourceTree = "<group>"; };
 		335AAC0A1936FF5A187DF6A5 /* KeyConfigModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyConfigModels.swift; sourceTree = "<group>"; };
 		345A38D425F245E68B09BAEC /* RegionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegionsView.swift; sourceTree = "<group>"; };
 		37962C7668818B685875086F /* AiChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiChatService.swift; sourceTree = "<group>"; };
@@ -815,6 +823,10 @@
 				3303963FDF1FD56D2371F754 /* IpQualityService.swift */,
 				83CD8904CA13BDE5C146E1C0 /* IpQualityView.swift */,
 				932F23678DD34C1D52809C02 /* IpQualityViewModel.swift */,
+				A1B2C3D40200000100000001 /* NetworkQualityModels.swift */,
+				A1B2C3D40200000200000002 /* NetworkQualityService.swift */,
+				A1B2C3D40200000300000003 /* NetworkQualityView.swift */,
+				A1B2C3D40200000400000004 /* NetworkQualityViewModel.swift */,
 			);
 			path = IpQuality;
 			sourceTree = "<group>";
@@ -1032,6 +1044,10 @@
 				91AF4B932B08B788EAA36AFE /* IpQualityService.swift in Sources */,
 				895FB190BDFB4FDD2AB1A83E /* IpQualityView.swift in Sources */,
 				2FB229544BFD79AF25B28D47 /* IpQualityViewModel.swift in Sources */,
+				A1B2C3D40100000100000001 /* NetworkQualityModels.swift in Sources */,
+				A1B2C3D40100000200000002 /* NetworkQualityService.swift in Sources */,
+				A1B2C3D40100000300000003 /* NetworkQualityView.swift in Sources */,
+				A1B2C3D40100000400000004 /* NetworkQualityViewModel.swift in Sources */,
 				0E873E387CFCCD84AE8D6461 /* KeyConfigModels.swift in Sources */,
 				5534DC741BD72CFC3D32149A /* KeyConfigService.swift in Sources */,
 				18B82090DEE90A12C82885E1 /* KeyConfigView.swift in Sources */,

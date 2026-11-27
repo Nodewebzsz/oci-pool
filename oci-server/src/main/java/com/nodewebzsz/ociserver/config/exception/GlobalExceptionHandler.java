@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import static com.nodewebzsz.ocicommon.utils.IpUtils.getClientIpAddress;
 
@@ -23,7 +24,21 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(IpBannedException.class)
-    public String handleIpBannedException(IpBannedException e, HttpServletRequest request, Model model) {
+    public String handleIpBannedException(IpBannedException e, HttpServletRequest request,
+                                          HttpServletResponse response, Model model) throws Exception {
+        String xRequestedWith = request.getHeader("X-Requested-With");
+        String accept = request.getHeader("Accept");
+        String uri = request.getRequestURI();
+        boolean isAjax = "XMLHttpRequest".equals(xRequestedWith)
+                || (accept != null && accept.contains("application/json"))
+                || (uri != null && uri.startsWith("/api/"));
+        if (isAjax) {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setContentType("application/json;charset=utf-8");
+            String msg = e.getMessage() == null ? "您的IP已被封禁" : e.getMessage().replace("\\", "\\\\").replace("\"", "\\\"");
+            response.getWriter().write("{\"success\":false,\"code\":403,\"banned\":true,\"message\":\"" + msg + "\"}");
+            return null;
+        }
         model.addAttribute("message", e.getMessage());
         model.addAttribute("code", 403);
         model.addAttribute("ip", getClientIpAddress(request));

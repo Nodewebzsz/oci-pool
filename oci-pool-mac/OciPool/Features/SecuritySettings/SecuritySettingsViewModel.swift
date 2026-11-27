@@ -20,6 +20,19 @@ final class SecuritySettingsViewModel: ObservableObject {
     @Published var channelNotifyEnabled = false
     @Published var isMfaSheetPresented = false
 
+    // IP Ban Management (P0)
+    @Published private(set) var ipBans: [IpBanRecord] = []
+    @Published private(set) var ipBanTotal: Int = 0
+    @Published var ipBanPage: Int = 1
+    let ipBanPageSize: Int = 10
+    @Published var ipBanStatusFilter: IpBanStatusFilter = .all
+    @Published var ipBanSearch: String = ""
+    @Published private(set) var ipBanLoading = false
+    @Published private(set) var ipBanError: String?
+    @Published var manualBanIp: String = ""
+    @Published var manualBanReason: String = ""
+    @Published private(set) var ipBanBusyId: String?
+
     @Published private(set) var isLoading = false
     @Published private(set) var savingKey: String?
     @Published private(set) var errorText: String?
@@ -45,6 +58,7 @@ final class SecuritySettingsViewModel: ObservableObject {
         } catch {
             errorText = (error as? APIError)?.errorDescription ?? error.localizedDescription
         }
+        await loadIpBans(page: ipBanPage)
     }
 
     private func apply(_ snap: SecuritySettingsSnapshot) {
@@ -397,6 +411,99 @@ final class SecuritySettingsViewModel: ObservableObject {
             try await LoadingHUD.shared.during {
                 try await service.updateChannelNotify(enabled: channelNotifyEnabled)
             }
+        } catch {
+            ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
+        }
+    }
+
+    // MARK: - IP Ban Management
+
+    var ipBanTotalPages: Int {
+        max(1, Int(ceil(Double(ipBanTotal) / Double(ipBanPageSize))))
+    }
+
+    func loadIpBans(page: Int? = nil) async {
+        let targetPage = max(1, page ?? ipBanPage)
+        ipBanLoading = true
+        ipBanError = nil
+        defer { ipBanLoading = false }
+        do {
+            let res = try await service.fetchIpBans(
+                page: targetPage,
+                size: ipBanPageSize,
+                status: ipBanStatusFilter.rawValue,
+                ip: ipBanSearch
+            )
+            ipBans = res.items
+            ipBanTotal = res.total
+            ipBanPage = res.page
+        } catch {
+            ipBanError = (error as? APIError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
+    func searchIpBans() {
+        Task { await loadIpBans(page: 1) }
+    }
+
+    func setIpBanStatusFilter(_ filter: IpBanStatusFilter) {
+        guard ipBanStatusFilter != filter else { return }
+        ipBanStatusFilter = filter
+        Task { await loadIpBans(page: 1) }
+    }
+
+    func goIpBanPage(_ page: Int) {
+        let clamped = min(max(1, page), ipBanTotalPages)
+        Task { await loadIpBans(page: clamped) }
+    }
+
+    func manualBan() {
+        Task { await performManualBan() }
+    }
+
+    private func performManualBan() async {
+        let ip = manualBanIp.trimmingCharacters(in: .whitespacesAndNewlines)
+        let reason = manualBanReason.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !ip.isEmpty else {
+            ToastCenter.shared.error("请输入有效的 IPv4 或 IPv6 地址")
+            return
+        }
+        guard AppAlert.confirm(
+            title: "封禁 IP",
+            message: "确认封禁 IP「\(ip)」？封禁后该地址将无法访问登录与受保护接口。",
+            confirmTitle: "封禁"
+        ) else { return }
+        savingKey = "manualBan"
+        defer { savingKey = nil }
+        do {
+            let msg = try await LoadingHUD.shared.during {
+                try await service.banIp(ip: ip, reason: reason)
+            }
+            ToastCenter.shared.success(msg)
+            manualBanIp = ""
+            manualBanReason = ""
+            await loadIpBans(page: 1)
+        } catch {
+            ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
+        }
+    }
+
+    func unbanRecord(_ record: IpBanRecord) {
+        Task { await performUnbanRecord(record) }
+    }
+
+    private func performUnbanRecord(_ record: IpBanRecord) async {
+        guard AppAlert.confirm(
+            title: "解除封禁",
+            message: "确认解除 IP「\(record.ipAddress)」的封禁状态？",
+            confirmTitle: "解封"
+        ) else { return }
+        ipBanBusyId = record.id
+        defer { ipBanBusyId = nil }
+        do {
+            let msg = try await service.unbanIp(id: record.id)
+            ToastCenter.shared.success(msg)
+            await loadIpBans(page: ipBanPage)
         } catch {
             ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
         }

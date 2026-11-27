@@ -122,6 +122,9 @@ if ! printf '%s' "$SEND_RESP" | grep -q '"success"[[:space:]]*:[[:space:]]*true'
   if printf '%s' "$SEND_RESP" | grep -q "用户名或密码错误"; then
     err "未找到用户 ${TARGET_USER}；若注册时修改过用户名，请执行: ./reset-password.sh <实际用户名>"
     exit 1
+  elif printf '%s' "$SEND_RESP" | grep -qE '"banned"[[:space:]]*:[[:space:]]*true|已被封禁'; then
+    err "当前来源 IP 已被封禁，请先通过管理员后台「系统设置 -> IP 封禁管理」或 Telegram 命令 /unbanIp 解封后重试。"
+    exit 1
   elif printf '%s' "$SEND_RESP" | grep -qE "请稍后再试|频繁"; then
     note "检测到近期已触发过验证码，尝试读取日志中有效验证码继续重置..."
   else

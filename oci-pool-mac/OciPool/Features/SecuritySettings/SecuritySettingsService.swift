@@ -143,4 +143,67 @@ struct SecuritySettingsService {
         let login = (obj["login"] as? String) ?? trimmed
         return (id, login)
     }
+
+    // MARK: - IP Ban Management
+
+    /// GET `/api/system/ip-bans`
+    func fetchIpBans(page: Int, size: Int = 10, status: String? = nil, ip: String? = nil) async throws -> IpBanPage {
+        var query: [String: String] = [
+            "page": String(max(1, page)),
+            "size": String(max(1, size))
+        ]
+        if let status = status, !status.isEmpty {
+            query["status"] = status
+        }
+        if let ip = ip?.trimmingCharacters(in: .whitespacesAndNewlines), !ip.isEmpty {
+            query["ip"] = ip
+        }
+        let url = try client.makeURL(baseURL, path: "/api/system/ip-bans", query: query)
+        let raw = try await client.getJSON(url)
+        return try SecuritySettingsJSON.parseIpBanPage(raw)
+    }
+
+    /// POST `/api/system/ip-bans/ban`
+    func banIp(ip: String, reason: String) async throws -> String {
+        let url = try client.makeURL(baseURL, path: "/api/system/ip-bans/ban")
+        let raw = try await client.postJSON(url, body: [
+            "ip": ip,
+            "reason": reason
+        ])
+        if let root = SecuritySettingsJSON.obj(raw) {
+            if let ok = root["success"] as? Bool, !ok {
+                throw APIError.serverMessage(SecuritySettingsJSON.firstNonEmpty(
+                    SecuritySettingsJSON.str(root["message"]),
+                    SecuritySettingsJSON.str(root["msg"]),
+                    "封禁 IP 失败"
+                ))
+            }
+            if let data = root["data"] as? [String: Any] {
+                let msg = SecuritySettingsJSON.str(data["message"])
+                if !msg.isEmpty { return msg }
+            }
+        }
+        return try SecuritySettingsJSON.parseApiResponse(raw, fallback: "已封禁 IP")
+    }
+
+    /// POST `/api/system/ip-bans/{id}/unban`
+    func unbanIp(id: String) async throws -> String {
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        let url = try client.makeURL(baseURL, path: "/api/system/ip-bans/\(encoded)/unban")
+        let raw = try await client.postJSON(url, body: [:])
+        if let root = SecuritySettingsJSON.obj(raw) {
+            if let ok = root["success"] as? Bool, !ok {
+                throw APIError.serverMessage(SecuritySettingsJSON.firstNonEmpty(
+                    SecuritySettingsJSON.str(root["message"]),
+                    SecuritySettingsJSON.str(root["msg"]),
+                    "解封失败"
+                ))
+            }
+            if let data = root["data"] as? [String: Any] {
+                let msg = SecuritySettingsJSON.str(data["message"])
+                if !msg.isEmpty { return msg }
+            }
+        }
+        return try SecuritySettingsJSON.parseApiResponse(raw, fallback: "已解除封禁")
+    }
 }

@@ -18,37 +18,41 @@ struct VpsService {
     func enablePing() async throws -> String {
         let url = try client.makeURL(baseURL, path: "/vps/instances/enablePing")
         let raw = try await client.postJSON(url, body: [:])
-        return InstanceJSON.successMessage(raw, fallback: "已开启自动 Ping").message
+        let res = InstanceJSON.successMessage(raw, fallback: "已开启自动 Ping")
+        if !res.ok { throw APIError.serverMessage(res.message) }
+        return res.message
     }
 
     func disablePing() async throws -> String {
         let url = try client.makeURL(baseURL, path: "/vps/instances/disablePing")
         let raw = try await client.postJSON(url, body: [:])
-        return InstanceJSON.successMessage(raw, fallback: "已停止自动 Ping").message
+        let res = InstanceJSON.successMessage(raw, fallback: "已停止自动 Ping")
+        if !res.ok { throw APIError.serverMessage(res.message) }
+        return res.message
     }
 
     func manualPing() async throws -> String {
         let url = try client.makeURL(baseURL, path: "/vps/instances/ping")
         let raw = try await client.postJSON(url, body: [:])
-        return InstanceJSON.successMessage(raw, fallback: "Ping 检测已下发").message
+        let res = InstanceJSON.successMessage(raw, fallback: "Ping 检测已下发")
+        if !res.ok { throw APIError.serverMessage(res.message) }
+        return res.message
     }
 
     func installMonitor(vpsId: String) async throws -> String {
-        let url = try client.makeURL(baseURL, path: "/api/monitor/install")
-        let (data, http) = try await client.postForm(url, fields: ["vpsId": vpsId])
-        guard (200..<300).contains(http.statusCode) else {
-            throw APIError.serverMessage("HTTP \(http.statusCode)")
-        }
-        return InstanceJSON.successMessage(data, fallback: "安装指令已发送").message
+        let url = try client.makeURL(baseURL, path: "/api/monitor/install", query: ["vpsId": vpsId])
+        let raw = try await client.postJSON(url, body: [:], longTimeout: true)
+        let res = InstanceJSON.successMessage(raw, fallback: "安装指令已发送")
+        if !res.ok { throw APIError.serverMessage(res.message) }
+        return res.message
     }
 
     func uninstallMonitor(vpsId: String) async throws -> String {
-        let url = try client.makeURL(baseURL, path: "/api/monitor/uninstall")
-        let (data, http) = try await client.postForm(url, fields: ["vpsId": vpsId])
-        guard (200..<300).contains(http.statusCode) else {
-            throw APIError.serverMessage("HTTP \(http.statusCode)")
-        }
-        return InstanceJSON.successMessage(data, fallback: "卸载指令已发送").message
+        let url = try client.makeURL(baseURL, path: "/api/monitor/uninstall", query: ["vpsId": vpsId])
+        let raw = try await client.postJSON(url, body: [:], longTimeout: true)
+        let res = InstanceJSON.successMessage(raw, fallback: "卸载指令已发送")
+        if !res.ok { throw APIError.serverMessage(res.message) }
+        return res.message
     }
 
     /// 本机 `ping -c 1` 测延迟（毫秒）；失败返回 -1

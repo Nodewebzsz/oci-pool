@@ -109,6 +109,8 @@ public class SaTokenConfig implements WebMvcConfigurer {
                         "/api/send-verification-code",
                         "/api/monitor/download",
                         "/api/monitor/report",
+                        "/api/network-quality/agent/poll",
+                        "/api/network-quality/agent/report",
                         "/css/**",
                         "/js/**",
                         "/webfonts/**",

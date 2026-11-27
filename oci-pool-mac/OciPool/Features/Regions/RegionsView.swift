@@ -235,7 +235,7 @@ struct RegionsView: View {
                     Text("全球放货地图")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(RegionsTheme.text(dark))
-                    Text("实心圆表示我已关联覆盖区域；菱形 ◆ 表示官方已放货但尚未关联覆盖的空白区")
+                    Text("实心圆表示已关联，空心圆表示有货未覆盖；橙色光晕表示今日新增放货")
                         .font(.system(size: 11))
                         .foregroundColor(RegionsTheme.muted(dark))
                 }
@@ -255,7 +255,7 @@ struct RegionsView: View {
             )
             .aspectRatio(2, contentMode: .fit)
 
-            // Web 双层覆盖图例：已关联有货 · 已关联待货 · 官方有货未覆盖(菱形) · 今日新增 · 未放货
+            // Web 双层覆盖图例：已关联有货 · 已关联待货 · 官方有货未覆盖(空心圆) · 今日新增 · 未放货
             HStack(spacing: 20) {
                 HStack(spacing: 6) {
                     Circle()
@@ -272,10 +272,10 @@ struct RegionsView: View {
                     Text("我已关联 · 待放货").font(.system(size: 11)).foregroundColor(RegionsTheme.text(dark).opacity(0.75))
                 }
                 HStack(spacing: 6) {
-                    DiamondMarkerShape()
-                        .fill(AppTheme.cyan.opacity(0.25))
+                    Circle()
+                        .fill(AppTheme.sidebarHover(dark))
                         .frame(width: 10, height: 10)
-                        .overlay(DiamondMarkerShape().stroke(AppTheme.cyan, lineWidth: 1.4))
+                        .overlay(Circle().stroke(AppTheme.cyan, lineWidth: 1.4))
                     Text("有货未覆盖").font(.system(size: 11)).foregroundColor(RegionsTheme.text(dark).opacity(0.75))
                 }
                 HStack(spacing: 6) {

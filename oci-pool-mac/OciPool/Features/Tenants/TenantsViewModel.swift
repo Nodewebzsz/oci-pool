@@ -1980,9 +1980,9 @@ final class TenantsViewModel: ObservableObject {
 
     /// 校验验证码 → 拉 JSON → 关 sheet → 系统保存面板（避免 sheet 与 NSSavePanel 叠层冲突）。
     private func runExport(defaultName: String, fetch: @escaping (String) async throws -> (Data, String?)) {
-        let code = exportCode.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !code.isEmpty else {
-            ToastCenter.shared.error("请输入 6 位验证码")
+        let code = exportCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard code.range(of: "^[A-Z0-9]{8}$", options: .regularExpression) != nil else {
+            ToastCenter.shared.error("请输入 8 位大写字母/数字验证码")
             return
         }
         Task { @MainActor in

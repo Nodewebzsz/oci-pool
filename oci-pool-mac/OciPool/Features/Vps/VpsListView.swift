@@ -4,10 +4,11 @@ import AppKit
 /// VPS 监控看板（对齐 Web `/vps/instances/list` · `vps_list.ftl`）
 struct VpsListView: View {
     @EnvironmentObject private var appearance: AppearanceController
+    @Environment(\.colorScheme) private var colorScheme
     @StateObject private var model = VpsViewModel()
     @State private var hoveredCardId: String?
 
-    private var dark: Bool { appearance.isDarkEffective }
+    private var dark: Bool { appearance.mode == .system ? colorScheme == .dark : (appearance.mode == .dark) }
 
     var body: some View {
         Group {
@@ -25,6 +26,10 @@ struct VpsListView: View {
         .onDisappear { model.teardown() }
         .onReceive(NotificationCenter.default.publisher(for: .ociReloadCurrentPage)) { _ in
             Task { await model.reload() }
+        }
+        .sheet(item: $model.historyContext) { ctx in
+            NetworkQualityHistorySheet(context: ctx, baseURL: model.serverURL)
+                .environmentObject(appearance)
         }
     }
 
@@ -57,15 +62,6 @@ struct VpsListView: View {
             }
         )
         .appLoading(model.isBusy || (model.isLoading && !model.cards.isEmpty))
-        .background(
-            Group {
-                if model.moreMenuOpen {
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .onTapGesture { model.closeMoreMenu() }
-                }
-            }
-        )
     }
 
     // MARK: - Toolbar
@@ -232,7 +228,8 @@ struct VpsListView: View {
         active: Bool,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
+        let chipRadius: CGFloat = AppTheme.isClaude ? 8 : 5
+        return Button(action: action) {
             HStack(spacing: 5) {
                 Image(systemName: systemImage)
                     .font(.system(size: 11, weight: .semibold))
@@ -243,73 +240,68 @@ struct VpsListView: View {
             .padding(.vertical, 7)
             .foregroundColor(active ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: chipRadius)
                     .fill(active
-                          ? AppTheme.sidebarActive.opacity(0.14)
-                          : (dark ? Color(hex: "2c3136") : Color(hex: "eef2f6")))
+                          ? appearance.accent.accentSoft(dark)
+                          : AppTheme.sidebarHover(dark))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(active ? AppTheme.sidebarActive.opacity(0.4) : AppTheme.border(dark).opacity(0.5), lineWidth: 1)
+                RoundedRectangle(cornerRadius: chipRadius)
+                    .stroke(active ? AppTheme.sidebarActive.opacity(0.45) : AppTheme.border(dark), lineWidth: 1)
             )
         }
         .buttonStyle(PlainButtonStyle())
     }
 
     private var moreMenu: some View {
-        ZStack(alignment: .topTrailing) {
-            toolChip(title: "更多", systemImage: "gearshape", active: model.moreMenuOpen) {
-                model.toggleMoreMenu()
-            }
-            if model.moreMenuOpen {
-                VStack(alignment: .leading, spacing: 2) {
-                    moreItem("开启自动 Ping", "play.fill", AppTheme.sidebarActive) { model.enablePing() }
-                    moreItem("停止自动 Ping", "stop.fill", AppTheme.danger) { model.disablePing() }
-                    moreItem("手动 Ping 检测", "scope", AppTheme.sidebarActive) { model.manualPing() }
-                    Divider().opacity(0.4)
-                    moreItem("刷新页面", "arrow.clockwise", AppTheme.sidebarText(dark)) {
-                        model.closeMoreMenu()
-                        Task { await model.reload() }
-                    }
-                }
-                .padding(8)
-                .frame(width: 180, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(AppTheme.sidebarBg(dark))
-                        .shadow(color: Color.black.opacity(0.18), radius: 12, y: 4)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1)
-                )
-                .offset(y: 36)
-            }
+        toolChip(title: "更多", systemImage: "gearshape", active: model.moreMenuOpen) {
+            model.toggleMoreMenu()
         }
+        .background(
+            VpsMoreMenuFloatBridge(
+                isOpen: model.moreMenuOpen,
+                panelWidth: 186,
+                onDismiss: { model.closeMoreMenu() }
+            ) {
+                moreMenuPanelContent
+                    .environmentObject(appearance)
+            }
+        )
     }
 
-    private func moreItem(
-        _ title: String,
-        _ icon: String,
-        _ color: Color,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(color)
-                    .frame(width: 14)
-                Text(title)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
-                Spacer()
+    private var moreMenuPanelContent: some View {
+        let menuRadius: CGFloat = AppTheme.isClaude ? 10 : 7
+        return VStack(alignment: .leading, spacing: 2) {
+            VpsMoreMenuItem(title: "开启自动 Ping", icon: "play.fill", iconColor: AppTheme.success, dark: dark) {
+                model.enablePing()
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .contentShape(Rectangle())
+            VpsMoreMenuItem(title: "停止自动 Ping", icon: "stop.fill", iconColor: AppTheme.danger, dark: dark) {
+                model.disablePing()
+            }
+            VpsMoreMenuItem(title: "手动 Ping 检测", icon: "scope", iconColor: AppTheme.info, dark: dark) {
+                model.manualPing()
+            }
+            Rectangle()
+                .fill(AppTheme.border(dark))
+                .frame(height: 1)
+                .padding(.vertical, 4)
+            VpsMoreMenuItem(title: "刷新页面", icon: "arrow.clockwise", iconColor: AppTheme.textSecondary(dark), dark: dark) {
+                model.closeMoreMenu()
+                Task { await model.reload() }
+            }
         }
-        .buttonStyle(PlainButtonStyle())
+        .padding(6)
+        .frame(width: 186, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: menuRadius)
+                .fill(AppTheme.sidebarBg(dark))
+                .shadow(color: Color.black.opacity(dark ? 0.42 : 0.16), radius: 12, y: 4)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: menuRadius)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
+        )
+        .padding(14)
     }
 
     // MARK: - Grid
@@ -350,7 +342,8 @@ struct VpsListView: View {
                             onCopyIP: { model.copyIP(card) },
                             onSSH: { model.openSSH(card) },
                             onInstall: { model.installMonitor(card) },
-                            onUninstall: { model.uninstallMonitor(card) }
+                            onUninstall: { model.uninstallMonitor(card) },
+                            onOpenQualityHistory: { task in model.openQualityHistory(card: card, task: task) }
                         )
                     }
                 }
@@ -372,6 +365,7 @@ private struct VpsServerCard: View {
     let onSSH: () -> Void
     let onInstall: () -> Void
     let onUninstall: () -> Void
+    let onOpenQualityHistory: (NetworkQualityTask) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -402,7 +396,7 @@ private struct VpsServerCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 10) {
                 cloudIcon
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     Button(action: onCopyIP) {
                         HStack(spacing: 6) {
                             Text(showIP ? card.displayIP : card.maskedIP)
@@ -417,17 +411,68 @@ private struct VpsServerCard: View {
                     .buttonStyle(PlainButtonStyle())
                     .help("点击复制 IP")
 
-                    tagsRow
+                    if !card.item.displayName.isEmpty {
+                        Text(card.item.displayName)
+                            .font(.system(size: 11))
+                            .foregroundColor(AppTheme.textTertiary(dark))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
                 }
                 Spacer(minLength: 4)
-                StatusBadge(
-                    text: card.isOnline ? "在线" : "离线",
-                    tone: card.isOnline ? .success : .danger
-                )
+                VStack(alignment: .trailing, spacing: 4) {
+                    StatusBadge(
+                        text: card.isOnline ? "在线" : "离线",
+                        tone: card.isOnline ? .success : .danger
+                    )
+                    StatusBadge(
+                        text: card.qualityStatusLabel,
+                        tone: card.qualityStatusTone
+                    )
+                }
             }
+            tagsRow
             metricsBlock
+            if !card.qualitySummaries.isEmpty {
+                qualitySummaryRow
+            }
         }
         .padding(14)
+    }
+
+    private var qualitySummaryRow: some View {
+        let pillRadius: CGFloat = AppTheme.isClaude ? 6 : 4
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(card.qualitySummaries) { entry in
+                    let tone = entry.sample?.statusTone ?? .neutral
+                    Button(action: { onOpenQualityHistory(entry.task) }) {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(tone.color(dark: dark))
+                                .frame(width: 5, height: 5)
+                            Text(entry.task.name)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(AppTheme.navIcon(dark))
+                                .lineLimit(1)
+                            Text(entry.sample?.compactMetricText ?? "待采样")
+                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .foregroundColor(tone.color(dark: dark))
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(RoundedRectangle(cornerRadius: pillRadius).fill(tone.softBackground(dark: dark)))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: pillRadius)
+                                .stroke(tone.color(dark: dark).opacity(dark ? 0.3 : 0.22), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .help("点击查看「\(entry.task.name)」历史延迟与丢包")
+                }
+            }
+        }
     }
 
     private var cloudIcon: some View {
@@ -450,32 +495,37 @@ private struct VpsServerCard: View {
     }
 
     private var tagsRow: some View {
-        FlowWrap(spacing: 6) {
-            tag(card.item.regionName.isEmpty ? "—" : card.item.regionName, icon: "mappin.and.ellipse")
-            archTag
-            tag(card.specText, icon: nil)
-            tag(
-                showTenant
-                    ? (card.item.tenancyName.isEmpty ? "—" : card.item.tenancyName)
-                    : card.item.maskedTenancyName,
-                icon: "person"
-            )
-            if !card.metrics.uptime.isEmpty {
-                tag(card.metrics.uptime, icon: "clock")
+        let tenantText = showTenant
+            ? (card.item.tenancyName.isEmpty ? "—" : card.item.tenancyName)
+            : card.item.maskedTenancyName
+        return VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 5) {
+                tag(card.item.regionName.isEmpty ? "—" : card.item.regionName, icon: "mappin.and.ellipse")
+                archTag.fixedSize()
+                tag(card.specText, icon: nil).fixedSize()
+                Spacer(minLength: 0)
             }
-            if !card.metrics.load.isEmpty {
-                tag("负载 \(card.metrics.load)", icon: "gauge")
-            }
-            if card.isLatencyTesting {
-                tag("测速中", icon: "bolt")
-            } else if let ms = card.latencyMs {
-                latencyTag(ms)
+            HStack(spacing: 5) {
+                tag(tenantText, icon: "person")
+                if !card.metrics.uptime.isEmpty {
+                    tag(card.metrics.uptime, icon: "clock").fixedSize()
+                }
+                if !card.metrics.load.isEmpty {
+                    tag("负载 \(card.metrics.load)", icon: "gauge").fixedSize()
+                }
+                if card.isLatencyTesting {
+                    tag("测速中", icon: "bolt").fixedSize()
+                } else if let ms = card.latencyMs {
+                    latencyTag(ms).fixedSize()
+                }
+                Spacer(minLength: 0)
             }
         }
     }
 
     private var archTag: some View {
         let a = card.item.architecture.isEmpty ? "NONE" : card.item.architecture
+        let pillRadius: CGFloat = AppTheme.isClaude ? 6 : 4
         let color: Color = {
             switch card.archClass {
             case "arm": return Color(hex: "b484e8")
@@ -488,7 +538,7 @@ private struct VpsServerCard: View {
             .foregroundColor(color)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
-            .background(RoundedRectangle(cornerRadius: 6).fill(color.opacity(0.12)))
+            .background(RoundedRectangle(cornerRadius: pillRadius).fill(color.opacity(0.12)))
     }
 
     private func latencyTag(_ ms: Int) -> some View {
@@ -502,7 +552,8 @@ private struct VpsServerCard: View {
     }
 
     private func tag(_ text: String, icon: String?, color: Color? = nil) -> some View {
-        HStack(spacing: 3) {
+        let pillRadius: CGFloat = AppTheme.isClaude ? 6 : 4
+        return HStack(spacing: 3) {
             if let icon = icon {
                 Image(systemName: icon)
                     .font(.system(size: 9))
@@ -510,12 +561,13 @@ private struct VpsServerCard: View {
             Text(text)
                 .font(.system(size: 10, weight: .medium))
                 .lineLimit(1)
+                .truncationMode(.tail)
         }
         .foregroundColor(color ?? AppTheme.sidebarText(dark))
         .padding(.horizontal, 7)
         .padding(.vertical, 3)
         .background(
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: pillRadius)
                 .fill(dark ? Color.white.opacity(0.06) : Color.black.opacity(0.04))
         )
     }
@@ -578,7 +630,9 @@ private struct VpsServerCard: View {
     private var cardActions: some View {
         HStack(spacing: 8) {
             AppButton(title: "SSH", systemImage: "terminal", kind: .secondary) { onSSH() }
-            if !card.item.monitorInstalled {
+            if card.needsProbeUpgrade {
+                AppButton(title: "升级探针", systemImage: "arrow.up.circle", kind: .orange) { onInstall() }
+            } else if !card.item.monitorInstalled {
                 AppButton(title: "安装", systemImage: "arrow.down.circle", kind: .primary) { onInstall() }
             }
             AppButton(title: "卸载", systemImage: "trash", kind: .danger) { onUninstall() }
@@ -619,5 +673,208 @@ private struct _FlowLayout<Content: View>: View {
                 content()
             }
         }
+    }
+}
+
+// MARK: - Floating More Menu (NSPanel, never expands parent toolbar)
+
+private struct VpsMoreMenuItem: View {
+    let title: String
+    let icon: String
+    let iconColor: Color
+    let dark: Bool
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        let itemRadius: CGFloat = AppTheme.isClaude ? 6 : 4
+        return Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(iconColor)
+                    .frame(width: 14)
+                Text(title)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(AppTheme.navIcon(dark))
+                Spacer()
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: itemRadius)
+                    .fill(hovering ? AppTheme.sidebarHover(dark) : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
+        .onHover { hovering = $0 }
+    }
+}
+
+private struct VpsMoreMenuFloatBridge<MenuContent: View>: NSViewRepresentable {
+    let isOpen: Bool
+    let panelWidth: CGFloat
+    let onDismiss: () -> Void
+    @ViewBuilder let content: () -> MenuContent
+
+    final class AnchorView: NSView {
+        var panelWidth: CGFloat = 186
+        var onDismiss: (() -> Void)?
+        var contentBuilder: (() -> MenuContent)?
+        private var popupPanel: NSPanel?
+        private var mouseMonitor: Any?
+        private var keyMonitor: Any?
+        private let shadowPad: CGFloat = 14
+
+        override var isFlipped: Bool { true }
+
+        deinit {
+            dismiss()
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if window == nil {
+                dismiss()
+            }
+        }
+
+        func present() {
+            guard let window = window, let builder = contentBuilder else { return }
+            if popupPanel == nil {
+                let host = NSHostingView(rootView: builder())
+                let panel = NSPanel(
+                    contentRect: NSRect(x: 0, y: 0, width: panelWidth + shadowPad * 2, height: 120),
+                    styleMask: [.borderless, .nonactivatingPanel],
+                    backing: .buffered,
+                    defer: false
+                )
+                panel.isFloatingPanel = true
+                panel.level = .popUpMenu
+                panel.hasShadow = false
+                panel.backgroundColor = .clear
+                panel.isOpaque = false
+                panel.contentView = host
+                popupPanel = panel
+                window.addChildWindow(panel, ordered: .above)
+            }
+            layoutPanel()
+            startMonitoring()
+        }
+
+        func dismiss() {
+            stopMonitoring()
+            if let panel = popupPanel {
+                panel.parent?.removeChildWindow(panel)
+                panel.orderOut(nil)
+                popupPanel = nil
+            }
+        }
+
+        func layoutPanel() {
+            guard let panel = popupPanel,
+                  let window = window,
+                  let host = panel.contentView as? NSHostingView<MenuContent> else { return }
+            if let builder = contentBuilder {
+                host.rootView = builder()
+            }
+            let fitting = host.fittingSize
+            let totalW = panelWidth + shadowPad * 2
+            let totalH = max(fitting.height > 20 ? fitting.height : 160, 60)
+
+            let triggerWin = convert(bounds, to: nil)
+            let triggerScreen = window.convertToScreen(triggerWin)
+
+            var panelX = triggerScreen.maxX - panelWidth - shadowPad
+            var panelY = triggerScreen.minY - 6 - (totalH - shadowPad)
+
+            let screenFrame = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
+            if panelY + shadowPad < screenFrame.minY + 4 {
+                panelY = triggerScreen.maxY + 6 - shadowPad
+            }
+            if panelX + totalW - shadowPad > screenFrame.maxX - 4 {
+                panelX = screenFrame.maxX - 4 - (totalW - shadowPad)
+            }
+            if panelX + shadowPad < screenFrame.minX + 4 {
+                panelX = screenFrame.minX + 4 - shadowPad
+            }
+
+            panel.setFrame(NSRect(x: panelX, y: panelY, width: totalW, height: totalH), display: true)
+        }
+
+        private func startMonitoring() {
+            stopMonitoring()
+            mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .scrollWheel]) { [weak self] event in
+                guard let self = self, let panel = self.popupPanel else { return event }
+                if event.type == .scrollWheel {
+                    self.triggerDismiss()
+                    return event
+                }
+                let loc = NSEvent.mouseLocation
+                let visiblePanelRect = panel.frame.insetBy(dx: self.shadowPad - 2, dy: self.shadowPad - 2)
+                if visiblePanelRect.contains(loc) {
+                    return event
+                }
+                if let win = self.window {
+                    let triggerRect = win.convertToScreen(self.convert(self.bounds, to: nil))
+                    if triggerRect.contains(loc) {
+                        return event
+                    }
+                }
+                self.triggerDismiss()
+                return event
+            }
+            keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                if event.keyCode == 53 {
+                    self?.triggerDismiss()
+                    return nil
+                }
+                return event
+            }
+        }
+
+        private func stopMonitoring() {
+            if let m = mouseMonitor {
+                NSEvent.removeMonitor(m)
+                mouseMonitor = nil
+            }
+            if let k = keyMonitor {
+                NSEvent.removeMonitor(k)
+                keyMonitor = nil
+            }
+        }
+
+        private func triggerDismiss() {
+            DispatchQueue.main.async { [weak self] in
+                self?.onDismiss?()
+            }
+        }
+    }
+
+    func makeNSView(context: Context) -> AnchorView {
+        let view = AnchorView()
+        view.panelWidth = panelWidth
+        view.onDismiss = onDismiss
+        view.contentBuilder = content
+        return view
+    }
+
+    func updateNSView(_ nsView: AnchorView, context: Context) {
+        nsView.panelWidth = panelWidth
+        nsView.onDismiss = onDismiss
+        nsView.contentBuilder = content
+        if isOpen {
+            DispatchQueue.main.async {
+                nsView.present()
+            }
+        } else {
+            nsView.dismiss()
+        }
+    }
+
+    static func dismantleNSView(_ nsView: AnchorView, coordinator: ()) {
+        nsView.dismiss()
     }
 }

@@ -4,8 +4,10 @@ import com.nodewebzsz.ocicommon.utils.IpUtils;
 import com.nodewebzsz.ociserver.config.exception.RateLimitException;
 import com.nodewebzsz.ociserver.controller.BaseController;
 import com.nodewebzsz.ocicommon.param.ApiResponse;
+import com.nodewebzsz.ociserver.service.BanService;
 import com.nodewebzsz.ociserver.service.VerifyService;
 import com.nodewebzsz.ociserver.service.login.AuthSecurityService;
+import com.nodewebzsz.ociserver.service.login.LoginFailureGuard;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -29,6 +31,12 @@ public class PasswordResetController  extends BaseController {
 
     @Resource
     private AuthSecurityService authSecurityService;
+
+    @Resource
+    private BanService banService;
+
+    @Resource
+    private LoginFailureGuard loginFailureGuard;
 
     /**
      * 发送重置验证码
@@ -105,7 +113,8 @@ public class PasswordResetController  extends BaseController {
     @PostMapping("/reset-password")
     public ApiResponse resetPassword(
             @RequestBody Map<String, String> request,
-            @RequestHeader(value = "Reset-Token", required = false) String resetToken) {
+            @RequestHeader(value = "Reset-Token", required = false) String resetToken,
+            HttpServletRequest httpServletRequest) {
 
         try {
             String username = request.get("username");
@@ -124,6 +133,11 @@ public class PasswordResetController  extends BaseController {
             }
 
             verifyService.resetPassword(username, resetToken);
+            if (httpServletRequest != null) {
+                String clientIp = IpUtils.getClientIpAddress(httpServletRequest);
+                banService.unbanIp(clientIp, "密码重置自动解封", username);
+                loginFailureGuard.reset(clientIp);
+            }
             boolean channelEnabled = verifyService.isMessageEnabled();
             String msg = channelEnabled
                     ? "密码重置成功，新密码已发送到您的通知终端"

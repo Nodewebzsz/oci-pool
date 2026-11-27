@@ -2014,7 +2014,7 @@ struct TenantSheetHost: View {
                     Spacer(minLength: 0)
                 }
                 field("验证码", text: $model.exportCode)
-                hint("请输入通知中的 6 位数字验证码")
+                hint("请输入通知中的 8 位大写字母或数字验证码")
             }
         }
     }

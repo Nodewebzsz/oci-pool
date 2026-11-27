@@ -6,9 +6,12 @@ import AppKit
 struct SecuritySettingsView: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appearance: AppearanceController
+    @Environment(\.colorScheme) private var colorScheme
     @StateObject private var model = SecuritySettingsViewModel()
 
-    private var dark: Bool { appearance.isDarkEffective }
+    private var dark: Bool { appearance.mode == .system ? colorScheme == .dark : (appearance.mode == .dark) }
+    private var controlRadius: CGFloat { AppTheme.isClaude ? 8 : 5 }
+    private var segmentRadius: CGFloat { AppTheme.isClaude ? 6 : 4 }
 
     // 各行按内容量分级等高，消除死板 500px 导致的巨大留白
     private let row1MinHeight: CGFloat = 380
@@ -85,7 +88,7 @@ struct SecuritySettingsView: View {
     var body: some View {
         PageScaffold(
             title: "系统设置",
-            subtitle: "账号安全 · OAuth · MFA · 验证码 · 频道通知",
+            subtitle: "账号安全 · OAuth · MFA · 验证码 · 频道通知 · IP 封禁管理",
             systemImage: "gearshape",
             iconColor: AppTheme.sidebarActive,
             toolbar: { toolbar },
@@ -112,6 +115,7 @@ struct SecuritySettingsView: View {
                             } second: {
                                 channelCard
                             }
+                            ipBanCard
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -509,6 +513,288 @@ struct SecuritySettingsView: View {
                 model.saveChannelNotify()
             }
         }
+    }
+
+    // MARK: - IP Ban Management (P0)
+
+    private var ipBanCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "hand.raised.fill")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(AppTheme.danger)
+                Text("IP 封禁管理")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppTheme.navIcon(dark))
+                Text("自动登录保护与后台手动封禁审计")
+                    .font(.system(size: 11))
+                    .foregroundColor(AppTheme.textTertiary(dark))
+                    .lineLimit(1)
+                StatusBadge(
+                    text: "共 \(model.ipBanTotal) 条",
+                    tone: model.ipBanTotal > 0 ? .danger : .neutral
+                )
+                Spacer(minLength: 8)
+
+                AppButton(
+                    title: "刷新记录",
+                    systemImage: "arrow.clockwise",
+                    kind: .secondary,
+                    isLoading: model.ipBanLoading
+                ) {
+                    Task { await model.loadIpBans(page: model.ipBanPage) }
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(AppTheme.sidebarHover(dark))
+            .overlay(Rectangle().fill(AppTheme.border(dark)).frame(height: 1), alignment: .bottom)
+
+            VStack(alignment: .leading, spacing: 12) {
+                // 手动封禁栏
+                HStack(spacing: 8) {
+                    AppTextField(
+                        text: $model.manualBanIp,
+                        placeholder: "输入要封禁的 IPv4 / IPv6 地址",
+                        leadingSystemImage: "network",
+                        onCommit: { model.manualBan() }
+                    )
+                    .frame(minWidth: 190, maxWidth: 250)
+
+                    AppTextField(
+                        text: $model.manualBanReason,
+                        placeholder: "封禁原因（可选，默认：后台手动封禁）",
+                        leadingSystemImage: "text.bubble",
+                        onCommit: { model.manualBan() }
+                    )
+
+                    AppButton(
+                        title: "手动封禁",
+                        systemImage: "nosign",
+                        kind: .danger,
+                        isLoading: model.savingKey == "manualBan",
+                        enabled: !model.manualBanIp.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    ) {
+                        model.manualBan()
+                    }
+                }
+
+                // 筛选与搜索栏
+                HStack(spacing: 8) {
+                    HStack(spacing: 4) {
+                        ForEach(IpBanStatusFilter.allCases) { filter in
+                            let active = model.ipBanStatusFilter == filter
+                            Button(action: { model.setIpBanStatusFilter(filter) }) {
+                                Text(filter.label)
+                                    .font(.system(size: 11.5, weight: active ? .semibold : .medium))
+                                    .foregroundColor(active ? appearance.accent.accentFg(dark) : AppTheme.textSecondary(dark))
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: segmentRadius)
+                                            .fill(active ? AppTheme.sidebarActive : Color.clear)
+                                    )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .padding(3)
+                    .background(
+                        RoundedRectangle(cornerRadius: controlRadius)
+                            .fill(AppTheme.sidebarHover(dark))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: controlRadius)
+                            .stroke(AppTheme.border(dark), lineWidth: 1)
+                    )
+
+                    Spacer(minLength: 8)
+
+                    AppTextField(
+                        text: $model.ipBanSearch,
+                        placeholder: "按 IP 搜索…",
+                        leadingSystemImage: "magnifyingglass",
+                        onCommit: { model.searchIpBans() }
+                    )
+                    .frame(width: 210)
+
+                    AppButton(
+                        title: "查询",
+                        systemImage: "magnifyingglass",
+                        kind: .secondary,
+                        isLoading: model.ipBanLoading
+                    ) {
+                        model.searchIpBans()
+                    }
+                }
+
+                if let err = model.ipBanError, !err.isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(AppTheme.danger)
+                        Text(err)
+                            .font(.system(size: 11.5))
+                            .foregroundColor(AppTheme.danger)
+                        Spacer()
+                    }
+                    .padding(10)
+                    .background(AppTheme.dangerSoft(dark))
+                    .cornerRadius(controlRadius)
+                }
+
+                if model.ipBanLoading && model.ipBans.isEmpty {
+                    HStack {
+                        Spacer()
+                        ProgressView("加载封禁记录…")
+                            .padding(.vertical, 20)
+                        Spacer()
+                    }
+                } else if model.ipBans.isEmpty {
+                    HStack {
+                        Spacer()
+                        VStack(spacing: 6) {
+                            Image(systemName: "checkmark.shield")
+                                .font(.system(size: 20))
+                                .foregroundColor(AppTheme.textTertiary(dark))
+                            Text("暂无匹配的 IP 封禁记录")
+                                .font(.system(size: 12))
+                                .foregroundColor(AppTheme.textTertiary(dark))
+                        }
+                        .padding(.vertical, 20)
+                        Spacer()
+                    }
+                } else {
+                    VStack(spacing: 0) {
+                        HStack(spacing: 10) {
+                            Text("IP 地址").frame(width: 150, alignment: .leading)
+                            Text("状态").frame(width: 72, alignment: .leading)
+                            Text("原因 / 来源").frame(maxWidth: .infinity, alignment: .leading)
+                            Text("封禁时间").frame(width: 140, alignment: .leading)
+                            Text("操作").frame(width: 80, alignment: .trailing)
+                        }
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(AppTheme.textTertiary(dark))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(AppTheme.sidebarHover(dark))
+
+                        ForEach(Array(model.ipBans.enumerated()), id: \.element.id) { idx, item in
+                            Rectangle().fill(AppTheme.border(dark)).frame(height: 1)
+                            ipBanRow(item, striped: idx % 2 == 1)
+                        }
+                    }
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(AppTheme.border(dark), lineWidth: 1)
+                    )
+                }
+            }
+            .padding(14)
+
+            if model.ipBanTotal > model.ipBanPageSize {
+                HStack(spacing: 10) {
+                    Text("第 \(model.ipBanPage) / \(model.ipBanTotalPages) 页 · 共 \(model.ipBanTotal) 条")
+                        .font(.system(size: 11.5))
+                        .foregroundColor(AppTheme.textTertiary(dark))
+                    Spacer()
+                    AppButton(
+                        title: "上一页",
+                        systemImage: "chevron.left",
+                        kind: .secondary,
+                        enabled: model.ipBanPage > 1 && !model.ipBanLoading
+                    ) {
+                        model.goIpBanPage(model.ipBanPage - 1)
+                    }
+                    AppButton(
+                        title: "下一页",
+                        systemImage: "chevron.right",
+                        kind: .secondary,
+                        enabled: model.ipBanPage < model.ipBanTotalPages && !model.ipBanLoading
+                    ) {
+                        model.goIpBanPage(model.ipBanPage + 1)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(AppTheme.sidebarHover(dark))
+                .overlay(Rectangle().fill(AppTheme.border(dark)).frame(height: 1), alignment: .top)
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(AppTheme.sidebarBg(dark))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
+        )
+        .cornerRadius(8)
+    }
+
+    private func ipBanRow(_ item: IpBanRecord, striped: Bool) -> some View {
+        HStack(spacing: 10) {
+            Text(item.ipAddress.isEmpty ? "—" : item.ipAddress)
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundColor(AppTheme.navIcon(dark))
+                .lineLimit(1)
+                .frame(width: 150, alignment: .leading)
+
+            StatusBadge(
+                text: item.isActive ? "封禁中" : "已解封",
+                tone: item.isActive ? .danger : .success
+            )
+            .frame(width: 72, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.reason.isEmpty ? "—" : item.reason)
+                    .font(.system(size: 12))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    if !item.source.isEmpty {
+                        Text("来源: \(item.source)")
+                    }
+                    if !item.operatorName.isEmpty {
+                        Text("操作人: \(item.operatorName)")
+                    }
+                    if !item.isActive && !item.unbanTime.isEmpty {
+                        Text("解封: \(item.unbanTime)")
+                    }
+                }
+                .font(.system(size: 10.5))
+                .foregroundColor(AppTheme.textTertiary(dark))
+                .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text(item.createTime.isEmpty ? "—" : item.createTime)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(AppTheme.textSecondary(dark))
+                .lineLimit(1)
+                .frame(width: 140, alignment: .leading)
+
+            HStack {
+                Spacer(minLength: 0)
+                if item.isActive {
+                    AppButton(
+                        title: "解封",
+                        kind: .secondary,
+                        isLoading: model.ipBanBusyId == item.id
+                    ) {
+                        model.unbanRecord(item)
+                    }
+                } else {
+                    Text("—")
+                        .font(.system(size: 11))
+                        .foregroundColor(AppTheme.textTertiary(dark))
+                }
+            }
+            .frame(width: 80, alignment: .trailing)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, appearance.density.rowPadding)
+        .background(striped ? AppTheme.sidebarHover(dark).opacity(0.45) : Color.clear)
     }
 
     private func errorBanner(_ text: String) -> some View {

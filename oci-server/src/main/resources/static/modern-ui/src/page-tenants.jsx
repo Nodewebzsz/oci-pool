@@ -240,22 +240,25 @@ function TenantsPage({ density }) {
       body: (
         <div style={{ padding: 8 }}>
           <input autoFocus value={exportCode}
-            onChange={e => setExportCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            placeholder={tr('tenants.export.codePh')} maxLength={6}
-            style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-2)', color: 'var(--fg-0)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 16, fontFamily: 'var(--font-mono)', letterSpacing: 6, textAlign: 'center', outline: 'none' }} />
+            onChange={e => setExportCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
+            placeholder={tr('tenants.export.codePh')} maxLength={8}
+            style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-2)', color: 'var(--fg-0)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 16, fontFamily: 'var(--font-mono)', letterSpacing: 4, textAlign: 'center', textTransform: 'uppercase', outline: 'none' }} />
         </div>
       ),
       footer: (
         <>
           <Button variant="ghost" size="md" onClick={shell.closeModal}>{tr('common.cancel')}</Button>
-          <Button variant="primary" size="md" icon="download" disabled={exportCode.length !== 6} onClick={async () => {
+          <Button variant="primary" size="md" icon="download" disabled={exportCode.trim().length !== 8} onClick={async () => {
             try {
-              const res = await fetch('/tenants/export', { method: 'GET', headers: { 'X-Verify-Code': exportCode, 'Accept':'application/json','X-Requested-With':'XMLHttpRequest' }, credentials: 'include' });
+              const res = await fetch('/tenants/export', { method: 'GET', headers: { 'X-Verify-Code': exportCode.trim().toUpperCase(), 'Accept':'application/json','X-Requested-With':'XMLHttpRequest' }, credentials: 'include' });
               if (res.ok) {
                 const blob = await res.blob(); const url = URL.createObjectURL(blob);
                 const a = document.createElement('a'); a.href = url; a.download = `tenants_${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url);
                 shell.showToast(tr('tenants.export.ok'), { kind: 'success' });
-              } else shell.showToast(tr('tenants.export.fail').replace('{err}', res.status), { kind: 'error' });
+              } else {
+                const msg = await res.text().catch(() => '');
+                shell.showToast(tr('tenants.export.fail').replace('{err}', msg || res.status), { kind: 'error' });
+              }
             } catch (e) { shell.showToast(tr('tenants.export.fail').replace('{err}', e.message || e), { kind: 'error' }); }
             shell.closeModal();
           }}>{tr('tenants.export.submit')}</Button>

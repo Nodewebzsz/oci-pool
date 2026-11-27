@@ -17,12 +17,16 @@ final class VpsViewModel: ObservableObject {
 
     /// 内嵌 SSH 整页（对齐 Web 跳转终端）
     @Published var sshItem: InstanceItem?
+    @Published var historyContext: NetworkQualityHistoryContext?
 
     private let session: AppSession
+    var serverURL: String { session.serverURL }
     private var service: VpsService { VpsService(baseURL: session.serverURL) }
+    private var qualityService: NetworkQualityService { NetworkQualityService(baseURL: session.serverURL) }
     private let monitorWS = NativeWSClient()
     private var heartbeatTimer: Timer?
     private var metricsByToken: [String: VpsLiveMetrics] = [:]
+    private var isActive = false
 
     var totalCount: Int { cards.count }
     var onlineCount: Int { cards.filter(\.isOnline).count }
@@ -49,12 +53,14 @@ final class VpsViewModel: ObservableObject {
     }
 
     func start() {
+        isActive = true
         Task { await reload() }
         connectMonitor()
         startHeartbeatWatch()
     }
 
     func teardown() {
+        isActive = false
         heartbeatTimer?.invalidate()
         heartbeatTimer = nil
         monitorWS.disconnect(reason: nil)
@@ -67,6 +73,7 @@ final class VpsViewModel: ObservableObject {
         defer { isLoading = false }
         do {
             let resp = try await service.listAll()
+            let overview = try? await qualityService.fetchOverview()
             cards = resp.content.map { item in
                 var c = VpsCardItem(item: item)
                 if let m = metricsByToken[item.instanceId], m.hasData {
@@ -74,6 +81,16 @@ final class VpsViewModel: ObservableObject {
                     c.item.monitorInstalled = true
                 } else if item.lastHeartbeatMs > 0 {
                     c.metrics.lastBeatMs = item.lastHeartbeatMs
+                }
+                if let ov = overview {
+                    c.qualityAgent = ov.agent(forInstanceId: item.id)
+                    let assignedTasks = ov.tasks(forInstanceId: item.id)
+                    c.qualitySummaries = assignedTasks.map { task in
+                        VpsQualitySummary(
+                            task: task,
+                            sample: ov.latestSample(instanceId: item.id, taskId: task.id)
+                        )
+                    }
                 }
                 return c
             }
@@ -176,9 +193,10 @@ final class VpsViewModel: ObservableObject {
     }
 
     func installMonitor(_ card: VpsCardItem) {
+        let isUpgrade = card.needsProbeUpgrade || card.item.monitorInstalled
         guard AppAlert.confirm(
-            title: "安装监控探针",
-            message: "将通过 SSH 连接 \(card.displayIP) 并安装 Agent。"
+            title: isUpgrade ? "升级监控与网络质量探针" : "安装监控与网络质量探针",
+            message: "将通过 SSH 连接 \(card.displayIP) 并部署 Agent 与网络质量探针。"
         ) else { return }
         Task {
             isBusy = true
@@ -188,6 +206,7 @@ final class VpsViewModel: ObservableObject {
                 if let idx = cards.firstIndex(where: { $0.id == card.id }) {
                     cards[idx].item.monitorInstalled = true
                 }
+                await reload()
             } catch {
                 ToastCenter.shared.error(error.localizedDescription)
             }
@@ -210,11 +229,27 @@ final class VpsViewModel: ObservableObject {
                     cards[idx].metrics = VpsLiveMetrics()
                     cards[idx].monitorWarning = false
                 }
+                await reload()
             } catch {
                 ToastCenter.shared.error(error.localizedDescription)
             }
             isBusy = false
         }
+    }
+
+    func openQualityHistory(card: VpsCardItem, task: NetworkQualityTask) {
+        let name = card.item.displayName.isEmpty ? card.displayIP : card.item.displayName
+        historyContext = NetworkQualityHistoryContext(
+            instanceId: card.item.id,
+            instanceName: name,
+            taskId: task.id,
+            taskName: task.name,
+            revision: task.version,
+            target: task.target,
+            type: task.type,
+            operatorType: task.operatorType,
+            region: task.region
+        )
     }
 
     func openSSH(_ card: VpsCardItem) {
@@ -246,9 +281,10 @@ final class VpsViewModel: ObservableObject {
         monitorWS.onState = { [weak self] state in
             guard let self = self else { return }
             if case .closed = state {
-                // 自动重连
+                guard self.isActive else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
-                    self?.connectMonitor()
+                    guard let self = self, self.isActive else { return }
+                    self.connectMonitor()
                 }
             }
         }

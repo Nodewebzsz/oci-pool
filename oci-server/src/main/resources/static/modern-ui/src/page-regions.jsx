@@ -745,6 +745,7 @@ function RegionMapView({ regions, lang, onSelectRegion }) {
                 ? 3.4
                 : 2.2;
             const activeColor = isToday ? 'var(--orange)' : 'var(--accent)';
+            const uncoveredColor = isToday ? 'var(--orange)' : 'var(--cyan)';
 
             return (
               <g key={r.code}
@@ -775,7 +776,7 @@ function RegionMapView({ regions, lang, onSelectRegion }) {
                   </>
                 )}
 
-                {/* 3) 未关联但官方已放货: 旋转 45° 半透明菱形标记 */}
+                {/* 3) 未关联但官方已放货: 小尺寸空心圆，与已关联实心圆区分 */}
                 {kind === 'unlinked_released' && (
                   <>
                     {isToday && (
@@ -784,16 +785,13 @@ function RegionMapView({ regions, lang, onSelectRegion }) {
                         <animate attributeName="opacity" values="0.22;0;0.22" dur="2.4s" repeatCount="indefinite" />
                       </circle>
                     )}
-                    <rect
-                      width={7}
-                      height={7}
-                      x={x - 3.5}
-                      y={y - 3.5}
-                      rx={1}
-                      transform={`rotate(45 ${x} ${y})`}
-                      fill="color-mix(in oklab, var(--orange) 26%, var(--bg-1))"
-                      stroke="var(--orange)"
-                      strokeWidth="1.35"
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r={3.4}
+                      fill="var(--bg-2)"
+                      stroke={uncoveredColor}
+                      strokeWidth="1.4"
                     />
                   </>
                 )}
@@ -812,7 +810,7 @@ function RegionMapView({ regions, lang, onSelectRegion }) {
                       fontSize="9.5"
                       fontWeight={kind === 'linked_active' ? '600' : '500'}
                       fontFamily="var(--font-sans)"
-                      fill={kind === 'unlinked_released' ? 'var(--orange)' : (kind === 'linked_active' ? 'var(--fg-0)' : 'var(--fg-2)')}
+                      fill={kind === 'unlinked_released' ? uncoveredColor : (kind === 'linked_active' ? 'var(--fg-0)' : 'var(--fg-2)')}
                       stroke="var(--bg-0)"
                       strokeWidth="2.6"
                       paintOrder="stroke"
@@ -963,10 +961,10 @@ function RegionMapView({ regions, lang, onSelectRegion }) {
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{
-              width: 8, height: 8, borderRadius: 1,
-              background: 'color-mix(in oklab, var(--orange) 26%, var(--bg-1))',
-              border: '1.5px solid var(--orange)',
-              transform: 'rotate(45deg)',
+              width: 9, height: 9, borderRadius: '50%',
+              background: 'var(--bg-2)',
+              border: '1.5px solid var(--cyan)',
+              boxSizing: 'border-box',
               display: 'inline-block',
             }} />
             {regionTx(tr, lang, 'regions.map.legend.uncoveredReleased', '有货未覆盖 (可订阅开拓)', 'Released · Uncovered')}

@@ -424,4 +424,17 @@ public class ThreadPoolConfig {
                 new ThreadPoolExecutor.AbortPolicy()
         );
     }
+
+    @Bean(name = "loginNotificationExecutor")
+    public ThreadPoolTaskExecutor loginNotificationExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(100);
+        executor.setThreadNamePrefix("login-notify-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.DiscardPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(false);
+        executor.initialize();
+        return executor;
+    }
 }

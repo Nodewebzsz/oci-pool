@@ -51,16 +51,65 @@ public class LoginUserService {
      * 验证用户名和密码，返回 LoginUser（失败抛异常）
      */
     public LoginUser validateCredentials(String username, String password) {
-        LoginUser user = loginUserRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("用户名或密码错误"));
-
-        if (!passwordEncoder.matches(password, user.getPassword())) {
-            log.warn("用户 [{}] 密码验证失败", username);
+        CredentialCheckResult result = checkCredentials(username, password);
+        if (result.getStatus() != CredentialCheckStatus.OK) {
             throw new RuntimeException("用户名或密码错误");
         }
+        return result.getUser();
+    }
 
+    /**
+     * 区分“用户名不存在”与“密码错误”的凭据校验方法
+     */
+    public CredentialCheckResult checkCredentials(String username, String password) {
+        Optional<LoginUser> optionalUser = loginUserRepository.findByUsername(username);
+        if (!optionalUser.isPresent()) {
+            log.warn("用户 [{}] 不存在，登录验证失败", username);
+            return CredentialCheckResult.unknownUsername();
+        }
+        LoginUser user = optionalUser.get();
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            log.warn("用户 [{}] 密码验证失败", username);
+            return CredentialCheckResult.wrongPassword(user);
+        }
         versionCheckTask.checkVersion();
-        return user;
+        return CredentialCheckResult.ok(user);
+    }
+
+    public enum CredentialCheckStatus {
+        OK,
+        UNKNOWN_USERNAME,
+        WRONG_PASSWORD
+    }
+
+    public static final class CredentialCheckResult {
+        private final CredentialCheckStatus status;
+        private final LoginUser user;
+
+        private CredentialCheckResult(CredentialCheckStatus status, LoginUser user) {
+            this.status = status;
+            this.user = user;
+        }
+
+        public static CredentialCheckResult ok(LoginUser user) {
+            return new CredentialCheckResult(CredentialCheckStatus.OK, user);
+        }
+
+        public static CredentialCheckResult unknownUsername() {
+            return new CredentialCheckResult(CredentialCheckStatus.UNKNOWN_USERNAME, null);
+        }
+
+        public static CredentialCheckResult wrongPassword(LoginUser user) {
+            return new CredentialCheckResult(CredentialCheckStatus.WRONG_PASSWORD, user);
+        }
+
+        public CredentialCheckStatus getStatus() {
+            return status;
+        }
+
+        public LoginUser getUser() {
+            return user;
+        }
     }
 
     /**
@@ -131,9 +180,11 @@ public class LoginUserService {
     }
 
     public void updatePassword(PasswordUpdateRequest request, HttpServletRequest httpServletRequest) {
-        log.info("修改用户信息请求参数：{}", JSONUtil.toJsonStr(request));
-
         String currentUsername = StpUtil.getLoginIdAsString();
+        log.info("用户 [{}] 请求修改账号信息（是否修改用户名：{}，是否修改密码：{}）",
+                currentUsername,
+                StringUtils.hasText(request.getNewUsername()) && !request.getNewUsername().equals(currentUsername),
+                StringUtils.hasText(request.getNewPassword()));
         LoginUser user = loginUserRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> {
                     log.warn("用户 [{}] 不存在，登录验证失败", currentUsername);
@@ -156,12 +207,12 @@ public class LoginUserService {
             user.setUsername(request.getNewUsername());
         }
 
-        log.info("修改后的用户信息：{}", JSONUtil.toJsonStr(user));
         if (StringUtils.hasText(request.getNewPassword())) {
             if (!ObjectUtil.equals(request.getNewPassword(), request.getCurrentPassword())) {
                 user.setPassword(passwordEncoder.encode(request.getNewPassword()));
             }
         }
         loginUserRepository.save(user);
+        log.info("用户 [{}] 账号信息修改成功", user.getUsername());
     }
 }
