@@ -102,11 +102,11 @@ struct ProxyConfigView: View {
                          valueColor: Color?, mono: Bool = false) -> some View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(label)
+                Text(L(label))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(AppTheme.textTertiary(dark))
                     .lineLimit(1)
-                Text(value)
+                Text(L(value))
                     .font(.system(size: 22, weight: .bold, design: mono ? .monospaced : .default))
                     .foregroundColor(valueColor ?? AppTheme.navIcon(dark))
                     .lineLimit(1)
@@ -151,7 +151,7 @@ struct ProxyConfigView: View {
                 VStack(spacing: 10) {
                     Spacer()
                     ProgressView()
-                    Text("加载代理列表中…")
+                    Text(L("加载代理列表中…"))
                         .font(.system(size: 12))
                         .foregroundColor(AppTheme.sidebarText(dark))
                     Spacer()
@@ -199,49 +199,49 @@ struct ProxyConfigView: View {
         let proto = item.proxyType.uppercased()
         let protoColor = proto == "SOCKS5" ? AppTheme.sidebarActive : AppTheme.info
         return HStack(spacing: 0) {
-            Text("\(index)")
+            Text(L("\(index)"))
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(AppTheme.textTertiary(dark))
                 .frame(width: 44)
             HStack(spacing: 7) {
-                Circle().fill(tone).frame(width: 8, height: 8).help(item.healthHelp)
-                Text(item.customName.isEmpty ? item.proxyHost : item.customName)
+                Circle().fill(tone).frame(width: 8, height: 8).help(L(item.healthHelp))
+                Text(L(item.customName.isEmpty ? item.proxyHost : item.customName))
                     .font(.system(size: 12.5, weight: .medium))
                     .foregroundColor(primaryText)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                    .help(item.customName.isEmpty ? item.proxyHost : item.customName)
+                    .help(L(item.customName.isEmpty ? item.proxyHost : item.customName))
                 if item.isForce {
-                    Text("强制")
+                    Text(L("强制"))
                         .font(.system(size: 10.5, weight: .semibold))
                         .foregroundColor(AppTheme.danger)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 1)
                         .background(RoundedRectangle(cornerRadius: 4).fill(AppTheme.danger.opacity(0.12)))
                         .overlay(RoundedRectangle(cornerRadius: 4).stroke(AppTheme.danger.opacity(0.25), lineWidth: 1))
-                        .help("强制代理：节点不可用时拒绝请求")
+                        .help(L("强制代理：节点不可用时拒绝请求"))
                         .fixedSize()
                 }
             }
             .padding(.horizontal, 8)
             .frame(width: 140, alignment: .leading)
-            Text(proto.isEmpty ? "—" : proto)
+            Text(L(proto.isEmpty ? "—" : proto))
                 .font(.system(size: 10.5, weight: .bold, design: .monospaced))
                 .foregroundColor(protoColor)
                 .padding(.horizontal, 7)
                 .padding(.vertical, 2)
                 .background(RoundedRectangle(cornerRadius: 4).fill(protoColor.opacity(0.14)))
                 .frame(width: 76, alignment: .leading)
-            Text(item.endpoint)
+            Text(L(item.endpoint))
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundColor(AppTheme.cyan)
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .frame(width: 200, alignment: .leading)
-                .help(item.endpoint)
+                .help(L(item.endpoint))
             locationCell(item)
             Button(action: { model.openEdit(item) }) {
-                Text("\(item.boundTenantIds.count)")
+                Text(L("\(item.boundTenantIds.count)"))
                     .font(.system(size: 11.5, weight: .semibold))
                     .foregroundColor(item.boundTenantIds.isEmpty ? AppTheme.textTertiary(dark) : primaryText)
                     .frame(minWidth: 26, minHeight: 22)
@@ -249,11 +249,11 @@ struct ProxyConfigView: View {
                     .background(Capsule().fill(AppTheme.bg3(dark)))
             }
             .buttonStyle(PlainButtonStyle())
-            .help(item.tenantName.isEmpty ? "点击管理该代理关联的租户" : "点击管理该代理关联的租户\n\(item.tenantName)")
+            .help(L(item.tenantName.isEmpty ? "点击管理该代理关联的租户" : "点击管理该代理关联的租户\n\(item.tenantName)"))
             .frame(width: 64)
             Group {
                 if let ms = item.latency {
-                    Text("\(ms) ms")
+                    Text(L("\(ms) ms"))
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundColor(latencyColor(ms))
                 } else {
@@ -266,7 +266,7 @@ struct ProxyConfigView: View {
                     if health == .testing {
                         ProgressView().scaleEffect(0.45).frame(width: 10, height: 10)
                     }
-                    Text(health.label)
+                    Text(L(health.label))
                         .font(.system(size: 11.5, weight: .medium))
                 }
                 .foregroundColor(health == .unchecked ? AppTheme.textSecondary(dark) : tone)
@@ -274,13 +274,13 @@ struct ProxyConfigView: View {
                 .padding(.vertical, 2)
                 .background(Capsule().fill(tone.opacity(0.08)))
                 .overlay(Capsule().stroke(AppTheme.border(dark), lineWidth: 1))
-                Text(item.checkedText.isEmpty ? " " : item.checkedText)
+                Text(L(item.checkedText.isEmpty ? " " : item.checkedText))
                     .font(.system(size: 9.5))
                     .foregroundColor(AppTheme.textTertiary(dark))
                     .lineLimit(1)
                     .frame(height: 12)
             }
-            .help(item.healthHelp)
+            .help(L(item.healthHelp))
             .frame(width: 96)
             HStack(spacing: 2) {
                 actionButton(icon: "wifi", help: "检测连通性", hover: AppTheme.sidebarActive,
@@ -317,7 +317,7 @@ struct ProxyConfigView: View {
                 ProgressView()
                     .scaleEffect(0.55)
                     .frame(width: 12, height: 12)
-                Text("检测中…")
+                Text(L("检测中…"))
                     .font(.system(size: 11.5))
                     .foregroundColor(AppTheme.textTertiary(dark))
                     .lineLimit(1)
@@ -325,7 +325,7 @@ struct ProxyConfigView: View {
                 Image(systemName: "mappin.and.ellipse")
                     .font(.system(size: 10))
                     .foregroundColor(AppTheme.sidebarActive)
-                Text(item.location)
+                Text(L(item.location))
                     .font(.system(size: 12))
                     .foregroundColor(primaryText)
                     .lineLimit(1)
@@ -337,16 +337,16 @@ struct ProxyConfigView: View {
             }
         }
         .frame(minWidth: 110, maxWidth: .infinity, alignment: .leading)
-        .help(item.location.isEmpty ? "未解析" : item.location)
+        .help(L(item.location.isEmpty ? "未解析" : item.location))
     }
 
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(AppTheme.danger)
-            Text(text).font(.system(size: 12))
+            Text(L(text)).font(.system(size: 12))
             Spacer()
-            Button("重试") { Task { await model.reload() } }
+            Button(L("重试")) { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
             Button(action: { model.clearError() }) {
                 Image(systemName: "xmark")
@@ -355,7 +355,7 @@ struct ProxyConfigView: View {
                     .padding(4)
             }
             .buttonStyle(PlainButtonStyle())
-            .help("关闭提示")
+            .help(L("关闭提示"))
         }
         .foregroundColor(AppTheme.danger)
         .padding(12)
@@ -396,6 +396,6 @@ private struct ProxyActionButton: View {
         .buttonStyle(PlainButtonStyle())
         .opacity(isEnabled ? 1 : 0.45)
         .onHover { hovering = $0 }
-        .help(help)
+        .help(L(help))
     }
 }

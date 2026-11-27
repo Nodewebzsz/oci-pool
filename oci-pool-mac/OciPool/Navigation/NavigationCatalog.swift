@@ -5,11 +5,12 @@ import Foundation
 struct NavigationItem: Identifiable, Hashable {
     var id: NavID { nav }
     let nav: NavID
-    let title: String
+    let rawTitle: String
     let systemImage: String
     let webPath: String
     /// nil = always visible; else cloud types 1=OCI 2=GCP 3=Azure 4=AWS
     let cloudTypes: Set<Int>?
+    var title: String { L(rawTitle) }
 }
 
 enum NavigationCatalog {
@@ -96,6 +97,7 @@ enum NavigationCatalog {
             if !q.isEmpty {
                 list = list.filter {
                     $0.title.localizedCaseInsensitiveContains(q)
+                        || $0.rawTitle.localizedCaseInsensitiveContains(q)
                         || $0.nav.rawValue.localizedCaseInsensitiveContains(q)
                 }
             }
@@ -110,6 +112,6 @@ enum NavigationCatalog {
         _ path: String,
         _ clouds: Set<Int>? = nil
     ) -> NavigationItem {
-        NavigationItem(nav: nav, title: title, systemImage: image, webPath: path, cloudTypes: clouds)
+        NavigationItem(nav: nav, rawTitle: title, systemImage: image, webPath: path, cloudTypes: clouds)
     }
 }

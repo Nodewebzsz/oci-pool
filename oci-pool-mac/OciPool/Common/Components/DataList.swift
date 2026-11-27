@@ -93,7 +93,7 @@ struct DataListColumnHeader: View {
     private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
 
     var body: some View {
-        Text(title)
+        Text(L(title))
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(AppTheme.sidebarText(dark))
             .frame(width: width, alignment: alignment)

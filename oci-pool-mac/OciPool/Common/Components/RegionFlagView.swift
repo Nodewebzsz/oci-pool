@@ -183,7 +183,7 @@ struct RegionFlagView: View {
 
     var body: some View {
         let flag = RegionFlag.emoji(code: code, name: name)
-        Text(flag)
+        Text(L(flag))
             .font(.system(size: size))
             .lineLimit(1)
     }
@@ -193,6 +193,7 @@ struct RegionFlagView: View {
 
 /// 区域徽章组件：展示「国旗 Emoji + 中文区域名」
 struct RegionBadgeView: View {
+    @ObservedObject private var i18n = AppI18n.shared
     let code: String
     var name: String? = nil
     var size: CGFloat = 13
@@ -213,9 +214,9 @@ struct RegionBadgeView: View {
         }()
 
         HStack(spacing: 6) {
-            Text(flag)
+            Text(L(flag))
                 .font(.system(size: size))
-            Text(resolvedName)
+            Text(L(resolvedName))
                 .font(.system(size: 12, weight: bold ? .semibold : .medium))
                 .foregroundColor(textColor)
                 .lineLimit(1)

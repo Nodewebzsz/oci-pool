@@ -421,7 +421,7 @@ final class StorageViewModel: ObservableObject {
         let panel = NSSavePanel()
         panel.canCreateDirectories = true
         panel.nameFieldStringValue = item.displayName
-        panel.title = "保存对象"
+        panel.title = L("保存对象")
         guard panel.runModal() == .OK, let dest = panel.url else { return }
         Task {
             LoadingHUD.shared.begin()
@@ -468,7 +468,7 @@ final class StorageViewModel: ObservableObject {
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
-        panel.title = "选择要上传的文件"
+        panel.title = L("选择要上传的文件")
         guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
         startUpload(files: panel.urls)
     }

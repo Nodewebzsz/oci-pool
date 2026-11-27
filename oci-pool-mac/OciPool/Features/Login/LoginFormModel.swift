@@ -27,7 +27,7 @@ final class LoginFormModel: ObservableObject {
     @Published var modeActivated = false
     /// UserDefaults: user has explicitly chosen a mode at least once (not first install).
     @Published var hasPersistedChoice = false
-    @Published var locale: AppLocale = .zhCN
+    @Published var locale: AppLocale = AppI18n.shared.locale
 
     @Published var messageEnabled = false
     @Published var mfaEnabled = false

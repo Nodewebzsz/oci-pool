@@ -46,6 +46,14 @@ final class ContentHostViewController: NSViewController {
             }
             .store(in: &cancellables)
 
+        NotificationCenter.default.publisher(for: .ociLocaleDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self = self, let nav = self.currentNav else { return }
+                self.view.window?.title = "OCI-POOL — \(NavigationCatalog.item(for: nav)?.title ?? nav.rawValue)"
+            }
+            .store(in: &cancellables)
+
         replace(with: navigation.selected, force: true)
     }
 

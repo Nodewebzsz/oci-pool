@@ -56,7 +56,7 @@ struct EdgeOneView: View {
     /// Web 页头 actions：域名: label + zone 下拉 220 + 密钥配置(orange) + 添加记录 + 同步(primary) + 刷新
     private var toolbar: some View {
         HStack(spacing: 8) {
-            Text("域名:")
+            Text(L("域名:"))
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.textTertiary(dark))
             SelectMenu(
@@ -114,7 +114,7 @@ struct EdgeOneView: View {
                             Image(systemName: m.systemImage)
                                 .font(.system(size: 11, weight: .medium))
                                 .frame(width: 14)
-                            Text(m.title)
+                            Text(L(m.title))
                                 .font(.system(size: 12, weight: .medium))
                         }
                         .foregroundColor(active
@@ -151,12 +151,12 @@ struct EdgeOneView: View {
     private var searchBar: some View {
         HStack(spacing: 10) {
             if model.mode == .dns {
-                Text("按名称:")
+                Text(L("按名称:"))
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.textTertiary(dark))
                     .fixedSize()
                 SearchField(text: $model.searchName, placeholder: "e.g. www", maxWidth: 220)
-                Text("按值:")
+                Text(L("按值:"))
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.textTertiary(dark))
                     .fixedSize()
@@ -168,12 +168,12 @@ struct EdgeOneView: View {
                 .fixedSize()
                 Spacer()
             } else {
-                Text("域名:")
+                Text(L("域名:"))
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.textTertiary(dark))
                     .fixedSize()
                 SearchField(text: $model.searchName, placeholder: "e.g. www.example.com", maxWidth: 240)
-                Text("状态:")
+                Text(L("状态:"))
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.textTertiary(dark))
                     .fixedSize()
@@ -210,10 +210,10 @@ struct EdgeOneView: View {
             Image(systemName: icon)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(AppTheme.textSecondary(dark))
-            Text(title)
+            Text(L(title))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(AppTheme.navIcon(dark))
-            Text("(\(count))")
+            Text(L("(\(count))"))
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundColor(AppTheme.textTertiary(dark))
             Spacer(minLength: 0)
@@ -253,7 +253,7 @@ struct EdgeOneView: View {
                     VStack(spacing: 10) {
                         Spacer()
                         ProgressView()
-                        Text("正在加载 DNS 记录…")
+                        Text(L("正在加载 DNS 记录…"))
                             .font(.system(size: 12))
                             .foregroundColor(AppTheme.sidebarText(dark))
                         Spacer()
@@ -329,7 +329,7 @@ struct EdgeOneView: View {
                     VStack(spacing: 10) {
                         Spacer()
                         ProgressView()
-                        Text("正在加载加速域名…")
+                        Text(L("正在加载加速域名…"))
                             .font(.system(size: 12))
                             .foregroundColor(AppTheme.sidebarText(dark))
                         Spacer()
@@ -438,7 +438,7 @@ struct EdgeOneView: View {
                 .buttonStyle(PlainButtonStyle())
                 .disabled(true)
                 .opacity(0.4)
-                .help("不可编辑")
+                .help(L("不可编辑"))
 
                 actionBtn("trash", color: AppTheme.danger, tip: "删除") {
                     model.deleteDomain(item)
@@ -451,7 +451,7 @@ struct EdgeOneView: View {
 
     private func typeChip(_ type: String) -> some View {
         let c = EdgeOneJSON.typeColor(type)
-        return Text(type)
+        return Text(L(type))
             .font(.system(size: 11, weight: .bold, design: .monospaced))
             .foregroundColor(c)
             .padding(.horizontal, 8)
@@ -461,14 +461,14 @@ struct EdgeOneView: View {
     }
 
     private func cell(_ text: String, width: CGFloat?) -> some View {
-        Text(text.isEmpty ? "—" : text)
+        Text(L(text.isEmpty ? "—" : text))
             .font(.system(size: 12))
             .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
             .lineLimit(1)
             .truncationMode(.middle)
             .frame(width: width, alignment: .center)
             .frame(maxWidth: width == nil ? .infinity : width, alignment: .leading)
-            .help(text)
+            .help(L(text))
     }
 
     private func actionBtn(_ icon: String, color: Color, tip: String, action: @escaping () -> Void) -> some View {
@@ -480,18 +480,18 @@ struct EdgeOneView: View {
                 .background(RoundedRectangle(cornerRadius: 6).fill(color.opacity(0.12)))
         }
         .buttonStyle(PlainButtonStyle())
-        .help(tip)
+        .help(L(tip))
     }
 
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(AppTheme.danger)
-            Text(text).font(.system(size: 12))
+            Text(L(text)).font(.system(size: 12))
             Spacer()
-            Button("密钥配置") { model.openConfig() }
+            Button(L("密钥配置")) { model.openConfig() }
                 .buttonStyle(PlainButtonStyle())
-            Button("重试") {
+            Button(L("重试")) {
                 Task { await model.loadZones(selectFirst: true) }
             }
             .buttonStyle(PlainButtonStyle())
@@ -502,7 +502,7 @@ struct EdgeOneView: View {
                     .padding(4)
             }
             .buttonStyle(PlainButtonStyle())
-            .help("关闭提示")
+            .help(L("关闭提示"))
         }
         .foregroundColor(AppTheme.danger)
         .padding(12)

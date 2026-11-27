@@ -87,7 +87,7 @@ struct SpeedTestView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 12))
-            Text(text)
+            Text(L(text))
                 .font(.system(size: 12))
             Spacer(minLength: 8)
             AppButton(title: "重试", kind: .secondary) {
@@ -112,12 +112,12 @@ struct SpeedTestView: View {
             // 1. 当前 IP
             ZStack(alignment: .topTrailing) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("当前 IP")
+                    Text(L("当前 IP"))
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(AppTheme.sidebarText(dark))
                         .textCase(.uppercase)
 
-                    Text(model.clientIP)
+                    Text(L(model.clientIP))
                         .font(.system(size: 17, weight: .bold, design: .monospaced))
                         .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                         .lineLimit(1)
@@ -125,7 +125,7 @@ struct SpeedTestView: View {
                         .padding(.top, 2)
 
                     if !model.clientLocation.isEmpty {
-                        Text(model.clientLocation)
+                        Text(L(model.clientLocation))
                             .font(.system(size: 11))
                             .foregroundColor(AppTheme.sidebarText(dark))
                             .lineLimit(1)
@@ -152,16 +152,16 @@ struct SpeedTestView: View {
             let hasBest = model.bestRegion != nil
             ZStack(alignment: .topTrailing) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("最优区域")
+                    Text(L("最优区域"))
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(AppTheme.sidebarText(dark))
                         .textCase(.uppercase)
 
                     if let best = model.bestRegion {
                         HStack(spacing: 6) {
-                            Text(best.flag)
+                            Text(L(best.flag))
                                 .font(.system(size: 16))
-                            Text(best.name)
+                            Text(L(best.name))
                                 .font(.system(size: 15, weight: .bold))
                                 .foregroundColor(dark ? Color.white.opacity(0.95) : Color.primary)
                                 .lineLimit(1)
@@ -169,20 +169,20 @@ struct SpeedTestView: View {
                         .padding(.top, 2)
 
                         HStack(spacing: 4) {
-                            Text("\(best.ms) ms")
+                            Text(L("\(best.ms) ms"))
                                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
                                 .foregroundColor(AppTheme.sidebarActive)
                             Text("·")
                                 .font(.system(size: 11))
                                 .foregroundColor(AppTheme.sidebarText(dark))
-                            Text(best.code)
+                            Text(L(best.code))
                                 .font(.system(size: 11, design: .monospaced))
                                 .foregroundColor(AppTheme.sidebarText(dark))
                                 .lineLimit(1)
                         }
                         .padding(.top, 1)
                     } else {
-                        Text(model.isTesting ? "测试中…" : "--")
+                        Text(L(model.isTesting ? "测试中…" : "--"))
                             .font(.system(size: 17, weight: .bold))
                             .foregroundColor(AppTheme.sidebarText(dark))
                             .padding(.top, 2)
@@ -217,7 +217,7 @@ struct SpeedTestView: View {
             let hasAvg = model.avgLatencyMs != nil
             ZStack(alignment: .topTrailing) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("平均延迟")
+                    Text(L("平均延迟"))
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(AppTheme.sidebarText(dark))
                         .textCase(.uppercase)
@@ -225,7 +225,7 @@ struct SpeedTestView: View {
                     if let avg = model.avgLatencyMs {
                         let tone = SpeedLatencyTone.from(ms: avg)
                         HStack(alignment: .firstTextBaseline, spacing: 2) {
-                            Text("\(avg)")
+                            Text(L("\(avg)"))
                                 .font(.system(size: 18, weight: .bold, design: .monospaced))
                                 .foregroundColor(SpeedTestTheme.toneColor(tone, dark: dark))
                             Text("ms")
@@ -234,7 +234,7 @@ struct SpeedTestView: View {
                         }
                         .padding(.top, 2)
 
-                        Text("基于 \(model.testedSuccessCount) / \(model.regions.count) 个区域")
+                        Text(L("基于 \(model.testedSuccessCount) / \(model.regions.count) 个区域"))
                             .font(.system(size: 11))
                             .foregroundColor(AppTheme.sidebarText(dark))
                             .padding(.top, 1)
@@ -271,7 +271,7 @@ struct SpeedTestView: View {
                 Image(systemName: "award.fill")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(AppTheme.sidebarActive)
-                Text("Top 5 最优线路")
+                Text(L("Top 5 最优线路"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
                 Spacer(minLength: 0)
@@ -301,20 +301,20 @@ struct SpeedTestView: View {
         let isFirst = index == 0
         return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 5) {
-                Text(medal).font(.system(size: 15))
-                Text(item.flag).font(.system(size: 15))
+                Text(L(medal)).font(.system(size: 15))
+                Text(L(item.flag)).font(.system(size: 15))
             }
-            Text(item.name)
+            Text(L(item.name))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                 .lineLimit(1)
                 .padding(.top, 2)
-            Text(item.id)
+            Text(L(item.id))
                 .font(.system(size: 9.5, design: .monospaced))
                 .foregroundColor(AppTheme.sidebarText(dark))
                 .lineLimit(1)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text("\(item.ms)")
+                Text(L("\(item.ms)"))
                     .font(.system(size: 15, weight: .bold, design: .monospaced))
                     .foregroundColor(tone)
                 Text("ms")
@@ -350,7 +350,7 @@ struct SpeedTestView: View {
                 Image(systemName: "globe")
                     .font(.system(size: 12))
                     .foregroundColor(AppTheme.sidebarText(dark))
-                Text("全球 OCI 区域 (\(model.regions.count))")
+                Text(L("全球 OCI 区域 (\(model.regions.count))"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
                 Spacer(minLength: 8)
@@ -367,11 +367,11 @@ struct SpeedTestView: View {
             if model.isTesting {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("正在测速中...")
+                        Text(L("正在测速中..."))
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(AppTheme.info)
                         Spacer()
-                        Text("\(model.testedCount)/\(model.regions.count)")
+                        Text(L("\(model.testedCount)/\(model.regions.count)"))
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundColor(AppTheme.sidebarText(dark))
                     }
@@ -422,7 +422,7 @@ struct SpeedTestView: View {
             RoundedRectangle(cornerRadius: 2)
                 .fill(color)
                 .frame(width: 8, height: 8)
-            Text(label)
+            Text(L(label))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.sidebarText(dark))
         }
@@ -447,9 +447,9 @@ struct SpeedTestView: View {
         return VStack(alignment: .leading, spacing: 6) {
             // 头部：国旗 + 中文名，右侧如果是最优显示 🏆
             HStack(spacing: 6) {
-                Text(region.flag)
+                Text(L(region.flag))
                     .font(.system(size: 14))
-                Text(region.simpleName)
+                Text(L(region.simpleName))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                     .lineLimit(1)
@@ -461,7 +461,7 @@ struct SpeedTestView: View {
             }
 
             // 区域 Code 单独占一行，解决挤在右边胶囊被硬折三行的严重缺陷
-            Text(region.code)
+            Text(L(region.code))
                 .font(.system(size: 10, design: .monospaced))
                 .foregroundColor(AppTheme.sidebarText(dark))
                 .lineLimit(1)
@@ -474,7 +474,7 @@ struct SpeedTestView: View {
                         .scaleEffect(0.65)
                         .frame(width: 20, height: 20)
                 } else {
-                    Text(state.displayText)
+                    Text(L(state.displayText))
                         .font(Font.system(size: state == .timeout ? 15 : 22, weight: .bold).monospacedDigit())
                         .foregroundColor(
                             state == .timeout

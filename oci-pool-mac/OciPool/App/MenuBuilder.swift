@@ -11,59 +11,59 @@ enum MenuBuilder {
         // App
         let appMenuItem = NSMenuItem()
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "关于 OCI-POOL", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        appMenu.addItem(withTitle: L("关于 OCI-POOL"), action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(NSMenuItem.separator())
         let logout = NSMenuItem(
-            title: "退出登录",
+            title: L("退出登录"),
             action: #selector(AppDelegate.logoutAction(_:)),
             keyEquivalent: "l"
         )
         logout.keyEquivalentModifierMask = [.command, .shift]
         appMenu.addItem(logout)
         appMenu.addItem(NSMenuItem.separator())
-        appMenu.addItem(withTitle: "隐藏 OCI-POOL", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: L("隐藏 OCI-POOL"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         let hideOthers = NSMenuItem(
-            title: "隐藏其他",
+            title: L("隐藏其他"),
             action: #selector(NSApplication.hideOtherApplications(_:)),
             keyEquivalent: "h"
         )
         hideOthers.keyEquivalentModifierMask = [.command, .option]
         appMenu.addItem(hideOthers)
-        appMenu.addItem(withTitle: "显示全部", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
+        appMenu.addItem(withTitle: L("显示全部"), action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
         appMenu.addItem(NSMenuItem.separator())
-        appMenu.addItem(withTitle: "退出 OCI-POOL", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: L("退出 OCI-POOL"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appMenuItem.submenu = appMenu
         main.addItem(appMenuItem)
 
         // Edit
         let editItem = NSMenuItem()
-        let edit = NSMenu(title: "编辑")
-        edit.addItem(withTitle: "撤销", action: Selector(("undo:")), keyEquivalent: "z")
-        edit.addItem(withTitle: "重做", action: Selector(("redo:")), keyEquivalent: "Z")
+        let edit = NSMenu(title: L("编辑"))
+        edit.addItem(withTitle: L("撤销"), action: Selector(("undo:")), keyEquivalent: "z")
+        edit.addItem(withTitle: L("重做"), action: Selector(("redo:")), keyEquivalent: "Z")
         edit.addItem(NSMenuItem.separator())
-        edit.addItem(withTitle: "剪切", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        edit.addItem(withTitle: "拷贝", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        edit.addItem(withTitle: "粘贴", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        edit.addItem(withTitle: "全选", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        edit.addItem(withTitle: L("剪切"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: L("拷贝"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: L("粘贴"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: L("全选"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         editItem.submenu = edit
         main.addItem(editItem)
 
         // View
         let viewItem = NSMenuItem()
-        let view = NSMenu(title: "查看")
+        let view = NSMenu(title: L("查看"))
         view.addItem(NSMenuItem(
-            title: "刷新当前页",
+            title: L("刷新当前页"),
             action: #selector(AppDelegate.refreshAction(_:)),
             keyEquivalent: "r"
         ))
         view.addItem(NSMenuItem.separator())
         view.addItem(NSMenuItem(
-            title: "切换主题",
+            title: L("切换主题"),
             action: #selector(AppDelegate.cycleThemeAction(_:)),
             keyEquivalent: "t"
         ))
         let toggleSidebar = NSMenuItem(
-            title: "显示/隐藏侧栏",
+            title: L("显示/隐藏侧栏"),
             action: #selector(AppDelegate.toggleSidebarAction(_:)),
             keyEquivalent: "s"
         )
@@ -74,7 +74,7 @@ enum MenuBuilder {
 
         // Navigate — filtered by current cloud provider (same rules as sidebar)
         let navItem = NSMenuItem()
-        let nav = NSMenu(title: "导航")
+        let nav = NSMenu(title: L("导航"))
         nav.autoenablesItems = true
         navigationMenu = nav
         navigationMenuItem = navItem
@@ -84,11 +84,11 @@ enum MenuBuilder {
 
         // Window
         let windowItem = NSMenuItem()
-        let window = NSMenu(title: "窗口")
-        window.addItem(withTitle: "最小化", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
-        window.addItem(withTitle: "缩放", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        let window = NSMenu(title: L("窗口"))
+        window.addItem(withTitle: L("最小化"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        window.addItem(withTitle: L("缩放"), action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
         window.addItem(NSMenuItem.separator())
-        window.addItem(withTitle: "前置全部窗口", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
+        window.addItem(withTitle: L("前置全部窗口"), action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
         windowItem.submenu = window
         main.addItem(windowItem)
 
@@ -103,7 +103,7 @@ enum MenuBuilder {
         let cloud = AppSession.shared.cloudProvider
         // Section header showing active cloud
         let cloudTitle = NSMenuItem(
-            title: "当前云：\(AppSession.shared.cloudProviderName)",
+            title: L("当前云：\(AppSession.shared.cloudProviderName)"),
             action: nil,
             keyEquivalent: ""
         )
@@ -113,7 +113,7 @@ enum MenuBuilder {
 
         let filtered = NavigationCatalog.filtered(search: "", cloudType: cloud)
         if filtered.isEmpty {
-            let empty = NSMenuItem(title: "无可用菜单", action: nil, keyEquivalent: "")
+            let empty = NSMenuItem(title: L("无可用菜单"), action: nil, keyEquivalent: "")
             empty.isEnabled = false
             nav.addItem(empty)
             return

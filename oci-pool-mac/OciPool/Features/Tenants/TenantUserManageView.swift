@@ -69,7 +69,7 @@ struct TenantUserManageView: View {
             }) {
                 HStack(spacing: 6) {
                     Image(systemName: "key.fill").font(.system(size: 11, weight: .semibold))
-                    Text("密码策略").font(.system(size: 12, weight: .semibold))
+                    Text(L("密码策略")).font(.system(size: 12, weight: .semibold))
                 }
                 .padding(.horizontal, 12).padding(.vertical, 7)
                 .foregroundColor(.white)
@@ -153,7 +153,7 @@ struct TenantUserManageView: View {
             }
         }) {
             VStack(spacing: 0) {
-                Text(tab.title)
+                Text(L(tab.title))
                     .font(.system(size: 13, weight: active ? .semibold : .regular))
                     .foregroundColor(active ? AppTheme.sidebarActive : mutedText)
                     .padding(.horizontal, 16)
@@ -194,19 +194,19 @@ struct TenantUserManageView: View {
 
     private var addUserForm: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("添加用户").font(.system(size: 13, weight: .semibold)).foregroundColor(primaryText)
+            Text(L("添加用户")).font(.system(size: 13, weight: .semibold)).foregroundColor(primaryText)
             HStack(alignment: .top, spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
                     formField("用户名", text: $model.newUsername)
                     formField("邮箱", text: $model.newEmail)
-                    Toggle("使用邮箱作为用户名", isOn: $model.useEmailAsUsername)
+                    Toggle(L("使用邮箱作为用户名"), isOn: $model.useEmailAsUsername)
                         .font(.system(size: 12))
                         .foregroundColor(primaryText)
                 }
                 .frame(width: 280)
                 if !model.groups.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("用户组").font(.system(size: 11, weight: .semibold)).foregroundColor(mutedText)
+                        Text(L("用户组")).font(.system(size: 11, weight: .semibold)).foregroundColor(mutedText)
                         SelectMenu(
                             options: model.groups.map { SelectOption(id: $0.id, title: $0.name) },
                             selection: Binding(
@@ -237,7 +237,7 @@ struct TenantUserManageView: View {
     private var passwordPolicyForm: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("密码策略配置").font(.system(size: 13, weight: .semibold)).foregroundColor(primaryText)
+                Text(L("密码策略配置")).font(.system(size: 13, weight: .semibold)).foregroundColor(primaryText)
                 Spacer()
                 Button(action: { model.showPasswordPolicy = false }) {
                     Image(systemName: "xmark").font(.system(size: 11)).foregroundColor(mutedText)
@@ -245,21 +245,21 @@ struct TenantUserManageView: View {
                 .buttonStyle(PlainButtonStyle())
             }
             ForEach(model.policyInfoLines, id: \.self) { line in
-                Text(line).font(.system(size: 12)).foregroundColor(mutedText)
+                Text(L(line)).font(.system(size: 12)).foregroundColor(mutedText)
             }
             HStack(alignment: .top, spacing: 24) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Toggle("启用密码过期策略", isOn: $model.policyEnableExpiry)
+                    Toggle(L("启用密码过期策略"), isOn: $model.policyEnableExpiry)
                         .font(.system(size: 12)).foregroundColor(primaryText)
                     if model.policyEnableExpiry {
                         formField("过期天数 (0=永不)", text: $model.policyExpiryDays, width: 160)
                     }
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("说明").font(.system(size: 11, weight: .semibold)).foregroundColor(mutedText)
-                    Text("· 策略作用于该租户下 OCI 用户").font(.system(size: 11)).foregroundColor(mutedText)
-                    Text("· 过期后用户需重置密码").font(.system(size: 11)).foregroundColor(mutedText)
-                    Text("· 天数为 0 表示永不过期").font(.system(size: 11)).foregroundColor(mutedText)
+                    Text(L("说明")).font(.system(size: 11, weight: .semibold)).foregroundColor(mutedText)
+                    Text(L("· 策略作用于该租户下 OCI 用户")).font(.system(size: 11)).foregroundColor(mutedText)
+                    Text(L("· 过期后用户需重置密码")).font(.system(size: 11)).foregroundColor(mutedText)
+                    Text(L("· 天数为 0 表示永不过期")).font(.system(size: 11)).foregroundColor(mutedText)
                 }
             }
             HStack(spacing: 8) {
@@ -402,7 +402,7 @@ struct TenantUserManageView: View {
     private var addNotifyForm: some View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("添加通知邮箱").font(.system(size: 13, weight: .semibold)).foregroundColor(primaryText)
+                Text(L("添加通知邮箱")).font(.system(size: 13, weight: .semibold)).foregroundColor(primaryText)
                 formField("邮箱地址 *", text: $model.newNotifyEmail, width: 300)
             }
             Spacer()
@@ -496,7 +496,7 @@ struct TenantUserManageView: View {
     private var notifyFooter: some View {
         HStack(spacing: 6) {
             Image(systemName: "info.circle").font(.system(size: 11)).foregroundColor(AppTheme.sidebarActive)
-            Text("共 \(model.notifyEmails.count) ���收件人，系统通知将发送至全部邮箱")
+            Text(L("共 \(model.notifyEmails.count) ���收件人，系统通知将发送至全部邮箱"))
                 .font(.system(size: 12)).foregroundColor(mutedText)
             Spacer()
         }
@@ -530,10 +530,10 @@ struct TenantUserManageView: View {
             HStack(spacing: 8) {
                 Image(systemName: "info.circle.fill")
                     .foregroundColor(AppTheme.sidebarActive)
-                Text("MFA 状态").font(.system(size: 13, weight: .semibold)).foregroundColor(primaryText)
+                Text(L("MFA 状态")).font(.system(size: 13, weight: .semibold)).foregroundColor(primaryText)
             }
             HStack(spacing: 12) {
-                Text(model.mfaStatusText)
+                Text(L(model.mfaStatusText))
                     .font(.system(size: 13))
                     .foregroundColor(primaryText)
                 StatusBadge(
@@ -553,9 +553,9 @@ struct TenantUserManageView: View {
         Group {
             if !model.mfaDetailLines.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("详细信息").font(.system(size: 12, weight: .semibold)).foregroundColor(mutedText)
+                    Text(L("详细信息")).font(.system(size: 12, weight: .semibold)).foregroundColor(mutedText)
                     ForEach(model.mfaDetailLines, id: \.self) { line in
-                        Text(line)
+                        Text(L(line))
                             .font(.system(size: 12, design: .monospaced))
                             .foregroundColor(mutedText)
                     }
@@ -575,21 +575,21 @@ struct TenantUserManageView: View {
         VStack(spacing: 8) {
             Spacer()
             ProgressView()
-            Text(text).font(.system(size: 12)).foregroundColor(mutedText)
+            Text(L(text)).font(.system(size: 12)).foregroundColor(mutedText)
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func colHeader(_ title: String, _ w: CGFloat) -> some View {
-        Text(title)
+        Text(L(title))
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(mutedText)
             .frame(width: w, alignment: .center)
     }
 
     private func cell(_ text: String, _ w: CGFloat, muted: Bool = false, bold: Bool = false) -> some View {
-        Text(text)
+        Text(L(text))
             .font(.system(size: 12, weight: bold ? .semibold : .regular))
             .foregroundColor(muted ? mutedText : primaryText)
             .lineLimit(1)
@@ -598,7 +598,7 @@ struct TenantUserManageView: View {
 
     private func formField(_ label: String, text: Binding<String>, width: CGFloat = 240) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(.system(size: 11, weight: .semibold)).foregroundColor(mutedText)
+            Text(L(label)).font(.system(size: 11, weight: .semibold)).foregroundColor(mutedText)
             AppTextField(text: text, placeholder: label).frame(width: width)
         }
     }

@@ -18,10 +18,10 @@ struct TenantsView: View {
     private let wDays: CGFloat = 56
     private let wTask: CGFloat = 72
     private let wMulti: CGFloat = 56
-    private let wType: CGFloat = 96
+    private let wType: CGFloat = 108
     private let wCreate: CGFloat = 68
     private let wTime: CGFloat = 128
-    private let wStatus: CGFloat = 56
+    private let wStatus: CGFloat = 76
     private let wAction: CGFloat = 52
     private let hPad: CGFloat = 12
     private let minNameShownFloor: CGFloat = 128
@@ -163,7 +163,7 @@ struct TenantsView: View {
                     .background(RoundedRectangle(cornerRadius: 5).fill(AppTheme.sidebarHover(dark)))
             }
             .buttonStyle(PlainButtonStyle())
-            .help("显示/隐藏脱敏")
+            .help(L("显示/隐藏脱敏"))
 
             AppButton(title: "API 导入", systemImage: "bolt.fill", kind: .primary) {
                 model.openAdd()
@@ -185,10 +185,10 @@ struct TenantsView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.circle")
                 .font(.system(size: 14))
-            Text(text).font(.system(size: 12))
+            Text(L(text)).font(.system(size: 12))
             Spacer()
             Button(action: { Task { await model.reload() } }) {
-                Text("重试")
+                Text(L("重试"))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(AppTheme.sidebarText(dark))
                     .padding(.horizontal, 8)
@@ -249,7 +249,7 @@ struct TenantsView: View {
                         VStack(spacing: 10) {
                             Spacer()
                             ProgressView()
-                            Text("正在加载租户数据…")
+                            Text(L("正在加载租户数据…"))
                                 .font(.system(size: 12))
                                 .foregroundColor(AppTheme.sidebarText(dark))
                             Spacer()
@@ -283,7 +283,7 @@ struct TenantsView: View {
                         VStack(spacing: 8) {
                             ProgressView()
                                 .scaleEffect(0.9)
-                            Text("更新中…")
+                            Text(L("更新中…"))
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(AppTheme.sidebarText(dark))
                         }
@@ -324,7 +324,7 @@ struct TenantsView: View {
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.sidebarText(dark).opacity(0.55))
                     .frame(width: cols.proxy, alignment: .center)
-                    .help("绑定代理")
+                    .help(L("绑定代理"))
                 colHeader("租户名", cols.name)
                 colHeader("自定义名称", cols.def)
                 colHeader("账号成本", cols.cost)
@@ -420,25 +420,25 @@ struct TenantsView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
-        .help(tip)
+        .help(L(tip))
     }
 
     private func nameCell(_ item: TenantItem, width: CGFloat) -> some View {
         let shown = !model.namesHidden
         return HStack(spacing: 4) {
             Button(action: { model.namesHidden.toggle() }) {
-                Text(shown ? item.displayName : item.maskedName)
+                Text(L(shown ? item.displayName : item.maskedName))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             .buttonStyle(PlainButtonStyle())
-            .help(item.displayName)
+            .help(L(item.displayName))
 
             if item.isManaged {
                 Button(action: { model.openEditManagedPermissions(item) }) {
-                    Text("受限")
+                    Text(L("受限"))
                         .font(.system(size: 9.5, weight: .bold))
                         .foregroundColor(Color(hex: "10b981"))
                         .padding(.horizontal, 4)
@@ -453,7 +453,7 @@ struct TenantsView: View {
                         )
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help("已开启自定义受限 API（点击修改权限）")
+                .help(L("已开启自定义受限 API（点击修改权限）"))
             }
         }
         .frame(width: width, alignment: .center)
@@ -462,7 +462,7 @@ struct TenantsView: View {
 
     private func defNameCell(_ item: TenantItem, width: CGFloat) -> some View {
         Button(action: { model.openEditName(item) }) {
-            Text(item.defNameText)
+            Text(L(item.defNameText))
                 .font(.system(size: 12))
                 // Web：自定义名 fg-1，未设置为空白
                 .foregroundColor(AppTheme.sidebarText(dark))
@@ -473,14 +473,14 @@ struct TenantsView: View {
                 .clipped()
         }
         .buttonStyle(PlainButtonStyle())
-        .help(item.customAlias.isEmpty ? "" : item.customAlias)
+        .help(L(item.customAlias.isEmpty ? "" : item.customAlias))
     }
 
     /// Web：账号成本 0=accent 绿，>0=橙 + dashed 下划线
     private func costCell(_ item: TenantItem, width: CGFloat) -> some View {
         let nonZero = item.costText != "—" && Double(item.costText.replacingOccurrences(of: "$", with: "")) != 0
         return Button(action: { model.openEditCost(item) }) {
-            Text(nonZero ? "$\(item.costText)" : item.costText)
+            Text(L(nonZero ? "$\(item.costText)" : item.costText))
                 .font(.system(size: 12))
                 .foregroundColor(item.costText == "—" ? RegionsMuted : (nonZero ? AppTheme.orange : AppTheme.sidebarActive))
                 .underline(true, color: item.costText == "—" ? .clear : AppTheme.orange.opacity(0.6))
@@ -494,7 +494,7 @@ struct TenantsView: View {
 
     /// Web：存活天数 info-soft 蓝色徽章
     private func activeDaysCell(_ item: TenantItem, width: CGFloat) -> some View {
-        Text(item.activeDaysText)
+        Text(L(item.activeDaysText))
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(AppTheme.info)
             .padding(.horizontal, 8)
@@ -509,7 +509,7 @@ struct TenantsView: View {
             if item.openBootFlag {
                 PulseDotSmall(color: AppTheme.sidebarActive)
             }
-            Text(item.openTaskText)
+            Text(L(item.openTaskText))
                 .font(.system(size: 11))
                 .foregroundColor(item.openBootFlag ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
         }
@@ -528,7 +528,7 @@ struct TenantsView: View {
             if item.isMultiRegion {
                 Circle().fill(AppTheme.sidebarActive).frame(width: 6, height: 6)
             }
-            Text(item.multiRegionText)
+            Text(L(item.multiRegionText))
         }
         .font(.system(size: 12))
         .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
@@ -541,10 +541,12 @@ struct TenantsView: View {
             Circle()
                 .fill(item.isActive ? AppTheme.sidebarActive : AppTheme.danger)
                 .frame(width: 6, height: 6)
-            Text(item.statusText)
+            Text(L(item.statusText))
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(item.isActive ? AppTheme.sidebarActive : AppTheme.danger)
+                .lineLimit(1)
         }
+        .fixedSize(horizontal: true, vertical: false)
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
         .background(
@@ -560,9 +562,10 @@ struct TenantsView: View {
         if item.accountTypeName != "未知", !item.accountTypeName.isEmpty {
             Button(action: { model.activeSheet = .accountDetail(item) }) {
                 // Web：trial=violet / official=cyan / 其他=orange 软底徽章
-                Text(item.typeText)
+                Text(L(item.typeText))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(item.typeBadgeColor)
+                    .lineLimit(1)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(RoundedRectangle(cornerRadius: 4).fill(item.typeBadgeColor.opacity(0.14)))
@@ -581,7 +584,7 @@ struct TenantsView: View {
             Button(action: { model.openBoot(item) }) {
                 HStack(spacing: 4) {
                     Image(systemName: "zap.fill").font(.system(size: 10, weight: .semibold))
-                    Text("创建实例")
+                    Text(L("创建实例"))
                         .font(.system(size: 11, weight: .semibold))
                 }
                 .foregroundColor(.white)
@@ -609,21 +612,21 @@ struct TenantsView: View {
     }
 
     private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .center) -> some View {
-        Text(title)
+        Text(L(title))
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(AppTheme.sidebarText(dark))
             .frame(width: w, alignment: align)
     }
 
     private func cell(_ text: String, _ w: CGFloat, bold: Bool = false, muted: Bool = false) -> some View {
-        Text(text)
+        Text(L(text))
             .font(.system(size: 12, weight: bold ? .semibold : .regular))
             .foregroundColor(muted ? AppTheme.sidebarText(dark) : (dark ? Color.white.opacity(0.9) : Color.primary))
             .lineLimit(1)
             .truncationMode(.tail)
             .frame(width: w, alignment: .center)
             .clipped()
-            .help(text)
+            .help(L(text))
     }
 }
 
@@ -636,7 +639,7 @@ private struct TenantColWidths {
 // MARK: - AppKit ellipsis + 窗内浮层（绝不使用 NSPopover，保证在应用窗口内）
 
 private enum TenantActionMenuLayout {
-    static let width: CGFloat = 304
+    static var width: CGFloat { AppI18n.shared.isEnglish ? 432 : 304 }
     static let shadowBleed: CGFloat = 24
     static let vPad: CGFloat = 8
     static let titleH: CGFloat = 20
@@ -1092,7 +1095,7 @@ struct TenantActionMenuContent: View {
             // 对齐 Boot header：状态点（有效脉冲动效）+ 租户名/用户名
             HStack(spacing: 6) {
                 MenuPulseDot(color: isActive ? AppTheme.sidebarActive : AppTheme.sidebarText(dark), pulse: isActive)
-                Text(displayName.isEmpty ? "—" : displayName)
+                Text(L(displayName.isEmpty ? "—" : displayName))
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                     .lineLimit(1)
@@ -1149,7 +1152,7 @@ struct TenantActionMenuContent: View {
                 Image(systemName: act.systemImage)
                     .font(.system(size: 11, weight: .semibold))
                     .frame(width: 14)
-                Text(act.title)
+                Text(L(act.title))
                     .font(.system(size: 12, weight: .medium))
                     .lineLimit(1)
                 Spacer(minLength: 0)

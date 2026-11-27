@@ -75,7 +75,7 @@ struct TenantRegionSubView: View {
             if model.regionSubLoading {
                 HStack(spacing: 6) {
                     ProgressView().scaleEffect(0.7)
-                    Text("加载中…").font(.system(size: 12)).foregroundColor(mutedText)
+                    Text(L("加载中…")).font(.system(size: 12)).foregroundColor(mutedText)
                 }
             }
         }
@@ -87,10 +87,10 @@ struct TenantRegionSubView: View {
 
     private func statCard(label: String, value: String, accent: Bool) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(value)
+            Text(L(value))
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundColor(accent ? AppTheme.sidebarActive : primaryText)
-            Text(label)
+            Text(L(label))
                 .font(.system(size: 11))
                 .foregroundColor(mutedText)
         }
@@ -112,12 +112,12 @@ struct TenantRegionSubView: View {
             Image(systemName: "info.circle.fill")
                 .foregroundColor(AppTheme.cyan)
                 .font(.system(size: 13))
-            (Text("主区域为 ")
+            (Text(L("主区域为 "))
                 .foregroundColor(mutedText)
-            + Text(homeName)
+            + Text(L(homeName))
                 .fontWeight(.semibold)
                 .foregroundColor(primaryText)
-            + Text("，不可退订。订阅新区域后可在该区域创建实例。")
+            + Text(L("，不可退订。订阅新区域后可在该区域创建实例。"))
                 .foregroundColor(mutedText))
                 .font(.system(size: 11.5))
             Spacer()
@@ -149,7 +149,7 @@ struct TenantRegionSubView: View {
         let active = model.regionSubTab == index
         return Button(action: { model.regionSubTab = index }) {
             VStack(spacing: 0) {
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 13, weight: active ? .semibold : .regular))
                     .foregroundColor(active ? AppTheme.sidebarActive : mutedText)
                     .padding(.horizontal, 16)
@@ -233,12 +233,12 @@ struct TenantRegionSubView: View {
 
     private func subscribedRow(index: Int, r: TenantSubscribedRegion, wName: CGFloat, wKey: CGFloat, wHome: CGFloat, wStatus: CGFloat, width: CGFloat, hPad: CGFloat) -> some View {
         HStack(spacing: 0) {
-            Text(r.regionName.isEmpty ? r.regionKey : r.regionName)
+            Text(L(r.regionName.isEmpty ? r.regionKey : r.regionName))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(primaryText)
                 .lineLimit(1)
                 .frame(width: wName, alignment: .center)
-            Text(r.regionKey)
+            Text(L(r.regionKey))
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.sidebarActive)
                 .lineLimit(1)
@@ -256,7 +256,7 @@ struct TenantRegionSubView: View {
     }
 
     private func homeBadge(_ isHome: Bool) -> some View {
-        Text(isHome ? "主区域" : "—")
+        Text(L(isHome ? "主区域" : "—"))
             .font(.system(size: 11, weight: isHome ? .semibold : .regular))
             .foregroundColor(isHome ? AppTheme.sidebarActive : mutedText)
             .padding(.horizontal, isHome ? 8 : 0)
@@ -346,10 +346,10 @@ struct TenantRegionSubView: View {
                     .foregroundColor(AppTheme.sidebarActive)
                     .frame(width: 18)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(r.cnName.isEmpty ? r.name : r.cnName)
+                    Text(L(r.cnName.isEmpty ? r.name : r.cnName))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(primaryText)
-                    Text("\(r.key)  ·  \(r.name)")
+                    Text(L("\(r.key)  ·  \(r.name)"))
                         .font(.system(size: 11))
                         .foregroundColor(mutedText)
                 }
@@ -370,14 +370,14 @@ struct TenantRegionSubView: View {
         VStack(spacing: 8) {
             Spacer()
             ProgressView()
-            Text(text).font(.system(size: 12)).foregroundColor(mutedText)
+            Text(L(text)).font(.system(size: 12)).foregroundColor(mutedText)
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func colHeader(_ title: String, _ w: CGFloat?) -> some View {
-        let view = Text(title)
+        let view = Text(L(title))
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(mutedText)
         if let w = w {

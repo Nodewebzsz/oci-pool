@@ -57,7 +57,7 @@ struct KeyConfigView: View {
                 Image(systemName: "globe")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(AppTheme.info)
-                Text("域名服务商配置")
+                Text(L("域名服务商配置"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(AppTheme.navIcon(dark))
             }
@@ -157,7 +157,7 @@ struct KeyConfigView: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(iconColor)
                 }
-                Text(name)
+                Text(L(name))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(AppTheme.navIcon(dark))
                 statusBadge(enabled: enabled.wrappedValue, connected: connected)
@@ -223,7 +223,7 @@ struct KeyConfigView: View {
 
         return HStack(spacing: 4) {
             Circle().fill(color).frame(width: 5, height: 5)
-            Text(text)
+            Text(L(text))
                 .font(.system(size: 10.5, weight: .semibold))
                 .foregroundColor(color)
         }
@@ -237,7 +237,7 @@ struct KeyConfigView: View {
     private func secretField(label: String, text: Binding<String>, placeholder: String, hint: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
-                Text(label)
+                Text(L(label))
                     .font(.system(size: 12))
                     .foregroundColor(AppTheme.sidebarText(dark))
                 Text("*")
@@ -259,9 +259,9 @@ struct KeyConfigView: View {
                         )
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help("复制")
+                .help(L("复制"))
             }
-            Text(hint)
+            Text(L(hint))
                 .font(.system(size: 10.5))
                 .foregroundColor(AppTheme.textTertiary(dark))
         }
@@ -271,7 +271,7 @@ struct KeyConfigView: View {
     private func inputField(label: String, text: Binding<String>, placeholder: String, hint: String, mono: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
-                Text(label)
+                Text(L(label))
                     .font(.system(size: 12))
                     .foregroundColor(AppTheme.sidebarText(dark))
                 Text("*")
@@ -279,7 +279,7 @@ struct KeyConfigView: View {
                     .foregroundColor(AppTheme.danger)
             }
             AppTextField(text: text, placeholder: placeholder)
-            Text(hint)
+            Text(L(hint))
                 .font(.system(size: 10.5))
                 .foregroundColor(AppTheme.textTertiary(dark))
         }
@@ -296,10 +296,10 @@ struct KeyConfigView: View {
                     .font(.system(size: 22, weight: .medium))
                     .foregroundColor(AppTheme.textTertiary(dark))
             }
-            Text("更多服务商")
+            Text(L("更多服务商"))
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(AppTheme.textSecondary(dark))
-            Text("敬请期待...")
+            Text(L("敬请期待..."))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.textTertiary(dark))
         }
@@ -317,7 +317,7 @@ struct KeyConfigView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.circle")
                 .font(.system(size: 14))
-            Text(text).font(.system(size: 12))
+            Text(L(text)).font(.system(size: 12))
             Spacer()
         }
         .foregroundColor(AppTheme.danger)

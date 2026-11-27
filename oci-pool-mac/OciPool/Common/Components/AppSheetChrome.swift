@@ -149,12 +149,12 @@ struct AppSheetChrome<Content: View, Footer: View>: View {
                 }
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(AppSheetSurface.primaryText(dark))
                     .lineLimit(1)
                 if let sub = subtitle, !sub.isEmpty {
-                    Text(sub)
+                    Text(L(sub))
                         .font(.system(size: 12))
                         .foregroundColor(AppSheetSurface.mutedText(dark))
                         .lineLimit(1)
@@ -173,7 +173,7 @@ struct AppSheetChrome<Content: View, Footer: View>: View {
                     }
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help("关闭")
+                .help(L("关闭"))
             }
         }
         .padding(.horizontal, 24)
@@ -230,7 +230,7 @@ struct AppSheetTabBar: View {
             ForEach(Array(titles.enumerated()), id: \.offset) { idx, title in
                 let selected = selectedIndex == idx
                 Button(action: { onSelect(idx) }) {
-                    Text(title)
+                    Text(L(title))
                         .font(.system(size: 13, weight: selected ? .medium : .regular))
                         .foregroundColor(
                             selected
@@ -268,13 +268,13 @@ struct AppSheetTableHeader: View {
             ForEach(Array(columns.enumerated()), id: \.offset) { _, col in
                 Group {
                     if let w = col.width {
-                        Text(col.title.uppercased())
+                        Text(L(col.title).uppercased())
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(AppSheetSurface.mutedText(dark))
                             .lineLimit(1)
                             .frame(width: w, alignment: .center)
                     } else {
-                        Text(col.title.uppercased())
+                        Text(L(col.title).uppercased())
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(AppSheetSurface.mutedText(dark))
                             .lineLimit(1)
@@ -367,7 +367,7 @@ struct AppSheetFixedTable<Header: View, Rows: View>: View {
                 VStack(spacing: 8) {
                     Spacer()
                     ProgressView().scaleEffect(0.8)
-                    Text("加载中…")
+                    Text(L("加载中…"))
                         .font(.system(size: 12))
                         .foregroundColor(AppSheetSurface.mutedText(dark))
                     Spacer()
@@ -380,7 +380,7 @@ struct AppSheetFixedTable<Header: View, Rows: View>: View {
                     Image(systemName: emptyIcon)
                         .font(.system(size: 30))
                         .foregroundColor(AppSheetSurface.mutedText(dark).opacity(0.6))
-                    Text(emptyText)
+                    Text(L(emptyText))
                         .font(.system(size: 13))
                         .foregroundColor(AppSheetSurface.primaryText(dark))
                     Spacer()
@@ -426,11 +426,11 @@ struct AppDetailRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 15) {
-            Text(label)
+            Text(L(label))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(AppSheetSurface.mutedText(dark))
                 .frame(width: 88, alignment: .leading)
-            Text(value.isEmpty ? "—" : value)
+            Text(L(value.isEmpty ? "—" : L(value)))
                 .font(.system(size: 13))
                 .foregroundColor(AppSheetSurface.primaryText(dark))
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -494,12 +494,12 @@ struct AppSheetInfoBox: View {
             HStack(spacing: 8) {
                 Image(systemName: "info.circle.fill")
                     .foregroundColor(AppSheetSurface.accentBlue(dark))
-                Text(text)
+                Text(L(text))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(AppSheetSurface.accentBlue(dark))
             }
             ForEach(lines, id: \.self) { line in
-                Text("• \(line)")
+                Text(L("• \(line)"))
                     .font(.system(size: 12))
                     .foregroundColor(AppSheetSurface.mutedText(dark))
             }

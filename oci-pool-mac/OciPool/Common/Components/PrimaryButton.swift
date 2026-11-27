@@ -30,7 +30,7 @@ struct AppButton: View {
                     Image(systemName: systemImage)
                         .font(.system(size: 11, weight: .semibold))
                 }
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 12, weight: .semibold))
                     .lineLimit(1)
             }

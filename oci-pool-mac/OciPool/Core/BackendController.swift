@@ -107,7 +107,9 @@ final class BackendController: ObservableObject {
             appendBackendLog("spawned java pid=\(proc.processIdentifier) jar=\(jarURL.lastPathComponent)")
         } catch {
             guard epoch == startEpoch else { return }
-            state = .failed("启动 Java 失败：\(error.localizedDescription)")
+            state = .failed(AppI18n.shared.isEnglish
+                ? "Failed to launch Java: \(error.localizedDescription)"
+                : "启动 Java 失败：\(error.localizedDescription)")
             appendBackendLog("spawn failed: \(error)")
             return
         }
@@ -130,14 +132,36 @@ final class BackendController: ObservableObject {
             if !proc.isRunning {
                 guard epoch == startEpoch else { return }
                 let code = proc.terminationStatus
-                state = .failed("后端进程退出 (code=\(code))，见 Application Support/OciPool/backend.log")
+                state = .failed(AppI18n.shared.isEnglish
+                    ? "Backend process exited (code=\(code)); see ~/.ocipool/backend.log"
+                    : "后端进程退出 (code=\(code))，见 ~/.ocipool/backend.log")
                 appendBackendLog("java exited code=\(code)")
                 return
             }
         }
         guard epoch == startEpoch else { return }
-        state = .failed("后端启动超时（90 秒），见 backend.log")
+        state = .failed(AppI18n.shared.isEnglish
+            ? "Backend startup timed out (90s); see backend.log"
+            : "后端启动超时（90 秒），见 backend.log")
         appendBackendLog("timeout 90s")
+    }
+
+    /// Start embedded backend if needed and wait until it reaches `.ready` or `.failed`.
+    @MainActor
+    func ensureStartedAndWait() async -> Bool {
+        switch state {
+        case .ready:
+            return true
+        case .idle, .failed:
+            await start()
+            return state == .ready
+        case .starting:
+            while case .starting = state {
+                if Task.isCancelled { return false }
+                try? await Task.sleep(nanoseconds: 150_000_000)
+            }
+            return state == .ready
+        }
     }
 
     /// Stop embedded backend. Call on app quit (menu / Dock / Cmd+Q) or when switching to remote mode.

@@ -368,12 +368,12 @@ struct SecuritySettingsView: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 13))
                                 .foregroundColor(AppTheme.sidebarActive)
-                            Text("已绑定 TOTP 认证器")
+                            Text(L("已绑定 TOTP 认证器"))
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(AppTheme.sidebarActive)
                         }
                         Spacer()
-                        Text(model.mfa.secretKey.prefix(4) + "••••••••" + model.mfa.secretKey.suffix(4))
+                        Text(L(model.mfa.secretKey.prefix(4) + "••••••••" + model.mfa.secretKey.suffix(4)))
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundColor(AppTheme.textTertiary(dark))
                         AppButton(
@@ -397,7 +397,7 @@ struct SecuritySettingsView: View {
                         Image(systemName: "info.circle")
                             .font(.system(size: 12))
                             .foregroundColor(AppTheme.textTertiary(dark))
-                        Text("尚未完成动态验证绑定。点击下方「配置向导」扫码并在第三步完成验证以激活。")
+                        Text(L("尚未完成动态验证绑定。点击下方「配置向导」扫码并在第三步完成验证以激活。"))
                             .font(.system(size: 11.5))
                             .foregroundColor(AppTheme.textTertiary(dark))
                     }
@@ -494,11 +494,11 @@ struct SecuritySettingsView: View {
             enabled: $model.channelNotifyEnabled,
             minHeight: row3MinHeight
         ) {
-            Text("开启后，抢机成功会向公共频道上报实例类型与区域，不含账号与 IP 等隐私信息。")
+            Text(L("开启后，抢机成功会向公共频道上报实例类型与区域，不含账号与 IP 等隐私信息。"))
                 .font(.system(size: 11.5))
                 .foregroundColor(AppTheme.textTertiary(dark))
                 .fixedSize(horizontal: false, vertical: true)
-            Text("采集：机型、区域。不采集：租户、密钥、IP、用户名。")
+            Text(L("采集：机型、区域。不采集：租户、密钥、IP、用户名。"))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.textTertiary(dark).opacity(0.85))
                 .fixedSize(horizontal: false, vertical: true)
@@ -523,10 +523,10 @@ struct SecuritySettingsView: View {
                 Image(systemName: "hand.raised.fill")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(AppTheme.danger)
-                Text("IP 封禁管理")
+                Text(L("IP 封禁管理"))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(AppTheme.navIcon(dark))
-                Text("自动登录保护与后台手动封禁审计")
+                Text(L("自动登录保护与后台手动封禁审计"))
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.textTertiary(dark))
                     .lineLimit(1)
@@ -585,7 +585,7 @@ struct SecuritySettingsView: View {
                         ForEach(IpBanStatusFilter.allCases) { filter in
                             let active = model.ipBanStatusFilter == filter
                             Button(action: { model.setIpBanStatusFilter(filter) }) {
-                                Text(filter.label)
+                                Text(L(filter.label))
                                     .font(.system(size: 11.5, weight: active ? .semibold : .medium))
                                     .foregroundColor(active ? appearance.accent.accentFg(dark) : AppTheme.textSecondary(dark))
                                     .padding(.horizontal, 10)
@@ -632,7 +632,7 @@ struct SecuritySettingsView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundColor(AppTheme.danger)
-                        Text(err)
+                        Text(L(err))
                             .font(.system(size: 11.5))
                             .foregroundColor(AppTheme.danger)
                         Spacer()
@@ -645,7 +645,7 @@ struct SecuritySettingsView: View {
                 if model.ipBanLoading && model.ipBans.isEmpty {
                     HStack {
                         Spacer()
-                        ProgressView("加载封禁记录…")
+                        ProgressView(L("加载封禁记录…"))
                             .padding(.vertical, 20)
                         Spacer()
                     }
@@ -656,7 +656,7 @@ struct SecuritySettingsView: View {
                             Image(systemName: "checkmark.shield")
                                 .font(.system(size: 20))
                                 .foregroundColor(AppTheme.textTertiary(dark))
-                            Text("暂无匹配的 IP 封禁记录")
+                            Text(L("暂无匹配的 IP 封禁记录"))
                                 .font(.system(size: 12))
                                 .foregroundColor(AppTheme.textTertiary(dark))
                         }
@@ -666,11 +666,11 @@ struct SecuritySettingsView: View {
                 } else {
                     VStack(spacing: 0) {
                         HStack(spacing: 10) {
-                            Text("IP 地址").frame(width: 150, alignment: .leading)
-                            Text("状态").frame(width: 72, alignment: .leading)
-                            Text("原因 / 来源").frame(maxWidth: .infinity, alignment: .leading)
-                            Text("封禁时间").frame(width: 140, alignment: .leading)
-                            Text("操作").frame(width: 80, alignment: .trailing)
+                            Text(L("IP 地址")).frame(width: 150, alignment: .leading)
+                            Text(L("状态")).frame(width: 72, alignment: .leading)
+                            Text(L("原因 / 来源")).frame(maxWidth: .infinity, alignment: .leading)
+                            Text(L("封禁时间")).frame(width: 140, alignment: .leading)
+                            Text(L("操作")).frame(width: 80, alignment: .trailing)
                         }
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(AppTheme.textTertiary(dark))
@@ -694,7 +694,7 @@ struct SecuritySettingsView: View {
 
             if model.ipBanTotal > model.ipBanPageSize {
                 HStack(spacing: 10) {
-                    Text("第 \(model.ipBanPage) / \(model.ipBanTotalPages) 页 · 共 \(model.ipBanTotal) 条")
+                    Text(L("第 \(model.ipBanPage) / \(model.ipBanTotalPages) 页 · 共 \(model.ipBanTotal) 条"))
                         .font(.system(size: 11.5))
                         .foregroundColor(AppTheme.textTertiary(dark))
                     Spacer()
@@ -734,7 +734,7 @@ struct SecuritySettingsView: View {
 
     private func ipBanRow(_ item: IpBanRecord, striped: Bool) -> some View {
         HStack(spacing: 10) {
-            Text(item.ipAddress.isEmpty ? "—" : item.ipAddress)
+            Text(L(item.ipAddress.isEmpty ? "—" : item.ipAddress))
                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundColor(AppTheme.navIcon(dark))
                 .lineLimit(1)
@@ -747,19 +747,19 @@ struct SecuritySettingsView: View {
             .frame(width: 72, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.reason.isEmpty ? "—" : item.reason)
+                Text(L(item.reason.isEmpty ? "—" : item.reason))
                     .font(.system(size: 12))
                     .foregroundColor(AppTheme.sidebarText(dark))
                     .lineLimit(1)
                 HStack(spacing: 6) {
                     if !item.source.isEmpty {
-                        Text("来源: \(item.source)")
+                        Text(L("来源: \(item.source)"))
                     }
                     if !item.operatorName.isEmpty {
-                        Text("操作人: \(item.operatorName)")
+                        Text(L("操作人: \(item.operatorName)"))
                     }
                     if !item.isActive && !item.unbanTime.isEmpty {
-                        Text("解封: \(item.unbanTime)")
+                        Text(L("解封: \(item.unbanTime)"))
                     }
                 }
                 .font(.system(size: 10.5))
@@ -768,7 +768,7 @@ struct SecuritySettingsView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Text(item.createTime.isEmpty ? "—" : item.createTime)
+            Text(L(item.createTime.isEmpty ? "—" : item.createTime))
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(AppTheme.textSecondary(dark))
                 .lineLimit(1)
@@ -801,9 +801,9 @@ struct SecuritySettingsView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(AppTheme.danger)
-            Text(text).font(.system(size: 12))
+            Text(L(text)).font(.system(size: 12))
             Spacer()
-            Button("重试") { Task { await model.reload() } }
+            Button(L("重试")) { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
         }
         .foregroundColor(AppTheme.danger)
@@ -832,7 +832,7 @@ struct MfaSetupSheet: View {
             onClose: { model.isMfaSheetPresented = false },
             footer: {
                 HStack {
-                    Text("提示：未完成步骤 3 动态码验证直接关闭不会激活 MFA")
+                    Text(L("提示：未完成步骤 3 动态码验证直接关闭不会激活 MFA"))
                         .font(.system(size: 11))
                         .foregroundColor(AppTheme.textTertiary(dark))
                     Spacer()
@@ -845,7 +845,7 @@ struct MfaSetupSheet: View {
                 VStack(alignment: .leading, spacing: 10) {
                     // 步骤 1：扫码绑定
                     VStack(alignment: .center, spacing: 6) {
-                        Text("步骤 1：打开手机认证器 App 扫描二维码")
+                        Text(L("步骤 1：打开手机认证器 App 扫描二维码"))
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(dark ? Color.white.opacity(0.95) : Color.primary)
 
@@ -864,7 +864,7 @@ struct MfaSetupSheet: View {
                                 .frame(width: 115, height: 115)
                         }
 
-                        Text("支持 Google Authenticator、Microsoft Authenticator、1Password 等")
+                        Text(L("支持 Google Authenticator、Microsoft Authenticator、1Password 等"))
                             .font(.system(size: 10.5))
                             .foregroundColor(AppTheme.textTertiary(dark))
                     }

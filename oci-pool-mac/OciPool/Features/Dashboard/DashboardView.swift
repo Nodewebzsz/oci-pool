@@ -47,7 +47,7 @@ struct DashboardView: View {
                     // Web 页头图标为 Lucide activity 描边（SF Symbol 在部分系统上不渲染）
                     MenuGlyph(name: "activity", size: 17, color: AppTheme.sidebarActive)
                 }
-                Text("系统监控")
+                Text(L("系统监控"))
                     .font(AppTypography.pageTitle)
                     .foregroundColor(AppTheme.navIcon(dark))
                     
@@ -60,7 +60,7 @@ struct DashboardView: View {
                         .fill(AppTheme.sidebarActive)
                         .frame(width: 6, height: 6)
                         .shadow(color: AppTheme.sidebarActive.opacity(0.5), radius: 3)
-                    Text(model.lastUpdateText)
+                    Text(L(model.lastUpdateText))
                         .font(.system(size: 11.5, design: .monospaced))
                         .foregroundColor(AppTheme.sidebarText(dark))
                 }
@@ -76,7 +76,7 @@ struct DashboardView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 12, weight: .medium))
-                        Text("刷新")
+                        Text(L("刷新"))
                             .font(.system(size: 12.5, weight: .medium))
                     }
                     .foregroundColor(AppTheme.sidebarText(dark))
@@ -101,7 +101,7 @@ struct DashboardView: View {
     }
 
     private func errorBanner(_ text: String) -> some View {
-        Text(text)
+        Text(L(text))
             .font(.system(size: 12))
             .foregroundColor(AppTheme.danger)
     }
@@ -135,12 +135,12 @@ struct DashboardView: View {
                     .foregroundColor(iconColor)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(AppTheme.textTertiary(dark))
                     .lineLimit(1)
                     .truncationMode(.tail)
-                Text(value)
+                Text(L(value))
                     .font(.system(size: 22, weight: .bold))
                     .foregroundColor(AppTheme.navIcon(dark))
                     .lineLimit(1)
@@ -164,15 +164,22 @@ struct DashboardView: View {
     private var tenantPortraitCard: some View {
         let p = model.tenantPortrait
         let total = max(0, p.totalMainTenants)
+        let inactive = max(0, p.inactiveCount)
 
         return SectionCard(title: "号池主账号画像") {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     StatusBadge(
-                        text: "主区域账号 \(total) 个",
+                        text: inactive > 0 ? "有效主账号 \(total) 个" : "主区域账号 \(total) 个",
                         tone: total > 0 ? .info : .neutral
                     )
-                    Text("仅聚合主区域租户（排除子区域映射行），透视升级比例、注册主体、存活账龄与多区扩展")
+                    if inactive > 0 {
+                        StatusBadge(
+                            text: "失效 \(inactive) 个（已排除）",
+                            tone: .danger
+                        )
+                    }
+                    Text(L("仅聚合有效主区域租户（排除子区域映射与失效账号），透视升级比例、注册主体、存活账龄与多区扩展"))
                         .font(.system(size: 11.5))
                         .foregroundColor(AppTheme.textSecondary(dark))
                         .lineLimit(2)
@@ -204,7 +211,7 @@ struct DashboardView: View {
                             Image(systemName: "person.2")
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundColor(AppTheme.textTertiary(dark))
-                            Text("暂无主账号数据，前往「租户管理」添加 OCI 主区域账号后自动生成多维画像")
+                            Text(L("暂无主账号数据，前往「租户管理」添加 OCI 主区域账号后自动生成多维画像"))
                                 .font(.system(size: 12))
                                 .foregroundColor(AppTheme.textSecondary(dark))
                                 .lineLimit(2)
@@ -225,7 +232,9 @@ struct DashboardView: View {
                             color: AppTheme.sidebarActive,
                             label: "升级号占比",
                             primary: portraitPercent(p.upgradedCount, total),
-                            detail: "升级 \(p.upgradedCount) · 免费 \(p.freeCount)",
+                            detail: p.unknownPlanCount > 0
+                                ? "升级 \(p.upgradedCount) · 免费 \(p.freeCount) · 未知 \(p.unknownPlanCount)"
+                                : "升级 \(p.upgradedCount) · 免费 \(p.freeCount)",
                             ratio: Double(p.upgradedCount) / Double(total)
                         )
                         portraitTile(
@@ -303,12 +312,12 @@ struct DashboardView: View {
                 Image(systemName: icon)
                     .font(.system(size: 11.5, weight: .semibold))
                     .foregroundColor(color)
-                Text(label)
+                Text(L(label))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(AppTheme.textSecondary(dark))
                     .lineLimit(1)
             }
-            Text(primary)
+            Text(L(primary))
                 .font(.system(size: 20, weight: .bold, design: .monospaced))
                 .foregroundColor(AppTheme.navIcon(dark))
                 .lineLimit(1)
@@ -323,7 +332,7 @@ struct DashboardView: View {
                 }
             }
             .frame(height: 4)
-            Text(detail)
+            Text(L(detail))
                 .font(.system(size: 10.5))
                 .foregroundColor(AppTheme.textTertiary(dark))
                 .lineLimit(1)
@@ -347,14 +356,14 @@ struct DashboardView: View {
     ) -> some View {
         let maxCount = max(1, bars.map(\.count).max() ?? 1)
         return VStack(alignment: .leading, spacing: 8) {
-            Text(title)
+            Text(L(title))
                 .font(.system(size: 11.5, weight: .semibold))
                 .foregroundColor(AppTheme.navIcon(dark))
 
             VStack(spacing: 7) {
                 ForEach(Array(bars.enumerated()), id: \.offset) { _, bar in
                     HStack(spacing: 8) {
-                        Text(bar.label)
+                        Text(L(bar.label))
                             .font(.system(size: 11))
                             .foregroundColor(AppTheme.textSecondary(dark))
                             .frame(width: 88, alignment: .leading)
@@ -373,7 +382,7 @@ struct DashboardView: View {
                         }
                         .frame(height: 14)
 
-                        Text("\(bar.count) (\(portraitPercent(bar.count, total)))")
+                        Text(L("\(bar.count) (\(portraitPercent(bar.count, total)))"))
                             .font(.system(size: 10.5, weight: .medium, design: .monospaced))
                             .foregroundColor(AppTheme.navIcon(dark))
                             .frame(width: 72, alignment: .trailing)
@@ -490,11 +499,11 @@ struct DashboardView: View {
                     .font(.system(size: 15, weight: .medium))
                     .foregroundColor(iconColor)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
+                    Text(L(title))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(AppTheme.navIcon(dark))
                         .lineLimit(1)
-                    Text(subtitle)
+                    Text(L(subtitle))
                         .font(.system(size: 10.5, design: .monospaced))
                         .foregroundColor(AppTheme.textTertiary(dark))
                         .lineLimit(1)
@@ -519,12 +528,12 @@ struct DashboardView: View {
                 Rectangle().fill(AppTheme.border(dark)).frame(height: 1)
                 ForEach(Array(rows.enumerated()), id: \.offset) { idx, row in
                     HStack(alignment: .center, spacing: 12) {
-                        Text(row.0)
+                        Text(L(row.0))
                             .font(.system(size: 11.5))
                             .foregroundColor(AppTheme.textTertiary(dark))
                             .lineLimit(1)
                         Spacer(minLength: 8)
-                        Text(row.1)
+                        Text(L(row.1))
                             .font(.system(size: 11.5, weight: .medium))
                             .foregroundColor(mutedRows.contains(idx) ? AppTheme.textTertiary(dark) : AppTheme.navIcon(dark))
                             .multilineTextAlignment(.trailing)
@@ -609,7 +618,7 @@ struct DashboardView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     if model.activityLogs.isEmpty {
-                        Text("暂无实时活动")
+                        Text(L("暂无实时活动"))
                             .font(.system(size: 12))
                             .foregroundColor(AppTheme.textTertiary(dark))
                             .frame(maxWidth: .infinity, minHeight: 152)
@@ -641,12 +650,12 @@ struct DashboardView: View {
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(iconColor)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(AppTheme.navIcon(dark))
                     .lineLimit(1)
                 if let subtitle = subtitle {
-                    Text(subtitle)
+                    Text(L(subtitle))
                         .font(.system(size: 11))
                         .foregroundColor(AppTheme.textTertiary(dark))
                         .lineLimit(1)
@@ -665,12 +674,12 @@ struct DashboardView: View {
     /// Web 活动行：padding 10px 16px · 时间 mono 10 fg-3 · 级别徽章(mono 9·700 · soft 底) · 消息 + 租户·区域
     private func activityRow(_ log: ActivityLog, showDivider: Bool) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Text(log.time)
+            Text(L(log.time))
                 .font(.system(size: 10, design: .monospaced))
                 .foregroundColor(AppTheme.textTertiary(dark))
                 .frame(width: 56, alignment: .leading)
                 .padding(.top, 2)
-            Text(log.level)
+            Text(L(log.level))
                 .font(.system(size: 9, weight: .bold, design: .monospaced))
                 .foregroundColor(levelColor(log.level).fg)
                 .padding(.horizontal, 5)
@@ -679,12 +688,12 @@ struct DashboardView: View {
                 .cornerRadius(3)
                 .frame(minWidth: 46, alignment: .center)
             VStack(alignment: .leading, spacing: 2) {
-                Text(log.msg)
+                Text(L(log.msg))
                     .font(.system(size: 11.5))
                     .foregroundColor(AppTheme.sidebarText(dark))
                     .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Text("\(log.tenant) · \(log.region)")
+                Text(L("\(log.tenant) · \(log.region)"))
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(AppTheme.textTertiary(dark))
                     .lineLimit(1)
@@ -713,7 +722,7 @@ struct DashboardView: View {
     private func legendItem(color: Color, shape: LegendShape, label: String) -> some View {
         HStack(spacing: 5) {
             legendDot(color, shape: shape)
-            Text(label)
+            Text(L(label))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.textSecondary(dark))
         }
@@ -766,7 +775,7 @@ struct EmptyBarChart: View {
                     let tick = maxY / 4 * Double(i)
                     Path { p in p.move(to: CGPoint(x: left, y: y)); p.addLine(to: CGPoint(x: left + plotW, y: y)) }
                         .stroke(AppTheme.border(dark), style: StrokeStyle(lineWidth: 1, dash: i == 0 ? [] : [2, 4]))
-                    Text(String(format: "%.0f", tick))
+                    Text(L(String(format: "%.0f", tick)))
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundColor(AppTheme.textTertiary(dark))
                         .frame(width: 30, alignment: .trailing)
@@ -776,13 +785,13 @@ struct EmptyBarChart: View {
                 // x labels
                 ForEach(Array(labels.enumerated()), id: \.offset) { i, label in
                     let x = left + (CGFloat(i) / CGFloat(max(1, labels.count))) * plotW + (plotW / CGFloat(max(1, labels.count))) / 2
-                    Text(label)
+                    Text(L(label))
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundColor(AppTheme.textTertiary(dark))
                         .position(x: x, y: h - 8)
                 }
 
-                Text("暂无数据")
+                Text(L("暂无数据"))
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.textTertiary(dark))
                     .position(x: left + plotW / 2, y: top + plotH / 2)
@@ -795,6 +804,7 @@ struct EmptyBarChart: View {
 // MARK: - Gauge（Web CircularGauge：轨道 bg-3 · 圆头进度 · 中央数值 + 下方标签，无内圆底）
 
 struct DashboardGauge: View {
+    @ObservedObject private var i18n = AppI18n.shared
     let value: Double
     var maxValue: Double = 100
     var color: Color = AppTheme.sidebarActive
@@ -823,18 +833,18 @@ struct DashboardGauge: View {
             VStack(spacing: 6) {
                 if belowLabel == nil {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
-                        Text(renderedValue)
+                        Text(L(renderedValue))
                             .font(.system(size: valueSize, weight: .bold))
                             .foregroundColor(color)
-                        Text(unitLabel)
+                        Text(L(unitLabel))
                             .font(.system(size: valueSize * 0.45, weight: .bold))
                             .foregroundColor(color)
                     }
                 } else {
-                    Text(renderedValue)
+                    Text(L(renderedValue))
                         .font(.system(size: valueSize, weight: .bold))
                         .foregroundColor(color)
-                    Text(belowLabel ?? "")
+                    Text(L(belowLabel ?? ""))
                         .font(.system(size: 11))
                         .foregroundColor(AppTheme.textTertiary(dark))
                 }

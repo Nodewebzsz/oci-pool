@@ -146,7 +146,7 @@ private struct SelectMenuPanelView: View {
                     if state.allowClear {
                         row(
                             id: "__clear__",
-                            title: state.placeholder,
+                            title: L(state.placeholder),
                             subtitle: nil,
                             selected: state.selection == nil,
                             muted: true,
@@ -158,7 +158,7 @@ private struct SelectMenuPanelView: View {
                     }
 
                     if filteredOptions.isEmpty {
-                        Text("无匹配项")
+                        Text(L("无匹配项"))
                             .font(.system(size: 12))
                             .foregroundColor(AppInputStyle.placeholder(dark))
                             .frame(maxWidth: .infinity)
@@ -167,8 +167,8 @@ private struct SelectMenuPanelView: View {
                         ForEach(filteredOptions) { opt in
                             row(
                                 id: opt.id,
-                                title: opt.title,
-                                subtitle: opt.subtitle,
+                                title: L(opt.title),
+                                subtitle: opt.subtitle.map { L($0) },
                                 selected: state.selection == opt.id,
                                 muted: false,
                                 enabled: opt.enabled
@@ -200,7 +200,7 @@ private struct SelectMenuPanelView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(AppInputStyle.icon(dark))
-            TextField("搜索…", text: $state.searchText)
+            TextField(L("搜索…"), text: $state.searchText)
                 .textFieldStyle(PlainTextFieldStyle())
                 .font(.system(size: 12))
                 .foregroundColor(AppInputStyle.text(dark))
@@ -244,12 +244,12 @@ private struct SelectMenuPanelView: View {
         return Button(action: action) {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
+                    Text(L(title))
                         .font(.system(size: 13, weight: (selected && !muted) ? .semibold : .regular))
                         .foregroundColor(titleColor)
                         .lineLimit(1)
                     if let subtitle = subtitle, !subtitle.isEmpty {
-                        Text(subtitle)
+                        Text(L(subtitle))
                             .font(.system(size: 11))
                             .foregroundColor(AppInputStyle.placeholder(dark))
                             .lineLimit(1)
@@ -512,9 +512,9 @@ struct SelectMenu: View {
 
     private var displayTitle: String {
         if let id = selection, let opt = options.first(where: { $0.id == id }) {
-            return opt.title
+            return L(opt.title)
         }
-        return placeholder
+        return L(placeholder)
     }
 
     private var showingPlaceholder: Bool {
@@ -567,7 +567,7 @@ struct SelectMenu: View {
     private var trigger: some View {
         Button(action: toggleOpen) {
             HStack(spacing: 8) {
-                Text(displayTitle)
+                Text(L(displayTitle))
                     .font(.system(size: AppInputStyle.fontSize))
                     .foregroundColor(
                         showingPlaceholder
@@ -604,7 +604,7 @@ struct SelectMenu: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
-        .help(displayTitle)
+        .help(L(displayTitle))
     }
 
     // MARK: Open / close

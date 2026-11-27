@@ -3,6 +3,7 @@ package com.nodewebzsz.ociserver.controller;
 import cn.dev33.satoken.stp.StpUtil;
 import com.nodewebzsz.ocicommon.utils.IpUtils;
 import com.nodewebzsz.ocicommon.utils.RsaUtils;
+import com.nodewebzsz.ociserver.config.AuthSessionHelper;
 import com.nodewebzsz.ociserver.config.exception.IpBannedException;
 import com.nodewebzsz.ociserver.controller.BaseController.MessageResolver;
 import com.nodewebzsz.ociserver.pojo.request.MfaConfig;
@@ -134,7 +135,7 @@ public class LoginController {
             loginFailureGuard.withLoginLock(resolvedIp, () -> {
                 loginFailureGuard.loginSucceeded(resolvedIp);
                 authSecurityService.clearLoginFailure(resolvedIp, username);
-                StpUtil.login(user.getUsername(), rememberMe);
+                AuthSessionHelper.login(user.getUsername(), rememberMe);
             });
             log.info("用户 [{}] 登录成功，rememberMe={}", username, rememberMe);
 

@@ -771,11 +771,11 @@ struct InstanceConsoleView: View {
                             Image(systemName: "tv")
                                 .font(.system(size: 28, weight: .light))
                                 .foregroundColor(Color.white.opacity(0.35))
-                            Text(canvasPlaceholderText)
+                            Text(L(canvasPlaceholderText))
                                 .font(.system(size: 13))
                                 .foregroundColor(Color.white.opacity(0.55))
                             if model.needsWebsockifyInstall {
-                                Text("Mac 本机未安装 websockify，画面无法显示")
+                                Text(L("Mac 本机未安装 websockify，画面无法显示"))
                                     .font(.system(size: 12))
                                     .foregroundColor(AppTheme.danger.opacity(0.9))
                                 AppButton(
@@ -836,10 +836,10 @@ struct InstanceConsoleView: View {
             Image(systemName: "tv")
                 .foregroundColor(AppTheme.sidebarActive)
             VStack(alignment: .leading, spacing: 2) {
-                Text("控制台 — \(item.displayName.isEmpty ? "实例" : item.displayName)")
+                Text(L("控制台 — \(item.displayName.isEmpty ? "实例" : item.displayName)"))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
-                Text(model.statusText)
+                Text(L(model.statusText))
                     .font(.system(size: 11))
                     .foregroundColor(
                         model.statusText.contains("已连接")
@@ -867,11 +867,11 @@ struct InstanceConsoleView: View {
 
     private var toolbar: some View {
         HStack(spacing: 10) {
-            Text("公网 IP：\(item.publicIps.isEmpty ? "—" : item.publicIps)")
+            Text(L("公网 IP：\(item.publicIps.isEmpty ? "—" : item.publicIps)"))
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.sidebarText(dark))
             if let port = model.websockifyPort {
-                Text("websockify：\(port)")
+                Text(L("websockify：\(port)"))
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(AppTheme.sidebarText(dark))
             }
@@ -913,7 +913,7 @@ struct InstanceConsoleView: View {
 
     private var logPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("连接日志")
+            Text(L("连接日志"))
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(AppTheme.sidebarText(dark))
                 .padding(10)
@@ -921,13 +921,13 @@ struct InstanceConsoleView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 4) {
                     if let err = model.errorText, !err.isEmpty {
-                        Text(err)
+                        Text(L(err))
                             .font(.system(size: 11))
                             .foregroundColor(AppTheme.danger)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     ForEach(Array(model.logLines.enumerated()), id: \.offset) { _, line in
-                        Text(line)
+                        Text(L(line))
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundColor(dark ? Color.white.opacity(0.85) : Color.primary.opacity(0.85))
                             .frame(maxWidth: .infinity, alignment: .leading)

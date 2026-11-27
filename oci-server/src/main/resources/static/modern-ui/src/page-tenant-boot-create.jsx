@@ -670,17 +670,17 @@ function estimateBootMonthlyCost(input) {
           icon="zap"
           iconColor="var(--orange)"
           title={
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, lineHeight: 1.25 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8, lineHeight: 1.15 }}>
               <span
                 onClick={() => navigate('tenants')}
-                style={{ cursor: 'pointer', color: 'var(--fg-2)', fontSize: 16, fontWeight: 500, transition: 'color 120ms' }}
+                style={{ cursor: 'pointer', color: 'var(--fg-2)', fontWeight: 400, transition: 'color 120ms' }}
                 onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
                 onMouseLeave={e => e.currentTarget.style.color = 'var(--fg-2)'}
               >
                 租户管理
               </span>
-              <span style={{ color: 'var(--fg-3)', fontSize: 13, opacity: 0.7 }}>/</span>
-              <span style={{ color: 'var(--fg-0)', fontSize: 15, fontWeight: 600 }}>创建开机任务</span>
+              <span style={{ color: 'var(--fg-3)', fontSize: '0.78em', fontWeight: 300, opacity: 0.65 }}>/</span>
+              <span style={{ color: 'var(--fg-0)', fontWeight: 'var(--page-title-weight)' }}>创建开机任务</span>
             </div>
           }
           subtitle={subtitleText}

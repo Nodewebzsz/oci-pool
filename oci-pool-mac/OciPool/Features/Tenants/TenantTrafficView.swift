@@ -153,7 +153,7 @@ struct TenantTrafficView: View {
             HStack(alignment: .center, spacing: 14) {
                 // Time presets
                 HStack(spacing: 8) {
-                    Text("时间范围：")
+                    Text(L("时间范围："))
                         .font(.system(size: 13))
                         .foregroundColor(secondaryText)
                     presetBtn("今天", value: "today")
@@ -164,7 +164,7 @@ struct TenantTrafficView: View {
                 if model.tqTimePreset == "custom" {
                     HStack(spacing: 8) {
                         dateField(text: $model.tqStart)
-                        Text("至")
+                        Text(L("至"))
                             .font(.system(size: 12))
                             .foregroundColor(secondaryText)
                         dateField(text: $model.tqEnd)
@@ -178,7 +178,7 @@ struct TenantTrafficView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 11, weight: .semibold))
-                        Text("查询")
+                        Text(L("查询"))
                             .font(.system(size: 13, weight: .medium))
                     }
                     .foregroundColor(.white)
@@ -207,7 +207,7 @@ struct TenantTrafficView: View {
     private func presetBtn(_ title: String, value: String) -> some View {
         let active = model.tqTimePreset == value
         return Button(action: { model.applyTrafficPreset(value) }) {
-            Text(title)
+            Text(L(title))
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(active ? .white : accentGreen)
                 .padding(.horizontal, 12)
@@ -255,7 +255,7 @@ struct TenantTrafficView: View {
                         .font(.system(size: 13))
                         .foregroundColor(selected ? accentGreen : secondaryText)
                 }
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 13))
                     .foregroundColor(primaryText)
                     .lineLimit(1)
@@ -290,10 +290,10 @@ struct TenantTrafficView: View {
                 .foregroundColor(iconColor)
                 .frame(width: 28)
             VStack(alignment: .leading, spacing: 6) {
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 13))
                     .foregroundColor(secondaryText)
-                Text(value)
+                Text(L(value))
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(primaryText)
                     .lineLimit(1)
@@ -336,7 +336,7 @@ struct TenantTrafficView: View {
         let remain = max(threshold - usedGB, 0)
         let pct = min(100, (usedGB / threshold) * 100)
         return VStack(spacing: 10) {
-            Text(title)
+            Text(L(title))
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(primaryText)
             TrafficDonutView(
@@ -368,7 +368,7 @@ struct TenantTrafficView: View {
     private func legendItem(_ color: Color, _ text: String) -> some View {
         HStack(spacing: 5) {
             Circle().fill(color).frame(width: 8, height: 8)
-            Text(text)
+            Text(L(text))
                 .font(.system(size: 11))
                 .foregroundColor(secondaryText)
                 .lineLimit(1)
@@ -380,7 +380,7 @@ struct TenantTrafficView: View {
     private var trendCard: some View {
         let series = trendSeries
         return VStack(spacing: 0) {
-            Text("总体流量趋势")
+            Text(L("总体流量趋势"))
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(primaryText)
                 .frame(maxWidth: .infinity)
@@ -393,7 +393,7 @@ struct TenantTrafficView: View {
                     legendItem(outColor, "出站流量")
                     legendItem(accentBlue, "总流量")
                     Spacer()
-                    Text("流量 (GB)")
+                    Text(L("流量 (GB)"))
                         .font(.system(size: 11))
                         .foregroundColor(secondaryText)
                 }
@@ -427,7 +427,7 @@ struct TenantTrafficView: View {
 
     private var instanceSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("实例展示流量趋势")
+            Text(L("实例展示流量趋势"))
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(primaryText)
                 .frame(maxWidth: .infinity)
@@ -459,12 +459,12 @@ struct TenantTrafficView: View {
         let buckets = instanceDayBuckets(group.samples)
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(group.name)
+                Text(L(group.name))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(primaryText)
                     .lineLimit(1)
                 Spacer()
-                Text(group.ip.isEmpty ? "IP: —" : "IP: \(group.ip)")
+                Text(L(group.ip.isEmpty ? "IP: —" : "IP: \(group.ip)"))
                     .font(.system(size: 12))
                     .foregroundColor(secondaryText)
                     .lineLimit(1)
@@ -473,7 +473,7 @@ struct TenantTrafficView: View {
                 legendItem(inColor, "入站流量 (MB)")
                 legendItem(outColor, "出站流量 (MB)")
                 Spacer()
-                Text("流量 (MB)")
+                Text(L("流量 (MB)"))
                     .font(.system(size: 10))
                     .foregroundColor(secondaryText)
             }
@@ -529,7 +529,7 @@ struct TenantTrafficView: View {
             Image(systemName: "chart.bar")
                 .font(.system(size: 28))
                 .foregroundColor(secondaryText.opacity(0.45))
-            Text(text)
+            Text(L(text))
                 .font(.system(size: 12))
                 .foregroundColor(secondaryText)
         }
@@ -563,6 +563,7 @@ struct TenantTrafficView: View {
 // MARK: - Donut chart (Web ECharts pie radius 50%–75%)
 
 private struct TrafficDonutView: View {
+    @ObservedObject private var i18n = AppI18n.shared
     let used: Double
     let remain: Double
     let usedColor: Color
@@ -585,7 +586,7 @@ private struct TrafficDonutView: View {
                     .stroke(usedColor, style: StrokeStyle(lineWidth: lineW, lineCap: .butt))
                     .rotationEffect(.degrees(-90))
                     .frame(width: size * 0.78, height: size * 0.78)
-                Text(centerText)
+                Text(L(centerText))
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(dark ? Color(hex: "e2e8f0") : Color(hex: "222222"))
             }
@@ -628,7 +629,7 @@ private struct TrafficLineChart: View {
                         p.addLine(to: CGPoint(x: padL + w, y: y))
                     }
                     .stroke(gridColor, lineWidth: 1)
-                    Text(String(format: "%.1f", maxY * Double(g) / 4))
+                    Text(L(String(format: "%.1f", maxY * Double(g) / 4)))
                         .font(.system(size: 9))
                         .foregroundColor(labelColor)
                         .position(x: padL - 18, y: y)
@@ -667,7 +668,7 @@ private struct TrafficLineChart: View {
         let step = max(1, n / 8)
         ForEach(Array(stride(from: 0, to: n, by: step)), id: \.self) { i in
             let x = padL + (n > 1 ? CGFloat(i) / CGFloat(n - 1) * w : w / 2)
-            Text(shortTime(times[i]))
+            Text(L(shortTime(times[i])))
                 .font(.system(size: 9))
                 .foregroundColor(labelColor)
                 .position(x: x, y: padT + h + 14)
@@ -723,7 +724,7 @@ private struct TrafficBarChart: View {
                         p.addLine(to: CGPoint(x: padL + w, y: y))
                     }
                     .stroke(gridColor, lineWidth: 1)
-                    Text(String(format: "%.0f", maxY * Double(g) / 4))
+                    Text(L(String(format: "%.0f", maxY * Double(g) / 4)))
                         .font(.system(size: 9))
                         .foregroundColor(labelColor)
                         .position(x: padL - 16, y: y)
@@ -744,7 +745,7 @@ private struct TrafficBarChart: View {
                         .frame(width: barW, height: max(1, outH))
                         .position(x: cx + barW * 0.55, y: padT + h - outH / 2)
 
-                    Text(shortLabel(labels[i]))
+                    Text(L(shortLabel(labels[i])))
                         .font(.system(size: 9))
                         .foregroundColor(labelColor)
                         .rotationEffect(.degrees(-35))
@@ -785,7 +786,7 @@ private struct RegionMultiSelectTrigger: View {
             panelState.isOpen.toggle()
         }) {
             HStack {
-                Text(displayText)
+                Text(L(displayText))
                     .font(.system(size: 13))
                     .foregroundColor(primaryText)
                     .lineLimit(1)
@@ -855,7 +856,7 @@ private struct RegionMultiSelectDropdownPanel: View {
                 if isAll { onClearAll() } else { onSelectAll() }
             }) {
                 HStack(spacing: 8) {
-                    Text(isAll ? "取消全选" : "全选")
+                    Text(L(isAll ? "取消全选" : "全选"))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(primaryText)
                     Spacer()
@@ -869,7 +870,7 @@ private struct RegionMultiSelectDropdownPanel: View {
             Divider().background(cardBorder.opacity(0.8))
 
             if regions.isEmpty {
-                Text("暂无区域（将使用当前租户）")
+                Text(L("暂无区域（将使用当前租户）"))
                     .font(.system(size: 12))
                     .foregroundColor(secondaryText)
                     .padding(10)
@@ -883,7 +884,7 @@ private struct RegionMultiSelectDropdownPanel: View {
                                     Image(systemName: selected ? "checkmark.square.fill" : "square")
                                         .font(.system(size: 13))
                                         .foregroundColor(selected ? accentGreen : secondaryText)
-                                    Text(regionLabel(reg))
+                                    Text(L(regionLabel(reg)))
                                         .font(.system(size: 13))
                                         .foregroundColor(primaryText)
                                         .lineLimit(1)

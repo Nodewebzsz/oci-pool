@@ -22,11 +22,22 @@ enum ToolbarPacking {
         var x: CGFloat = 0
         var y: CGFloat = 0
         var rowHeight: CGFloat = 0
+        var rowStart = 0
         var usedWidth: CGFloat = 0
         let limit = max(1, width)
+        func alignRow(_ range: Range<Int>, height: CGFloat) {
+            for index in range {
+                let offset = (height - frames[index].height) * 0.5
+                if offset > 0 {
+                    frames[index].origin.y += offset
+                }
+            }
+        }
         for size in sizes {
             let itemWidth = min(size.width, limit)
             if x > 0 && x + itemWidth > limit {
+                alignRow(rowStart..<frames.count, height: rowHeight)
+                rowStart = frames.count
                 x = 0
                 y += rowHeight + spacing
                 rowHeight = 0
@@ -36,6 +47,7 @@ enum ToolbarPacking {
             rowHeight = max(rowHeight, size.height)
             x += itemWidth + spacing
         }
+        alignRow(rowStart..<frames.count, height: rowHeight)
         return (frames, CGSize(width: usedWidth, height: frames.isEmpty ? 0 : y + rowHeight))
     }
 }

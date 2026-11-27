@@ -20,7 +20,7 @@ struct InstancesView: View {
     private let wCpu: CGFloat = 64
     private let wArch: CGFloat = 68
     private let wVol: CGFloat = 86
-    private let wIpv6: CGFloat = 52
+    private let wIpv6: CGFloat = 78
     private let wTimeBase: CGFloat = 92
     private let wAction: CGFloat = 48
     private let hPad: CGFloat = 14
@@ -110,7 +110,7 @@ struct InstancesView: View {
             Button(action: { NavigationState.shared.closeTenantSubPage() }) {
                 HStack(spacing: 4) {
                     Image(systemName: "chevron.left").font(.system(size: 11, weight: .semibold))
-                    Text("返回").font(.system(size: 12, weight: .medium))
+                    Text(L("返回")).font(.system(size: 12, weight: .medium))
                 }
                 .foregroundColor(AppTheme.sidebarText(dark))
                 .padding(.horizontal, 8)
@@ -123,28 +123,28 @@ struct InstancesView: View {
                 )
             }
             .buttonStyle(PlainButtonStyle())
-            .help("返回上一级")
+            .help(L("返回上一级"))
 
             Text("›").font(.system(size: 11)).foregroundColor(AppTheme.sidebarText(dark).opacity(0.5))
 
             // 第一级：OCI 租户管理（点击直接返回租户管理大列表）
             Button(action: { NavigationState.shared.closeToTenantsList() }) {
-                Text("OCI 租户管理")
+                Text(L("OCI 租户管理"))
                     .font(.system(size: 12))
                     .foregroundColor(AppTheme.sidebarText(dark))
             }
             .buttonStyle(PlainButtonStyle())
-            .help("回到租户列表")
+            .help(L("回到租户列表"))
 
             // 第二级：租户详情 · 租户名（若有上级租户详情上下文，点击即可返回该租户详情）
             let name = NavigationState.shared.tenantSubPageName
             Text("›").font(.system(size: 11)).foregroundColor(AppTheme.sidebarText(dark).opacity(0.5))
             Button(action: { NavigationState.shared.closeTenantSubPage() }) {
                 HStack(spacing: 4) {
-                    Text("租户详情")
+                    Text(L("租户详情"))
                     if !name.isEmpty {
                         Text("·")
-                        Text(name)
+                        Text(L(name))
                             .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     }
                 }
@@ -152,11 +152,11 @@ struct InstancesView: View {
                 .foregroundColor(AppTheme.sidebarText(dark))
             }
             .buttonStyle(PlainButtonStyle())
-            .help("回到该租户详情页")
+            .help(L("回到该租户详情页"))
 
             // 第三级：当前实例列表
             Text("›").font(.system(size: 11)).foregroundColor(AppTheme.sidebarText(dark).opacity(0.5))
-            Text("实例列表")
+            Text(L("实例列表"))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(AppTheme.sidebarActive)
 
@@ -175,13 +175,10 @@ struct InstancesView: View {
 
     // MARK: - Toolbar
 
-    /// Web 页头 actions：`请选择:` + 租户/区域 Select(160) + eye 图标钮 + 查看实例(primary) + 一键导出(orange)
+    /// Web 页头 actions：租户/区域 Select + eye 图标钮 + 查看实例(primary) + 一键导出(orange)
     private var toolbar: some View {
         AdaptivePageToolbar {
             if !tenantSubPage {
-                Text("请选择:")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.textTertiary(dark))
                 SelectMenu(
                     options: model.parentTenants.map { SelectOption(id: $0.id, title: parentLabel($0)) },
                     selection: Binding(
@@ -197,7 +194,7 @@ struct InstancesView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "globe")
                         .font(.system(size: 11))
-                    Text("当前区域:")
+                    Text(L("当前区域:"))
                         .font(.system(size: 12))
                 }
                 .foregroundColor(AppTheme.textTertiary(dark))
@@ -235,7 +232,7 @@ struct InstancesView: View {
                     )
             }
             .buttonStyle(PlainButtonStyle())
-            .help(model.namesHidden ? "显示完整租户名" : "隐藏租户名")
+            .help(L(model.namesHidden ? "显示完整租户名" : "隐藏租户名"))
             if !tenantSubPage {
                 AppButton(title: "查看实例", systemImage: "magnifyingglass", kind: .primary,
                           enabled: !model.selectedRegionId.isEmpty) {
@@ -256,7 +253,7 @@ struct InstancesView: View {
             Image(systemName: "line.3.horizontal.decrease")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(AppTheme.sidebarActive)
-            Text("当前筛选:")
+            Text(L("当前筛选:"))
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(AppTheme.sidebarActive)
             filterChip(label: "租户", value: model.selectedParentId.isEmpty
@@ -265,7 +262,7 @@ struct InstancesView: View {
             filterChip(label: "区域", value: model.selectedRegionId.isEmpty
                 ? nil
                 : (model.regions.first(where: { $0.id == model.selectedRegionId }).map { regionLabel($0) } ?? model.selectedRegionId))
-            Text("· 匹配 \(model.pageState.totalElements) 条")
+            Text(L("· 匹配 \(model.pageState.totalElements) 条"))
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.textSecondary(dark))
             if !tenantSubPage {
@@ -291,10 +288,10 @@ struct InstancesView: View {
     /// 筛选 chip：`标签 值`（bg-1 底 radius 3；未选择时值=未选择）
     private func filterChip(label: String, value: String?) -> some View {
         HStack(spacing: 5) {
-            Text(label)
+            Text(L(label))
                 .font(.system(size: 10.5))
                 .foregroundColor(AppTheme.textTertiary(dark))
-            Text(value ?? "未选择")
+            Text(L(value ?? "未选择"))
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(AppTheme.navIcon(dark))
                 .lineLimit(1)
@@ -335,11 +332,11 @@ struct InstancesView: View {
                     .foregroundColor(color)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(label)
+                Text(L(label))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(AppTheme.textTertiary(dark))
                     .lineLimit(1)
-                Text(value)
+                Text(L(value))
                     .font(.system(size: 22, weight: .bold))
                     .foregroundColor(AppTheme.navIcon(dark))
                     .lineLimit(1)
@@ -375,7 +372,7 @@ struct InstancesView: View {
                 summaryChip(icon: "ellipsis.circle", title: "其他", value: "\(model.otherStateCount)", accent: AppTheme.orange)
             }
             Spacer(minLength: 0)
-            Text("快捷：启停 · 复制IP · SSH · 更多")
+            Text(L("快捷：启停 · 复制IP · SSH · 更多"))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.sidebarText(dark).opacity(0.85))
         }
@@ -394,10 +391,10 @@ struct InstancesView: View {
                     .foregroundColor(accent)
             }
             VStack(alignment: .leading, spacing: 1) {
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(AppTheme.sidebarText(dark))
-                Text(value)
+                Text(L(value))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
             }
@@ -417,9 +414,9 @@ struct InstancesView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 12))
+            Text(L(text)).font(.system(size: 12))
             Spacer()
-            Button("重试") { Task { await model.reload() } }
+            Button(L("重试")) { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
                 .font(.system(size: 12, weight: .semibold))
         }
@@ -475,7 +472,7 @@ struct InstancesView: View {
                         VStack(spacing: 10) {
                             Spacer()
                             ProgressView()
-                            Text("正在加载实例数据…")
+                            Text(L("正在加载实例数据…"))
                                 .font(.system(size: 12))
                                 .foregroundColor(AppTheme.sidebarText(dark))
                             Spacer()
@@ -508,7 +505,7 @@ struct InstancesView: View {
                         VStack(spacing: 8) {
                             ProgressView()
                                 .scaleEffect(0.9)
-                            Text("更新中…")
+                            Text(L("更新中…"))
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(AppTheme.sidebarText(dark))
                         }
@@ -641,14 +638,14 @@ struct InstancesView: View {
     // MARK: - Cells
 
     private func colHeader(_ title: String, _ width: CGFloat, align: Alignment = .center) -> some View {
-        Text(title)
+        Text(L(title))
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(AppTheme.sidebarText(dark))
             .frame(width: width, alignment: align)
     }
 
     private func cellText(_ text: String, _ width: CGFloat, muted: Bool = false) -> some View {
-        Text(text)
+        Text(L(text))
             .font(.system(size: 12))
             .foregroundColor(
                 muted
@@ -659,7 +656,7 @@ struct InstancesView: View {
             .truncationMode(.tail)
             .frame(width: width, alignment: .center)
             .clipped()
-            .help(text)
+            .help(L(text))
     }
 
     /// 所属区域列：国旗 emoji + 中文区域名（对齐 Web RegionBadge）
@@ -667,22 +664,22 @@ struct InstancesView: View {
         let code = item.regionCode.isEmpty ? item.regionName : item.regionCode
         let flag = RegionFlag.emoji(code)
         return HStack(spacing: 6) {
-            Text(flag.isEmpty ? "🌐" : flag)
+            Text(L(flag.isEmpty ? "🌐" : flag))
                 .font(.system(size: 14))
-            Text(item.regionName.isEmpty ? "—" : item.regionName)
+            Text(L(item.regionName.isEmpty ? "—" : item.regionName))
                 .font(.system(size: 12))
                 .foregroundColor(dark ? Color.white.opacity(0.88) : Color.primary)
                 .lineLimit(1)
                 .truncationMode(.tail)
         }
         .frame(width: width, alignment: .center)
-        .help(item.regionName.isEmpty ? "—" : "\(item.regionName)（\(code)）")
+        .help(L(item.regionName.isEmpty ? "—" : "\(item.regionName)（\(code)）"))
     }
 
     /// 架构徽章：ARM=info蓝 / 其余=violet 紫（对齐 Web getInstanceArch）
     private func archChip(_ arch: String) -> some View {
         let isARM = arch.uppercased() == "ARM"
-        return Text(arch.isEmpty ? "—" : arch)
+        return Text(L(arch.isEmpty ? "—" : arch))
             .font(.system(size: 10, weight: .semibold, design: .monospaced))
             .foregroundColor(isARM ? AppTheme.info : violetArch)
             .padding(.horizontal, 6)
@@ -703,7 +700,7 @@ struct InstancesView: View {
         }) {
             HStack(spacing: 6) {
                 // 对齐 Web：bg-3 圆角脱敏名块 + link 图标
-                Text(model.namesHidden ? item.maskedTenancyName : (item.tenancyName.isEmpty ? "—" : item.tenancyName))
+                Text(L(model.namesHidden ? item.maskedTenancyName : (item.tenancyName.isEmpty ? "—" : item.tenancyName)))
                     .font(.system(size: 11.5, weight: .medium, design: .monospaced))
                     .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
                     .lineLimit(1)
@@ -722,7 +719,7 @@ struct InstancesView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
-        .help(item.tenancyName.isEmpty ? "—" : item.tenancyName)
+        .help(L(item.tenancyName.isEmpty ? "—" : item.tenancyName))
     }
 
     private func nameCell(_ item: InstanceItem, width: CGFloat) -> some View {
@@ -732,7 +729,7 @@ struct InstancesView: View {
         return HStack(spacing: 8) {
             // 统一 MenuPulseDot：5pt + 运行中呼吸动效（对齐实例弹窗 header / Web StatusDot）
             MenuPulseDot(color: statusColor(item), pulse: item.isRunning)
-            Text(item.displayName.isEmpty ? "—" : item.displayName)
+            Text(L(item.displayName.isEmpty ? "—" : item.displayName))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
                 .lineLimit(1)
@@ -743,9 +740,9 @@ struct InstancesView: View {
         .onTapGesture(count: 2) {
             model.openUpdateName(item)
         }
-        .help(hasRemark
+        .help(L(hasRemark
               ? "\(item.displayName)\n备注：\(remark)\n双击修改名称"
-              : "\(item.displayName)\n双击修改名称")
+              : "\(item.displayName)\n双击修改名称"))
     }
 
     private func statusColor(_ item: InstanceItem) -> Color {
@@ -756,7 +753,7 @@ struct InstancesView: View {
         let priv = item.privateIps.trimmingCharacters(in: .whitespacesAndNewlines)
         let hasPriv = !priv.isEmpty && priv != "—" && priv != "-"
         return Button(action: { model.copyText(item.publicIps, label: "IPv4") }) {
-            Text(item.publicIps.isEmpty ? "—" : item.publicIps)
+            Text(L(item.publicIps.isEmpty ? "—" : item.publicIps))
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .foregroundColor(item.publicIps.isEmpty ? AppTheme.sidebarText(dark) : AppTheme.cyan)
                 .lineLimit(1)
@@ -764,11 +761,11 @@ struct InstancesView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
-        .help(
+        .help(L(
             item.publicIps.isEmpty
                 ? (hasPriv ? "无公网 IP · 内网 \(priv)" : "无公网 IP")
                 : (hasPriv ? "点击复制 IPv4 · 内网 \(priv)" : "点击复制 IPv4")
-        )
+        ))
     }
 
     private func ipv6Cell(_ item: InstanceItem, width: CGFloat) -> some View {
@@ -778,17 +775,20 @@ struct InstancesView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark")
                             .font(.system(size: 10, weight: .bold))
-                        Text("已启用")
+                        Text(L("已启用"))
                             .font(.system(size: 11))
+                            .lineLimit(1)
                     }
+                    .fixedSize(horizontal: true, vertical: false)
                     .foregroundColor(AppTheme.sidebarActive)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help("点击复制 IPv6：\(item.ipv6Addresses)")
+                .help(L("点击复制 IPv6：\(item.ipv6Addresses)"))
             } else {
-                Text("未启用")
+                Text(L("未启用"))
                     .font(.system(size: 11))
+                    .lineLimit(1)
                     .foregroundColor(AppTheme.sidebarText(dark))
             }
         }
@@ -899,7 +899,7 @@ enum InstanceActionPanel {
 // MARK: - 窗内操作菜单（不使用 NSMenu/NSPopover，保证在应用窗口内）
 
 private enum InstanceActionMenuLayout {
-    static let width: CGFloat = 280
+    static var width: CGFloat { AppI18n.shared.isEnglish ? 368 : 280 }
     static let vPad: CGFloat = 8
     static let titleH: CGFloat = 20
     static let gridGap: CGFloat = 1
@@ -1127,7 +1127,7 @@ struct InstanceActionMenuContent: View {
             // 对齐标准 header：状态点（运行中脉冲动效）+ 实例名（无重复灰块/项数）
             HStack(spacing: 6) {
                 MenuPulseDot(color: itemStateColor, pulse: item.isRunning)
-                Text(item.displayName.isEmpty ? "—" : item.displayName)
+                Text(L(item.displayName.isEmpty ? "—" : item.displayName))
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                     .lineLimit(1)
@@ -1168,7 +1168,7 @@ struct InstanceActionMenuContent: View {
                 Image(systemName: act.systemImage)
                     .font(.system(size: 11, weight: .semibold))
                     .frame(width: 14)
-                Text(act.title)
+                Text(L(act.title))
                     .font(.system(size: 12, weight: .medium))
                     .lineLimit(1)
                 Spacer(minLength: 0)

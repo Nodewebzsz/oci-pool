@@ -46,7 +46,7 @@ struct MigrationView: View {
                             masterKeyBanner(key)
                         }
                         if let status = model.statusText, !status.isEmpty {
-                            Text(status)
+                            Text(L(status))
                                 .font(.system(size: 12))
                                 .foregroundColor(AppTheme.sidebarText(dark))
                         }
@@ -107,24 +107,24 @@ struct MigrationView: View {
                                     .foregroundColor(AppTheme.sidebarActive)
                             }
                             VStack(spacing: 3) {
-                                Text(name)
+                                Text(L(name))
                                     .font(.system(size: 12.5, weight: .semibold, design: .monospaced))
                                     .foregroundColor(dark ? .white : Color(hex: "1a202c"))
                                     .lineLimit(1)
                                 if let size = model.selectedFileSizeText {
-                                    Text(size)
+                                    Text(L(size))
                                         .font(.system(size: 11, design: .monospaced))
                                         .foregroundColor(AppTheme.textTertiary(dark))
                                 }
                             }
                             HStack(spacing: 12) {
-                                Text("点击更换文件")
+                                Text(L("点击更换文件"))
                                     .font(.system(size: 11, weight: .medium))
                                     .foregroundColor(AppTheme.sidebarActive)
                                 Button(action: { model.clearImportFile() }) {
                                     HStack(spacing: 3) {
                                         Image(systemName: "xmark.circle.fill")
-                                        Text("清除")
+                                        Text(L("清除"))
                                     }
                                     .font(.system(size: 11, weight: .medium))
                                     .foregroundColor(AppTheme.danger)
@@ -142,10 +142,10 @@ struct MigrationView: View {
                                     .foregroundColor(AccentPreset.orange.color)
                             }
                             VStack(spacing: 3) {
-                                Text("拖拽备份文件到此处，或点击选择")
+                                Text(L("拖拽备份文件到此处，或点击选择"))
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
-                                Text("支持 .enc 加密备份或 .sql 数据库文件")
+                                Text(L("支持 .enc 加密备份或 .sql 数据库文件"))
                                     .font(.system(size: 10.5))
                                     .foregroundColor(AppTheme.textTertiary(dark))
                             }
@@ -188,7 +188,7 @@ struct MigrationView: View {
                     leadingSystemImage: "key"
                 )
             }
-            Text("导入会覆盖当前库中相关数据，操作前请确认已备份。")
+            Text(L("导入会覆盖当前库中相关数据，操作前请确认已备份。"))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.sidebarText(dark))
                 .fixedSize(horizontal: false, vertical: true)
@@ -211,7 +211,7 @@ struct MigrationView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(AppTheme.sidebarActive)
                 .frame(width: 16)
-            Text(text)
+            Text(L(text))
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.sidebarText(dark))
                 .fixedSize(horizontal: false, vertical: true)
@@ -226,7 +226,7 @@ struct MigrationView: View {
                     Image(systemName: "key.fill")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(AppTheme.sidebarActive)
-                    Text("最近一次导出的 Master Key")
+                    Text(L("最近一次导出的 Master Key"))
                         .font(.system(size: 12.5, weight: .semibold))
                         .foregroundColor(dark ? Color.white.opacity(0.95) : Color(hex: "1a202c"))
                 }
@@ -243,7 +243,7 @@ struct MigrationView: View {
                     HStack(spacing: 4) {
                         Image(systemName: copiedKey ? "checkmark" : "doc.on.doc")
                             .font(.system(size: 10.5, weight: .medium))
-                        Text(copiedKey ? "已复制" : "复制密钥")
+                        Text(L(copiedKey ? "已复制" : "复制密钥"))
                             .font(.system(size: 11, weight: .medium))
                     }
                     .padding(.horizontal, 9)
@@ -263,7 +263,7 @@ struct MigrationView: View {
 
             // 中间层：独立等宽密钥槽（Code Box）
             HStack {
-                Text(key)
+                Text(L(key))
                     .font(.system(size: 13, weight: .medium, design: .monospaced))
                     .foregroundColor(AppTheme.sidebarActive)
                     .lineLimit(1)
@@ -282,7 +282,7 @@ struct MigrationView: View {
             )
 
             // 底部：辅助安全说明
-            Text("此密钥用于解密恢复该 .enc 备份文件，请妥善保存至密码管理器或安全介质中。")
+            Text(L("此密钥用于解密恢复该 .enc 备份文件，请妥善保存至密码管理器或安全介质中。"))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.textTertiary(dark))
         }

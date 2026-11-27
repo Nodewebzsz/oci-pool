@@ -16,11 +16,11 @@ struct EmptyStateView: View {
             Image(systemName: icon)
                 .font(.system(size: 36, weight: .light))
                 .foregroundColor(AppTheme.sidebarText(dark).opacity(0.55))
-            Text(title)
+            Text(L(title))
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(dark ? Color.white.opacity(0.85) : Color.primary)
             if let subtitle = subtitle {
-                Text(subtitle)
+                Text(L(subtitle))
                     .font(.system(size: 12))
                     .foregroundColor(AppTheme.sidebarText(dark))
                     .multilineTextAlignment(.center)

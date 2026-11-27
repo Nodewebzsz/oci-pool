@@ -163,7 +163,7 @@ struct TenantQuotaView: View {
             VStack(spacing: 10) {
                 Spacer()
                 ProgressView()
-                Text("加载配额数据…")
+                Text(L("加载配额数据…"))
                     .font(.system(size: 12))
                     .foregroundColor(secondaryText)
                 Spacer()
@@ -216,7 +216,7 @@ struct TenantQuotaView: View {
                     if model.quotaLoading && !model.quotaItems.isEmpty {
                         VStack(spacing: 8) {
                             ProgressView().scaleEffect(0.9)
-                            Text("更新中…")
+                            Text(L("更新中…"))
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(secondaryText)
                         }
@@ -263,17 +263,17 @@ struct TenantQuotaView: View {
                 MenuPulseDot(color: usageColor(pct), pulse: pct >= 90)
                     .padding(.leading, 2)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(row.name.isEmpty ? "—" : row.name)
+                    Text(L(row.name.isEmpty ? "—" : row.name))
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(primaryText)
                         .lineLimit(2)
-                        .help(row.name)
+                        .help(L(row.name))
                     if !row.scope.isEmpty {
-                        Text(row.scope)
+                        Text(L(row.scope))
                             .font(.system(size: 10))
                             .foregroundColor(secondaryText)
                             .lineLimit(1)
-                            .help(row.scope)
+                            .help(L(row.scope))
                     }
                 }
             }
@@ -301,7 +301,7 @@ struct TenantQuotaView: View {
                 .frame(width: wBar, alignment: .leading)
                 .padding(.trailing, 4)
 
-            Text("\(pct)%")
+            Text(L("\(pct)%"))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(pctColor(pct))
                 .frame(width: wPct, alignment: .center)
@@ -331,7 +331,7 @@ struct TenantQuotaView: View {
 
     private var bottomBar: some View {
         HStack(alignment: .center, spacing: 12) {
-            Text(statusText)
+            Text(L(statusText))
                 .font(.system(size: 12))
                 .foregroundColor(secondaryText)
 
@@ -348,12 +348,12 @@ struct TenantQuotaView: View {
                 }
 
                 HStack(spacing: 6) {
-                    Text("第 \(model.quotaPage + 1) 页")
+                    Text(L("第 \(model.quotaPage + 1) 页"))
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(primaryText)
                     Text("|")
                         .foregroundColor(cardBorder.opacity(0.6))
-                    Text("每页")
+                    Text(L("每页"))
                         .font(.system(size: 12))
                         .foregroundColor(secondaryText)
                     SelectMenu(
@@ -371,7 +371,7 @@ struct TenantQuotaView: View {
                         width: 72,
                         allowClear: false
                     )
-                    Text("条")
+                    Text(L("条"))
                         .font(.system(size: 12))
                         .foregroundColor(secondaryText)
                 }
@@ -405,9 +405,9 @@ struct TenantQuotaView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack {
             Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 12))
+            Text(L(text)).font(.system(size: 12))
             Spacer()
-            Button("重试") {
+            Button(L("重试")) {
                 Task { await model.queryQuota(page: model.quotaPage) }
             }
             .buttonStyle(PlainButtonStyle())
@@ -421,7 +421,7 @@ struct TenantQuotaView: View {
     // MARK: - Cells / chrome
 
     private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .center) -> some View {
-        Text(title)
+        Text(L(title))
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(secondaryText)
             .lineLimit(1)
@@ -430,12 +430,12 @@ struct TenantQuotaView: View {
     }
 
     private func numCell(_ text: String, _ w: CGFloat, color: Color, bold: Bool = false) -> some View {
-        Text(text.isEmpty ? "—" : text)
+        Text(L(text.isEmpty ? "—" : text))
             .font(.system(size: 12, weight: bold ? .semibold : .regular))
             .foregroundColor(color)
             .lineLimit(1)
             .frame(width: w, alignment: .center)
-            .help(text)
+            .help(L(text))
     }
 
     private func progressBar(pct: Int) -> some View {
@@ -462,7 +462,7 @@ struct TenantQuotaView: View {
         let label = typeName.hasPrefix("裸金属·")
             ? "BM·" + String(typeName.dropFirst(4))
             : typeName
-        return Text(label)
+        return Text(L(label))
             .font(.system(size: 10, weight: .semibold))
             .foregroundColor(style.fg)
             .padding(.horizontal, 6)

@@ -98,15 +98,15 @@ struct TenantAuditLogView: View {
                         customChip
                     }
                     HStack(spacing: 8) {
-                        Text("开始")
+                        Text(L("开始"))
                             .font(.system(size: 12))
                             .foregroundColor(AppTheme.sidebarText(dark))
                         AuditDateInputField(text: $model.auditStart, dark: dark)
-                        Text("结束")
+                        Text(L("结束"))
                             .font(.system(size: 12))
                             .foregroundColor(AppTheme.sidebarText(dark))
                         AuditDateInputField(text: $model.auditEnd, dark: dark)
-                        Text("最多查询近 90 天")
+                        Text(L("最多查询近 90 天"))
                             .font(.system(size: 11))
                             .foregroundColor(AppTheme.sidebarText(dark).opacity(0.85))
                     }
@@ -125,7 +125,7 @@ struct TenantAuditLogView: View {
     private func rangeChip(_ days: Int, _ title: String) -> some View {
         let active = model.isAuditQuickRangeActive(days)
         return Button(action: { model.applyAuditQuickRange(days) }) {
-            Text(title)
+            Text(L(title))
                 .font(.system(size: 12, weight: active ? .semibold : .regular))
                 .foregroundColor(active ? .white : AppTheme.sidebarText(dark))
                 .padding(.horizontal, 11)
@@ -139,14 +139,14 @@ struct TenantAuditLogView: View {
                 )
         }
         .buttonStyle(PlainButtonStyle())
-        .help("查询最近 \(days) 天（含今天）的审计事件")
+        .help(L("查询最近 \(days) 天（含今天）的审计事件"))
     }
 
     /// 「自定义」状态指示：日期不匹配任何快捷区间时高亮。
     /// 本页日期字段始终可编辑，故这里只作状态显示，不设点击（避免造出无效按钮）。
     private var customChip: some View {
         let active = model.isAuditRangeCustom
-        return Text("自定义")
+        return Text(L("自定义"))
             .font(.system(size: 12, weight: active ? .semibold : .regular))
             .foregroundColor(active ? .white : AppTheme.sidebarText(dark).opacity(0.75))
             .padding(.horizontal, 11)
@@ -158,7 +158,7 @@ struct TenantAuditLogView: View {
                     lineWidth: 1
                 )
             )
-            .help("手动编辑上方日期即处于自定义区间")
+            .help(L("手动编辑上方日期即处于自定义区间"))
     }
 
     // MARK: - Banners
@@ -178,14 +178,14 @@ struct TenantAuditLogView: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 12))
             VStack(alignment: .leading, spacing: 1) {
-                Text("查询审计日志失败")
+                Text(L("查询审计日志失败"))
                     .font(.system(size: 12, weight: .semibold))
-                Text(text)
+                Text(L(text))
                     .font(.system(size: 11))
                     .opacity(0.9)
             }
             Spacer()
-            Button("重试") {
+            Button(L("重试")) {
                 model.reloadAudit()
             }
             .buttonStyle(PlainButtonStyle())
@@ -207,9 +207,9 @@ struct TenantAuditLogView: View {
                 .font(.system(size: 12))
                 .padding(.top, 1)
             VStack(alignment: .leading, spacing: 1) {
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 12, weight: .semibold))
-                Text(detail)
+                Text(L(detail))
                     .font(.system(size: 11))
                     .opacity(0.9)
             }
@@ -233,7 +233,7 @@ struct TenantAuditLogView: View {
             VStack {
                 Spacer()
                 ProgressView()
-                Text("加载审计日志…")
+                Text(L("加载审计日志…"))
                     .font(.system(size: 12))
                     .foregroundColor(AppTheme.sidebarText(dark))
                     .padding(.top, 8)
@@ -338,7 +338,7 @@ struct TenantAuditLogView: View {
         Group {
             if hasSignal {
                 let tint = log.isConsoleSession ? AppTheme.info : AppTheme.violet
-                Text(log.envLabel)
+                Text(L(log.envLabel))
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(tint)
                     .padding(.horizontal, 8)
@@ -353,7 +353,7 @@ struct TenantAuditLogView: View {
         }
         .lineLimit(1)
         .frame(width: width, alignment: .center)
-        .help(log.envDetail)
+        .help(L(log.envDetail))
     }
 
     /// 响应列：语义徽章（成功 / 失败 / 未知）+ 原始状态码
@@ -364,19 +364,19 @@ struct TenantAuditLogView: View {
         let codeColor = log.isError ? AppTheme.danger : AppTheme.sidebarText(dark)
         return HStack(spacing: 7) {
             StatusBadge(text: label, tone: tone)
-            Text(codeText)
+            Text(L(codeText))
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(codeColor)
                 .lineLimit(1)
         }
-        .help("响应状态：\(label)（原始码 \(codeText)）")
+        .help(L("响应状态：\(label)（原始码 \(codeText)）"))
     }
 
     // MARK: - Footer（游标分页标准形态）
 
     private var footBar: some View {
         HStack(spacing: 12) {
-            Text(model.auditFooterText)
+            Text(L(model.auditFooterText))
                 .font(.system(size: 12))
                 .foregroundColor(model.auditReachedLimit ? AppTheme.orange : AppTheme.sidebarText(dark))
             Spacer()
@@ -408,7 +408,7 @@ struct TenantAuditLogView: View {
     }
 
     private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .center) -> some View {
-        Text(title)
+        Text(L(title))
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(AppTheme.sidebarText(dark))
             .frame(width: w, alignment: align)
@@ -421,7 +421,7 @@ struct TenantAuditLogView: View {
         bold: Bool = false,
         hover: String? = nil
     ) -> some View {
-        Text(text)
+        Text(L(text))
             .font(.system(size: 12, weight: bold ? .semibold : .regular))
             .foregroundColor(
                 muted
@@ -430,7 +430,7 @@ struct TenantAuditLogView: View {
             )
             .lineLimit(1)
             .truncationMode(.tail)
-            .help(hover ?? text)
+            .help(L(hover ?? text))
             .frame(width: w, alignment: .center)
     }
 }

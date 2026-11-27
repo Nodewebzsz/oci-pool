@@ -46,7 +46,7 @@ struct LoginField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if !title.isEmpty {
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(LoginPalette.text(dark))
             }
@@ -54,7 +54,7 @@ struct LoginField: View {
             HStack(spacing: 8) {
                 LoginNSTextField(
                     text: $text,
-                    placeholder: placeholder,
+                    placeholder: L(placeholder),
                     secure: secure && !revealPassword,
                     dark: dark,
                     enabled: enabled,
@@ -73,7 +73,7 @@ struct LoginField: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .help(revealPassword ? "隐藏密码" : "显示密码")
+                    .help(L(revealPassword ? "隐藏密码" : "显示密码"))
                 }
 
                 if enabled && !text.isEmpty && (focused || hovering) {
@@ -149,7 +149,7 @@ struct LoginFieldActionButton: View {
                         .scaleEffect(0.65)
                         .frame(width: 14, height: 14)
                 }
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 13, weight: .semibold))
                     .lineLimit(1)
             }
@@ -347,7 +347,7 @@ struct LoginPillButton: View {
                         .scaleEffect(0.7)
                         .frame(width: 14, height: 14)
                 }
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 16, weight: .semibold))
                     .lineLimit(1)
             }

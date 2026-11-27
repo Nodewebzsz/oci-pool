@@ -66,7 +66,7 @@ struct CloudflareView: View {
     /// Web 页头 actions：域名: label + zone 下拉 220 + 密钥配置(orange) + 添加记录(primary) + 同步记录(info) + 刷新列表(outline)
     private var toolbar: some View {
         AdaptivePageToolbar {
-            Text("域名:")
+            Text(L("域名:"))
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.textTertiary(dark))
             SelectMenu(
@@ -127,7 +127,7 @@ struct CloudflareView: View {
     /// Web 搜索卡（bg-1 border radius 8 padding 10）：按名称: 输入 + 按值: 输入 + 搜索(info) + 清除(danger-soft)
     private var searchBar: some View {
         HStack(spacing: 10) {
-            Text("类型:")
+            Text(L("类型:"))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.textTertiary(dark))
             SelectMenu(
@@ -140,11 +140,11 @@ struct CloudflareView: View {
                 width: 100,
                 allowClear: true
             )
-            Text("按名称:")
+            Text(L("按名称:"))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.textTertiary(dark))
             SearchField(text: $model.searchName, placeholder: "e.g. www", fillsWidth: true)
-            Text("按值:")
+            Text(L("按值:"))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.textTertiary(dark))
             SearchField(text: $model.searchContent, placeholder: "e.g. 192.9", fillsWidth: true)
@@ -171,10 +171,10 @@ struct CloudflareView: View {
                 Image(systemName: "list.bullet")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(AppTheme.textSecondary(dark))
-                Text("DNS 记录")
+                Text(L("DNS 记录"))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(AppTheme.navIcon(dark))
-                Text("(\(model.filteredRecords.count)/\(model.records.count))")
+                Text(L("(\(model.filteredRecords.count)/\(model.records.count))"))
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundColor(AppTheme.textTertiary(dark))
                 Spacer(minLength: 0)
@@ -196,7 +196,7 @@ struct CloudflareView: View {
                     VStack(spacing: 10) {
                         Spacer()
                         ProgressView()
-                        Text("正在加载 DNS 记录…")
+                        Text(L("正在加载 DNS 记录…"))
                             .font(.system(size: 12))
                             .foregroundColor(AppTheme.sidebarText(dark))
                         Spacer()
@@ -250,7 +250,7 @@ struct CloudflareView: View {
                 Circle()
                     .fill(item.proxied ? AppTheme.orange : AppTheme.sidebarText(dark).opacity(0.5))
                     .frame(width: 5, height: 5)
-                Text(item.proxied ? "已代理" : "仅 DNS")
+                Text(L(item.proxied ? "已代理" : "仅 DNS"))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(item.proxied ? AppTheme.orange : AppTheme.sidebarText(dark))
             }
@@ -273,14 +273,14 @@ struct CloudflareView: View {
                 .frame(width: colTypeWidth, alignment: .center)
             cell(item.name, width: colNameWidth)
             HStack(spacing: 6) {
-                Text(item.content.isEmpty ? "—" : item.content)
+                Text(L(item.content.isEmpty ? "—" : item.content))
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                    .help(item.content)
+                    .help(L(item.content))
                 if item.type == "MX", let p = item.priority {
-                    Text("优先级 \(p)")
+                    Text(L("优先级 \(p)"))
                         .font(.system(size: 10, weight: .semibold, design: .monospaced))
                         .foregroundColor(AppTheme.orange)
                         .padding(.horizontal, 5)
@@ -292,7 +292,7 @@ struct CloudflareView: View {
             .frame(maxWidth: .infinity, alignment: .center)
 
             // TTL — 严格使用 colTtlWidth，水平居中对齐表头
-            Text(CloudflareJSON.formatTTL(item.ttl))
+            Text(L(CloudflareJSON.formatTTL(item.ttl)))
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(AppTheme.sidebarText(dark))
                 .lineLimit(1)
@@ -319,7 +319,7 @@ struct CloudflareView: View {
 
     private func typeChip(_ type: String) -> some View {
         let c = CloudflareJSON.typeColor(type)
-        return Text(type)
+        return Text(L(type))
             .font(.system(size: 11, weight: .bold, design: .monospaced))
             .foregroundColor(c)
             .padding(.horizontal, 8)
@@ -329,14 +329,14 @@ struct CloudflareView: View {
     }
 
     private func cell(_ text: String, width: CGFloat?, align: Alignment = .center) -> some View {
-        Text(text.isEmpty ? "—" : text)
+        Text(L(text.isEmpty ? "—" : text))
             .font(.system(size: 12, design: .monospaced))
             .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
             .lineLimit(1)
             .truncationMode(.middle)
             .frame(width: width, alignment: align)
             .frame(maxWidth: width == nil ? .infinity : nil, alignment: align)
-            .help(text)
+            .help(L(text))
     }
 
     private func actionBtn(_ icon: String, color: Color, tip: String, action: @escaping () -> Void) -> some View {
@@ -348,18 +348,18 @@ struct CloudflareView: View {
                 .background(RoundedRectangle(cornerRadius: 6).fill(color.opacity(0.12)))
         }
         .buttonStyle(PlainButtonStyle())
-        .help(tip)
+        .help(L(tip))
     }
 
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(AppTheme.danger)
-            Text(text).font(.system(size: 12))
+            Text(L(text)).font(.system(size: 12))
             Spacer()
-            Button("密钥配置") { model.openConfig() }
+            Button(L("密钥配置")) { model.openConfig() }
                 .buttonStyle(PlainButtonStyle())
-            Button("重试") {
+            Button(L("重试")) {
                 Task { await model.loadZones(selectFirst: true) }
             }
             .buttonStyle(PlainButtonStyle())
@@ -370,7 +370,7 @@ struct CloudflareView: View {
                     .padding(4)
             }
             .buttonStyle(PlainButtonStyle())
-            .help("关闭提示")
+            .help(L("关闭提示"))
         }
         .foregroundColor(AppTheme.danger)
         .padding(12)

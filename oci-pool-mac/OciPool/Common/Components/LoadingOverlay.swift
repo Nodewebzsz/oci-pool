@@ -92,7 +92,7 @@ struct PageLoadingView: View {
                 .progressViewStyle(CircularProgressViewStyle())
                 .scaleEffect(0.9)
             if !message.isEmpty {
-                Text(message)
+                Text(L(message))
                     .font(.system(size: 12))
                     .foregroundColor(AppTheme.sidebarText(dark))
             }

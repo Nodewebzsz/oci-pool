@@ -62,6 +62,10 @@ final class AuthService {
         await client.validateSession(baseURL: baseURL)
     }
 
+    func validateSessionDetailed(baseURL: String) async -> APIClient.SessionValidationResult {
+        await client.validateSessionDetailed(baseURL: baseURL)
+    }
+
     func loginFactorConfig(baseURL: String) async -> APIClient.LoginFactorConfig {
         await client.fetchLoginFactorConfig(baseURL: baseURL)
     }

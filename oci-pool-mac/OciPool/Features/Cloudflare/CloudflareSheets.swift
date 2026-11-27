@@ -79,7 +79,7 @@ struct CloudflareDnsSheet: View {
                             .disabled(isEdit)
                         }
                         if !isEdit {
-                            Text("根域名使用 @")
+                            Text(L("根域名使用 @"))
                                 .font(.system(size: 11))
                                 .foregroundColor(AppTheme.sidebarText(dark))
                         }
@@ -132,7 +132,7 @@ struct CloudflareDnsSheet: View {
                                         .toggleStyle(SwitchToggleStyle(tint: Color(hex: "f38020")))
                                         .labelsHidden()
 
-                                        Text("橙云代理可隐藏源站 IP")
+                                        Text(L("橙云代理可隐藏源站 IP"))
                                             .font(.system(size: 11))
                                             .foregroundColor(AppTheme.sidebarText(dark))
                                     }
@@ -195,7 +195,7 @@ struct CloudflareConfigSheet: View {
                 if model.configForm != nil {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack {
-                            Text("启用 Cloudflare")
+                            Text(L("启用 Cloudflare"))
                                 .font(.system(size: 13, weight: .medium))
                             Spacer()
                             Toggle("", isOn: Binding(
@@ -279,11 +279,11 @@ struct CloudflareOfficialIpsSheet: View {
                         tone: isRemote ? .success : .warning
                     )
                     if !info.fetchedAt.isEmpty {
-                        Text("更新：\(info.displayFetchedAt)")
+                        Text(L("更新：\(info.displayFetchedAt)"))
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundColor(AppSheetSurface.mutedText(dark))
                             .lineLimit(1)
-                            .help(info.fetchedAt)
+                            .help(L(info.fetchedAt))
                     }
                     AppButton(
                         title: "刷新网段",
@@ -330,7 +330,7 @@ struct CloudflareOfficialIpsSheet: View {
 
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("Nginx ngx_http_realip_module 配置片段")
+                            Text(L("Nginx ngx_http_realip_module 配置片段"))
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(AppSheetSurface.primaryText(dark))
                             Spacer()
@@ -338,7 +338,7 @@ struct CloudflareOfficialIpsSheet: View {
                                 model.copyToPasteboard(info.nginxRealIpSnippet, successNotice: "Nginx real_ip 配置已复制")
                             }
                         }
-                        Text(info.nginxRealIpSnippet)
+                        Text(L(info.nginxRealIpSnippet))
                             .font(.system(size: 11.5, design: .monospaced))
                             .foregroundColor(AppSheetSurface.primaryText(dark))
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -358,7 +358,7 @@ struct CloudflareOfficialIpsSheet: View {
     private func cidrColumn(title: String, cidrs: [String], copyNotice: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(AppSheetSurface.primaryText(dark))
                 StatusBadge(text: "\(cidrs.count)", tone: .info)
@@ -367,7 +367,7 @@ struct CloudflareOfficialIpsSheet: View {
                     model.copyToPasteboard(cidrs.joined(separator: "\n"), successNotice: copyNotice)
                 }
             }
-            Text(cidrs.isEmpty ? "—" : cidrs.joined(separator: "\n"))
+            Text(L(cidrs.isEmpty ? "—" : cidrs.joined(separator: "\n")))
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(AppSheetSurface.primaryText(dark))
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -443,7 +443,7 @@ struct CloudflarePublicIpExtractSheet: View {
                 if model.publicIpExtractForm != nil {
                     VStack(alignment: .leading, spacing: 14) {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("记录类型")
+                            Text(L("记录类型"))
                                 .font(.system(size: 11.5, weight: .semibold))
                                 .foregroundColor(AppSheetSurface.primaryText(dark))
                             HStack(spacing: 8) {
@@ -459,7 +459,7 @@ struct CloudflarePublicIpExtractSheet: View {
                         }
 
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Cloudflare 代理状态")
+                            Text(L("Cloudflare 代理状态"))
                                 .font(.system(size: 11.5, weight: .semibold))
                                 .foregroundColor(AppSheetSurface.primaryText(dark))
                             HStack(spacing: 8) {
@@ -486,19 +486,19 @@ struct CloudflarePublicIpExtractSheet: View {
                         }
 
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("提取结果预览（保持记录顺序自动去重）")
+                            Text(L("提取结果预览（保持记录顺序自动去重）"))
                                 .font(.system(size: 11.5, weight: .semibold))
                                 .foregroundColor(AppSheetSurface.primaryText(dark))
 
                             if ips.isEmpty {
-                                Text("当前筛选条件下没有匹配的 A / AAAA 公网 IP 记录")
+                                Text(L("当前筛选条件下没有匹配的 A / AAAA 公网 IP 记录"))
                                     .font(.system(size: 12))
                                     .foregroundColor(AppSheetSurface.mutedText(dark))
                                     .frame(maxWidth: .infinity, minHeight: 120)
                                     .background(AppSheetSurface.panelBg(dark))
                                     .cornerRadius(8)
                             } else {
-                                Text(ips.joined(separator: "\n"))
+                                Text(L(ips.joined(separator: "\n")))
                                     .font(.system(size: 12, design: .monospaced))
                                     .foregroundColor(AppSheetSurface.primaryText(dark))
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -519,7 +519,7 @@ struct CloudflarePublicIpExtractSheet: View {
 
     private func filterPill(title: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title)
+            Text(L(title))
                 .font(.system(size: 11.5, weight: active ? .semibold : .regular))
                 .foregroundColor(active ? appearance.accent.accentFg(dark) : AppSheetSurface.primaryText(dark))
                 .padding(.horizontal, 10)

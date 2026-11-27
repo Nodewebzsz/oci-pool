@@ -25,7 +25,7 @@ struct LoginForgotPasswordSheet: View {
                     .padding(.horizontal, 28)
                     .padding(.vertical, 16)
                 if let msg = model.resetMessage {
-                    Text(msg)
+                    Text(L(msg))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(model.resetMessageIsError
                                          ? Color(hex: "ef4444")
@@ -49,7 +49,7 @@ struct LoginForgotPasswordSheet: View {
 
     private var header: some View {
         HStack {
-            Text("重置密码")
+            Text(L("重置密码"))
                 .font(.system(size: 16, weight: .heavy))
                 .foregroundColor(LoginPalette.text(dark))
             Spacer()
@@ -98,12 +98,12 @@ struct LoginForgotPasswordSheet: View {
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.white)
                 } else {
-                    Text("\(n)")
+                    Text(L("\(n)"))
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(active ? .white : LoginPalette.muted(dark))
                 }
             }
-            Text(title)
+            Text(L(title))
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(active || done ? LoginPalette.text(dark) : LoginPalette.muted(dark))
         }
@@ -123,7 +123,7 @@ struct LoginForgotPasswordSheet: View {
         switch model.resetStep {
         case 1:
             VStack(alignment: .leading, spacing: 14) {
-                Text("输入用户名并获取验证码，完成身份验证。")
+                Text(L("输入用户名并获取验证码，完成身份验证。"))
                     .font(.system(size: 13))
                     .foregroundColor(LoginPalette.muted(dark))
                     .padding(12)
@@ -140,7 +140,7 @@ struct LoginForgotPasswordSheet: View {
                 )
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("验证码")
+                    Text(L("验证码"))
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(LoginPalette.text(dark))
                     HStack(alignment: .center, spacing: 12) {
@@ -169,7 +169,7 @@ struct LoginForgotPasswordSheet: View {
             }
         case 2:
             VStack(alignment: .leading, spacing: 14) {
-                Text("确认后将为账号生成新密码（与 Web 端一致）。")
+                Text(L("确认后将为账号生成新密码（与 Web 端一致）。"))
                     .font(.system(size: 13))
                     .foregroundColor(LoginPalette.muted(dark))
                     .padding(12)
@@ -177,10 +177,10 @@ struct LoginForgotPasswordSheet: View {
                     .background(LoginPalette.panel(dark).opacity(0.6))
                     .cornerRadius(10)
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("账号")
+                    Text(L("账号"))
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(LoginPalette.muted(dark))
-                    Text(model.resetUsername)
+                    Text(L(model.resetUsername))
                         .font(.system(size: 15, weight: .bold))
                         .foregroundColor(LoginPalette.text(dark))
                 }
@@ -194,12 +194,12 @@ struct LoginForgotPasswordSheet: View {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 42))
                     .foregroundColor(AppTheme.sidebarActive)
-                Text("密码重置成功")
+                Text(L("密码重置成功"))
                     .font(.system(size: 16, weight: .heavy))
                     .foregroundColor(LoginPalette.text(dark))
-                Text(model.resetSuccessDetail.isEmpty
+                Text(L(model.resetSuccessDetail.isEmpty
                      ? "请使用新密码登录（详见服务端返回信息）"
-                     : model.resetSuccessDetail)
+                     : model.resetSuccessDetail))
                     .font(.system(size: 13))
                     .foregroundColor(LoginPalette.muted(dark))
                     .multilineTextAlignment(.center)
@@ -218,7 +218,7 @@ struct LoginForgotPasswordSheet: View {
                     onBack()
                 }
             }) {
-                Text(model.resetStep == 3 ? "完成" : (model.resetStep == 1 ? "取消" : "上一步"))
+                Text(L(model.resetStep == 3 ? "完成" : (model.resetStep == 1 ? "取消" : "上一步")))
                     .font(.system(size: 15, weight: .bold))
                     .frame(maxWidth: .infinity)
                     .frame(height: 52)
@@ -238,7 +238,7 @@ struct LoginForgotPasswordSheet: View {
                         if model.resetBusy {
                             ProgressView().scaleEffect(0.7)
                         }
-                        Text(model.resetStep == 1 ? "下一步" : "确认重置")
+                        Text(L(model.resetStep == 1 ? "下一步" : "确认重置"))
                             .font(.system(size: 15, weight: .bold))
                     }
                     .frame(maxWidth: .infinity)

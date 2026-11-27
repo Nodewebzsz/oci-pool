@@ -49,7 +49,7 @@ struct LoginView: View {
                         onDeploymentMode: { mode in Task { await switchDeploymentMode(mode) } },
                         onForgotPassword: { model.openForgotPassword() },
                         onLocale: { loc in
-                            UserDefaults.standard.set(loc.rawValue, forKey: "appLocale")
+                            AppI18n.shared.setLocale(loc)
                         }
                     )
                     .frame(width: geo.size.width * 0.45)
@@ -82,11 +82,12 @@ struct LoginView: View {
             model.deploymentMode = session.deploymentMode
             model.serverURL = session.serverURL
             model.hasPersistedChoice = session.hasChosenDeploymentMode
+            model.rememberMe = session.rememberMePreference
             if !session.username.isEmpty { model.username = session.username }
-            if let raw = UserDefaults.standard.string(forKey: "appLocale"),
-               let loc = AppLocale(rawValue: raw) {
-                model.locale = loc
+            if let notice = session.restoreNotice, !notice.isEmpty {
+                model.infoText = notice
             }
+            model.locale = AppI18n.shared.locale
             // First install: wait for explicit pick.
             // Already chosen before: restore last mode and start/connect automatically.
             if session.hasChosenDeploymentMode {
@@ -98,6 +99,11 @@ struct LoginView: View {
         .onReceive(backend.$state) { state in
             if case .ready = state, model.modeActivated, model.deploymentMode == .local {
                 Task { await loadMeta(force: false) }
+            }
+        }
+        .onReceive(session.$restoreNotice) { notice in
+            if let notice = notice, !notice.isEmpty {
+                model.infoText = notice
             }
         }
         .onDisappear {
@@ -215,7 +221,7 @@ struct LoginView: View {
             // No local Java; load meta if remote URL already known.
             await loadMeta(force: false)
         } else {
-            await backend.start()
+            _ = await backend.ensureStartedAndWait()
             await loadMeta(force: true)
         }
     }
@@ -254,7 +260,7 @@ struct LoginView: View {
             // User connects via「连接」when URL ready; auto-try if host already filled.
             await loadMeta(force: false)
         } else {
-            await backend.start()
+            _ = await backend.ensureStartedAndWait()
             await loadMeta(force: true)
         }
     }
@@ -453,9 +459,11 @@ struct LoginView: View {
             return
         }
         do {
+            let remember = await MainActor.run { model.rememberMe }
             try await session.registerFirstUser(
                 username: model.username.trimmingCharacters(in: .whitespacesAndNewlines),
-                password: pass
+                password: pass,
+                rememberMe: remember
             )
             await MainActor.run { model.isSubmitting = false }
         } catch {
@@ -516,7 +524,12 @@ struct LoginView: View {
             session.serverURL = model.serverURL
         }
         do {
-            let url = try await APIClient.shared.oauthLoginURL(baseURL: session.serverURL, provider: provider)
+            let remember = await MainActor.run { model.rememberMe }
+            let url = try await APIClient.shared.oauthLoginURL(
+                baseURL: session.serverURL,
+                provider: provider,
+                rememberMe: remember
+            )
             await MainActor.run {
                 NSWorkspace.shared.open(url)
                 model.infoText = model.locale == .enUS
@@ -596,14 +609,14 @@ struct LoginView: View {
         }
         guard !user.isEmpty else {
             await MainActor.run {
-                model.resetMessage = "请输入用户名"
+                model.resetMessage = L("请输入用户名")
                 model.resetMessageIsError = true
             }
             return
         }
         guard !code.isEmpty else {
             await MainActor.run {
-                model.resetMessage = "请输入验证码"
+                model.resetMessage = L("请输入验证码")
                 model.resetMessageIsError = true
             }
             return
@@ -623,7 +636,7 @@ struct LoginView: View {
                 model.resetToken = token
                 model.resetStep = 2
                 model.resetBusy = false
-                model.resetMessage = "身份验证成功"
+                model.resetMessage = L("身份验证成功")
                 model.resetMessageIsError = false
             }
         } catch {
@@ -642,7 +655,7 @@ struct LoginView: View {
         let token = await MainActor.run { model.resetToken }
         guard let token = token, !token.isEmpty else {
             await MainActor.run {
-                model.resetMessage = "验证已失效，请重新开始"
+                model.resetMessage = L("验证已失效，请重新开始")
                 model.resetMessageIsError = true
                 model.resetStep = 1
             }

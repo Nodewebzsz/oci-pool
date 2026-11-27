@@ -442,10 +442,10 @@ struct InstanceVnicView: View {
             Image(systemName: "network")
                 .foregroundColor(AppTheme.sidebarActive)
             VStack(alignment: .leading, spacing: 2) {
-                Text("网络管理 — \(item.displayName.isEmpty ? "实例" : item.displayName)")
+                Text(L("网络管理 — \(item.displayName.isEmpty ? "实例" : item.displayName)"))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
-                Text(item.instanceId.isEmpty ? "缺少 OCID" : item.instanceId)
+                Text(L(item.instanceId.isEmpty ? "缺少 OCID" : item.instanceId))
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(AppTheme.sidebarText(dark))
                     .lineLimit(1)
@@ -481,10 +481,10 @@ struct InstanceVnicView: View {
 
     private func chip(_ title: String, _ value: String, _ accent: Color) -> some View {
         HStack(spacing: 8) {
-            Text(title)
+            Text(L(title))
                 .font(.system(size: 10, weight: .medium))
                 .foregroundColor(AppSheetSurface.mutedText(dark))
-            Text(value)
+            Text(L(value))
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(accent)
         }
@@ -512,7 +512,7 @@ struct InstanceVnicView: View {
             VStack {
                 Spacer()
                 ProgressView()
-                Text("加载网络…").font(.system(size: 12)).foregroundColor(AppSheetSurface.mutedText(dark))
+                Text(L("加载网络…")).font(.system(size: 12)).foregroundColor(AppSheetSurface.mutedText(dark))
                 Spacer()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -540,12 +540,12 @@ struct InstanceVnicView: View {
     private func vnicCard(_ v: VnicItem) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(v.vnicDisplayName.isEmpty ? v.vnicId : v.vnicDisplayName)
+                Text(L(v.vnicDisplayName.isEmpty ? v.vnicId : v.vnicDisplayName))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(AppSheetSurface.primaryText(dark))
                     .lineLimit(1)
                 if v.isPrimary {
-                    Text("主")
+                    Text(L("主"))
                         .font(.system(size: 10, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 6)
@@ -553,7 +553,7 @@ struct InstanceVnicView: View {
                         .background(Capsule().fill(AppTheme.sidebarActive))
                 }
                 Spacer()
-                Text(v.lifecycleState.isEmpty ? "—" : v.lifecycleState)
+                Text(L(v.lifecycleState.isEmpty ? "—" : v.lifecycleState))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(v.lifecycleState.uppercased() == "ATTACHED" ? AppTheme.sidebarActive : AppSheetSurface.mutedText(dark))
             }
@@ -567,15 +567,15 @@ struct InstanceVnicView: View {
                         .foregroundColor(AppSheetSurface.mutedText(dark))
                     ForEach(v.ipv6Addresses, id: \.self) { ip in
                         HStack {
-                            Text(ip)
+                            Text(L(ip))
                                 .font(.system(size: 11, design: .monospaced))
                                 .foregroundColor(AppTheme.sidebarActive)
                                 .lineLimit(1)
                             Spacer()
-                            Button("复制") { model.copy(ip, label: "IPv6") }
+                            Button(L("复制")) { model.copy(ip, label: "IPv6") }
                                 .buttonStyle(PlainButtonStyle())
                                 .font(.system(size: 11))
-                            Button("删除") { model.deleteIpv6(vnic: v, address: ip) }
+                            Button(L("删除")) { model.deleteIpv6(vnic: v, address: ip) }
                                 .buttonStyle(PlainButtonStyle())
                                 .font(.system(size: 11))
                                 .foregroundColor(AppTheme.danger)
@@ -598,11 +598,11 @@ struct InstanceVnicView: View {
 
     private func infoRow(_ label: String, _ value: String, copy: @escaping () -> Void) -> some View {
         HStack(alignment: .top, spacing: 8) {
-            Text(label)
+            Text(L(label))
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(AppSheetSurface.mutedText(dark))
                 .frame(width: 36, alignment: .leading)
-            Text(value)
+            Text(L(value))
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundColor(AppSheetSurface.primaryText(dark))
                 .lineLimit(2)
@@ -621,9 +621,9 @@ struct InstanceVnicView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack {
             Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 12))
+            Text(L(text)).font(.system(size: 12))
             Spacer()
-            Button("重试") { Task { await model.reload() } }
+            Button(L("重试")) { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
         }
         .foregroundColor(AppTheme.danger)
@@ -659,7 +659,7 @@ struct InstanceVnicView: View {
                         AppTextField(text: $model.formIpv6Count, placeholder: "0")
                     }
                     if let e = model.formError, !e.isEmpty {
-                        Text(e).font(.system(size: 12)).foregroundColor(AppTheme.danger)
+                        Text(L(e)).font(.system(size: 12)).foregroundColor(AppTheme.danger)
                     }
                 }
             }
@@ -683,14 +683,14 @@ struct InstanceVnicView: View {
             },
             content: {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(model.ipv6Target?.vnicDisplayName ?? model.ipv6Target?.vnicId ?? "")
+                    Text(L(model.ipv6Target?.vnicDisplayName ?? model.ipv6Target?.vnicId ?? ""))
                         .font(.system(size: 12))
                         .foregroundColor(AppSheetSurface.mutedText(dark))
                     FormFieldRow(label: "数量", required: true) {
                         AppTextField(text: $model.formIpv6AddCount, placeholder: "1")
                     }
                     if let e = model.formError, !e.isEmpty {
-                        Text(e).font(.system(size: 12)).foregroundColor(AppTheme.danger)
+                        Text(L(e)).font(.system(size: 12)).foregroundColor(AppTheme.danger)
                     }
                 }
             }

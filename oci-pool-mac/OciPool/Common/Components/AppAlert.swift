@@ -12,11 +12,11 @@ enum AppAlert {
         style: NSAlert.Style = .warning
     ) -> Bool {
         let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
+        alert.messageText = L(title)
+        alert.informativeText = L(message)
         alert.alertStyle = style
-        alert.addButton(withTitle: confirmTitle)
-        alert.addButton(withTitle: cancelTitle)
+        alert.addButton(withTitle: L(confirmTitle))
+        alert.addButton(withTitle: L(cancelTitle))
         return alert.runModal() == .alertFirstButtonReturn
     }
 
@@ -31,14 +31,14 @@ enum AppAlert {
         confirmTitle: String = "确认"
     ) -> String? {
         let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
+        alert.messageText = L(title)
+        alert.informativeText = L(message)
         alert.alertStyle = .critical
-        alert.addButton(withTitle: confirmTitle)
-        alert.addButton(withTitle: "取消")
+        alert.addButton(withTitle: L(confirmTitle))
+        alert.addButton(withTitle: L("取消"))
 
         let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
-        input.placeholderString = placeholder
+        input.placeholderString = L(placeholder)
         input.identifier = NSUserInterfaceItemIdentifier("requireText")
         alert.accessoryView = input
 
@@ -48,39 +48,39 @@ enum AppAlert {
 
     static func info(title: String, message: String) {
         let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
+        alert.messageText = L(title)
+        alert.informativeText = L(message)
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "好")
+        alert.addButton(withTitle: L("好"))
         alert.runModal()
     }
 
     /// Oracle API 开机风控确认：取消为默认按钮，确认后才允许提交。
     static func confirmOracleApiBootRisk() -> Bool {
         let alert = NSAlert()
-        alert.messageText = "API 开机风控警告"
-        alert.informativeText = "Oracle 已加强对 API 开机的风控。通过 API 创建实例极大概率触发风控，可能导致账号受限。"
+        alert.messageText = L("API 开机风控警告")
+        alert.informativeText = L("Oracle 已加强对 API 开机的风控。通过 API 创建实例极大概率触发风控，可能导致账号受限。")
         alert.alertStyle = .critical
-        alert.addButton(withTitle: "取消")
-        alert.addButton(withTitle: "已知晓风险，继续创建")
+        alert.addButton(withTitle: L("取消"))
+        alert.addButton(withTitle: L("已知晓风险，继续创建"))
         return alert.runModal() == .alertSecondButtonReturn
     }
 
     static func notice(title: String = "提示", message: String) {
         let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
+        alert.messageText = L(title)
+        alert.informativeText = L(message)
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "知道了")
+        alert.addButton(withTitle: L("知道了"))
         alert.runModal()
     }
 
     static func error(title: String = "错误", message: String) {
         let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
+        alert.messageText = L(title)
+        alert.informativeText = L(message)
         alert.alertStyle = .critical
-        alert.addButton(withTitle: "好")
+        alert.addButton(withTitle: L("好"))
         alert.runModal()
     }
 
@@ -94,15 +94,15 @@ enum AppAlert {
         cancelTitle: String = "取消"
     ) -> String? {
         let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
+        alert.messageText = L(title)
+        alert.informativeText = L(message)
         alert.alertStyle = .informational
-        alert.addButton(withTitle: confirmTitle)
-        alert.addButton(withTitle: cancelTitle)
+        alert.addButton(withTitle: L(confirmTitle))
+        alert.addButton(withTitle: L(cancelTitle))
 
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
         field.stringValue = defaultValue
-        field.placeholderString = placeholder
+        field.placeholderString = L(placeholder)
         alert.accessoryView = field
         alert.window.initialFirstResponder = field
 

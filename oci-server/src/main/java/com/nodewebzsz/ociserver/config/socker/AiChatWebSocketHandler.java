@@ -511,10 +511,34 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
-        log.error("WebSocket传输错误: sessionId={}", session.getId(), exception);
-        if (session.isOpen()) {
-            session.close();
+        if (isClientDisconnect(exception)) {
+            log.debug("WebSocket客户端已断开: sessionId={}, reason={}", session.getId(), exception.getMessage());
+        } else {
+            log.error("WebSocket传输错误: sessionId={}", session.getId(), exception);
         }
+        if (session.isOpen()) {
+            try {
+                session.close();
+            } catch (IOException ignored) {
+            }
+        }
+    }
+
+    private boolean isClientDisconnect(Throwable exception) {
+        Throwable cursor = exception;
+        while (cursor != null) {
+            if (cursor instanceof java.io.EOFException) {
+                return true;
+            }
+            String msg = cursor.getMessage();
+            if (msg != null && (msg.contains("Broken pipe")
+                    || msg.contains("Connection reset")
+                    || msg.contains("An established connection was aborted"))) {
+                return true;
+            }
+            cursor = cursor.getCause();
+        }
+        return false;
     }
 
     @Override

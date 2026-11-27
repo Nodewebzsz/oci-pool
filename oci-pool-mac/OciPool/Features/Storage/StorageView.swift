@@ -62,7 +62,7 @@ struct StorageView: View {
 
     private var filterBar: some View {
         HStack(spacing: 12) {
-            Text("租户")
+            Text(L("租户"))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(AppTheme.sidebarText(dark))
             SelectMenu(
@@ -96,11 +96,11 @@ struct StorageView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-            Text(text)
+            Text(L(text))
                 .font(.system(size: 12))
                 .lineLimit(2)
             Spacer()
-            Button("重试") { Task { await model.reloadAll() } }
+            Button(L("重试")) { Task { await model.reloadAll() } }
                 .buttonStyle(PlainButtonStyle())
                 .font(.system(size: 12, weight: .semibold))
             Button(action: { model.clearError() }) {
@@ -110,7 +110,7 @@ struct StorageView: View {
                     .padding(4)
             }
             .buttonStyle(PlainButtonStyle())
-            .help("关闭提示")
+            .help(L("关闭提示"))
         }
         .foregroundColor(AppTheme.danger)
         .padding(12)
@@ -150,7 +150,7 @@ struct StorageView: View {
                     VStack(spacing: 8) {
                         Spacer()
                         ProgressView()
-                        Text("正在加载存储桶…")
+                        Text(L("正在加载存储桶…"))
                             .font(.system(size: 12))
                             .foregroundColor(AppTheme.sidebarText(dark))
                         Spacer()
@@ -177,7 +177,7 @@ struct StorageView: View {
                                         if model.bucketsLoading {
                                             ProgressView().scaleEffect(0.7)
                                         }
-                                        Text("加载更多")
+                                        Text(L("加载更多"))
                                             .font(.system(size: 12, weight: .medium))
                                         Spacer()
                                     }
@@ -200,13 +200,13 @@ struct StorageView: View {
         return HStack(alignment: .center, spacing: 8) {
             Button(action: { model.selectBucket(b) }) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(b.name)
+                    Text(L(b.name))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                         .lineLimit(1)
                     HStack(spacing: 6) {
                         if !b.createdText.isEmpty {
-                            Text(b.createdText)
+                            Text(L(b.createdText))
                                 .font(.system(size: 11))
                                 .foregroundColor(AppTheme.sidebarText(dark))
                         }
@@ -280,7 +280,7 @@ struct StorageView: View {
                                 VStack(spacing: 10) {
                                     Spacer()
                                     ProgressView()
-                                    Text("正在加载对象列表…")
+                                    Text(L("正在加载对象列表…"))
                                         .font(.system(size: 12))
                                         .foregroundColor(AppTheme.sidebarText(dark))
                                     Spacer()
@@ -310,7 +310,7 @@ struct StorageView: View {
                             if model.objectsLoading && !model.objects.isEmpty {
                                 VStack(spacing: 8) {
                                     ProgressView().scaleEffect(0.85)
-                                    Text("更新中…")
+                                    Text(L("更新中…"))
                                         .font(.system(size: 11, weight: .medium))
                                         .foregroundColor(AppTheme.sidebarText(dark))
                                 }
@@ -337,10 +337,10 @@ struct StorageView: View {
 
     private var objectHeader: some View {
         HStack(spacing: 0) {
-            Text("名称").frame(maxWidth: .infinity, alignment: .leading)
-            Text("大小").frame(width: 88, alignment: .center)
-            Text("修改时间").frame(maxWidth: .infinity, alignment: .leading)
-            Text("操作").frame(width: 160, alignment: .center)
+            Text(L("名称")).frame(maxWidth: .infinity, alignment: .leading)
+            Text(L("大小")).frame(width: 88, alignment: .center)
+            Text(L("修改时间")).frame(maxWidth: .infinity, alignment: .leading)
+            Text(L("操作")).frame(width: 160, alignment: .center)
         }
         .font(.system(size: 11, weight: .semibold))
         .foregroundColor(AppTheme.sidebarText(dark))
@@ -351,24 +351,24 @@ struct StorageView: View {
 
     private func objectRow(_ o: StorageObjectItem) -> some View {
         HStack(spacing: 0) {
-            Text(o.name)
+            Text(L(o.name))
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .help(o.name)
+                .help(L(o.name))
 
-            Text(o.sizeText)
+            Text(L(o.sizeText))
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundColor(AppTheme.sidebarText(dark))
                 .frame(width: 88, alignment: .center)
 
-            Text(o.modifiedText)
+            Text(L(o.modifiedText))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.sidebarText(dark))
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .help(o.modifiedText)
+                .help(L(o.modifiedText))
 
             HStack(spacing: 4) {
                 if o.isPreviewable {
@@ -396,17 +396,17 @@ struct StorageView: View {
                 .cornerRadius(6)
         }
         .buttonStyle(PlainButtonStyle())
-        .help(help)
+        .help(L(help))
     }
 
     private var objectPager: some View {
         HStack(spacing: 10) {
-            Text(model.objectPageLabel)
+            Text(L(model.objectPageLabel))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.sidebarText(dark))
             Spacer()
             Button(action: { model.objectPrevPage() }) {
-                Label("上一页", systemImage: "chevron.left")
+                Label(L("上一页"), systemImage: "chevron.left")
                     .font(.system(size: 11, weight: .medium))
             }
             .buttonStyle(PlainButtonStyle())
@@ -415,7 +415,7 @@ struct StorageView: View {
 
             Button(action: { model.objectNextPage() }) {
                 HStack(spacing: 4) {
-                    Text("下一页").font(.system(size: 11, weight: .medium))
+                    Text(L("下一页")).font(.system(size: 11, weight: .medium))
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .semibold))
                 }
@@ -459,7 +459,7 @@ struct StorageView: View {
             Image(systemName: systemImage)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(AppTheme.sidebarActive)
-            Text(title)
+            Text(L(title))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
                 .lineLimit(1)
@@ -504,11 +504,11 @@ struct StorageView: View {
                     .foregroundColor(color)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(label)
+                Text(L(label))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(AppTheme.textTertiary(dark))
                     .lineLimit(1)
-                Text(value)
+                Text(L(value))
                     .font(.system(size: 22, weight: .bold))
                     .foregroundColor(AppTheme.navIcon(dark))
                     .lineLimit(1)
@@ -531,7 +531,7 @@ struct StorageView: View {
         HStack {
             Spacer()
             ProgressView().scaleEffect(0.8)
-            Text("加载中…")
+            Text(L("加载中…"))
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.sidebarText(dark))
             Spacer()

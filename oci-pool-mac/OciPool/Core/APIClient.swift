@@ -395,10 +395,10 @@ final class APIClient {
         }
     }
 
-    func oauthLoginURL(baseURL: String, provider: String) async throws -> URL {
+    func oauthLoginURL(baseURL: String, provider: String, rememberMe: Bool = false) async throws -> URL {
         // provider: github | google
         let path = provider == "google" ? "/api/google/login/url" : "/api/github/login/url"
-        let url = try makeURL(baseURL, path: path)
+        let url = try makeURL(baseURL, path: path, query: ["remember-me": rememberMe ? "true" : "false"])
         let data = try await getJSON(url)
         // may be plain string URL or JSON
         if let s = String(data: data, encoding: .utf8)?
@@ -425,7 +425,49 @@ final class APIClient {
 
     /// True only if a non-empty `satoken` cookie exists for this host.
     func hasSaTokenCookie(baseURL: String) -> Bool {
-        !(cookieHeader(for: baseURL) ?? "").isEmpty
+        saTokenCookie(for: baseURL) != nil
+    }
+
+    /// Find the active non-empty `satoken` cookie for `baseURL` (handling localhost/127.0.0.1 equivalence).
+    func saTokenCookie(for baseURL: String) -> HTTPCookie? {
+        guard let url = try? makeURL(baseURL, path: "/"),
+              let host = url.host else { return nil }
+        let all = HTTPCookieStorage.shared.cookies ?? []
+        let candidates = all.filter { c in
+            guard c.name == "satoken", !c.value.isEmpty else { return false }
+            let domain = c.domain.trimmingCharacters(in: CharacterSet(charactersIn: "."))
+            return c.domain == host
+                || c.domain.contains(host)
+                || host.contains(domain)
+                || (isLocalHost(host) && isLocalHost(c.domain))
+        }
+        return candidates.max { lhs, rhs in
+            (lhs.expiresDate ?? .distantPast) < (rhs.expiresDate ?? .distantPast)
+        }
+    }
+
+    /// Inject a persisted `satoken` cookie into shared `HTTPCookieStorage` for session restoration.
+    func restoreSaTokenCookie(_ token: String, expiresAt: Date?, for baseURL: String) {
+        guard !token.isEmpty,
+              let url = try? makeURL(baseURL, path: "/"),
+              let host = url.host else { return }
+        clearCookies(for: baseURL)
+        var props: [HTTPCookiePropertyKey: Any] = [
+            .name: "satoken",
+            .value: token,
+            .domain: host,
+            .path: "/",
+            .version: 0
+        ]
+        if let expiresAt = expiresAt {
+            props[.expires] = expiresAt
+        }
+        if url.scheme?.lowercased() == "https" {
+            props[.secure] = "TRUE"
+        }
+        if let cookie = HTTPCookie(properties: props) {
+            HTTPCookieStorage.shared.setCookie(cookie)
+        }
     }
 
     /// 组装当前 baseURL 应对的 Cookie 头（含 satoken），供 SSE / 特殊请求显式携带。
@@ -467,25 +509,44 @@ final class APIClient {
         return h == "localhost" || h == "127.0.0.1" || h == "0.0.0.0" || h == "::1" || h == "[::1]"
     }
 
-    /// Strict session probe: must have satoken cookie AND authenticated JSON API.
-    func validateSession(baseURL: String) async -> Bool {
-        guard hasSaTokenCookie(baseURL: baseURL) else { return false }
+    enum SessionValidationResult {
+        case valid
+        case unauthorized
+        case unreachable
+    }
+
+    /// Strict session probe distinguishing valid session, expired/revoked auth, and network errors.
+    func validateSessionDetailed(baseURL: String) async -> SessionValidationResult {
+        guard hasSaTokenCookie(baseURL: baseURL) else { return .unauthorized }
         guard let url = try? makeURL(baseURL, path: "/oci/list/json", query: ["page": "0", "size": "1"]) else {
-            return false
+            return .unreachable
         }
         do {
-            let data = try await getJSON(url)
-            // Reject HTML login pages accidentally returned as 200
+            var req = URLRequest(url: url)
+            req.httpMethod = "GET"
+            req.setValue("application/json", forHTTPHeaderField: "Accept")
+            req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+            let (data, http) = try await rawData(for: req)
+            if http.statusCode == 401 || http.statusCode == 403 {
+                return .unauthorized
+            }
+            guard (200..<300).contains(http.statusCode) else {
+                return .unreachable
+            }
             if let s = String(data: data.prefix(32), encoding: .utf8),
                s.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("<") {
-                return false
+                return .unauthorized
             }
-            // Prefer JSON object/array
             let obj = try? JSONSerialization.jsonObject(with: data)
-            return obj != nil
+            return obj != nil ? .valid : .unauthorized
         } catch {
-            return false
+            return .unreachable
         }
+    }
+
+    /// Strict session probe: must have satoken cookie AND authenticated JSON API.
+    func validateSession(baseURL: String) async -> Bool {
+        await validateSessionDetailed(baseURL: baseURL) == .valid
     }
 
     struct LoginFactorConfig {
@@ -554,7 +615,9 @@ final class APIClient {
     func clearCookies(for baseURL: String) {
         guard let host = URL(string: baseURL)?.host,
               let cookies = HTTPCookieStorage.shared.cookies else { return }
-        for cookie in cookies where cookie.domain.contains(host) || host.contains(cookie.domain) {
+        for cookie in cookies where cookie.domain.contains(host)
+            || host.contains(cookie.domain)
+            || (isLocalHost(host) && isLocalHost(cookie.domain)) {
             HTTPCookieStorage.shared.deleteCookie(cookie)
         }
     }

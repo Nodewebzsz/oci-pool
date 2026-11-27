@@ -42,9 +42,9 @@ struct NetworkQualityWorkbenchView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundColor(AppTheme.danger)
-                    Text(err).font(.system(size: 12))
+                    Text(L(err)).font(.system(size: 12))
                     Spacer()
-                    Button("重试") { Task { await model.reload() } }
+                    Button(L("重试")) { Task { await model.reload() } }
                         .buttonStyle(PlainButtonStyle())
                 }
                 .foregroundColor(AppTheme.danger)
@@ -77,10 +77,10 @@ struct NetworkQualityWorkbenchView: View {
                 Image(systemName: "waveform.path.ecg")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(AppTheme.info)
-                Text("VPS 探针节点")
+                Text(L("VPS 探针节点"))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(AppTheme.navIcon(dark))
-                Text("远端 VPS 独立探针状态与一键部署")
+                Text(L("远端 VPS 独立探针状态与一键部署"))
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.textTertiary(dark))
                     .lineLimit(1)
@@ -101,7 +101,7 @@ struct NetworkQualityWorkbenchView: View {
                         HStack(spacing: 4) {
                             Image(systemName: agentsCollapsed ? "chevron.down" : "chevron.up")
                                 .font(.system(size: 10, weight: .semibold))
-                            Text(agentsCollapsed ? "展开节点" : "收起节点")
+                            Text(L(agentsCollapsed ? "展开节点" : "收起节点"))
                                 .font(.system(size: 11, weight: .medium))
                         }
                         .foregroundColor(AppTheme.textSecondary(dark))
@@ -127,7 +127,7 @@ struct NetworkQualityWorkbenchView: View {
                     if model.isLoading && allAgents.isEmpty {
                         HStack {
                             Spacer()
-                            ProgressView("加载探针状态…").padding(.vertical, 14)
+                            ProgressView(L("加载探针状态…")).padding(.vertical, 14)
                             Spacer()
                         }
                     } else if allAgents.isEmpty {
@@ -157,9 +157,9 @@ struct NetworkQualityWorkbenchView: View {
                                     HStack(spacing: 5) {
                                         Image(systemName: showAllAgents ? "chevron.up" : "chevron.down")
                                             .font(.system(size: 10, weight: .semibold))
-                                        Text(showAllAgents
+                                        Text(L(showAllAgents
                                             ? "收起至前 \(agentPreviewLimit) 台"
-                                            : "展开其余 \(hiddenCount) 台节点（共 \(allAgents.count) 台）")
+                                            : "展开其余 \(hiddenCount) 台节点（共 \(allAgents.count) 台）"))
                                             .font(.system(size: 11, weight: .medium))
                                     }
                                     .foregroundColor(AppTheme.textSecondary(dark))
@@ -196,18 +196,18 @@ struct NetworkQualityWorkbenchView: View {
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 8) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(agent.primaryLabel)
+                    Text(L(agent.primaryLabel))
                         .font(.system(size: 12.5, weight: .semibold))
                         .foregroundColor(AppTheme.navIcon(dark))
                         .lineLimit(1)
                     HStack(spacing: 6) {
-                        Text(metaText)
+                        Text(L(metaText))
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundColor(AppTheme.textSecondary(dark))
                             .lineLimit(1)
                             .truncationMode(.tail)
                         if !agent.capabilities.isEmpty {
-                            Text(agent.capabilities.uppercased())
+                            Text(L(agent.capabilities.uppercased()))
                                 .font(.system(size: 9.5, weight: .medium, design: .monospaced))
                                 .foregroundColor(AppTheme.textTertiary(dark))
                                 .padding(.horizontal, 4)
@@ -263,7 +263,7 @@ struct NetworkQualityWorkbenchView: View {
                 }
                 Spacer(minLength: 0)
                 if let seen = agent.lastSeen, seen > 0 {
-                    Text(NetworkQualityJSON.formatEpochMs(seen, short: true))
+                    Text(L(NetworkQualityJSON.formatEpochMs(seen, short: true)))
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundColor(AppTheme.textTertiary(dark))
                         .lineLimit(1)
@@ -286,10 +286,10 @@ struct NetworkQualityWorkbenchView: View {
                 Image(systemName: "network")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(AppTheme.sidebarActive)
-                Text("网络质量探测任务")
+                Text(L("网络质量探测任务"))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(AppTheme.navIcon(dark))
-                Text("点击任意节点胶囊查看 1h / 6h / 24h / 7d 历史趋势")
+                Text(L("点击任意节点胶囊查看 1h / 6h / 24h / 7d 历史趋势"))
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.textTertiary(dark))
                     .lineLimit(1)
@@ -313,7 +313,7 @@ struct NetworkQualityWorkbenchView: View {
                 if model.isLoading && model.overview.tasks.isEmpty {
                     HStack {
                         Spacer()
-                        ProgressView("加载探测任务…").padding(.vertical, 20)
+                        ProgressView(L("加载探测任务…")).padding(.vertical, 20)
                         Spacer()
                     }
                 } else if model.overview.tasks.isEmpty {
@@ -348,7 +348,7 @@ struct NetworkQualityWorkbenchView: View {
             HStack(alignment: .center, spacing: 8) {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
-                        Text(task.name)
+                        Text(L(task.name))
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(AppTheme.navIcon(dark))
                         StatusBadge(
@@ -360,7 +360,7 @@ struct NetworkQualityWorkbenchView: View {
                             tone: .neutral
                         )
                         if !task.region.isEmpty {
-                            Text(task.region)
+                            Text(L(task.region))
                                 .font(.system(size: 11))
                                 .foregroundColor(AppTheme.textSecondary(dark))
                         }
@@ -371,10 +371,10 @@ struct NetworkQualityWorkbenchView: View {
                     }
 
                     HStack(spacing: 10) {
-                        Text(task.target)
+                        Text(L(task.target))
                             .font(.system(size: 11.5, design: .monospaced))
                             .foregroundColor(AppTheme.textSecondary(dark))
-                        Text("每 \(task.intervalSeconds)s · 采样 \(task.sampleCount) 次 · 节点 \(task.instanceIds.count) 台")
+                        Text(L("每 \(task.intervalSeconds)s · 采样 \(task.sampleCount) 次 · 节点 \(task.instanceIds.count) 台"))
                             .font(.system(size: 11))
                             .foregroundColor(AppTheme.textTertiary(dark))
                     }
@@ -470,17 +470,17 @@ struct NetworkQualityWorkbenchView: View {
                     .fill(tone.color(dark: dark))
                     .frame(width: 7, height: 7)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(agent.primaryLabel)
+                    Text(L(agent.primaryLabel))
                         .font(.system(size: 11.5, weight: .semibold))
                         .foregroundColor(AppTheme.navIcon(dark))
                         .lineLimit(1)
-                    Text(sample == nil ? "等待首次采样" : NetworkQualityJSON.formatEpochMs(sample?.updatedAt, short: true))
+                    Text(L(sample == nil ? "等待首次采样" : NetworkQualityJSON.formatEpochMs(sample?.updatedAt, short: true)))
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundColor(AppTheme.textTertiary(dark))
                         .lineLimit(1)
                 }
                 Spacer(minLength: 4)
-                Text(sample?.compactMetricText ?? "—")
+                Text(L(sample?.compactMetricText ?? "—"))
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
                     .foregroundColor(tone.color(dark: dark))
                     .lineLimit(1)
@@ -497,7 +497,7 @@ struct NetworkQualityWorkbenchView: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
-        .help("点击查看「\(agent.primaryLabel) → \(task.name)」历史延迟与丢包趋势")
+        .help(L("点击查看「\(agent.primaryLabel) → \(task.name)」历史延迟与丢包趋势"))
     }
 }
 
@@ -551,7 +551,7 @@ struct NetworkQualityTaskEditorSheet: View {
                                 ForEach(NetworkQualityOperator.allCases) { op in
                                     let active = model.draft.operatorType == op
                                     Button(action: { model.draft.operatorType = op }) {
-                                        Text(op.label)
+                                        Text(L(op.label))
                                             .font(.system(size: 11.5, weight: active ? .semibold : .medium))
                                             .foregroundColor(active ? appearance.accent.accentFg(dark) : AppSheetSurface.mutedText(dark))
                                             .padding(.horizontal, 9)
@@ -571,7 +571,7 @@ struct NetworkQualityTaskEditorSheet: View {
                                 ForEach(NetworkQualityProbeType.allCases) { pt in
                                     let active = model.draft.type == pt
                                     Button(action: { model.draft.type = pt }) {
-                                        Text(pt.label)
+                                        Text(L(pt.label))
                                             .font(.system(size: 11.5, weight: active ? .semibold : .medium))
                                             .foregroundColor(active ? appearance.accent.accentFg(dark) : AppSheetSurface.mutedText(dark))
                                             .padding(.horizontal, 10)
@@ -604,7 +604,7 @@ struct NetworkQualityTaskEditorSheet: View {
                         }
                         FormFieldRow(label: "启用状态") {
                             HStack {
-                                Toggle(model.draft.enabled ? "已启用" : "已暂停", isOn: $model.draft.enabled)
+                                Toggle(L(model.draft.enabled ? "已启用" : "已暂停"), isOn: $model.draft.enabled)
                                     .toggleStyle(SwitchToggleStyle(tint: AppTheme.sidebarActive))
                                 Spacer()
                             }
@@ -614,25 +614,25 @@ struct NetworkQualityTaskEditorSheet: View {
 
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("执行探测的 VPS 节点 *（已选 \(model.draft.instanceIds.count) 台）")
+                            Text(L("执行探测的 VPS 节点 *（已选 \(model.draft.instanceIds.count) 台）"))
                                 .font(.system(size: 11.5, weight: .semibold))
                                 .foregroundColor(AppSheetSurface.mutedText(dark))
                             Spacer()
-                            Button("全选在线") {
+                            Button(L("全选在线")) {
                                 model.draft.instanceIds = Set(model.overview.agents.filter { $0.qualityStatus == "online" }.map(\.id))
                             }
                             .buttonStyle(PlainButtonStyle())
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(AppTheme.info)
 
-                            Button("全选全部") {
+                            Button(L("全选全部")) {
                                 model.draft.instanceIds = Set(model.overview.agents.map(\.id))
                             }
                             .buttonStyle(PlainButtonStyle())
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(AppTheme.sidebarActive)
 
-                            Button("清空") {
+                            Button(L("清空")) {
                                 model.draft.instanceIds = []
                             }
                             .buttonStyle(PlainButtonStyle())
@@ -641,7 +641,7 @@ struct NetworkQualityTaskEditorSheet: View {
                         }
 
                         if model.overview.agents.isEmpty {
-                            Text("暂无可选 VPS 节点")
+                            Text(L("暂无可选 VPS 节点"))
                                 .font(.system(size: 12))
                                 .foregroundColor(AppSheetSurface.mutedText(dark))
                                 .padding(10)
@@ -660,10 +660,10 @@ struct NetworkQualityTaskEditorSheet: View {
                                             Image(systemName: checked ? "checkmark.square.fill" : "square")
                                                 .font(.system(size: 13))
                                                 .foregroundColor(checked ? AppTheme.sidebarActive : AppSheetSurface.mutedText(dark))
-                                            Text(agent.primaryLabel)
+                                            Text(L(agent.primaryLabel))
                                                 .font(.system(size: 12, weight: .medium))
                                                 .foregroundColor(AppSheetSurface.primaryText(dark))
-                                            Text(agent.publicIps)
+                                            Text(L(agent.publicIps))
                                                 .font(.system(size: 11, design: .monospaced))
                                                 .foregroundColor(AppSheetSurface.mutedText(dark))
                                             Spacer()
@@ -747,7 +747,7 @@ struct NetworkQualityHistorySheet: View {
                                     selectedWindow = w
                                     loadHistory()
                                 }) {
-                                    Text(w.label)
+                                    Text(L(w.label))
                                         .font(.system(size: 11.5, weight: active ? .semibold : .medium))
                                         .foregroundColor(active ? appearance.accent.accentFg(dark) : AppSheetSurface.mutedText(dark))
                                         .padding(.horizontal, 10)
@@ -775,7 +775,7 @@ struct NetworkQualityHistorySheet: View {
                     if let err = errorText, !err.isEmpty {
                         HStack(spacing: 8) {
                             Image(systemName: "exclamationmark.triangle.fill")
-                            Text(err).font(.system(size: 12))
+                            Text(L(err)).font(.system(size: 12))
                             Spacer()
                         }
                         .foregroundColor(AppTheme.danger)
@@ -807,12 +807,12 @@ struct NetworkQualityHistorySheet: View {
                     // Trend Chart
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("延迟趋势（ms）")
+                            Text(L("延迟趋势（ms）"))
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(AppSheetSurface.primaryText(dark))
                             Spacer()
                             if history.truncated {
-                                Text("仅展示最近 \(history.points.count) / \(history.totalPoints) 条")
+                                Text(L("仅展示最近 \(history.points.count) / \(history.totalPoints) 条"))
                                     .font(.system(size: 10.5))
                                     .foregroundColor(AppSheetSurface.mutedText(dark))
                             }
@@ -830,12 +830,12 @@ struct NetworkQualityHistorySheet: View {
 
                     // Recent Samples Table
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("采样明细（最新在前）")
+                        Text(L("采样明细（最新在前）"))
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(AppSheetSurface.primaryText(dark))
 
                         if history.points.isEmpty {
-                            Text(isLoading ? "加载中…" : "当前时间窗口内暂无采样记录")
+                            Text(L(isLoading ? "加载中…" : "当前时间窗口内暂无采样记录"))
                                 .font(.system(size: 12))
                                 .foregroundColor(AppSheetSurface.mutedText(dark))
                                 .padding(.vertical, 16)
@@ -843,12 +843,12 @@ struct NetworkQualityHistorySheet: View {
                         } else {
                             VStack(spacing: 0) {
                                 HStack(spacing: 8) {
-                                    Text("时间").frame(width: 120, alignment: .leading)
-                                    Text("状态").frame(width: 72, alignment: .leading)
-                                    Text("平均延迟").frame(width: 82, alignment: .trailing)
-                                    Text("最小 / 最大").frame(width: 118, alignment: .trailing)
-                                    Text("成功/尝试").frame(width: 68, alignment: .trailing)
-                                    Text("详情").frame(maxWidth: .infinity, alignment: .leading)
+                                    Text(L("时间")).frame(width: 120, alignment: .leading)
+                                    Text(L("状态")).frame(width: 72, alignment: .leading)
+                                    Text(L("平均延迟")).frame(width: 82, alignment: .trailing)
+                                    Text(L("最小 / 最大")).frame(width: 118, alignment: .trailing)
+                                    Text(L("成功/尝试")).frame(width: 68, alignment: .trailing)
+                                    Text(L("详情")).frame(maxWidth: .infinity, alignment: .leading)
                                 }
                                 .font(.system(size: 10.5, weight: .semibold))
                                 .foregroundColor(AppSheetSurface.mutedText(dark))
@@ -859,25 +859,25 @@ struct NetworkQualityHistorySheet: View {
                                 ForEach(Array(history.points.reversed().prefix(80).enumerated()), id: \.element.id) { idx, point in
                                     Rectangle().fill(AppSheetSurface.border(dark)).frame(height: 1)
                                     HStack(spacing: 8) {
-                                        Text(NetworkQualityJSON.formatEpochMs(point.updatedAt))
+                                        Text(L(NetworkQualityJSON.formatEpochMs(point.updatedAt)))
                                             .font(.system(size: 11, design: .monospaced))
                                             .foregroundColor(AppSheetSurface.mutedText(dark))
                                             .frame(width: 120, alignment: .leading)
                                         StatusBadge(text: point.statusLabel, tone: point.statusTone)
                                             .frame(width: 72, alignment: .leading)
-                                        Text(NetworkQualityJSON.formatMs(point.avgMs))
+                                        Text(L(NetworkQualityJSON.formatMs(point.avgMs)))
                                             .font(.system(size: 11, weight: .semibold, design: .monospaced))
                                             .foregroundColor(AppSheetSurface.primaryText(dark))
                                             .frame(width: 82, alignment: .trailing)
-                                        Text("\(NetworkQualityJSON.formatMs(point.minMs)) / \(NetworkQualityJSON.formatMs(point.maxMs))")
+                                        Text(L("\(NetworkQualityJSON.formatMs(point.minMs)) / \(NetworkQualityJSON.formatMs(point.maxMs))"))
                                             .font(.system(size: 10.5, design: .monospaced))
                                             .foregroundColor(AppSheetSurface.mutedText(dark))
                                             .frame(width: 118, alignment: .trailing)
-                                        Text("\(point.successful)/\(point.attempts)")
+                                        Text(L("\(point.successful)/\(point.attempts)"))
                                             .font(.system(size: 11, design: .monospaced))
                                             .foregroundColor(AppSheetSurface.mutedText(dark))
                                             .frame(width: 68, alignment: .trailing)
-                                        Text(sampleDetailText(point))
+                                        Text(L(sampleDetailText(point)))
                                             .font(.system(size: 11))
                                             .foregroundColor(AppSheetSurface.mutedText(dark))
                                             .lineLimit(1)
@@ -903,10 +903,10 @@ struct NetworkQualityHistorySheet: View {
 
     private func kpiCard(_ title: String, _ value: String, _ accent: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title)
+            Text(L(title))
                 .font(.system(size: 10.5, weight: .medium))
                 .foregroundColor(AppSheetSurface.mutedText(dark))
-            Text(value)
+            Text(L(value))
                 .font(.system(size: 13.5, weight: .bold, design: .monospaced))
                 .foregroundColor(accent)
                 .lineLimit(1)
@@ -950,6 +950,7 @@ struct NetworkQualityHistorySheet: View {
 // MARK: - macOS 11+ SwiftUI Path Latency Trend Chart
 
 private struct NetworkQualityLatencyChart: View {
+    @ObservedObject private var i18n = AppI18n.shared
     let points: [NetworkQualitySample]
     let dark: Bool
 
@@ -966,7 +967,7 @@ private struct NetworkQualityLatencyChart: View {
                 Image(systemName: "waveform.path.ecg")
                     .font(.system(size: 18))
                     .foregroundColor(AppTheme.textTertiary(dark))
-                Text("暂无有效延迟数据点")
+                Text(L("暂无有效延迟数据点"))
                     .font(.system(size: 11.5))
                     .foregroundColor(AppTheme.textTertiary(dark))
             }
@@ -998,7 +999,7 @@ private struct NetworkQualityLatencyChart: View {
                         }
                         .stroke(AppTheme.border(dark).opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
 
-                        Text(String(format: "%.0f", val))
+                        Text(L(String(format: "%.0f", val)))
                             .font(.system(size: 9.5, design: .monospaced))
                             .foregroundColor(AppTheme.textTertiary(dark))
                             .frame(width: padLeft - 6, alignment: .trailing)
@@ -1066,9 +1067,9 @@ private struct NetworkQualityLatencyChart: View {
                     // X-axis start & end timestamps
                     if let first = points.first, let last = points.last {
                         HStack {
-                            Text(NetworkQualityJSON.formatEpochMs(first.updatedAt, short: true))
+                            Text(L(NetworkQualityJSON.formatEpochMs(first.updatedAt, short: true)))
                             Spacer()
-                            Text(NetworkQualityJSON.formatEpochMs(last.updatedAt, short: true))
+                            Text(L(NetworkQualityJSON.formatEpochMs(last.updatedAt, short: true)))
                         }
                         .font(.system(size: 9.5, design: .monospaced))
                         .foregroundColor(AppTheme.textTertiary(dark))

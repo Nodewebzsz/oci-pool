@@ -36,7 +36,7 @@ final class MigrationViewModel: ObservableObject {
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         panel.allowedFileTypes = ["enc", "sql"]
-        panel.message = "选择备份文件（.enc 加密备份）"
+        panel.message = L("选择备份文件（.enc 加密备份）")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         selectedFileURL = url
         selectedFileName = url.lastPathComponent
@@ -122,7 +122,7 @@ final class MigrationViewModel: ObservableObject {
         panel.canCreateDirectories = true
         panel.nameFieldStringValue = suggestedName
         panel.allowedFileTypes = ["enc"]
-        panel.message = "保存加密备份"
+        panel.message = L("保存加密备份")
         guard panel.runModal() == .OK, let url = panel.url else {
             throw APIError.serverMessage("已取消保存")
         }

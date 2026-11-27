@@ -121,7 +121,7 @@ struct NotifyView: View {
                         allowClear: false,
                         searchable: false
                     )
-                    Text("系统时区下每天 \(String(format: "%02d:00", model.task.executeHour)) 触发")
+                    Text(L("系统时区下每天 \(String(format: "%02d:00", model.task.executeHour)) 触发"))
                         .font(.system(size: 11))
                         .foregroundColor(AppTheme.sidebarText(dark))
                         .lineLimit(1)
@@ -201,11 +201,11 @@ struct NotifyView: View {
             }
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                     .lineLimit(1)
-                Text(subtitle)
+                Text(L(subtitle))
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.sidebarText(dark))
                     .lineLimit(2)
@@ -307,7 +307,7 @@ struct NotifyView: View {
                 HStack(spacing: 6) {
                     ForEach(["HTTP", "HTTPS", "SOCKS5"], id: \.self) { t in
                         Button(action: { model.proxy.type = t }) {
-                            Text(t)
+                            Text(L(t))
                                 .font(.system(size: 11.5, weight: model.proxy.type == t ? .semibold : .regular, design: .monospaced))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 5)
@@ -386,7 +386,7 @@ struct NotifyView: View {
             FormFieldRow(label: "Device Key *") {
                 AppTextField(text: $model.bark.deviceKey, placeholder: "设备密钥", leadingSystemImage: "key")
             }
-            Text("用于 iOS Bark App 接收推送；服务 URL 可自建。")
+            Text(L("用于 iOS Bark App 接收推送；服务 URL 可自建。"))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.textTertiary(dark))
                 .lineLimit(2)
@@ -431,7 +431,7 @@ struct NotifyView: View {
             FormFieldRow(label: "签名密钥") {
                 AppTextField(text: $model.dingTalk.secret, placeholder: "可选 Secret", secure: true)
             }
-            Text("在钉钉群「智能群助手」中添加自定义机器人获取 Webhook。")
+            Text(L("在钉钉群「智能群助手」中添加自定义机器人获取 Webhook。"))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.textTertiary(dark))
                 .lineLimit(2)
@@ -477,7 +477,7 @@ struct NotifyView: View {
             FormFieldRow(label: "签名密钥") {
                 AppTextField(text: $model.feishu.secret, placeholder: "可选 Secret", secure: true)
             }
-            Text("在飞书群「设置 → 群机器人」中添加自定义机器人。")
+            Text(L("在飞书群「设置 → 群机器人」中添加自定义机器人。"))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.textTertiary(dark))
                 .lineLimit(2)
@@ -511,9 +511,9 @@ struct NotifyView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(AppTheme.danger)
-            Text(text).font(.system(size: 12))
+            Text(L(text)).font(.system(size: 12))
             Spacer()
-            Button("重试") { Task { await model.reload() } }
+            Button(L("重试")) { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
         }
         .foregroundColor(AppTheme.danger)

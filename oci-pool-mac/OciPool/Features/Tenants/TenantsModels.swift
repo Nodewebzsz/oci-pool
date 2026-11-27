@@ -161,15 +161,15 @@ struct TenantItem: Decodable, Identifiable, Equatable {
         return RegionCnName.table[region] ?? region
     }
     // Web i18n tenants.task.active = 「进行中」
-    var openTaskText: String { openBootFlag ? "进行中" : "无任务" }
-    var syncStatusText: String { apiSynced ? "已同步" : "未同步" }
-    var multiRegionText: String { isMultiRegion ? "是" : "否" }
+    var openTaskText: String { L(openBootFlag ? "进行中" : "无任务") }
+    var syncStatusText: String { L(apiSynced ? "已同步" : "未同步") }
+    var multiRegionText: String { L(isMultiRegion ? "是" : "否") }
     var typeText: String {
-        if !accountTypeName.isEmpty, accountTypeName != "未知" { return accountTypeName }
+        if !accountTypeName.isEmpty, accountTypeName != "未知" { return L(accountTypeName) }
         // Web i18n tenants.type.fallback = 「普通多区号」
-        return hasChildren ? "普通多区号" : "未知"
+        return L(hasChildren ? "普通多区号" : "未知")
     }
-    var statusText: String { isActive ? "有效" : "失效" }
+    var statusText: String { L(isActive ? "有效" : "失效") }
     var activeDaysText: String { activeDays.isEmpty ? "0" : activeDays }
     var costText: String { accountCost.isEmpty ? "—" : accountCost }
     /// Web getTenantAlias：defName 等于 userName/租户ID 时视为「未设置」（后端历史数据回填），返回空
@@ -552,7 +552,7 @@ struct TenantRegionOption: Decodable, Identifiable, Equatable {
         } else {
             base = regionNameText
         }
-        return isHomeRegion ? "\(base) · 主" : base
+        return isHomeRegion ? "\(base) · \(L("主"))" : base
     }
 
     /// 租户下拉统一显示（方案 B）：真实租户名优先 · 中文区域（对齐 Web getTenantLabel）

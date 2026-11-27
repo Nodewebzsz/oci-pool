@@ -11,7 +11,7 @@ struct SectionCard<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             if let title = title {
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(AppTheme.navIcon(dark))
             }

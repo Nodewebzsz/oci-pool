@@ -425,28 +425,25 @@ function InstancesPage({ density }) {
         actions={
           <>
             {!isSubPage ? (
-              <>
-                <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>{tr('common.selectPlaceholder')}:</span>
-                <Select
-                  value={tenantFilter}
-                  onChange={v => {
-                    setTenantFilter(v);
-                    setRegionFilter('');
-                    setRegionOptions([]);
-                    setInstances([]);
-                    setLoading(true);
-                    setPage(1);
-                    writeRouteQuery({ tenantId: v, regionId: '', page: 1 });
-                  }}
-                  placeholder={tr('common.selectTenant')}
-                  width={220}
-                  searchable={tenantOptions.length > 5}
-                  options={tenantOptions.map(t => ({
-                    value: getTenantDbId(t),
-                    label: getTenantLabel(t, lang),
-                  }))}
-                />
-              </>
+              <Select
+                value={tenantFilter}
+                onChange={v => {
+                  setTenantFilter(v);
+                  setRegionFilter('');
+                  setRegionOptions([]);
+                  setInstances([]);
+                  setLoading(true);
+                  setPage(1);
+                  writeRouteQuery({ tenantId: v, regionId: '', page: 1 });
+                }}
+                placeholder={tr('common.selectTenant')}
+                width={220}
+                searchable={tenantOptions.length > 5}
+                options={tenantOptions.map(t => ({
+                  value: getTenantDbId(t),
+                  label: getTenantLabel(t, lang),
+                }))}
+              />
             ) : (
               <span style={{ fontSize: 12, color: 'var(--fg-3)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                 <Icon name="globe" size={12} />

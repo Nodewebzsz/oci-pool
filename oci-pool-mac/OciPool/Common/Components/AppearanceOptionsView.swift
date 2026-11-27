@@ -7,12 +7,13 @@ struct AppearanceOptionsView: View {
     var onSelect: () -> Void = {}
 
     private var dark: Bool { appearance.mode == .system ? colorScheme == .dark : (appearance.mode == .dark) }
+    private var isEnglish: Bool { english || AppI18n.shared.isEnglish }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            heading(english ? "Interface style" : "界面风格")
+            heading(isEnglish ? "Interface style" : "界面风格")
             ForEach(AppDesignStyle.allCases) { design in
-                option(english ? (design == .claude ? "Claude style" : "Classic style") : design.title,
+                option(isEnglish ? (design == .claude ? "Claude style" : "Classic style") : design.title,
                        icon: design == .claude ? "textformat" : "square.grid.2x2",
                        selected: appearance.design == design) {
                     appearance.design = design
@@ -20,7 +21,7 @@ struct AppearanceOptionsView: View {
                 }
             }
             Divider().padding(.vertical, 4)
-            heading(english ? "Color mode" : "配色模式")
+            heading(isEnglish ? "Color mode" : "配色模式")
             ForEach([AppAppearanceMode.light, .dark, .system], id: \.rawValue) { mode in
                 option(modeTitle(mode), icon: mode == .light ? "sun.max" : mode == .dark ? "moon" : "desktopcomputer", selected: appearance.mode == mode) {
                     appearance.mode = mode
@@ -58,11 +59,11 @@ struct AppearanceOptionsView: View {
         }
         .buttonStyle(PlainButtonStyle())
         .accessibilityLabel(title)
-        .accessibilityValue(selected ? (english ? "Selected" : "已选择") : "")
+        .accessibilityValue(selected ? (isEnglish ? "Selected" : "已选择") : "")
     }
 
     private func modeTitle(_ mode: AppAppearanceMode) -> String {
-        if !english { return mode.title }
+        if !isEnglish { return mode.title }
         switch mode {
         case .light: return "Light"
         case .dark: return "Dark"

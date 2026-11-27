@@ -86,34 +86,35 @@ struct PageScaffold<Toolbar: View, Content: View, Footer: View>: View {
                     }
                 }
                 VStack(alignment: .leading, spacing: 3) {
-                    // 支持面包屑导航结构：统一 16px 字号，通过颜色与字重形成优雅主次层级
+                    // 支持面包屑导航结构：父级与当前标题同字体同字号，通过颜色与字重区分主次层级
                     if let parent = parentTitle, let onBack = onParentClick {
-                        HStack(spacing: 8) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
                             Button(action: onBack) {
-                                Text(parent)
-                                    .font(.system(size: 16, weight: .medium))
+                                Text(L(parent))
+                                    .font(AppTypography.breadcrumbParent)
                                     .foregroundColor(AppTheme.textSecondary(dark))
+                                    .tracking(AppTheme.isClaude ? -0.2 : 0)
                             }
                             .buttonStyle(PlainButtonStyle())
                             .onHover { inside in
                                 if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
                             }
                             Text("/")
-                                .font(.system(size: 14, weight: .regular))
-                                .foregroundColor(AppTheme.textTertiary(dark).opacity(0.8))
-                            Text(title)
-                                .font(AppTheme.isClaude ? AppTypography.pageTitle : .system(size: 16, weight: .semibold))
+                                .font(AppTypography.breadcrumbSeparator)
+                                .foregroundColor(AppTheme.textTertiary(dark).opacity(0.65))
+                            Text(L(title))
+                                .font(AppTypography.breadcrumbTitle)
                                 .foregroundColor(AppTheme.navIcon(dark))
                                 .tracking(-0.2)
                         }
                     } else {
-                        Text(title)
+                        Text(L(title))
                             .font(AppTypography.pageTitle)
                             .foregroundColor(AppTheme.navIcon(dark))
                             .tracking(-0.2)
                     }
                     if let subtitle = subtitle {
-                        Text(subtitle)
+                        Text(L(subtitle))
                             .font(.system(size: 12))
                             .foregroundColor(AppTheme.textTertiary(dark))
                             .lineLimit(1)

@@ -7,8 +7,10 @@ import java.util.Map;
 @Data
 public class TenantPortraitVO {
     private long totalMainTenants;
+    private long inactiveCount;
     private long upgradedCount;
     private long freeCount;
+    private long unknownPlanCount;
     private long corporateCount;
     private long personalCount;
     private long unknownEntityCount;

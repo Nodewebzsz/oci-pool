@@ -27,14 +27,18 @@ final class HeaderViewModel: ObservableObject {
 
     private let session: AppSession
     private var pollTimer: Timer?
-    private let localeKey = "appLocale"
+    private var localeCancellable: AnyCancellable?
 
     init(session: AppSession = .shared) {
         self.session = session
-        if let raw = UserDefaults.standard.string(forKey: localeKey),
-           let loc = AppLocale(rawValue: raw) {
-            locale = loc
-        }
+        self.locale = AppI18n.shared.locale
+        self.localeCancellable = AppI18n.shared.$locale
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] newLoc in
+                if self?.locale != newLoc {
+                    self?.locale = newLoc
+                }
+            }
     }
 
     func start() {
@@ -62,8 +66,7 @@ final class HeaderViewModel: ObservableObject {
 
     func setLocale(_ loc: AppLocale) {
         locale = loc
-        UserDefaults.standard.set(loc.rawValue, forKey: localeKey)
-        // Instant — no text toast; selection checkmark is enough.
+        AppI18n.shared.setLocale(loc)
     }
 
     /// Web parity: topbar language button is a one-click zh ↔ en toggle (not a dropdown).

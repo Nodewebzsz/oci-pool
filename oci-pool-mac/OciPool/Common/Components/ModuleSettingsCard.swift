@@ -128,11 +128,11 @@ struct ModuleSettingsCard<BodyContent: View, Footer: View>: View {
             Image(systemName: systemImage)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(accent)
-            Text(title)
+            Text(L(title))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(AppTheme.navIcon(dark))
             if !subtitle.isEmpty {
-                Text(subtitle)
+                Text(L(subtitle))
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.textTertiary(dark))
                     .lineLimit(1)

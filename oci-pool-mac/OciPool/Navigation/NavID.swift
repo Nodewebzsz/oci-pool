@@ -101,13 +101,13 @@ enum NavSection: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .service: return "服务管理"
-        case .proxyPool: return "代理池"
-        case .proxy: return "域名与 CDN"
-        case .resource: return "资源管理"
-        case .system: return "系统管理"
-        case .tools: return "我的工具"
-        case .devConfig: return "开发配置"
+        case .service: return L("服务管理")
+        case .proxyPool: return L("代理池")
+        case .proxy: return L("域名与 CDN")
+        case .resource: return L("资源管理")
+        case .system: return L("系统管理")
+        case .tools: return L("我的工具")
+        case .devConfig: return L("开发配置")
         }
     }
 

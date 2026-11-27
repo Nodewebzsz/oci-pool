@@ -45,9 +45,10 @@ struct StatusBadge: View {
 
     var body: some View {
         let c = tone.color(dark: dark)
-        Text(text)
+        Text(L(text))
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(c)
+            .lineLimit(1)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(tone.softBackground(dark: dark))
