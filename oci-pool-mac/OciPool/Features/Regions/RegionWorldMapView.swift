@@ -55,7 +55,11 @@ enum RegionLngLat {
 /// 区域 code → 中文名（simpleName），对齐 Web data.jsx REGIONS。
 /// 用于租户下拉「租户名 · 中文区域」的展示。
 enum RegionCnName {
-    static let table: [String: String] = [
+    static var table: [String: String] {
+        AppI18n.shared.isEnglish ? enTable : zhTable
+    }
+
+    static let zhTable: [String: String] = [
         // Asia Pacific
         "ap-tokyo-1":        "东京",
         "ap-osaka-1":        "大阪",
@@ -105,6 +109,58 @@ enum RegionCnName {
         "sa-santiago-1":     "圣地亚哥",
         "sa-valparaiso-1":   "瓦尔帕莱索",
         "sa-bogota-1":       "波哥大"
+    ]
+
+    static let enTable: [String: String] = [
+        // Asia Pacific
+        "ap-tokyo-1":        "Tokyo",
+        "ap-osaka-1":        "Osaka",
+        "ap-chuncheon-1":    "Chuncheon",
+        "ap-seoul-1":        "Seoul",
+        "ap-singapore-1":    "Singapore",
+        "ap-singapore-2":    "Singapore West",
+        "ap-kulai-2":        "Kulai",
+        "ap-batam-1":        "Batam",
+        "ap-mumbai-1":       "Mumbai",
+        "ap-hyderabad-1":    "Hyderabad",
+        "ap-melbourne-1":    "Melbourne",
+        "ap-sydney-1":       "Sydney",
+        // Europe
+        "uk-london-1":       "London",
+        "uk-cardiff-1":      "Cardiff",
+        "eu-frankfurt-1":    "Frankfurt",
+        "eu-amsterdam-1":    "Amsterdam",
+        "eu-paris-1":        "Paris",
+        "eu-marseille-1":    "Marseille",
+        "eu-milan-1":        "Milan",
+        "eu-turin-1":        "Turin",
+        "eu-madrid-1":       "Madrid",
+        "eu-madrid-3":       "Madrid 3",
+        "eu-zurich-1":       "Zurich",
+        "eu-stockholm-1":    "Stockholm",
+        "eu-jovanovac-1":    "Jovanovac",
+        "il-jerusalem-1":    "Jerusalem",
+        // Middle East / Africa
+        "me-jeddah-1":       "Jeddah",
+        "me-riyadh-1":       "Riyadh",
+        "me-dubai-1":        "Dubai",
+        "me-abudhabi-1":     "Abu Dhabi",
+        "af-casablanca-1":   "Casablanca",
+        "af-johannesburg-1": "Johannesburg",
+        // Americas
+        "us-ashburn-1":      "Ashburn",
+        "us-phoenix-1":      "Phoenix",
+        "us-sanjose-1":      "San Jose",
+        "us-chicago-1":      "Chicago",
+        "ca-toronto-1":      "Toronto",
+        "ca-montreal-1":     "Montreal",
+        "mx-queretaro-1":    "Queretaro",
+        "mx-monterrey-1":    "Monterrey",
+        "sa-saopaulo-1":     "Sao Paulo",
+        "sa-vinhedo-1":      "Vinhedo",
+        "sa-santiago-1":     "Santiago",
+        "sa-valparaiso-1":   "Valparaiso",
+        "sa-bogota-1":       "Bogota"
     ]
 }
 

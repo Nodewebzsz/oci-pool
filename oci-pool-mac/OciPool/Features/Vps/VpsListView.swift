@@ -43,7 +43,7 @@ struct VpsListView: View {
             content: {
                 VStack(spacing: 0) {
                     if let err = model.errorText, !err.isEmpty {
-                        Text(err)
+                        Text(L(err))
                             .font(.system(size: 12))
                             .foregroundColor(AppTheme.danger)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -125,11 +125,11 @@ struct VpsListView: View {
         let content = ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 5) {
-                    Text(title)
+                    Text(L(title))
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(active ? AppTheme.danger : AppTheme.textTertiary(dark))
                     if active {
-                        Text("筛选中")
+                        Text(L("筛选中"))
                             .font(.system(size: 9, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 5)
@@ -138,7 +138,7 @@ struct VpsListView: View {
                             .cornerRadius(2)
                     }
                 }
-                Text(value)
+                Text(L(value))
                     .font(.system(size: 26, weight: .bold))
                     .foregroundColor(valueColor ?? AppTheme.navIcon(dark))
             }
@@ -184,7 +184,7 @@ struct VpsListView: View {
             HStack(spacing: 6) {
                 Image(systemName: "chart.line.uptrend.xyaxis")
                     .foregroundColor(AppTheme.sidebarActive)
-                Text("监控面板")
+                Text(L("监控面板"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
             }
@@ -233,7 +233,7 @@ struct VpsListView: View {
             HStack(spacing: 5) {
                 Image(systemName: systemImage)
                     .font(.system(size: 11, weight: .semibold))
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 12, weight: .medium))
             }
             .padding(.horizontal, 10)
@@ -309,7 +309,7 @@ struct VpsListView: View {
     private var cardGrid: some View {
         Group {
             if model.isLoading && model.cards.isEmpty {
-                ProgressView("加载中…")
+                ProgressView(L("加载中…"))
                     .frame(maxWidth: .infinity, minHeight: 220)
             } else if model.filteredCards.isEmpty {
                 EmptyStateView(
@@ -355,6 +355,7 @@ struct VpsListView: View {
 // MARK: - Server card
 
 private struct VpsServerCard: View {
+    @ObservedObject private var i18n = AppI18n.shared
     let card: VpsCardItem
     let showIP: Bool
     let showTenant: Bool
@@ -399,7 +400,7 @@ private struct VpsServerCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Button(action: onCopyIP) {
                         HStack(spacing: 6) {
-                            Text(showIP ? card.displayIP : card.maskedIP)
+                            Text(L(showIP ? card.displayIP : card.maskedIP))
                                 .font(.system(size: 14, weight: .semibold, design: .monospaced))
                                 .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                                 .lineLimit(1)
@@ -409,10 +410,10 @@ private struct VpsServerCard: View {
                         }
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .help("点击复制 IP")
+                    .help(L("点击复制 IP"))
 
                     if !card.item.displayName.isEmpty {
-                        Text(card.item.displayName)
+                        Text(L(card.item.displayName))
                             .font(.system(size: 11))
                             .foregroundColor(AppTheme.textTertiary(dark))
                             .lineLimit(1)
@@ -451,11 +452,11 @@ private struct VpsServerCard: View {
                             Circle()
                                 .fill(tone.color(dark: dark))
                                 .frame(width: 5, height: 5)
-                            Text(entry.task.name)
+                            Text(L(entry.task.name))
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundColor(AppTheme.navIcon(dark))
                                 .lineLimit(1)
-                            Text(entry.sample?.compactMetricText ?? "待采样")
+                            Text(L(entry.sample?.compactMetricText ?? "待采样"))
                                 .font(.system(size: 10, weight: .semibold, design: .monospaced))
                                 .foregroundColor(tone.color(dark: dark))
                                 .lineLimit(1)
@@ -469,7 +470,7 @@ private struct VpsServerCard: View {
                         )
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .help("点击查看「\(entry.task.name)」历史延迟与丢包")
+                    .help(L("点击查看「\(entry.task.name)」历史延迟与丢包"))
                 }
             }
         }
@@ -533,7 +534,7 @@ private struct VpsServerCard: View {
             default: return AppTheme.sidebarText(dark)
             }
         }()
-        return Text(a)
+        return Text(L(a))
             .font(.system(size: 10, weight: .semibold))
             .foregroundColor(color)
             .padding(.horizontal, 7)
@@ -558,7 +559,7 @@ private struct VpsServerCard: View {
                 Image(systemName: icon)
                     .font(.system(size: 9))
             }
-            Text(text)
+            Text(L(text))
                 .font(.system(size: 10, weight: .medium))
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -606,11 +607,11 @@ private struct VpsServerCard: View {
         }()
         return VStack(spacing: 3) {
             HStack {
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.sidebarText(dark))
                 Spacer()
-                Text(String(format: "%.0f%%", p))
+                Text(L(String(format: "%.0f%%", p)))
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
                     .foregroundColor(dark ? Color.white.opacity(0.85) : Color.primary)
             }
@@ -638,7 +639,7 @@ private struct VpsServerCard: View {
             AppButton(title: "卸载", systemImage: "trash", kind: .danger) { onUninstall() }
             Spacer()
             if card.monitorWarning {
-                Text("探针超时")
+                Text(L("探针超时"))
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(AppTheme.orange)
             }
@@ -695,7 +696,7 @@ private struct VpsMoreMenuItem: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(iconColor)
                     .frame(width: 14)
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(AppTheme.navIcon(dark))
                 Spacer()

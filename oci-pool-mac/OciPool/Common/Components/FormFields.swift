@@ -124,7 +124,7 @@ struct FormFieldRow<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 2) {
-                Text(cleanLabel)
+                Text(L(cleanLabel))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(AppTheme.sidebarText(dark))
                 if isRequiredEffective {
@@ -251,11 +251,11 @@ struct KeyValueRow: View {
 
     var body: some View {
         HStack(alignment: .top) {
-            Text(key)
+            Text(L(key))
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.sidebarText(dark))
                 .frame(width: 120, alignment: .leading)
-            Text(value)
+            Text(L(value))
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
             Spacer()

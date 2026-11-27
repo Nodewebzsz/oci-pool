@@ -3267,8 +3267,8 @@ const I18N = {
 
     // Monitor Main Tenant Portrait
     'monitor.portrait.title': '号池主账号多维画像',
-    'monitor.portrait.subtitle': '基于主区域租户聚合等级、注册主体、存活账龄与多区订阅分布',
-    'monitor.portrait.mainTotal': '主账号总数',
+    'monitor.portrait.subtitle': '基于有效主区域租户聚合等级、注册主体、存活账龄与多区订阅分布（自动排除子区映射与失效账号）',
+    'monitor.portrait.mainTotal': '有效主账号',
     'monitor.portrait.upgradedRatio': '升级号占比',
     'monitor.portrait.paid': '升级号',
     'monitor.portrait.free': '免费号',
@@ -6629,8 +6629,8 @@ const I18N = {
 
     // Monitor Main Tenant Portrait
     'monitor.portrait.title': 'Main Tenant Pool Portrait',
-    'monitor.portrait.subtitle': 'Aggregated by home-region accounts across tier, entity type, account age, and subscribed regions',
-    'monitor.portrait.mainTotal': 'Main Tenants',
+    'monitor.portrait.subtitle': 'Aggregated by active home-region accounts across tier, entity type, account age, and subscribed regions (excluding sub-regions and inactive accounts)',
+    'monitor.portrait.mainTotal': 'Active Main',
     'monitor.portrait.upgradedRatio': 'Upgraded Ratio',
     'monitor.portrait.paid': 'Paid',
     'monitor.portrait.free': 'Free',

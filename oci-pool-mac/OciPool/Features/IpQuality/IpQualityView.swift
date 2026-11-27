@@ -95,7 +95,7 @@ struct IpQualityView: View {
                             }
                         }
                     }) {
-                        Text(item.label)
+                        Text(L(item.label))
                             .font(.system(size: 11.5, weight: active ? .semibold : .medium))
                             .foregroundColor(active ? appearance.accent.accentFg(dark) : AppTheme.textSecondary(dark))
                             .padding(.horizontal, 10)
@@ -149,10 +149,10 @@ struct IpQualityView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 8) {
-                        Text("IP 质量检测全局配置")
+                        Text(L("IP 质量检测全局配置"))
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(dark ? Color.white.opacity(0.95) : Color.primary)
-                        Text(model.ipCheckEnabled ? "已启用" : "未启用")
+                        Text(L(model.ipCheckEnabled ? "已启用" : "未启用"))
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundColor(model.ipCheckEnabled ? AppTheme.sidebarActive : AppTheme.textTertiary(dark))
                             .padding(.horizontal, 7)
@@ -166,7 +166,7 @@ struct IpQualityView: View {
                                     .stroke(model.ipCheckEnabled ? AppTheme.sidebarActive.opacity(0.35) : AppTheme.border(dark).opacity(0.8), lineWidth: 1)
                             )
                     }
-                    Text("定期检测所有实例的公网 IP 质量，确保链路通畅可用")
+                    Text(L("定期检测所有实例的公网 IP 质量，确保链路通畅可用"))
                         .font(.system(size: 11))
                         .foregroundColor(AppTheme.textTertiary(dark))
                 }
@@ -184,7 +184,7 @@ struct IpQualityView: View {
             // 核心参数：检测周期 + 业务提示 + 保存按钮
             HStack(alignment: .center, spacing: 16) {
                 HStack(spacing: 8) {
-                    Text("检测周期:")
+                    Text(L("检测周期:"))
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(dark ? Color.white.opacity(0.85) : Color.primary)
 
@@ -205,7 +205,7 @@ struct IpQualityView: View {
                     Image(systemName: "info.circle")
                         .font(.system(size: 11))
                         .foregroundColor(AppTheme.textTertiary(dark))
-                    Text("按设定小时周期自动执行检测；当所有启用的运营商探针均检测不可达时，系统将自动分配更换新公网 IP。")
+                    Text(L("按设定小时周期自动执行检测；当所有启用的运营商探针均检测不可达时，系统将自动分配更换新公网 IP。"))
                         .font(.system(size: 11))
                         .foregroundColor(AppTheme.textTertiary(dark))
                         .lineLimit(2)
@@ -365,9 +365,9 @@ struct IpQualityView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(AppTheme.danger)
-            Text(text).font(.system(size: 12))
+            Text(L(text)).font(.system(size: 12))
             Spacer()
-            Button("重试") { Task { await model.reload() } }
+            Button(L("重试")) { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
         }
         .foregroundColor(AppTheme.danger)

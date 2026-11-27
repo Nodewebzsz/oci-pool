@@ -62,7 +62,7 @@ struct RegionsView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(AppTheme.info)
                 }
-                Text("区域管理")
+                Text(L("区域管理"))
                     .font(AppTypography.pageTitle)
                     .foregroundColor(RegionsTheme.text(dark))
                     .tracking(-0.2)
@@ -70,7 +70,7 @@ struct RegionsView: View {
             Spacer()
             HStack(spacing: 6) {
                 RegionsPulseDot(color: AppTheme.sidebarActive)
-                Text(model.lastUpdateText)
+                Text(L(model.lastUpdateText))
                     .font(.system(size: 11.5, design: .monospaced))
                     .foregroundColor(RegionsTheme.text(dark).opacity(0.86))
             }
@@ -95,9 +95,9 @@ struct RegionsView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack {
             Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 12))
+            Text(L(text)).font(.system(size: 12))
             Spacer()
-            Button("重试") { Task { await model.refresh() } }
+            Button(L("重试")) { Task { await model.refresh() } }
                 .buttonStyle(PlainButtonStyle())
         }
         .foregroundColor(RegionsTheme.red(dark))
@@ -137,10 +137,10 @@ struct RegionsView: View {
                 }
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(RegionsTheme.muted(dark))
-                Text(value)
+                Text(L(value))
                     .font(.system(size: 22, weight: .bold))
                     .foregroundColor(RegionsTheme.text(dark))
             }
@@ -166,10 +166,10 @@ struct RegionsView: View {
                     .foregroundColor(AppTheme.info)
             }
             HStack(spacing: 4) {
-                Text("数量:")
+                Text(L("数量:"))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(RegionsTheme.text(dark).opacity(0.86))
-                Text("\(model.filteredRows.count)")
+                Text(L("\(model.filteredRows.count)"))
                     .font(.system(size: 13, weight: .bold, design: .monospaced))
                     .foregroundColor(AppTheme.sidebarActive)
             }
@@ -206,7 +206,7 @@ struct RegionsView: View {
         return Button(action: { model.mapMode = mode }) {
             HStack(spacing: 6) {
                 icon.font(.system(size: 12, weight: .medium))
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 12, weight: active ? .medium : .regular))
                     .fixedSize()
             }
@@ -232,10 +232,10 @@ struct RegionsView: View {
                     MenuGlyph(name: "map", size: 16, color: AppTheme.info)
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("全球放货地图")
+                    Text(L("全球放货地图"))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(RegionsTheme.text(dark))
-                    Text("实心圆表示已关联，空心圆表示有货未覆盖；橙色光晕表示今日新增放货")
+                    Text(L("实心圆表示已关联，空心圆表示有货未覆盖；橙色光晕表示今日新增放货"))
                         .font(.system(size: 11))
                         .foregroundColor(RegionsTheme.muted(dark))
                 }
@@ -262,35 +262,35 @@ struct RegionsView: View {
                         .fill(AppTheme.sidebarActive)
                         .frame(width: 10, height: 10)
                         .shadow(color: AppTheme.sidebarActive, radius: 4)
-                    Text("我已关联 · 有放货").font(.system(size: 11)).foregroundColor(RegionsTheme.text(dark).opacity(0.75))
+                    Text(L("我已关联 · 有放货")).font(.system(size: 11)).foregroundColor(RegionsTheme.text(dark).opacity(0.75))
                 }
                 HStack(spacing: 6) {
                     Circle()
                         .fill(AppTheme.info)
                         .frame(width: 8, height: 8)
                         .overlay(Circle().stroke(AppTheme.info.opacity(0.5), lineWidth: 2))
-                    Text("我已关联 · 待放货").font(.system(size: 11)).foregroundColor(RegionsTheme.text(dark).opacity(0.75))
+                    Text(L("我已关联 · 待放货")).font(.system(size: 11)).foregroundColor(RegionsTheme.text(dark).opacity(0.75))
                 }
                 HStack(spacing: 6) {
                     Circle()
                         .fill(AppTheme.sidebarHover(dark))
                         .frame(width: 10, height: 10)
                         .overlay(Circle().stroke(AppTheme.cyan, lineWidth: 1.4))
-                    Text("有货未覆盖").font(.system(size: 11)).foregroundColor(RegionsTheme.text(dark).opacity(0.75))
+                    Text(L("有货未覆盖")).font(.system(size: 11)).foregroundColor(RegionsTheme.text(dark).opacity(0.75))
                 }
                 HStack(spacing: 6) {
                     Circle()
                         .fill(AppTheme.orange)
                         .frame(width: 10, height: 10)
                         .overlay(Circle().stroke(AppTheme.orange.opacity(0.25), lineWidth: 4))
-                    Text("今日新放货").font(.system(size: 11)).foregroundColor(RegionsTheme.text(dark).opacity(0.75))
+                    Text(L("今日新放货")).font(.system(size: 11)).foregroundColor(RegionsTheme.text(dark).opacity(0.75))
                 }
                 HStack(spacing: 6) {
                     Circle().fill(RegionsTheme.muted(dark)).frame(width: 5, height: 5)
-                    Text("未放货区域").font(.system(size: 11)).foregroundColor(RegionsTheme.text(dark).opacity(0.75))
+                    Text(L("未放货区域")).font(.system(size: 11)).foregroundColor(RegionsTheme.text(dark).opacity(0.75))
                 }
                 Spacer(minLength: 8)
-                Text("点击上方胶囊过滤覆盖层 · 悬停或点击节点查看详情")
+                Text(L("点击上方胶囊过滤覆盖层 · 悬停或点击节点查看详情"))
                     .font(.system(size: 10.5))
                     .foregroundColor(RegionsTheme.muted(dark))
             }
@@ -313,7 +313,7 @@ struct RegionsView: View {
             ForEach(pills, id: \.filter.id) { item in
                 let active = model.coverageFilter == item.filter
                 Button(action: { model.coverageFilter = item.filter }) {
-                    Text(item.label)
+                    Text(L(item.label))
                         .font(.system(size: 11.5, weight: active ? .semibold : .regular))
                         .foregroundColor(active ? appearance.accent.accentFg(dark) : RegionsTheme.text(dark).opacity(0.86))
                         .padding(.horizontal, 10)
@@ -363,7 +363,7 @@ struct RegionsView: View {
                     .overlay(Rectangle().fill(RegionsTheme.border(dark)).frame(height: 1), alignment: .bottom)
 
                 HStack(spacing: 0) {
-                    col("状态", 80)
+                    col("状态", 96)
                     colFlexible("区域编码")
                     colFlexible("区域名称")
                     col("架构类型", 90)
@@ -385,7 +385,7 @@ struct RegionsView: View {
                             HStack {
                                 Spacer()
                                 ProgressView().scaleEffect(0.85)
-                                Text("正在加载区域数据…")
+                                Text(L("正在加载区域数据…"))
                                     .font(.system(size: 12))
                                     .foregroundColor(RegionsTheme.muted(dark))
                                     .padding(.leading, 8)
@@ -394,7 +394,7 @@ struct RegionsView: View {
                             .frame(maxWidth: .infinity)
                             .padding(40)
                         } else if model.pageRows.isEmpty {
-                            Text("没有找到匹配的区域")
+                            Text(L("没有找到匹配的区域"))
                                 .font(.system(size: 13))
                                 .foregroundColor(RegionsTheme.muted(dark))
                                 .frame(maxWidth: .infinity)
@@ -501,7 +501,7 @@ struct RegionsView: View {
     private func regionRow(_ row: RegionRow) -> some View {
         HStack(spacing: 0) {
             regionBadge(open: row.isOpen)
-                .frame(width: 80, alignment: .center)
+                .frame(width: 96, alignment: .center)
             monoCellFlexible(row.regionCode, color: AppTheme.sidebarActive, size: 11.5)
             cellFlexible(row.name)
             archBadge(row.architectureType)
@@ -533,10 +533,12 @@ struct RegionsView: View {
             } else {
                 Circle().fill(RegionsTheme.muted(dark).opacity(0.6)).frame(width: 5, height: 5)
             }
-            Text(open ? "已放货" : "未放货")
+            Text(L(open ? "已放货" : "未放货"))
                 .font(.system(size: 11))
                 .foregroundColor(open ? AppTheme.sidebarActive : RegionsTheme.muted(dark))
+                .lineLimit(1)
         }
+        .fixedSize(horizontal: true, vertical: false)
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
         .background(
@@ -547,7 +549,7 @@ struct RegionsView: View {
 
     /// Web：info-soft 底 + info 色 mono 徽章
     private func archBadge(_ text: String) -> some View {
-        Text(text)
+        Text(L(text))
             .font(.system(size: 11, weight: .semibold, design: .monospaced))
             .foregroundColor(AppTheme.info)
             .padding(.horizontal, 8)
@@ -563,7 +565,7 @@ struct RegionsView: View {
         let color: Color = count > 100
             ? AppTheme.sidebarActive
             : (count > 20 ? RegionsTheme.text(dark) : (count > 0 ? RegionsTheme.text(dark).opacity(0.85) : RegionsTheme.muted(dark)))
-        return Text("\(count)")
+        return Text(L("\(count)"))
             .font(.system(size: 12, weight: count > 0 ? .semibold : .regular))
             .foregroundColor(color)
             .lineLimit(1)
@@ -572,7 +574,7 @@ struct RegionsView: View {
 
     /// Web 本月开机数量：>0 orange 加粗，0 fg-3
     private func monthlyCell(_ count: Int) -> some View {
-        Text("\(count)")
+        Text(L("\(count)"))
             .font(.system(size: 12, weight: count > 0 ? .semibold : .regular))
             .foregroundColor(count > 0 ? RegionsTheme.orange(dark) : RegionsTheme.muted(dark))
             .lineLimit(1)
@@ -580,7 +582,7 @@ struct RegionsView: View {
 
     /// 弹性列头（占满剩余宽度，让内容更长的列吸收多余空间；内容居中，与固定列统一）
     private func colFlexible(_ title: String) -> some View {
-        Text(title)
+        Text(L(title))
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(RegionsTheme.muted(dark))
             .frame(maxWidth: .infinity, alignment: .center)
@@ -588,7 +590,7 @@ struct RegionsView: View {
 
     /// 固定宽列头（短内容列，如状态/架构/数量）
     private func col(_ title: String, _ w: CGFloat) -> some View {
-        Text(title)
+        Text(L(title))
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(RegionsTheme.muted(dark))
             .frame(width: w, alignment: .center)
@@ -596,28 +598,28 @@ struct RegionsView: View {
 
     /// 弹性单元格（占满剩余空间，居中，截断 + hover 显示完整）
     private func cellFlexible(_ text: String) -> some View {
-        Text(text)
+        Text(L(text))
             .font(.system(size: 12))
             .foregroundColor(RegionsTheme.text(dark))
             .lineLimit(1)
             .truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .center)
             .clipped()
-            .help(text)
+            .help(L(text))
     }
 
     /// 弹性等宽字体单元格（占满剩余空间，居中，截断 + hover 显示完整）
     private func monoCellFlexible(_ text: String,
                                   color: Color? = nil,
                                   size: CGFloat = 12) -> some View {
-        Text(text)
+        Text(L(text))
             .font(.system(size: size, design: .monospaced))
             .foregroundColor(color ?? RegionsTheme.text(dark).opacity(0.72))
             .lineLimit(1)
             .truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .center)
             .clipped()
-            .help(text)
+            .help(L(text))
     }
 
     private static func fmt(_ s: String?) -> String {

@@ -441,7 +441,7 @@ final class InstanceSSHViewModel: ObservableObject {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
-        panel.message = "选择要上传到服务器的文件"
+        panel.message = L("选择要上传到服务器的文件")
         guard panel.runModal() == .OK, let fileURL = panel.url else { return }
 
         let u = username.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -601,7 +601,7 @@ struct InstanceSSHView: View {
                 searchBar
             }
             if let err = model.errorText, !err.isEmpty {
-                Text(err)
+                Text(L(err))
                     .font(.system(size: 12))
                     .foregroundColor(AppTheme.danger)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -648,16 +648,16 @@ struct InstanceSSHView: View {
             Image(systemName: "terminal")
                 .foregroundColor(AppTheme.sidebarActive)
             VStack(alignment: .leading, spacing: 2) {
-                Text(model.isConnected
+                Text(L(model.isConnected
                      ? "\(model.username)@\(model.host)"
-                     : "SSH — \(item.displayName.isEmpty ? "实例" : item.displayName)")
+                     : "SSH — \(item.displayName.isEmpty ? "实例" : item.displayName)"))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                 HStack(spacing: 6) {
                     Circle()
                         .fill(model.isConnected ? AppTheme.sidebarActive : AppTheme.textSecondary(dark))
                         .frame(width: 7, height: 7)
-                    Text(model.statusText)
+                    Text(L(model.statusText))
                         .font(.system(size: 11))
                         .foregroundColor(model.isConnected ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
                 }
@@ -689,13 +689,13 @@ struct InstanceSSHView: View {
             labeledField("地址", text: $model.host, width: 150)
             labeledField("端口", text: $model.port, width: 60)
             HStack(spacing: 4) {
-                Text("密码")
+                Text(L("密码"))
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.sidebarText(dark))
                 if model.showPassword {
                     field(text: $model.password, width: 130, placeholder: "密码")
                 } else {
-                    SecureField("密码", text: $model.password)
+                    SecureField(L("密码"), text: $model.password)
                         .textFieldStyle(PlainTextFieldStyle())
                         .font(.system(size: 12))
                         .padding(.horizontal, 8)
@@ -750,7 +750,7 @@ struct InstanceSSHView: View {
             divider
             Group {
                 toolBtn("", "minus", tip: "减小字号") { model.changeFont(-1) }
-                Text("\(Int(model.fontSize))px")
+                Text(L("\(Int(model.fontSize))px"))
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(AppTheme.sidebarText(dark))
                     .frame(width: 36)
@@ -786,14 +786,14 @@ struct InstanceSSHView: View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(AppTheme.sidebarText(dark))
-            TextField("搜索终端内容…", text: $model.searchQuery, onCommit: {
+            TextField(L("搜索终端内容…"), text: $model.searchQuery, onCommit: {
                 model.updateSearch()
             })
             .textFieldStyle(PlainTextFieldStyle())
             .font(.system(size: 12))
             .onChange(of: model.searchQuery) { _ in model.updateSearch() }
             if !model.searchHitText.isEmpty {
-                Text(model.searchHitText)
+                Text(L(model.searchHitText))
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.sidebarText(dark))
             }
@@ -810,18 +810,18 @@ struct InstanceSSHView: View {
 
     private var footer: some View {
         HStack {
-            Text(model.isConnected
+            Text(L(model.isConnected
                  ? "\(model.username)@\(model.host):\(model.port)"
-                 : "等待连接")
+                 : "等待连接"))
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(AppTheme.sidebarText(dark))
             Spacer()
-            Text("\(model.termCols) × \(model.termRows)")
+            Text(L("\(model.termCols) × \(model.termRows)"))
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(AppTheme.sidebarText(dark))
             Text("·")
                 .foregroundColor(AppTheme.sidebarText(dark).opacity(0.5))
-            Text("粘贴 ⌘V · 复制 ⌘C · 清屏后可下载日志")
+            Text(L("粘贴 ⌘V · 复制 ⌘C · 清屏后可下载日志"))
                 .font(.system(size: 10))
                 .foregroundColor(AppTheme.sidebarText(dark))
         }
@@ -845,7 +845,7 @@ struct InstanceSSHView: View {
 
     private func labeledField(_ label: String, text: Binding<String>, width: CGFloat) -> some View {
         HStack(spacing: 6) {
-            Text(label)
+            Text(L(label))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.sidebarText(dark))
             field(text: text, width: width, placeholder: label)
@@ -876,7 +876,7 @@ struct InstanceSSHView: View {
                 )
         }
         .buttonStyle(PlainButtonStyle())
-        .help(tip)
+        .help(L(tip))
     }
 
     private func toolBtn(_ title: String, _ systemImage: String, tip: String, action: @escaping () -> Void) -> some View {
@@ -885,7 +885,7 @@ struct InstanceSSHView: View {
                 Image(systemName: systemImage)
                     .font(.system(size: 11, weight: .semibold))
                 if !title.isEmpty {
-                    Text(title)
+                    Text(L(title))
                         .font(.system(size: 11, weight: .medium))
                 }
             }
@@ -902,6 +902,6 @@ struct InstanceSSHView: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
-        .help(tip)
+        .help(L(tip))
     }
 }

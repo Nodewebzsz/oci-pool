@@ -143,7 +143,7 @@ struct ApiTokensView: View {
                     placeholder: "可选说明"
                 )
             }
-            Text("生成新 Token 会使旧 Token 立即失效。")
+            Text(L("生成新 Token 会使旧 Token 立即失效。"))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.sidebarText(dark))
         } footer: {
@@ -179,7 +179,7 @@ struct ApiTokensView: View {
             enabled: nil,
             minHeight: row2MinHeight
         ) {
-            Text("匿名文档暴露面已收敛关闭。通过登录态保护的内建面板浏览全部开放接口、一键复制 Bearer cURL 命令或导出标准规范。")
+            Text(L("匿名文档暴露面已收敛关闭。通过登录态保护的内建面板浏览全部开放接口、一键复制 Bearer cURL 命令或导出标准规范。"))
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.sidebarText(dark))
                 .fixedSize(horizontal: false, vertical: true)
@@ -226,11 +226,11 @@ struct ApiTokensView: View {
             enabled: nil,
             minHeight: row2MinHeight
         ) {
-            Text("所有 API 请求需在请求头中携带 Bearer Token 完成鉴权。示例：")
+            Text(L("所有 API 请求需在请求头中携带 Bearer Token 完成鉴权。示例："))
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.sidebarText(dark))
 
-            Text(authHeaderSample)
+            Text(L(authHeaderSample))
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
                 .padding(12)
@@ -244,7 +244,7 @@ struct ApiTokensView: View {
                         .stroke(AppTheme.border(dark).opacity(0.7), lineWidth: 1)
                 )
 
-            Text("示例路径：/oci-pool/open-api/v1/models")
+            Text(L("示例路径：/oci-pool/open-api/v1/models"))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.sidebarText(dark))
         } footer: {
@@ -271,11 +271,11 @@ struct ApiTokensView: View {
                 Image(systemName: icon)
                     .foregroundColor(AppTheme.violet)
                     .frame(width: 18)
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
                 Spacer()
-                Text(detail)
+                Text(L(detail))
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(AppTheme.sidebarText(dark))
                 Image(systemName: trailingIcon)
@@ -297,11 +297,11 @@ struct ApiTokensView: View {
 
     private func infoRow(_ label: String, _ value: String, warn: Bool = false) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Text(label)
+            Text(L(label))
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.sidebarText(dark))
                 .frame(width: 72, alignment: .leading)
-            Text(value)
+            Text(L(value))
                 .font(.system(size: 12, weight: warn ? .semibold : .regular))
                 .foregroundColor(
                     warn
@@ -316,9 +316,9 @@ struct ApiTokensView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(AppTheme.danger)
-            Text(text).font(.system(size: 12))
+            Text(L(text)).font(.system(size: 12))
             Spacer()
-            Button("重试") { Task { await model.reload() } }
+            Button(L("重试")) { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
         }
         .foregroundColor(AppTheme.danger)
@@ -376,7 +376,7 @@ struct ApiDocsSheet: View {
                     if model.isSpecLoading && model.openApiSpec == nil {
                         HStack(spacing: 8) {
                             ProgressView()
-                            Text("正在加载受保护 OpenAPI 规范…")
+                            Text(L("正在加载受保护 OpenAPI 规范…"))
                                 .font(.system(size: 12))
                                 .foregroundColor(AppTheme.textSecondary(dark))
                         }
@@ -385,7 +385,7 @@ struct ApiDocsSheet: View {
                         HStack(spacing: 8) {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundColor(AppTheme.danger)
-                            Text(err)
+                            Text(L(err))
                                 .font(.system(size: 12))
                                 .foregroundColor(AppTheme.danger)
                             Spacer()
@@ -397,7 +397,7 @@ struct ApiDocsSheet: View {
                         .background(AppTheme.dangerSoft(dark))
                         .cornerRadius(8)
                     } else if model.filteredEndpoints.isEmpty {
-                        Text("未找到匹配的开放接口")
+                        Text(L("未找到匹配的开放接口"))
                             .font(.system(size: 12))
                             .foregroundColor(AppTheme.textTertiary(dark))
                             .frame(maxWidth: .infinity, minHeight: 120)
@@ -428,7 +428,7 @@ struct ApiDocsSheet: View {
             ForEach(groups, id: \.id) { g in
                 let active = model.selectedDocsGroup == g.id
                 Button(action: { model.selectedDocsGroup = g.id }) {
-                    Text(g.title)
+                    Text(L(g.title))
                         .font(.system(size: 11.5, weight: active ? .semibold : .regular))
                         .foregroundColor(active ? appearance.accent.accentFg(dark) : AppSheetSurface.primaryText(dark))
                         .padding(.horizontal, 10)
@@ -449,10 +449,10 @@ struct ApiDocsSheet: View {
     private func groupSection(title: String, items: [OpenApiEndpointItem]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(AppSheetSurface.primaryText(dark))
-                Text("\(items.count)")
+                Text(L("\(items.count)"))
                     .font(.system(size: 10.5, weight: .bold, design: .monospaced))
                     .foregroundColor(AppTheme.violet)
                     .padding(.horizontal, 6)
@@ -473,7 +473,7 @@ struct ApiDocsSheet: View {
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                Text(ep.method.uppercased())
+                Text(L(ep.method.uppercased()))
                     .font(.system(size: 10.5, weight: .bold, design: .monospaced))
                     .foregroundColor(methodColor)
                     .padding(.horizontal, 8)
@@ -481,7 +481,7 @@ struct ApiDocsSheet: View {
                     .background(methodColor.opacity(0.15))
                     .cornerRadius(5)
 
-                Text(ep.path)
+                Text(L(ep.path))
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundColor(AppSheetSurface.primaryText(dark))
                     .lineLimit(1)
@@ -516,7 +516,7 @@ struct ApiDocsSheet: View {
                 .buttonStyle(PlainButtonStyle())
             }
 
-            Text(ep.summary)
+            Text(L(ep.summary))
                 .font(.system(size: 11.5))
                 .foregroundColor(AppSheetSurface.mutedText(dark))
 
@@ -543,10 +543,10 @@ struct ApiDocsSheet: View {
 
     private func codeBlock(title: String, code: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title)
+            Text(L(title))
                 .font(.system(size: 10.5, weight: .semibold))
                 .foregroundColor(AppSheetSurface.mutedText(dark))
-            Text(code)
+            Text(L(code))
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(AppSheetSurface.primaryText(dark))
                 .frame(maxWidth: .infinity, alignment: .leading)

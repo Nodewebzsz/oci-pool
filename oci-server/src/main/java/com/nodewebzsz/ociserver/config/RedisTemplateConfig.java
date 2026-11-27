@@ -13,6 +13,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
+import javax.sql.DataSource;
+
 /**
  * RedisTemplate + sa-token 的 Redis 会话持久化配置。
  * <p>本项目只扫 {@code com.nodewebzsz.*},故 sa-token-redis-jackson 的
@@ -49,18 +51,27 @@ public class RedisTemplateConfig {
         return dao;
     }
 
-    // 全部 bean 创建完成后,检查 Redis 连通性:连通则启用 Redis 会话持久化;不可用时自动回退内存实现(本地单机/无Redis环境免配置)
+    // 全部 bean 创建完成后,检查 Redis 连通性:
+    // 1. Redis 可用 -> 启用 Redis 会话持久化
+    // 2. Redis 不可用 -> 回退到数据库持久化 JdbcSaTokenDao（H2 / MySQL 重启后继续保留 30 天免登会话）
+    // 3. 数据库持久化也异常 -> 兜底回退内存实现
     @Bean
-    public ApplicationListener<ContextRefreshedEvent> saTokenDaoProbe(RedisConnectionFactory factory, SaTokenDao saTokenDaoRedis) {
+    public ApplicationListener<ContextRefreshedEvent> saTokenDaoProbe(RedisConnectionFactory factory, SaTokenDao saTokenDaoRedis, DataSource dataSource) {
         return ev -> {
             try {
                 factory.getConnection().ping();
                 SaManager.setSaTokenDao(saTokenDaoRedis);
                 log.info("[sa-token] Redis 连接正常，生效 SaTokenDao = {}", SaManager.getSaTokenDao().getClass().getName());
             } catch (Exception e) {
-                cn.dev33.satoken.dao.SaTokenDaoDefaultImpl memoryDao = new cn.dev33.satoken.dao.SaTokenDaoDefaultImpl();
-                SaManager.setSaTokenDao(memoryDao);
-                log.warn("[sa-token] Redis 连接不可用 ({}），已自动回退到内存会话 SaTokenDaoDefaultImpl", e.getMessage());
+                try {
+                    JdbcSaTokenDao jdbcDao = new JdbcSaTokenDao(dataSource);
+                    SaManager.setSaTokenDao(jdbcDao);
+                    log.info("[sa-token] Redis 不可用 ({})，已自动切换为数据库持久化会话 JdbcSaTokenDao", e.getMessage());
+                } catch (Exception dbEx) {
+                    cn.dev33.satoken.dao.SaTokenDaoDefaultImpl memoryDao = new cn.dev33.satoken.dao.SaTokenDaoDefaultImpl();
+                    SaManager.setSaTokenDao(memoryDao);
+                    log.warn("[sa-token] Redis 与数据库会话存储均不可用 ({} / {})，已回退到内存会话 SaTokenDaoDefaultImpl", e.getMessage(), dbEx.getMessage());
+                }
             }
         };
     }

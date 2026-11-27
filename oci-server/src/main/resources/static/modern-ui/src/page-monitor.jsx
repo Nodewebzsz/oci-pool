@@ -310,8 +310,10 @@ function _trOr(tr, key, zh, en, lang) {
 
 function TenantPortraitSection({ portrait, error, tr, lang }) {
   const total = Number(portrait?.totalMainTenants || 0);
+  const inactive = Number(portrait?.inactiveCount || 0);
   const upgraded = Number(portrait?.upgradedCount || 0);
   const free = Number(portrait?.freeCount || 0);
+  const unknownPlan = Number(portrait?.unknownPlanCount || 0);
   const corporate = Number(portrait?.corporateCount || 0);
   const personal = Number(portrait?.personalCount || 0);
   const unknownEntity = Number(portrait?.unknownEntityCount || 0);
@@ -340,7 +342,9 @@ function TenantPortraitSection({ portrait, error, tr, lang }) {
     {
       title: _trOr(tr, 'monitor.portrait.upgradedRatio', '升级号占比', 'Upgraded Ratio', lang),
       main: pct(upgraded),
-      sub: `${_trOr(tr, 'monitor.portrait.paid', '升级号', 'Paid', lang)} ${upgraded} · ${_trOr(tr, 'monitor.portrait.free', '免费号', 'Free', lang)} ${free}`,
+      sub: unknownPlan > 0
+        ? `${_trOr(tr, 'monitor.portrait.paid', '升级号', 'Paid', lang)} ${upgraded} · ${_trOr(tr, 'monitor.portrait.free', '免费号', 'Free', lang)} ${free} · ${_trOr(tr, 'monitor.portrait.unverified', '待同步', 'Unsynced', lang)} ${unknownPlan}`
+        : `${_trOr(tr, 'monitor.portrait.paid', '升级号', 'Paid', lang)} ${upgraded} · ${_trOr(tr, 'monitor.portrait.free', '免费号', 'Free', lang)} ${free}`,
       ratio: total > 0 ? upgraded / total : 0,
       color: 'var(--accent)',
       icon: 'award',
@@ -377,17 +381,29 @@ function TenantPortraitSection({ portrait, error, tr, lang }) {
     <div style={{ marginBottom: 14 }}>
       <Card
         title={_trOr(tr, 'monitor.portrait.title', '号池主账号多维画像', 'Main Tenant Pool Portrait', lang)}
-        subtitle={_trOr(tr, 'monitor.portrait.subtitle', '基于主区域租户聚合等级、注册主体、存活账龄与多区订阅分布', 'Aggregated by home-region accounts across tier, entity type, account age, and subscribed regions', lang)}
+        subtitle={_trOr(tr, 'monitor.portrait.subtitle', '基于有效主区域租户聚合等级、注册主体、存活账龄与多区订阅分布（自动排除子区映射与失效账号）', 'Aggregated by active home-region accounts across tier, entity type, account age, and subscribed regions', lang)}
         headerIcon="users"
         headerIconColor="var(--accent)"
         action={
-          <span className="mono" style={{
-            fontSize: 11, color: 'var(--fg-2)',
-            padding: '3px 9px', borderRadius: 999,
-            background: 'var(--bg-2)', border: '1px solid var(--border)',
-          }}>
-            {_trOr(tr, 'monitor.portrait.mainTotal', '主账号总数', 'Main Tenants', lang)}: <b style={{ color: 'var(--fg-0)' }}>{total}</b>
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span className="mono" style={{
+              fontSize: 11, color: 'var(--fg-2)',
+              padding: '3px 9px', borderRadius: 999,
+              background: 'var(--bg-2)', border: '1px solid var(--border)',
+            }}>
+              {_trOr(tr, 'monitor.portrait.mainTotal', '有效主账号', 'Active Main', lang)}: <b style={{ color: 'var(--fg-0)' }}>{total}</b>
+            </span>
+            {inactive > 0 && (
+              <span className="mono" style={{
+                fontSize: 11, color: 'var(--danger, #dc2626)',
+                padding: '3px 9px', borderRadius: 999,
+                background: 'color-mix(in srgb, var(--danger, #dc2626) 10%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--danger, #dc2626) 24%, transparent)',
+              }}>
+                {lang === 'en' ? `Inactive excluded: ${inactive}` : `失效已排除: ${inactive}`}
+              </span>
+            )}
+          </div>
         }
       >
         {error || !portrait ? (

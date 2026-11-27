@@ -225,7 +225,7 @@ struct BootPricingEstimateCard: View {
                 Image(systemName: "dollarsign.circle.fill")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(toneColor)
-                Text("实时费用预估 (USD)")
+                Text(L("实时费用预估 (USD)"))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(AppTheme.navIcon(dark))
                 Spacer(minLength: 4)
@@ -257,15 +257,15 @@ struct BootPricingEstimateCard: View {
 
             DisclosureGroup(isExpanded: $showRiskNotes) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("• Always Free 免费池为租户级共享额度：总计最多 4 OCPU + 24 GB (A1.Flex)、2 台 E2.1.Micro 以及 200 GB 块存储/引导卷。")
-                    Text("• 若该租户名下已有存量实例或残留未删引导卷，叠加后超出免费池的部分将按 Oracle 官方单价扣减试用金或产生 Pay-As-You-Go 账单。")
-                    Text("• 引导卷超 200 GB 免费总额后按基础性能块存储约 $0.0255 / GB·月估算。")
+                    Text(L("• Always Free 免费池为租户级共享额度：总计最多 4 OCPU + 24 GB (A1.Flex)、2 台 E2.1.Micro 以及 200 GB 块存储/引导卷。"))
+                    Text(L("• 若该租户名下已有存量实例或残留未删引导卷，叠加后超出免费池的部分将按 Oracle 官方单价扣减试用金或产生 Pay-As-You-Go 账单。"))
+                    Text(L("• 引导卷超 200 GB 免费总额后按基础性能块存储约 $0.0255 / GB·月估算。"))
                 }
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.textSecondary(dark))
                 .padding(.top, 6)
             } label: {
-                Text("计费口径与超额风险说明")
+                Text(L("计费口径与超额风险说明"))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(AppTheme.info)
             }
@@ -283,10 +283,10 @@ struct BootPricingEstimateCard: View {
 
     private func metricPill(label: String, value: String, highlight: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(label)
+            Text(L(label))
                 .font(.system(size: 10))
                 .foregroundColor(AppTheme.textTertiary(dark))
-            Text(value)
+            Text(L(value))
                 .font(.system(size: 12.5, weight: .bold, design: .monospaced))
                 .foregroundColor(highlight)
                 .lineLimit(1)
@@ -375,7 +375,7 @@ struct TenantBootCreateView: View {
     private var headerSubtitle: String? {
         guard let t = tenant else { return nil }
         let realName = t.tenantPrimaryName
-        let regCn = RegionCnName.table[t.region] ?? (t.region.isEmpty ? "主区域" : t.region)
+        let regCn = RegionCnName.table[t.region] ?? (t.region.isEmpty ? L("主区域") : t.region)
         return "\(realName) · \(regCn)"
     }
 
@@ -446,10 +446,10 @@ struct TenantBootCreateView: View {
                 .foregroundColor(AppTheme.danger)
                 .padding(.top, 1)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Oracle API 开机风控警告")
+                Text(L("Oracle API 开机风控警告"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(AppTheme.danger)
-                Text("Oracle 近期已严厉收紧对通过 API 频繁下发创建实例任务的风控策略。高频（如 10s）自动轮询开机可能触发账号异常或限制。建议合理设置循环时间（推荐 60s 以上），保存前请仔细核对配额与配置。")
+                Text(L("Oracle 近期已严厉收紧对通过 API 频繁下发创建实例任务的风控策略。高频（如 10s）自动轮询开机可能触发账号异常或限制。建议合理设置循环时间（推荐 60s 以上），保存前请仔细核对配额与配置。"))
                     .font(.system(size: 12))
                     .foregroundColor(primaryText.opacity(0.88))
                     .fixedSize(horizontal: false, vertical: true)
@@ -486,14 +486,14 @@ struct TenantBootCreateView: View {
                                 Text("Ampere ARM")
                                     .font(.system(size: 13, weight: .bold))
                                     .foregroundColor(isArm ? accent : primaryText)
-                                Text("推荐")
+                                Text(L("推荐"))
                                     .font(.system(size: 9.5, weight: .semibold))
                                     .foregroundColor(accent)
                                     .padding(.horizontal, 5)
                                     .padding(.vertical, 1)
                                     .background(RoundedRectangle(cornerRadius: 3).fill(accent.opacity(0.15)))
                             }
-                            Text("最高可享 4C 24G 免费额度")
+                            Text(L("最高可享 4C 24G 免费额度"))
                                 .font(.system(size: 10.5))
                                 .foregroundColor(mutedText)
                         }
@@ -515,7 +515,7 @@ struct TenantBootCreateView: View {
                             Text("AMD / x86")
                                 .font(.system(size: 13, weight: .bold))
                                 .foregroundColor(!isArm ? AppTheme.info : primaryText)
-                            Text("标准 1C 1G 微型或付费实例")
+                            Text(L("标准 1C 1G 微型或付费实例"))
                                 .font(.system(size: 10.5))
                                 .foregroundColor(mutedText)
                         }
@@ -577,11 +577,11 @@ struct TenantBootCreateView: View {
                         Button(action: { applyTemplate(tpl) }) {
                             VStack(alignment: .leading, spacing: 5) {
                                 HStack {
-                                    Text(tpl.label)
+                                    Text(L(tpl.label))
                                         .font(.system(size: 12.5, weight: .semibold))
                                         .foregroundColor(active ? accent : primaryText)
                                     Spacer(minLength: 2)
-                                    Text(tpl.tag)
+                                    Text(L(tpl.tag))
                                         .font(.system(size: 9.5, weight: .semibold))
                                         .foregroundColor(tpl.paid ? Color(hex: "f78166") : accent)
                                         .padding(.horizontal, 5)
@@ -591,7 +591,7 @@ struct TenantBootCreateView: View {
                                                 .fill((tpl.paid ? Color(hex: "f78166") : accent).opacity(0.14))
                                         )
                                 }
-                                Text("\(tpl.ocpu)C \(tpl.memory)G · \(tpl.disk)GB")
+                                Text(L("\(tpl.ocpu)C \(tpl.memory)G · \(tpl.disk)GB"))
                                     .font(.system(size: 11.5, weight: .medium, design: .monospaced))
                                     .foregroundColor(mutedText)
                             }
@@ -611,7 +611,7 @@ struct TenantBootCreateView: View {
                 }
 
                 // 底部提示行 (对齐 Web 端)
-                Text("💡 提示：点击预设模板将自动联动下方参数并生成任务备注，后续亦可在下方卡片中进行微调。")
+                Text(L("💡 提示：点击预设模板将自动联动下方参数并生成任务备注，后续亦可在下方卡片中进行微调。"))
                     .font(.system(size: 11))
                     .foregroundColor(mutedText)
                     .lineLimit(2)
@@ -631,7 +631,7 @@ struct TenantBootCreateView: View {
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
-                        Text("实例规格 (Shape) *")
+                        Text(L("实例规格 (Shape) *"))
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(primaryText)
                         if normalizedSpec.isFreeFixed {
@@ -643,7 +643,7 @@ struct TenantBootCreateView: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: "arrow.counterclockwise")
                                         .font(.system(size: 10, weight: .semibold))
-                                    Text("恢复模板默认")
+                                    Text(L("恢复模板默认"))
                                         .font(.system(size: 11, weight: .medium))
                                 }
                                 .foregroundColor(accent)
@@ -677,7 +677,7 @@ struct TenantBootCreateView: View {
                         Image(systemName: "xmark.octagon.fill")
                             .font(.system(size: 11))
                             .foregroundColor(AppTheme.danger)
-                        Text(err)
+                        Text(L(err))
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(AppTheme.danger)
                         Spacer(minLength: 0)
@@ -696,10 +696,10 @@ struct TenantBootCreateView: View {
                         Image(systemName: ratioOk ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                             .font(.system(size: 11))
                             .foregroundColor(ratioOk ? accent : AppTheme.orange)
-                        Text(ratioOk
+                        Text(L(ratioOk
                             ? "ARM 内存核心比守卫：当前 \(model.bootOcpu)C : \(model.bootMemory)G (1:6) 完美符合 Oracle 官方推荐规则"
                             : "注意：当前比例为 1:\(String(format: "%.1f", m / c))，Oracle ARM 官方严格推荐 1C:6G 比例"
-                        )
+                        ))
                         .font(.system(size: 11))
                         .foregroundColor(ratioOk ? accent : AppTheme.orange)
                     }
@@ -721,7 +721,7 @@ struct TenantBootCreateView: View {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 11))
                             .foregroundColor(AppTheme.orange)
-                        Text("当前规格已超过 Oracle ARM 永久免费上限 (4C 24G 200GB)，可能产生计费")
+                        Text(L("当前规格已超过 Oracle ARM 永久免费上限 (4C 24G 200GB)，可能产生计费"))
                             .font(.system(size: 11))
                             .foregroundColor(AppTheme.orange)
                     }
@@ -775,7 +775,7 @@ struct TenantBootCreateView: View {
                     // 起止时间联动下拉框 (从 00:00 至 24:00)
                     HStack(spacing: 8) {
                         HStack(spacing: 6) {
-                            Text("从")
+                            Text(L("从"))
                                 .font(.system(size: 11))
                                 .foregroundColor(mutedText)
                             SelectMenu(
@@ -796,7 +796,7 @@ struct TenantBootCreateView: View {
                         }
 
                         HStack(spacing: 6) {
-                            Text("至")
+                            Text(L("至"))
                                 .font(.system(size: 11))
                                 .foregroundColor(mutedText)
                             SelectMenu(
@@ -823,7 +823,7 @@ struct TenantBootCreateView: View {
                         Image(systemName: "clock")
                             .font(.system(size: 11))
                             .foregroundColor(accent)
-                        Text(timeRangeHint.text)
+                        Text(L(timeRangeHint.text))
                             .font(.system(size: 11))
                             .foregroundColor(accent)
                     }
@@ -858,7 +858,7 @@ struct TenantBootCreateView: View {
                     if model.bootImagesLoading {
                         HStack(spacing: 8) {
                             ProgressView().controlSize(.small)
-                            Text("正在实时探测该区域镜像…")
+                            Text(L("正在实时探测该区域镜像…"))
                                 .font(.system(size: 12))
                                 .foregroundColor(mutedText)
                         }
@@ -868,7 +868,7 @@ struct TenantBootCreateView: View {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .font(.system(size: 12))
                                 .foregroundColor(AppTheme.danger)
-                            Text(error)
+                            Text(L(error))
                                 .font(.system(size: 12))
                                 .foregroundColor(AppTheme.danger)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -887,7 +887,7 @@ struct TenantBootCreateView: View {
                                 .fill(AppTheme.dangerSoft(dark))
                         )
                     } else if model.bootOSList.isEmpty {
-                        Text("该区域暂无可用镜像")
+                        Text(L("该区域暂无可用镜像"))
                             .font(.system(size: 12))
                             .foregroundColor(mutedText)
                             .frame(height: 32)
@@ -927,7 +927,7 @@ struct TenantBootCreateView: View {
                 FormFieldRow(label: "镜像 OCID") {
                     HStack(spacing: 8) {
                         AppTextField(
-                            text: .constant(model.bootImageId.isEmpty ? "探测匹配中…" : model.bootImageId),
+                            text: .constant(model.bootImageId.isEmpty ? L("探测匹配中…") : model.bootImageId),
                             placeholder: "ocid1.image.oc1...",
                             leadingSystemImage: "doc.text"
                         )
@@ -1006,10 +1006,10 @@ struct TenantBootCreateView: View {
                             .foregroundColor(iconColor)
                     )
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
+                    Text(L(title))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(primaryText)
-                    Text(subtitle)
+                    Text(L(subtitle))
                         .font(.system(size: 11))
                         .foregroundColor(mutedText)
                 }
@@ -1025,7 +1025,7 @@ struct TenantBootCreateView: View {
     // ─── 通用辅助控件 ───────────────────────────────────────────────
     private func numField(_ label: String, text: Binding<String>, disabled: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(label)
+            Text(L(label))
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(primaryText)
             AppTextField(
@@ -1048,7 +1048,7 @@ struct TenantBootCreateView: View {
     private func presetChip(label: String, value: String, binding: Binding<String>) -> some View {
         let active = binding.wrappedValue == value
         return Button(action: { binding.wrappedValue = value }) {
-            Text(label)
+            Text(L(label))
                 .font(.system(size: 11, weight: active ? .bold : .medium))
                 .foregroundColor(active ? accent : primaryText)
                 .padding(.horizontal, 10)

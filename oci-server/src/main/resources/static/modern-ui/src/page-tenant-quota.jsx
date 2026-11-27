@@ -231,14 +231,21 @@ function TenantQuotaPage({ density, ctx, navigate }) {
             <Icon name="bar-chart-3" size={16} />
           </div>
           <div style={{ minWidth: 0 }}>
-            {/* 面包屑导航：字号严格统一为 16px，通过颜色与字重清晰区分层级 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, lineHeight: 1.25 }}>
+            {/* 面包屑导航：与主标题同字体同字号，通过颜色与字重清晰区分层级 */}
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'baseline',
+              gap: 8,
+              lineHeight: 1.15,
+              fontFamily: 'var(--font-serif)',
+              fontSize: 'var(--page-title-size)',
+              letterSpacing: -0.3,
+            }}>
               <span
                 onClick={() => navigate('tenants')}
                 style={{
                   color: 'var(--fg-2)',
-                  fontSize: 16,
-                  fontWeight: 500,
+                  fontWeight: 400,
                   cursor: 'pointer',
                   transition: 'color 120ms',
                 }}
@@ -247,12 +254,10 @@ function TenantQuotaPage({ density, ctx, navigate }) {
               >
                 {tr('app.f0f7e8')}
               </span>
-              <span style={{ color: 'var(--fg-3)', fontSize: 13, fontWeight: 400, opacity: 0.7 }}>/</span>
+              <span style={{ color: 'var(--fg-3)', fontSize: '0.78em', fontWeight: 300, opacity: 0.65 }}>/</span>
               <span style={{
                 color: 'var(--fg-0)',
-                fontSize: 15,
-                fontWeight: 600,
-                letterSpacing: 0,
+                fontWeight: 'var(--page-title-weight)',
               }}>
                 账号配额
               </span>

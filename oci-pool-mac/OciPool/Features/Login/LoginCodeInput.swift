@@ -65,7 +65,7 @@ struct LoginCodeInput: View {
         return ZStack {
             RoundedRectangle(cornerRadius: 8)
                 .fill(value.isEmpty ? emptyBg : filledBg)
-            Text(value)
+            Text(L(value))
                 .font(.system(size: 22, weight: .semibold, design: .monospaced))
                 .foregroundColor(textColor)
         }

@@ -2,6 +2,7 @@ package com.nodewebzsz.ociserver.controller.login;
 
 import com.nodewebzsz.dao.entity.LoginUser;
 import com.nodewebzsz.ocicommon.enums.LoginTypeEnum;
+import com.nodewebzsz.ociserver.config.AuthSessionHelper;
 import com.nodewebzsz.ociserver.config.task.VersionCheckTask;
 import com.nodewebzsz.ociserver.controller.BaseController;
 import com.nodewebzsz.ociserver.pojo.request.GithubConfig;
@@ -136,7 +137,7 @@ public class GithubLoginController extends BaseController {
                     LoginTypeEnum.GITHUB
             );
 
-            StpUtil.login(localUser.getUsername(), stateInfo.rememberMe);
+            AuthSessionHelper.login(localUser.getUsername(), stateInfo.rememberMe);
             log.info("GitHub login success, user={}, rememberMe={}", localUser.getUsername(), stateInfo.rememberMe);
 
             String redirectUrl = isMobileRequest(request) ? "/m/tenants" : "/index";

@@ -49,7 +49,7 @@ struct EmailSheetHost: View {
     private func formErrorLine() -> some View {
         Group {
             if let err = model.formError, !err.isEmpty {
-                Text(err)
+                Text(L(err))
                     .font(.system(size: 12))
                     .foregroundColor(AppSheetSurface.accentRed(dark))
             }
@@ -100,18 +100,18 @@ struct EmailSheetHost: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("收件人")
+                        Text(L("收件人"))
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(AppTheme.sidebarText(dark))
                         Spacer()
                         AppButton(title: "全选", kind: .secondary) { model.selectAllComposeRecipients() }
                         AppButton(title: "清空", kind: .secondary) { model.clearComposeRecipients() }
-                        Text("已选 \(model.composeSelectedIds.count) 人")
+                        Text(L("已选 \(model.composeSelectedIds.count) 人"))
                             .font(.system(size: 11))
                             .foregroundColor(mutedText)
                     }
                     if model.composeContacts.isEmpty {
-                        Text("暂无收件人，请先添加联系人")
+                        Text(L("暂无收件人，请先添加联系人"))
                             .font(.system(size: 12))
                             .foregroundColor(mutedText)
                             .padding(.vertical, 12)
@@ -144,10 +144,10 @@ struct EmailSheetHost: View {
                 Image(systemName: on ? "checkmark.square.fill" : "square")
                     .foregroundColor(on ? AppTheme.sidebarActive : mutedText)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(c.name.isEmpty ? "—" : c.name)
+                    Text(L(c.name.isEmpty ? "—" : c.name))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(primaryText)
-                    Text(c.email)
+                    Text(L(c.email))
                         .font(.system(size: 11))
                         .foregroundColor(mutedText)
                 }
@@ -196,7 +196,7 @@ struct EmailSheetHost: View {
             }
         }) {
             VStack(alignment: .leading, spacing: 14) {
-                Text("为「\(tenantName)」配置发件域名")
+                Text(L("为「\(tenantName)」配置发件域名"))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(primaryText)
                 FormFieldRow(label: "邮箱域名", required: true) {
@@ -206,7 +206,7 @@ struct EmailSheetHost: View {
                         leadingSystemImage: "globe"
                     )
                 }
-                Text("域名需已在 OCI Email Delivery 中验证。开启后将使用该域名作为发件后缀。")
+                Text(L("域名需已在 OCI Email Delivery 中验证。开启后将使用该域名作为发件后缀。"))
                     .font(.system(size: 11))
                     .foregroundColor(mutedText)
                     .fixedSize(horizontal: false, vertical: true)
@@ -228,7 +228,7 @@ struct EmailSheetHost: View {
                 if let r = model.detailRecord {
                     detailInfo(r)
                 }
-                Text("收件明细")
+                Text(L("收件明细"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(primaryText)
                 if model.detailLoading && model.detailRecipients.isEmpty {
@@ -245,7 +245,7 @@ struct EmailSheetHost: View {
                     VStack(spacing: 0) {
                         ForEach(model.detailRecipients) { row in
                             HStack {
-                                Text(row.receiveEmailAddress.isEmpty ? "—" : row.receiveEmailAddress)
+                                Text(L(row.receiveEmailAddress.isEmpty ? "—" : row.receiveEmailAddress))
                                     .font(.system(size: 13))
                                     .foregroundColor(primaryText)
                                 Spacer()
@@ -278,10 +278,10 @@ struct EmailSheetHost: View {
             infoLine("发送时间", r.createTime.isEmpty ? "—" : r.createTime)
             infoLine("发件人", r.senderEmail.isEmpty ? "—" : r.senderEmail)
             infoLine("租户", r.tenantText)
-            Text("内容")
+            Text(L("内容"))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(mutedText)
-            Text(r.content.isEmpty ? "（无内容）" : r.content)
+            Text(L(r.content.isEmpty ? "（无内容）" : r.content))
                 .font(.system(size: 13))
                 .foregroundColor(primaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -293,10 +293,10 @@ struct EmailSheetHost: View {
 
     private func infoLine(_ label: String, _ value: String) -> some View {
         HStack(alignment: .top, spacing: 6) {
-            Text("\(label)：")
+            Text(L("\(label)："))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(mutedText)
-            Text(value)
+            Text(L(value))
                 .font(.system(size: 12))
                 .foregroundColor(primaryText)
             Spacer()

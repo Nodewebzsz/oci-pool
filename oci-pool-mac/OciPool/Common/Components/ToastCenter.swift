@@ -61,7 +61,7 @@ struct ToastHost: View {
     var body: some View {
         VStack {
             if let message = center.message {
-                Text(message)
+                Text(L(message))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.white)
                     .padding(.horizontal, 16)

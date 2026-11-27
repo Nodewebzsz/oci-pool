@@ -90,10 +90,10 @@ struct MemoView: View {
                 ForEach(MemoSortTab.allCases) { tab in
                     Button(action: { model.selectedTab = tab }) {
                         HStack(spacing: 5) {
-                            Text(tab.rawValue)
+                            Text(L(tab.rawValue))
                                 .font(.system(size: 12, weight: model.selectedTab == tab ? .semibold : .regular))
                             if tab == .all && model.hasLoadedOnce {
-                                Text("\(model.items.count)")
+                                Text(L("\(model.items.count)"))
                                     .font(.system(size: 10, weight: .bold))
                                     .padding(.horizontal, 5)
                                     .padding(.vertical, 1)
@@ -121,7 +121,7 @@ struct MemoView: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 12))
                     .foregroundColor(AppTheme.textTertiary(dark))
-                TextField("搜索标题、摘要或正文...", text: $model.searchText)
+                TextField(L("搜索标题、摘要或正文..."), text: $model.searchText)
                     .textFieldStyle(PlainTextFieldStyle())
                     .font(.system(size: 12))
                 if !model.searchText.isEmpty {
@@ -148,7 +148,7 @@ struct MemoView: View {
             Spacer()
 
             if !model.searchText.isEmpty && model.hasLoadedOnce {
-                Text("已找到 \(model.filtered.count) 条匹配")
+                Text(L("已找到 \(model.filtered.count) 条匹配"))
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.textTertiary(dark))
             }
@@ -161,7 +161,7 @@ struct MemoView: View {
         VStack(spacing: 12) {
             ProgressView()
                 .scaleEffect(0.9)
-            Text("正在加载笔记…")
+            Text(L("正在加载笔记…"))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.sidebarText(dark))
         }
@@ -203,11 +203,11 @@ struct MemoView: View {
             .padding(.top, 40)
 
             VStack(spacing: 6) {
-                Text(model.searchText.isEmpty ? "灵感与备忘随手记" : "无匹配笔记")
+                Text(L(model.searchText.isEmpty ? "灵感与备忘随手记" : "无匹配笔记"))
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(dark ? .white : Color(hex: "1a202c"))
 
-                Text(model.searchText.isEmpty ? "记录租户配置、常用 SSH 指令或重要凭据，安全存储随时查阅" : "试试换一个关键词，或清空搜索查看全部")
+                Text(L(model.searchText.isEmpty ? "记录租户配置、常用 SSH 指令或重要凭据，安全存储随时查阅" : "试试换一个关键词，或清空搜索查看全部"))
                     .font(.system(size: 12))
                     .foregroundColor(AppTheme.textTertiary(dark))
                     .multilineTextAlignment(.center)
@@ -218,7 +218,7 @@ struct MemoView: View {
                 Button(action: { model.openCreate() }) {
                     HStack(spacing: 6) {
                         Image(systemName: "plus")
-                        Text("创建第一篇笔记")
+                        Text(L("创建第一篇笔记"))
                     }
                     .font(.system(size: 12.5, weight: .semibold))
                     .foregroundColor(.white)
@@ -234,7 +234,7 @@ struct MemoView: View {
                 .padding(.top, 6)
             } else {
                 Button(action: { model.searchText = "" }) {
-                    Text("清除搜索条件")
+                    Text(L("清除搜索条件"))
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(AppTheme.sidebarActive)
                         .padding(.horizontal, 12)
@@ -254,9 +254,9 @@ struct MemoView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(AppTheme.danger)
-            Text(text).font(.system(size: 12))
+            Text(L(text)).font(.system(size: 12))
             Spacer()
-            Button("重试") { Task { await model.reload() } }
+            Button(L("重试")) { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
         }
         .foregroundColor(AppTheme.danger)
@@ -291,14 +291,14 @@ private struct MemoNoteCard: View {
                         .foregroundColor(AppTheme.sidebarActive)
                 }
 
-                Text(item.title.isEmpty ? "无标题" : item.title)
+                Text(L(item.title.isEmpty ? "无标题" : item.title))
                     .font(.system(size: 13.5, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.95) : Color(hex: "1a202c"))
                     .lineLimit(1)
 
                 Spacer(minLength: 4)
 
-                Text("\(item.content.count) 字")
+                Text(L("\(item.content.count) 字"))
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundColor(AppTheme.info)
                     .padding(.horizontal, 6)
@@ -319,7 +319,7 @@ private struct MemoNoteCard: View {
                         .fill(AppTheme.orange.opacity(0.75))
                         .frame(width: 2.5)
                         .cornerRadius(1.25)
-                    Text(item.summary)
+                    Text(L(item.summary))
                         .font(.system(size: 11.5))
                         .foregroundColor(AppTheme.textSecondary(dark))
                         .lineLimit(2)
@@ -336,7 +336,7 @@ private struct MemoNoteCard: View {
             }
 
             // 正文内容预览（带舒适行距，点击可阅读全量）
-            Text(item.content.isEmpty ? "（暂无正文内容）" : item.content)
+            Text(L(item.content.isEmpty ? "（暂无正文内容）" : item.content))
                 .font(.system(size: 12))
                 .lineSpacing(3.5)
                 .foregroundColor(dark ? Color.white.opacity(0.8) : Color.black.opacity(0.72))
@@ -358,7 +358,7 @@ private struct MemoNoteCard: View {
                 HStack(spacing: 4) {
                     Image(systemName: "clock")
                         .font(.system(size: 9.5))
-                    Text(displayTime)
+                    Text(L(displayTime))
                         .font(.system(size: 10.5, design: .monospaced))
                 }
                 .foregroundColor(AppTheme.textTertiary(dark))
@@ -376,7 +376,7 @@ private struct MemoNoteCard: View {
                     HStack(spacing: 4) {
                         Image(systemName: justCopied ? "checkmark" : "doc.on.doc")
                             .font(.system(size: 10.5, weight: .medium))
-                        Text(justCopied ? "已复制" : "复制")
+                        Text(L(justCopied ? "已复制" : "复制"))
                             .font(.system(size: 11, weight: .medium))
                     }
                     .padding(.horizontal, 8)
@@ -401,7 +401,7 @@ private struct MemoNoteCard: View {
                         .foregroundColor(AppTheme.sidebarText(dark))
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help("编辑笔记")
+                .help(L("编辑笔记"))
 
                 // 删除
                 Button(action: { model.delete(item) }) {
@@ -415,7 +415,7 @@ private struct MemoNoteCard: View {
                         .foregroundColor(AppTheme.danger)
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help("删除笔记")
+                .help(L("删除笔记"))
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
@@ -486,19 +486,19 @@ private struct MemoDetailSheet: View {
             content: {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
-                        Text(item.title.isEmpty ? "无标题" : item.title)
+                        Text(L(item.title.isEmpty ? "无标题" : item.title))
                             .font(.system(size: 18, weight: .bold))
                             .foregroundColor(dark ? .white : Color(hex: "1a202c"))
 
                         HStack(spacing: 12) {
                             HStack(spacing: 4) {
                                 Image(systemName: "clock")
-                                Text("更新于 " + (item.updateTime.isEmpty ? item.createTime : item.updateTime))
+                                Text(L("更新于 " + (item.updateTime.isEmpty ? item.createTime : item.updateTime)))
                             }
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundColor(AppTheme.textTertiary(dark))
 
-                            Text("\(item.content.count) 字符")
+                            Text(L("\(item.content.count) 字符"))
                                 .font(.system(size: 10, weight: .medium))
                                 .foregroundColor(AppTheme.info)
                                 .padding(.horizontal, 6)
@@ -512,7 +512,7 @@ private struct MemoDetailSheet: View {
                                     .fill(AppTheme.orange.opacity(0.7))
                                     .frame(width: 3)
                                     .cornerRadius(1.5)
-                                Text(item.summary)
+                                Text(L(item.summary))
                                     .font(.system(size: 12))
                                     .foregroundColor(AppTheme.textSecondary(dark))
                                     .lineSpacing(3)
@@ -526,7 +526,7 @@ private struct MemoDetailSheet: View {
 
                         Divider().opacity(0.5)
 
-                        Text(item.content.isEmpty ? "（无正文）" : item.content)
+                        Text(L(item.content.isEmpty ? "（无正文）" : item.content))
                             .font(.system(size: 13))
                             .lineSpacing(5)
                             .foregroundColor(dark ? Color.white.opacity(0.88) : Color.black.opacity(0.82))
@@ -612,7 +612,7 @@ private struct MemoEditorSheet: View {
                     FormFieldRow(label: "正文内容 *") {
                         VStack(alignment: .trailing, spacing: 4) {
                             AppTextEditor(text: $content, minHeight: 230)
-                            Text("\(content.count) 字符")
+                            Text(L("\(content.count) 字符"))
                                 .font(.system(size: 10))
                                 .foregroundColor(AppTheme.textTertiary(dark))
                         }

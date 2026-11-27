@@ -46,7 +46,7 @@ struct SidebarView: View {
                         cloudType: session.cloudProvider
                     )
                     if catalog.isEmpty {
-                        Text("无匹配菜单")
+                        Text(L("无匹配菜单"))
                             .font(.system(size: 12))
                             .foregroundColor(AppTheme.sidebarText(dark).opacity(0.7))
                             .frame(maxWidth: .infinity)
@@ -111,12 +111,12 @@ struct SidebarView: View {
             BrandMarkView(size: 32, dark: dark)
             if !collapsed {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(session.siteName)
+                    Text(L(session.siteName))
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(AppTheme.navIcon(dark))
                         .tracking(-0.1)
                         .lineLimit(1)
-                    Text("多租户池化管理")
+                    Text(L("多租户池化管理"))
                         .font(.system(size: 10))
                         .foregroundColor(AppTheme.sidebarText(dark))
                         .tracking(0.4)
@@ -199,7 +199,7 @@ struct SidebarView: View {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(Color(hex: dark ? "5d646a" : "81878c").opacity(0.5))
-                    Text("没有找到匹配的菜单")
+                    Text(L("没有找到匹配的菜单"))
                         .font(.system(size: 11.5))
                         .foregroundColor(Color(hex: dark ? "5d646a" : "81878c"))
                 }
@@ -221,11 +221,11 @@ struct SidebarView: View {
                     .overlay(AppTheme.border(dark))
 
                 HStack(spacing: 6) {
-                    Text("\(results.count) 项")
+                    Text(L("\(results.count) 项"))
                         .lineLimit(1)
                         .fixedSize()
                     Spacer(minLength: 4)
-                    Text("↑↓选择 ↵跳转 ESC关闭")
+                    Text(L("↑↓选择 ↵跳转 ESC关闭"))
                         .lineLimit(1)
                         .fixedSize()
                 }
@@ -256,7 +256,7 @@ struct SidebarView: View {
                         .font(.system(size: 12, weight: active ? .semibold : .medium))
                         .foregroundColor(Color(hex: dark ? "f6f9fb" : "0c1217"))
                         .lineLimit(1)
-                    Text(section?.title ?? "")
+                    Text(L(section?.title ?? ""))
                         .font(.system(size: 10))
                         .foregroundColor(Color(hex: dark ? "5d646a" : "81878c"))
                         .lineLimit(1)
@@ -293,11 +293,11 @@ struct SidebarView: View {
     private func highlightedTitle(_ text: String) -> Text {
         let q = navigation.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, let range = text.range(of: q, options: .caseInsensitive) else {
-            return Text(text)
+            return Text(L(text))
         }
-        return Text(text[text.startIndex..<range.lowerBound])
-            + Text(text[range]).foregroundColor(AppTheme.sidebarActive).fontWeight(.semibold)
-            + Text(text[range.upperBound...])
+        return Text(L(text[text.startIndex..<range.lowerBound]))
+            + Text(L(text[range])).foregroundColor(AppTheme.sidebarActive).fontWeight(.semibold)
+            + Text(L(text[range.upperBound...]))
     }
 
     private func commitSearch(_ item: NavigationItem) {
@@ -340,7 +340,7 @@ struct SidebarView: View {
                 MenuGlyph(name: section.lucideIcon, size: 15, color: selected ? activeColor : sectionColor(section))
                     .frame(width: 16)
                 if !collapsed {
-                    Text(section.title)
+                    Text(L(section.title))
                         .font(.system(size: 12.5, weight: .semibold))
                     Spacer(minLength: 4)
                 }
@@ -358,7 +358,7 @@ struct SidebarView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
-        .help(collapsed ? section.title : "")
+        .help(L(collapsed ? section.title : ""))
         .onHover { hovering in
             hoveredSection = hovering ? section : nil
         }
@@ -382,7 +382,7 @@ struct SidebarView: View {
                 MenuGlyph(name: section.lucideIcon, size: 15, color: sectionColor(section))
                     .frame(width: 16)
                 if !collapsed {
-                    Text(section.title)
+                    Text(L(section.title))
                         .font(.system(size: 12.5, weight: .semibold))
                     Spacer(minLength: 4)
                     Image(systemName: "chevron.down")
@@ -422,7 +422,7 @@ struct SidebarView: View {
                     )
                         .frame(width: 16)
                     if !collapsed {
-                        Text(item.title)
+                        Text(L(item.title))
                             .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
                             .lineLimit(1)
                         Spacer(minLength: 0)
@@ -465,14 +465,14 @@ struct SidebarView: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
                 PulseDot(color: AppTheme.success)
-                Text("后端服务运行中")
+                Text(L("后端服务运行中"))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(AppTheme.navIcon(dark))
             }
 
             // 版本行与微徽章 (100% 对齐 Web 端)
             HStack(spacing: 6) {
-                Text("v\(displayVersion)")
+                Text(L("v\(displayVersion)"))
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(AppTheme.sidebarText(dark))
 
@@ -481,7 +481,7 @@ struct SidebarView: View {
                         Circle()
                             .fill(Color(hex: "d97706"))
                             .frame(width: 4, height: 4)
-                        Text("↑ 新版 v\(header.version.latestVersion.replacingOccurrences(of: "^[vV]-?", with: "", options: .regularExpression))")
+                        Text(L("↑ 新版 v\(header.version.latestVersion.replacingOccurrences(of: "^[vV]-?", with: "", options: .regularExpression))"))
                             .font(.system(size: 9.5, weight: .semibold))
                             .foregroundColor(Color(hex: "d97706"))
                     }

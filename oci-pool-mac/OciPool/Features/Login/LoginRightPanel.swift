@@ -5,6 +5,7 @@ import AppKit
 /// Keeps native desktop extras (deployment mode + status) compact so the login
 /// page still matches the web layout while fitting the client window height.
 struct LoginRightPanel: View {
+    @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appearance: AppearanceController
     @State private var showAppearance = false
     @State private var recoveryLinkHovered = false
@@ -43,7 +44,9 @@ struct LoginRightPanel: View {
 
     private var infoColor: Color { Color(hex: dark ? "818cf8" : "4f46e5") }
     private var dangerColor: Color { Color(hex: "ef4444") }
-    private var formFieldEnabled: Bool { formReady && !model.isLoadingMeta && !model.isSubmitting }
+    private var formFieldEnabled: Bool {
+        formReady && !model.isLoadingMeta && !model.isSubmitting && !session.isRestoringSession
+    }
 
     var body: some View {
         ZStack {
@@ -112,7 +115,7 @@ struct LoginRightPanel: View {
                 Text(model.locale == .enUS ? "Service failed to start" : "服务启动失败")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(LoginPalette.text(dark))
-                Text(message)
+                Text(L(message))
                     .font(.system(size: 12))
                     .foregroundColor(LoginPalette.muted(dark))
                     .multilineTextAlignment(.center)
@@ -198,8 +201,8 @@ struct LoginRightPanel: View {
 
     private var deploymentChip: some View {
         HStack(spacing: 2) {
-            deploySegment(.local, model.locale == .enUS ? "本机" : "本机")
-            deploySegment(.remote, model.locale == .enUS ? "远程" : "远程")
+            deploySegment(.local, model.locale == .enUS ? "Local" : "本机")
+            deploySegment(.remote, model.locale == .enUS ? "Remote" : "远程")
         }
         .padding(3)
         .background(LoginPalette.chipBg(dark))
@@ -215,6 +218,8 @@ struct LoginRightPanel: View {
                     .font(.system(size: 11, weight: .semibold))
                 Text(title)
                     .font(.system(size: 11.5, weight: selected ? .bold : .medium))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
             .foregroundColor(selected ? LoginPalette.tabActiveText(dark) : LoginPalette.muted(dark))
             .padding(.horizontal, 11)
@@ -743,12 +748,13 @@ struct LoginRightPanel: View {
             }
         }
         .buttonStyle(PlainButtonStyle())
+        .disabled(session.isRestoringSession || model.isSubmitting)
     }
 
     private var loginPrimaryButton: some View {
         Button(action: onLogin) {
             HStack(spacing: 8) {
-                if model.isSubmitting {
+                if model.isSubmitting || session.isRestoringSession {
                     ProgressView().scaleEffect(0.7).frame(width: 14, height: 14)
                 } else {
                     // Web icon: log-in
@@ -765,11 +771,14 @@ struct LoginRightPanel: View {
             .cornerRadius(6)
         }
         .buttonStyle(LoginPressButtonStyle())
-        .disabled(!model.canAttemptLogin(backendReady: formReady))
-        .opacity(model.canAttemptLogin(backendReady: formReady) ? 1 : 0.6)
+        .disabled(session.isRestoringSession || !model.canAttemptLogin(backendReady: formReady))
+        .opacity((session.isRestoringSession || !model.canAttemptLogin(backendReady: formReady)) ? 0.6 : 1)
     }
 
     private var loginButtonTitle: String {
+        if session.isRestoringSession {
+            return model.locale == .enUS ? "Restoring session…" : "恢复会话中…"
+        }
         if model.isSubmitting {
             return model.locale == .enUS ? "Signing in…" : "登录中…"
         }
@@ -803,7 +812,14 @@ struct LoginRightPanel: View {
 
     @ViewBuilder
     private var statusLine: some View {
-        if let e = model.errorText {
+        if session.isRestoringSession {
+            HStack(spacing: 6) {
+                ProgressView().scaleEffect(0.6).frame(width: 12, height: 12)
+                Text(model.locale == .enUS ? "Restoring 30-day remembered session…" : "正在恢复 30 天免登会话…")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(LoginPalette.muted(dark))
+            }
+        } else if let e = model.errorText {
             Text(e)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(dangerColor)

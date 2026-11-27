@@ -122,12 +122,12 @@ struct TopNavDropdownOverlay: View {
         .onExitCommand { closeAll() }
         .alert(isPresented: $showLogoutConfirmation) {
             Alert(
-                title: Text("退出登录"),
-                message: Text("确定要退出当前账号吗？"),
-                primaryButton: .destructive(Text("退出登录")) {
+                title: Text(L("退出登录")),
+                message: Text(L("确定要退出当前账号吗？")),
+                primaryButton: .destructive(Text(L("退出登录"))) {
                     Task { await session.logout() }
                 },
-                secondaryButton: .cancel(Text("取消"))
+                secondaryButton: .cancel(Text(L("取消")))
             )
         }
     }
@@ -149,12 +149,12 @@ struct TopNavDropdownOverlay: View {
     private var accentPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("强调色")
+                Text(L("强调色"))
                     .font(.system(size: 10, weight: .semibold))
                     .tracking(0.6)
                     .foregroundColor(dark ? Color.white.opacity(0.5) : Color(hex: "6b7280"))
                 Spacer()
-                Text(appearance.accent.title)
+                Text(L(appearance.accent.title))
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(dark ? Color.white.opacity(0.65) : Color(hex: "374151"))
             }
@@ -181,9 +181,9 @@ struct TopNavDropdownOverlay: View {
                 .padding(.top, 4)
 
             HStack {
-                Text("hue \(appearance.accent.hue)°")
+                Text(L("hue \(appearance.accent.hue)°"))
                 Spacer()
-                Text("ESC 关闭")
+                Text(L("ESC 关闭"))
             }
             .font(.system(size: 9.5, design: .monospaced))
             .foregroundColor(dark ? Color.white.opacity(0.45) : Color(hex: "6b7280"))
@@ -256,10 +256,10 @@ private struct NotificationDropdownPanel: View {
             Image(systemName: "bell")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(AppTheme.orange)
-            Text("通知中心")
+            Text(L("通知中心"))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(textPrimary)
-            Text("\(totalCount) 条")
+            Text(L("\(totalCount) 条"))
                 .font(.system(size: 10, design: .monospaced))
                 .foregroundColor(textSecondary)
                 .padding(.horizontal, 6)
@@ -269,7 +269,7 @@ private struct NotificationDropdownPanel: View {
                         .fill(dark ? Color.white.opacity(0.06) : Color.black.opacity(0.05))
                 )
             Spacer(minLength: 0)
-            Button("全部已读") {
+            Button(L("全部已读")) {
                 Task { await header.markAllRead() }
             }
             .buttonStyle(PlainButtonStyle())
@@ -278,7 +278,7 @@ private struct NotificationDropdownPanel: View {
             .disabled(header.unreadCount == 0 || header.messagesMutating)
             .opacity(header.unreadCount == 0 ? 0.55 : 1)
 
-            Button("清空全部") {
+            Button(L("清空全部")) {
                 Task { await header.clearAllMessages() }
             }
             .buttonStyle(PlainButtonStyle())
@@ -300,7 +300,7 @@ private struct NotificationDropdownPanel: View {
                     Image(systemName: allVisibleSelected ? "checkmark.square.fill" : (selectedVisibleCount > 0 ? "minus.square.fill" : "square"))
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(selectedVisibleCount > 0 ? AppTheme.sidebarActive : textMuted)
-                    Text(selectedVisibleCount > 0 ? "已选 \(selectedVisibleCount) 条" : "全选")
+                    Text(L(selectedVisibleCount > 0 ? "已选 \(selectedVisibleCount) 条" : "全选"))
                         .font(.system(size: 10.5, weight: .medium))
                         .foregroundColor(textSecondary)
                 }
@@ -317,7 +317,7 @@ private struct NotificationDropdownPanel: View {
                     HStack(spacing: 4) {
                         Image(systemName: "trash")
                             .font(.system(size: 10, weight: .semibold))
-                        Text("删除所选 (\(selectedVisibleCount))")
+                        Text(L("删除所选 (\(selectedVisibleCount))"))
                             .font(.system(size: 10.5, weight: .semibold))
                     }
                     .foregroundColor(AppTheme.danger)
@@ -341,7 +341,7 @@ private struct NotificationDropdownPanel: View {
             if header.messagesLoading && visibleMessages.isEmpty {
                 HStack(spacing: 8) {
                     ProgressView()
-                    Text("加载通知…")
+                    Text(L("加载通知…"))
                         .font(.system(size: 11))
                         .foregroundColor(textMuted)
                 }
@@ -350,7 +350,7 @@ private struct NotificationDropdownPanel: View {
                 VStack(spacing: 8) {
                     Image(systemName: "tray")
                         .font(.system(size: 20, weight: .light))
-                    Text("暂无通知")
+                    Text(L("暂无通知"))
                         .font(.system(size: 11.5, weight: .medium))
                 }
                 .foregroundColor(textMuted)
@@ -401,17 +401,17 @@ private struct NotificationDropdownPanel: View {
                                     .fill(AppTheme.orange)
                                     .frame(width: 5, height: 5)
                             }
-                            Text(message.subject.isEmpty ? "通知" : message.subject)
+                            Text(L(message.subject.isEmpty ? "通知" : message.subject))
                                 .font(.system(size: 11.5, weight: .semibold))
                                 .foregroundColor(textPrimary)
                                 .lineLimit(1)
                             Spacer(minLength: 0)
-                            Text(relativeTime(message.createTime))
+                            Text(L(relativeTime(message.createTime)))
                                 .font(.system(size: 10))
                                 .foregroundColor(textMuted)
                                 .lineLimit(1)
                         }
-                        Text(summaryText(message))
+                        Text(L(summaryText(message)))
                             .font(.system(size: 11))
                             .foregroundColor(textSecondary)
                             .lineLimit(2)
@@ -430,7 +430,7 @@ private struct NotificationDropdownPanel: View {
     private var panelFooter: some View {
         Button(action: onOpenAll) {
             HStack(spacing: 4) {
-                Text("查看全部")
+                Text(L("查看全部"))
                 Image(systemName: "chevron.right")
                     .font(.system(size: 9, weight: .semibold))
             }
@@ -529,6 +529,6 @@ private struct AccentDot: View {
         }
         .buttonStyle(PlainButtonStyle())
         .onHover { hovering = $0 }
-        .help(preset.title)
+        .help(L(preset.title))
     }
 }

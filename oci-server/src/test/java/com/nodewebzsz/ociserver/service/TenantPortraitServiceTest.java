@@ -105,4 +105,59 @@ class TenantPortraitServiceTest {
         assertEquals(1L, vo.getAgeBuckets().get("d180To365"));
         assertEquals(1L, vo.getRegionCountBuckets().get("r3Plus"));
     }
+
+    @Test
+    void prefersRegisterDetailPaygOverStaleTrialAccountTypeAndExcludesInactiveTenants() {
+        Tenant activePaygWithStaleTrial = new Tenant();
+        activePaygWithStaleTrial.setId(20L);
+        activePaygWithStaleTrial.setIsHomeRegion(true);
+        activePaygWithStaleTrial.setActive(true);
+        activePaygWithStaleTrial.setAccountType("TRIAL_PAID_ACCOUNT");
+        activePaygWithStaleTrial.setActiveDays("212");
+        RegisterDetail rdActive = new RegisterDetail();
+        rdActive.setAccountType(Subscription.AccountType.Personal);
+        rdActive.setPlanType(Subscription.PlanType.Payg);
+        activePaygWithStaleTrial.setRegisterDetail(rdActive);
+
+        Tenant inactivePayg = new Tenant();
+        inactivePayg.setId(21L);
+        inactivePayg.setIsHomeRegion(true);
+        inactivePayg.setActive(false);
+        inactivePayg.setAccountType("UPGRADE_ACCOUNT");
+        inactivePayg.setActiveDays("226");
+        RegisterDetail rdInactive = new RegisterDetail();
+        rdInactive.setAccountType(Subscription.AccountType.Personal);
+        rdInactive.setPlanType(Subscription.PlanType.Payg);
+        inactivePayg.setRegisterDetail(rdInactive);
+
+        TenantPortraitVO vo = TenantServiceImpl.computeTenantPortrait(Arrays.asList(activePaygWithStaleTrial, inactivePayg));
+        assertEquals(1L, vo.getTotalMainTenants());
+        assertEquals(1L, vo.getInactiveCount());
+        assertEquals(1L, vo.getUpgradedCount());
+        assertEquals(0L, vo.getFreeCount());
+        assertEquals(0L, vo.getUnknownPlanCount());
+        assertEquals(1L, vo.getPersonalCount());
+        assertEquals(1L, vo.getOverHalfYearCount());
+    }
+
+    @Test
+    void excludesNonOciTenantsAndBucketsUnknownPlanSeparatelyFromFree() {
+        Tenant unknownPlanOci = new Tenant();
+        unknownPlanOci.setId(30L);
+        unknownPlanOci.setCloudType(1);
+        unknownPlanOci.setIsHomeRegion(true);
+        unknownPlanOci.setAccountType("UN_KNOW_ACCOUNT");
+
+        Tenant gcpTenant = new Tenant();
+        gcpTenant.setId(31L);
+        gcpTenant.setCloudType(2);
+        gcpTenant.setIsHomeRegion(true);
+        gcpTenant.setAccountType("FREE_ACCOUNT");
+
+        TenantPortraitVO vo = TenantServiceImpl.computeTenantPortrait(Arrays.asList(unknownPlanOci, gcpTenant));
+        assertEquals(1L, vo.getTotalMainTenants());
+        assertEquals(0L, vo.getUpgradedCount());
+        assertEquals(0L, vo.getFreeCount());
+        assertEquals(1L, vo.getUnknownPlanCount());
+    }
 }

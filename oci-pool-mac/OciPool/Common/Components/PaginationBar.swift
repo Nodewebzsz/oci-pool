@@ -69,7 +69,7 @@ struct PaginationBar: View {
 
     private var sizeSelector: some View {
         HStack(spacing: 8) {
-            Text("每页显示")
+            Text(L("每页显示"))
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.sidebarText(dark))
             SelectMenu(
@@ -88,7 +88,7 @@ struct PaginationBar: View {
 
     private var navControls: some View {
         HStack(spacing: 4) {
-            navButton(label: "上一页", systemName: "chevron.left", disabled: state.isFirst) {
+            navButton(label: L("上一页"), systemName: "chevron.left", disabled: state.isFirst) {
                 state.goPrev()
                 onChange()
             }
@@ -103,7 +103,7 @@ struct PaginationBar: View {
                         state.go(to: p)
                         onChange()
                     }) {
-                        Text("\(p + 1)")
+                        Text(L("\(p + 1)"))
                             .font(.system(size: 12, weight: p == state.page ? .bold : .regular))
                             .frame(minWidth: 28, minHeight: controlHeight)
                             .background(
@@ -122,7 +122,7 @@ struct PaginationBar: View {
                     .buttonStyle(PlainButtonStyle())
                 }
             }
-            navButton(label: "下一页", systemName: "chevron.right", disabled: state.isLast) {
+            navButton(label: L("下一页"), systemName: "chevron.right", disabled: state.isLast) {
                 state.goNext()
                 onChange()
             }
@@ -133,13 +133,13 @@ struct PaginationBar: View {
 
     private var infoAndJump: some View {
         HStack(spacing: 8) {
-            Text(rangeTextOverride ?? state.rangeText)
+            Text(L(rangeTextOverride ?? state.rangeText))
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.sidebarText(dark))
                 .lineLimit(1)
 
             if showsJump {
-                Text("跳至")
+                Text(L("跳至"))
                     .font(.system(size: 12))
                     .foregroundColor(AppTheme.sidebarText(dark))
 
@@ -152,7 +152,7 @@ struct PaginationBar: View {
                     onCommit: { jump() }
                 )
 
-                Text("页")
+                Text(L("页"))
                     .font(.system(size: 12))
                     .foregroundColor(AppTheme.sidebarText(dark))
             }
@@ -164,7 +164,7 @@ struct PaginationBar: View {
             HStack(spacing: 4) {
                 Image(systemName: systemName)
                     .font(.system(size: 11, weight: .semibold))
-                Text(label)
+                Text(L(label))
                     .font(.system(size: 12))
             }
             .padding(.horizontal, 8)

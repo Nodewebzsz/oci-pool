@@ -39,6 +39,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import static com.nodewebzsz.ocicommon.template.MessageTemplate.MESSAGE_CONFIG_TASK_ERROR_TEMPLATE;
@@ -109,6 +110,11 @@ public class CreateInstanceTaskV2 {
     /** 运行状态标记 */
     private final AtomicBoolean running = new AtomicBoolean(true);
 
+    /** Redis 不可用时自动降级到本地状态，避免桌面无 Redis 模式下高频刷屏与无效重连 */
+    private final AtomicBoolean redisAvailable = new AtomicBoolean(true);
+    private final AtomicLong redisRetryAfterMs = new AtomicLong(0);
+    private static final long REDIS_RETRY_COOLDOWN_MS = 5 * 60_000L;
+
     /** 抢机引擎运行状态在 Redis 中的 key(跨实例共享) */
     public static final String ENGINE_RUNNING_KEY = "oci:grab:engine:running";
 
@@ -144,10 +150,37 @@ public class CreateInstanceTaskV2 {
     public void initEngineState() {
         // 应用重启后默认恢复运行;Redis 是共享状态源,启动时同步一次。
         running.set(true);
+        if (!canUseRedis()) {
+            return;
+        }
         try {
             redisTemplate.opsForValue().set(ENGINE_RUNNING_KEY, "1");
+            markRedisHealthy();
         } catch (Exception e) {
-            log.warn("初始化抢机引擎 Redis 运行状态失败: {}", e.getMessage());
+            markRedisUnavailable("初始化", e);
+        }
+    }
+
+    private boolean canUseRedis() {
+        if (redisTemplate == null) {
+            return false;
+        }
+        return redisAvailable.get() || System.currentTimeMillis() >= redisRetryAfterMs.get();
+    }
+
+    private void markRedisHealthy() {
+        redisRetryAfterMs.set(0);
+        if (redisAvailable.compareAndSet(false, true)) {
+            log.info("抢机引擎 Redis 连接已恢复，重新启用共享运行状态同步");
+        }
+    }
+
+    private void markRedisUnavailable(String action, Exception e) {
+        redisRetryAfterMs.set(System.currentTimeMillis() + REDIS_RETRY_COOLDOWN_MS);
+        if (redisAvailable.compareAndSet(true, false)) {
+            log.info("抢机引擎{}时 Redis 不可用，已切换为本地状态模式（每 5 分钟静默探测恢复）: {}", action, e.getMessage());
+        } else {
+            log.debug("抢机引擎{}时 Redis 仍不可用，继续使用本地状态: {}", action, e.getMessage());
         }
     }
 
@@ -573,13 +606,16 @@ public class CreateInstanceTaskV2 {
      * 本地原子标记与 Redis 保持一致;当 Redis 不可用时,回退到本地标记。
      */
     public boolean isRunning() {
-        try {
-            Object redisValue = redisTemplate.opsForValue().get(ENGINE_RUNNING_KEY);
-            if (redisValue != null) {
-                return !"0".equals(String.valueOf(redisValue));
+        if (canUseRedis()) {
+            try {
+                Object redisValue = redisTemplate.opsForValue().get(ENGINE_RUNNING_KEY);
+                markRedisHealthy();
+                if (redisValue != null) {
+                    return !"0".equals(String.valueOf(redisValue));
+                }
+            } catch (Exception e) {
+                markRedisUnavailable("读取状态", e);
             }
-        } catch (Exception e) {
-            log.warn("读取抢机引擎 Redis 运行状态失败,回退到本地状态: {}", e.getMessage());
         }
         return running.get();
     }
@@ -589,10 +625,14 @@ public class CreateInstanceTaskV2 {
      */
     public void pause() {
         running.set(false);
+        if (!canUseRedis()) {
+            return;
+        }
         try {
             redisTemplate.opsForValue().set(ENGINE_RUNNING_KEY, "0");
+            markRedisHealthy();
         } catch (Exception e) {
-            log.warn("写入抢机引擎 Redis 暂停状态失败: {}", e.getMessage());
+            markRedisUnavailable("写入暂停状态", e);
         }
     }
 
@@ -601,10 +641,14 @@ public class CreateInstanceTaskV2 {
      */
     public void resume() {
         running.set(true);
+        if (!canUseRedis()) {
+            return;
+        }
         try {
             redisTemplate.opsForValue().set(ENGINE_RUNNING_KEY, "1");
+            markRedisHealthy();
         } catch (Exception e) {
-            log.warn("写入抢机引擎 Redis 恢复状态失败: {}", e.getMessage());
+            markRedisUnavailable("写入恢复状态", e);
         }
     }
 

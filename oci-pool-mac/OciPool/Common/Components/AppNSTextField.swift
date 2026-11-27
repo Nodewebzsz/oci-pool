@@ -113,7 +113,7 @@ struct AppNSTextField: NSViewRepresentable {
 
     private func placeholderAttr() -> NSAttributedString {
         NSAttributedString(
-            string: placeholder,
+            string: L(placeholder),
             attributes: [
                 .foregroundColor: nsHex(dark ? "768390" : "999999"),
                 .font: NSFont.systemFont(ofSize: fontSize, weight: .regular)

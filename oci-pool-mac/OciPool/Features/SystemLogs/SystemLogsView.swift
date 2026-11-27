@@ -63,7 +63,7 @@ struct SystemLogsView: View {
             Circle()
                 .fill(connectionColor)
                 .frame(width: 8, height: 8)
-            Text(model.connection.label)
+            Text(L(model.connection.label))
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(dark ? Color.white.opacity(0.75) : Color(hex: "374a61"))
         }
@@ -104,7 +104,7 @@ struct SystemLogsView: View {
             Image(systemName: "terminal")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(AppTheme.sidebarActive)
-            Text("控制台输出")
+            Text(L("控制台输出"))
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
                 .foregroundColor(AppTheme.sidebarActive)
             Text("▌")
@@ -115,7 +115,7 @@ struct SystemLogsView: View {
                 Circle()
                     .fill(connectionColor)
                     .frame(width: 7, height: 7)
-                Text(model.connection.label)
+                Text(L(model.connection.label))
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(Color.white.opacity(0.65))
             }
@@ -136,14 +136,14 @@ struct SystemLogsView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     if model.entries.isEmpty && !model.isLoadingHistory {
-                        Text("暂无日志")
+                        Text(L("暂无日志"))
                             .font(.system(size: 12, design: .monospaced))
                             .foregroundColor(Color.white.opacity(0.35))
                             .padding(.vertical, 8)
                             .id("empty")
                     }
                     ForEach(model.entries) { entry in
-                        Text(entry.text)
+                        Text(L(entry.text))
                             .font(.system(size: 12, design: .monospaced))
                             .foregroundColor(entry.level.color)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -176,7 +176,7 @@ struct SystemLogsView: View {
             HStack(spacing: 6) {
                 Image(systemName: "clock")
                     .font(.system(size: 10))
-                Text(model.clockText.isEmpty ? "--:--:--" : model.clockText)
+                Text(L(model.clockText.isEmpty ? "--:--:--" : model.clockText))
                     .font(.system(size: 11, design: .monospaced))
             }
             .foregroundColor(Color.white.opacity(0.55))
@@ -184,7 +184,7 @@ struct SystemLogsView: View {
             HStack(spacing: 6) {
                 Image(systemName: "list.bullet")
                     .font(.system(size: 10))
-                Text("共 \(model.entries.count) 条")
+                Text(L("共 \(model.entries.count) 条"))
                     .font(.system(size: 11, design: .monospaced))
             }
             .foregroundColor(Color.white.opacity(0.55))
@@ -192,14 +192,14 @@ struct SystemLogsView: View {
             Spacer()
 
             Toggle(isOn: $model.autoScroll) {
-                Text("自动滚动")
+                Text(L("自动滚动"))
                     .font(.system(size: 11))
                     .foregroundColor(Color.white.opacity(0.7))
             }
             .toggleStyle(SystemLogCheckboxToggleStyle())
             .foregroundColor(Color.white.opacity(0.7))
 
-            Text(model.connection == .connected ? "实时更新中" : "等待连接")
+            Text(L(model.connection == .connected ? "实时更新中" : "等待连接"))
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(Color.white.opacity(0.45))
         }
@@ -218,12 +218,12 @@ struct SystemLogsView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(AppTheme.orange)
-            Text(text)
+            Text(L(text))
                 .font(.system(size: 12))
                 .foregroundColor(dark ? Color.white.opacity(0.85) : Color(hex: "1e2f42"))
                 .lineLimit(2)
             Spacer()
-            Button("重试") { model.reconnectNow() }
+            Button(L("重试")) { model.reconnectNow() }
                 .buttonStyle(PlainButtonStyle())
                 .foregroundColor(AppTheme.sidebarActive)
                 .font(.system(size: 12, weight: .semibold))

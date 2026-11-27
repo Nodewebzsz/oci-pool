@@ -77,11 +77,11 @@ struct StorageSheetHost: View {
                     )
                 }
                 if let err = model.formError, !err.isEmpty {
-                    Text(err)
+                    Text(L(err))
                         .font(.system(size: 12))
                         .foregroundColor(AppSheetSurface.accentRed(dark))
                 }
-                Text("名称需全局唯一，仅小写字母、数字、连字符。")
+                Text(L("名称需全局唯一，仅小写字母、数字、连字符。"))
                     .font(.system(size: 11))
                     .foregroundColor(mutedText)
             }
@@ -103,21 +103,21 @@ struct StorageSheetHost: View {
             VStack(alignment: .leading, spacing: 12) {
                 // Web：有效期(小时) 1-168 + hint
                 HStack(spacing: 10) {
-                    Text("有效期(小时)").font(.system(size: 12, weight: .medium)).foregroundColor(primaryText)
+                    Text(L("有效期(小时)")).font(.system(size: 12, weight: .medium)).foregroundColor(primaryText)
                     AppTextField(text: $model.presignedHoursText, placeholder: "24")
                         .frame(width: 80)
-                    Text("建议 ≤ 168 小时(7 天)· 超时后链接自动失效")
+                    Text(L("建议 ≤ 168 小时(7 天)· 超时后链接自动失效"))
                         .font(.system(size: 11))
                         .foregroundColor(mutedText)
                 }
-                Text("预签名 URL(只读)")
+                Text(L("预签名 URL(只读)"))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(mutedText)
                 if model.presignedURLText.isEmpty {
                     HStack {
                         Spacer()
                         ProgressView().scaleEffect(0.8)
-                        Text("生成中…")
+                        Text(L("生成中…"))
                             .font(.system(size: 12))
                             .foregroundColor(mutedText)
                         Spacer()
@@ -125,7 +125,7 @@ struct StorageSheetHost: View {
                     .padding(.vertical, 24)
                 } else {
                     ScrollView {
-                        Text(model.presignedURLText)
+                        Text(L(model.presignedURLText))
                             .font(.system(size: 12, design: .monospaced))
                             .foregroundColor(primaryText)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -163,11 +163,11 @@ struct StorageSheetHost: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("总体进度")
+                        Text(L("总体进度"))
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(mutedText)
                         Spacer()
-                        Text("\(model.uploadOverallPercent)%")
+                        Text(L("\(model.uploadOverallPercent)%"))
                             .font(.system(size: 12, weight: .semibold, design: .monospaced))
                             .foregroundColor(primaryText)
                     }
@@ -180,12 +180,12 @@ struct StorageSheetHost: View {
     private func uploadRow(_ task: StorageUploadTask) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(task.fileName)
+                Text(L(task.fileName))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(primaryText)
                     .lineLimit(1)
                 Spacer()
-                Text(task.statusText)
+                Text(L(task.statusText))
                     .font(.system(size: 11))
                     .foregroundColor(task.failed ? AppSheetSurface.accentRed(dark) : mutedText)
             }

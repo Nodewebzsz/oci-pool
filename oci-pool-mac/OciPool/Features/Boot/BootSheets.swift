@@ -114,7 +114,7 @@ struct BootSheetHost: View {
                     AppTextField(text: $model.editDisk, placeholder: "50")
                 }
                 if let vErr = spec.validationError {
-                    Text(vErr)
+                    Text(L(vErr))
                         .font(.system(size: 11.5, weight: .medium))
                         .foregroundColor(AppSheetSurface.accentRed(dark))
                 }
@@ -134,7 +134,7 @@ struct BootSheetHost: View {
                     AppTextField(text: $model.editPassword, placeholder: "root 密码")
                 }
                 if let err = model.formError, !err.isEmpty {
-                    Text(err)
+                    Text(L(err))
                         .font(.system(size: 12))
                         .foregroundColor(AppSheetSurface.accentRed(dark))
                 }
@@ -210,11 +210,11 @@ struct BootSheetHost: View {
                             searchable: true
                         )
                     } else {
-                        Text(item.displayTenant)
+                        Text(L(item.displayTenant))
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(primaryText)
                         if !item.regionName.isEmpty {
-                            Text("· \(item.regionName)")
+                            Text(L("· \(item.regionName)"))
                                 .font(.system(size: 12))
                                 .foregroundColor(mutedText)
                         }
@@ -239,7 +239,7 @@ struct BootSheetHost: View {
                                     model.createMemory = "1"
                                 }
                             }) {
-                                Text(arch)
+                                Text(L(arch))
                                     .font(.system(size: 12, weight: .semibold))
                                     .foregroundColor(model.createArchitecture == arch ? appearance.accent.accentFg(dark) : primaryText)
                                     .padding(.horizontal, 12)
@@ -301,7 +301,7 @@ struct BootSheetHost: View {
                 }
 
                 if let vErr = spec.validationError {
-                    Text(vErr)
+                    Text(L(vErr))
                         .font(.system(size: 11.5, weight: .medium))
                         .foregroundColor(AppSheetSurface.accentRed(dark))
                 }
@@ -359,14 +359,14 @@ struct BootSheetHost: View {
                 }
 
                 if !model.createImageId.isEmpty {
-                    Text("镜像 ID：\(model.createImageId)")
+                    Text(L("镜像 ID：\(model.createImageId)"))
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundColor(mutedText)
                         .lineLimit(1)
                 }
 
                 if let err = model.formError, !err.isEmpty {
-                    Text(err)
+                    Text(L(err))
                         .font(.system(size: 12))
                         .foregroundColor(AppSheetSurface.accentRed(dark))
                 }

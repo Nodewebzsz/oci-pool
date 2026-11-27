@@ -29,7 +29,7 @@ struct RegionDetailSheet: View {
                             Image(systemName: "sparkles")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(AppTheme.orange)
-                            Text("官方已有 ARM 放货记录，但当前号池尚未关联覆盖此区域，可前往「租户管理」订阅开拓空白区。")
+                            Text(L("官方已有 ARM 放货记录，但当前号池尚未关联覆盖此区域，可前往「租户管理」订阅开拓空白区。"))
                                 .font(.system(size: 12))
                                 .foregroundColor(fg0)
                             Spacer(minLength: 0)
@@ -43,7 +43,7 @@ struct RegionDetailSheet: View {
                     overviewGrid
 
                     sectionLabel("近 30 天放货趋势")
-                    Text("后端当前未提供历史趋势接口")
+                    Text(L("后端当前未提供历史趋势接口"))
                         .font(.system(size: 12))
                         .foregroundColor(fg3)
                         .frame(maxWidth: .infinity)
@@ -55,7 +55,7 @@ struct RegionDetailSheet: View {
                     if model.regionDetailLoading && model.relatedTenants.isEmpty {
                         HStack { Spacer(); ProgressView(); Spacer() }.padding(20)
                     } else if model.relatedTenants.isEmpty {
-                        Text("暂无租户以此为主区域")
+                        Text(L("暂无租户以此为主区域"))
                             .font(.system(size: 12))
                             .foregroundColor(fg3)
                             .frame(maxWidth: .infinity)
@@ -67,18 +67,18 @@ struct RegionDetailSheet: View {
                                     Circle()
                                         .fill(t.isActive ? accent : fg3)
                                         .frame(width: 5, height: 5)
-                                    Text(t.chipName)
+                                    Text(L(t.chipName))
                                         .font(.system(size: 10.5, design: .monospaced))
                                         .foregroundColor(fg1)
                                         .padding(.horizontal, 5)
                                         .padding(.vertical, 1)
                                         .background(RoundedRectangle(cornerRadius: 3).fill(bg3))
-                                    Text(t.displayName)
+                                    Text(L(t.displayName))
                                         .font(.system(size: 12))
                                         .foregroundColor(fg0)
                                         .lineLimit(1)
                                     Spacer(minLength: 0)
-                                    Text("\(t.activeDays)天")
+                                    Text(L("\(t.activeDays)天"))
                                         .font(.system(size: 11, design: .monospaced))
                                         .foregroundColor(fg3)
                                 }
@@ -92,7 +92,7 @@ struct RegionDetailSheet: View {
 
                     sectionLabel("从此区域抢到的实例 (\(model.relatedInstances.count))")
                     if model.relatedInstances.isEmpty {
-                        Text(model.regionDetailLoading ? "加载中..." : "暂无实例")
+                        Text(L(model.regionDetailLoading ? "加载中..." : "暂无实例"))
                             .font(.system(size: 12))
                             .foregroundColor(fg3)
                             .frame(maxWidth: .infinity)
@@ -104,15 +104,15 @@ struct RegionDetailSheet: View {
                                     Circle()
                                         .fill(i.state.lowercased() == "running" ? accent : fg3)
                                         .frame(width: 5, height: 5)
-                                    Text(i.name)
+                                    Text(L(i.name))
                                         .font(.system(size: 12))
                                         .foregroundColor(fg0)
                                         .lineLimit(1)
                                     Spacer(minLength: 0)
-                                    Text("\(i.cpu)C\(i.mem)G")
+                                    Text(L("\(i.cpu)C\(i.mem)G"))
                                         .font(.system(size: 11, design: .monospaced))
                                         .foregroundColor(fg3)
-                                    Text(i.ip.isEmpty ? "—" : i.ip)
+                                    Text(L(i.ip.isEmpty ? "—" : i.ip))
                                         .font(.system(size: 11, design: .monospaced))
                                         .foregroundColor(cyan)
                                 }
@@ -152,7 +152,7 @@ struct RegionDetailSheet: View {
             }
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(row.name)
+                    Text(L(row.name))
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(fg0)
                         .lineLimit(1)
@@ -162,7 +162,7 @@ struct RegionDetailSheet: View {
                         .frame(width: 6, height: 6)
                     StatusBadge(text: row.coverageKind.badgeText, tone: row.coverageKind.tone)
                 }
-                Text(row.regionCode)
+                Text(L(row.regionCode))
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(fg3)
             }
@@ -180,7 +180,7 @@ struct RegionDetailSheet: View {
     }
 
     private func sectionLabel(_ text: String) -> some View {
-        Text(text)
+        Text(L(text))
             .font(.system(size: 10.5, weight: .semibold))
             .tracking(0.5)
             .foregroundColor(fg3)
@@ -199,12 +199,12 @@ struct RegionDetailSheet: View {
 
     private func metricBox(label: String, value: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(label)
+            Text(L(label))
                 .font(.system(size: 10.5, weight: .medium))
                 .tracking(0.5)
                 .textCase(.uppercase)
                 .foregroundColor(fg3)
-            Text(value)
+            Text(L(value))
                 .font(.system(size: 22, weight: .bold, design: .monospaced))
                 .foregroundColor(color)
         }

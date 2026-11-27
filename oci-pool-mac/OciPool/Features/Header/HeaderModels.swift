@@ -109,15 +109,15 @@ struct AssetAnalysis: Equatable {
 
     static func levelConfig(_ level: Int) -> (icon: String, name: String) {
         switch min(max(level, 1), 9) {
-        case 1: return ("person", "初级云玩家")
-        case 2: return ("star", "中级云达人")
-        case 3: return ("star.fill", "高级架构师")
-        case 4: return ("rosette", "资深资源商")
-        case 5: return ("medal", "核心运营商")
-        case 6: return ("bolt.fill", "顶级运营商")
-        case 7: return ("flame.fill", "巅峰掌控者")
-        case 8: return ("diamond.fill", "至尊领航员")
-        default: return ("crown.fill", "Oracle 主宰者")
+        case 1: return ("person", L("初级云玩家"))
+        case 2: return ("star", L("中级云达人"))
+        case 3: return ("star.fill", L("高级架构师"))
+        case 4: return ("rosette", L("资深资源商"))
+        case 5: return ("medal", L("核心运营商"))
+        case 6: return ("bolt.fill", L("顶级运营商"))
+        case 7: return ("flame.fill", L("巅峰掌控者"))
+        case 8: return ("diamond.fill", L("至尊领航员"))
+        default: return ("crown.fill", L("Oracle 主宰者"))
         }
     }
 }

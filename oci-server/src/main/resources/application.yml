@@ -154,6 +154,7 @@ sa-token:
   token-name: satoken
   timeout: 2592000
   active-timeout: 7200
+  dynamic-active-timeout: true
   is-concurrent: false
   token-style: uuid
   is-log: false

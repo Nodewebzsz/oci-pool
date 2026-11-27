@@ -628,12 +628,7 @@ public class TenantServiceImpl implements TenantService {
             log.debug("当前区域:{}为主区域", tenant.getRegion());
             tenantAdd.setId(snowflakeNextId);
             tenantAdd.setParenId(parentId);
-            AccountTypeEnum accountTypeEnum = tenancyDetail.getAccountTypeEnum();
-            if (null != accountTypeEnum) {
-                tenantAdd.setAccountType(tenancyDetail.getAccountTypeEnum().getType());
-            } else {
-                tenantAdd.setAccountType(AccountTypeEnum.UN_KNOW_ACCOUNT.getType());
-            }
+            tenantAdd.setAccountType(resolveImportedAccountType(subscription, tenancyDetail));
             //只有是主区域的时候保存注册信息
             if (subscription != null) {
                 registerDetailService.saveRegisterDetail(snowflakeNextId, tenant.getTenantId(), subscription);
@@ -697,12 +692,7 @@ public class TenantServiceImpl implements TenantService {
             log.debug("当前区域:{}为主区域", tenant.getRegion());
             tenantAdd.setId(snowflakeNextId);
             tenantAdd.setParenId(parentId);
-            AccountTypeEnum accountTypeEnum = tenancyDetail.getAccountTypeEnum();
-            if (null != accountTypeEnum) {
-                tenantAdd.setAccountType(tenancyDetail.getAccountTypeEnum().getType());
-            } else {
-                tenantAdd.setAccountType(AccountTypeEnum.UN_KNOW_ACCOUNT.getType());
-            }
+            tenantAdd.setAccountType(resolveImportedAccountType(subscription, tenancyDetail));
             //只有是主区域的时候保存注册信息
             if (subscription != null) {
                 registerDetailService.saveRegisterDetail(snowflakeNextId, tenant.getTenantId(), subscription);
@@ -743,12 +733,7 @@ public class TenantServiceImpl implements TenantService {
             log.debug("当前区域:{}为主区域", regionSubscription.getRegionName() );
             tenantAdd.setId(snowflakeNextId);
             tenantAdd.setParenId(parentId);
-            AccountTypeEnum accountTypeEnum = tenancyDetail.getAccountTypeEnum();
-            if (null != accountTypeEnum){
-                tenantAdd.setAccountType(tenancyDetail.getAccountTypeEnum().getType());
-            }else {
-                tenantAdd.setAccountType(AccountTypeEnum.UN_KNOW_ACCOUNT.getType());
-            }
+            tenantAdd.setAccountType(resolveImportedAccountType(subscription, tenancyDetail));
             //只有是主区域的时候保存注册信息
             if (subscription != null){
                 registerDetailService.saveRegisterDetail(snowflakeNextId, tenant.getTenantId(), subscription);
@@ -2563,10 +2548,10 @@ public class TenantServiceImpl implements TenantService {
         List<Tenant> content = allTenants.getContent();
         long totalCount = content.size();
         long upgradeCount = content.stream()
-                .filter(t -> "UPGRADE_ACCOUNT".equalsIgnoreCase(t.getAccountType()))
+                .filter(t -> "upgrade".equals(resolveAccountPlan(t)))
                 .count();
         long freeCount = content.stream()
-                .filter(t -> !"UPGRADE_ACCOUNT".equalsIgnoreCase(t.getAccountType()))
+                .filter(t -> "free".equals(resolveAccountPlan(t)))
                 .count();
         double totalCost = content.stream()
                 .map(Tenant::getAccountCost)
@@ -3064,7 +3049,9 @@ public class TenantServiceImpl implements TenantService {
     }
 
     private static boolean isPortraitMainTenant(Tenant tenant) {
-        return tenant != null && (tenant.getParenId() == null || tenant.getParenId() == 0L)
+        return tenant != null
+                && tenant.getCloudType() == CloudTypeEnum.ORACLE_CLOUD.getType()
+                && (tenant.getParenId() == null || tenant.getParenId() == 0L)
                 && !Boolean.FALSE.equals(tenant.getIsHomeRegion());
     }
 
@@ -3090,12 +3077,17 @@ public class TenantServiceImpl implements TenantService {
 
         Map<Long, Long> childCountByParent = new HashMap<>();
         List<Tenant> mainTenants = new ArrayList<>();
+        long inactive = 0L;
         for (Tenant t : allTenants) {
-            if (t == null) {
+            if (t == null || t.getCloudType() != CloudTypeEnum.ORACLE_CLOUD.getType()) {
                 continue;
             }
             if (isPortraitMainTenant(t)) {
-                mainTenants.add(t);
+                if (Boolean.FALSE.equals(t.getActive())) {
+                    inactive++;
+                } else {
+                    mainTenants.add(t);
+                }
             } else if (t.getParenId() != null && t.getParenId() > 0L) {
                 childCountByParent.merge(t.getParenId(), 1L, Long::sum);
             }
@@ -3103,6 +3095,7 @@ public class TenantServiceImpl implements TenantService {
 
         long upgraded = 0L;
         long free = 0L;
+        long unknownPlan = 0L;
         long corporate = 0L;
         long personal = 0L;
         long unknownEntity = 0L;
@@ -3111,10 +3104,13 @@ public class TenantServiceImpl implements TenantService {
         long multiRegion = 0L;
 
         for (Tenant main : mainTenants) {
-            if (isUpgradedAccount(main)) {
+            String plan = resolveAccountPlan(main);
+            if ("upgrade".equals(plan)) {
                 upgraded++;
-            } else {
+            } else if ("free".equals(plan)) {
                 free++;
+            } else {
+                unknownPlan++;
             }
 
             RegisterDetail rd = main.getRegisterDetail();
@@ -3160,8 +3156,10 @@ public class TenantServiceImpl implements TenantService {
         }
 
         vo.setTotalMainTenants(mainTenants.size());
+        vo.setInactiveCount(inactive);
         vo.setUpgradedCount(upgraded);
         vo.setFreeCount(free);
+        vo.setUnknownPlanCount(unknownPlan);
         vo.setCorporateCount(corporate);
         vo.setPersonalCount(personal);
         vo.setUnknownEntityCount(unknownEntity);
@@ -3171,7 +3169,29 @@ public class TenantServiceImpl implements TenantService {
         return vo;
     }
 
-    private static boolean isUpgradedAccount(Tenant tenant) {
+    private static String resolveImportedAccountType(Subscription subscription, TenancyDetail tenancyDetail) {
+        if (subscription != null && subscription.getPlanType() != null) {
+            if (subscription.getPlanType() == Subscription.PlanType.Payg) {
+                return AccountTypeEnum.UPGRADE_ACCOUNT.getType();
+            }
+            if (subscription.getPlanType() == Subscription.PlanType.FreeTier) {
+                return AccountTypeEnum.FREE_ACCOUNT.getType();
+            }
+        }
+        AccountTypeEnum accountTypeEnum = tenancyDetail != null ? tenancyDetail.getAccountTypeEnum() : null;
+        return accountTypeEnum != null ? accountTypeEnum.getType() : AccountTypeEnum.UN_KNOW_ACCOUNT.getType();
+    }
+
+    private static String resolveAccountPlan(Tenant tenant) {
+        RegisterDetail rd = tenant.getRegisterDetail();
+        if (rd != null && rd.getPlanType() != null) {
+            if (rd.getPlanType() == Subscription.PlanType.Payg) {
+                return "upgrade";
+            }
+            if (rd.getPlanType() == Subscription.PlanType.FreeTier) {
+                return "free";
+            }
+        }
         String raw = tenant.getAccountType();
         if (StringUtils.isNotBlank(raw)) {
             String upper = raw.trim().toUpperCase(Locale.ROOT);
@@ -3179,14 +3199,22 @@ public class TenantServiceImpl implements TenantService {
                     || "PAYG".equals(upper)
                     || "UPGRADE_ACCOUNT".equals(upper)
                     || raw.contains("升级")) {
-                return true;
+                return "upgrade";
             }
             if (upper.contains("FREE") || upper.contains("TRIAL") || raw.contains("免费") || raw.contains("试用")) {
-                return false;
+                return "free";
             }
         }
-        RegisterDetail rd = tenant.getRegisterDetail();
-        return rd != null && rd.getPlanType() == Subscription.PlanType.Payg;
+        String typeName = tenant.getAccountTypeName();
+        if (StringUtils.isNotBlank(typeName)) {
+            if (typeName.contains("升级")) {
+                return "upgrade";
+            }
+            if (typeName.contains("免费") || typeName.contains("试用")) {
+                return "free";
+            }
+        }
+        return "unknown";
     }
 
     private static long resolveTenantAgeDays(Tenant tenant, RegisterDetail rd) {

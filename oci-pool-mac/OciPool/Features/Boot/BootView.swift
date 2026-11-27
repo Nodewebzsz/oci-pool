@@ -20,7 +20,7 @@ struct BootView: View {
     private let wRemark: CGFloat = 70
     private let wRegion: CGFloat = 58
     private let wArch: CGFloat = 72
-    private let wStatus: CGFloat = 66
+    private let wStatus: CGFloat = 82
     private let wNum: CGFloat = 58
     private let wTime: CGFloat = 140
     private let wAction: CGFloat = 48
@@ -111,7 +111,7 @@ struct BootView: View {
             Button(action: { NavigationState.shared.closeTenantSubPage() }) {
                 HStack(spacing: 4) {
                     Image(systemName: "chevron.left").font(.system(size: 11, weight: .semibold))
-                    Text("返回").font(.system(size: 12, weight: .medium))
+                    Text(L("返回")).font(.system(size: 12, weight: .medium))
                 }
                 .foregroundColor(AppTheme.sidebarText(dark))
                 .padding(.horizontal, 8)
@@ -124,28 +124,28 @@ struct BootView: View {
                 )
             }
             .buttonStyle(PlainButtonStyle())
-            .help("返回上一级")
+            .help(L("返回上一级"))
 
             Text("›").font(.system(size: 11)).foregroundColor(AppTheme.sidebarText(dark).opacity(0.5))
 
             // 第一级：OCI 租户管理（点击直接返回租户大列表）
             Button(action: { NavigationState.shared.closeToTenantsList() }) {
-                Text("OCI 租户管理")
+                Text(L("OCI 租户管理"))
                     .font(.system(size: 12))
                     .foregroundColor(AppTheme.sidebarText(dark))
             }
             .buttonStyle(PlainButtonStyle())
-            .help("回到租户列表")
+            .help(L("回到租户列表"))
 
             // 第二级：租户详情 · 租户名（若有上级租户详情上下文，点击即可返回该租户详情）
             let name = NavigationState.shared.tenantSubPageName
             Text("›").font(.system(size: 11)).foregroundColor(AppTheme.sidebarText(dark).opacity(0.5))
             Button(action: { NavigationState.shared.closeTenantSubPage() }) {
                 HStack(spacing: 4) {
-                    Text("租户详情")
+                    Text(L("租户详情"))
                     if !name.isEmpty {
                         Text("·")
-                        Text(name)
+                        Text(L(name))
                             .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     }
                 }
@@ -153,11 +153,11 @@ struct BootView: View {
                 .foregroundColor(AppTheme.sidebarText(dark))
             }
             .buttonStyle(PlainButtonStyle())
-            .help("回到该租户详情页")
+            .help(L("回到该租户详情页"))
 
             // 第三级：当前查看开机
             Text("›").font(.system(size: 11)).foregroundColor(AppTheme.sidebarText(dark).opacity(0.5))
-            Text("查看开机")
+            Text(L("查看开机"))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(AppTheme.sidebarActive)
 
@@ -197,7 +197,7 @@ struct BootView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "globe")
                         .font(.system(size: 11))
-                    Text("当前区域:")
+                    Text(L("当前区域:"))
                         .font(.system(size: 12))
                 }
                 .foregroundColor(AppTheme.textTertiary(dark))
@@ -241,7 +241,7 @@ struct BootView: View {
                     )
             }
             .buttonStyle(PlainButtonStyle())
-            .help("显示/隐藏脱敏")
+            .help(L("显示/隐藏脱敏"))
 
             AppButton(title: "预开", systemImage: "play.circle", kind: .primary) {
                 model.openCreateBlank()
@@ -287,7 +287,7 @@ struct BootView: View {
                 Image(systemName: icon)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(color)
-                Text(label)
+                Text(L(label))
                     .font(.system(size: 10.5, weight: .medium))
                     .foregroundColor(AppTheme.textTertiary(dark))
                     .lineLimit(1)
@@ -299,7 +299,7 @@ struct BootView: View {
                         .shadow(color: AppTheme.sidebarActive.opacity(0.6), radius: 2)
                 }
             }
-            Text(value)
+            Text(L(value))
                 .font(.system(size: 20, weight: .bold, design: .monospaced))
                 .foregroundColor(color)
                 .lineLimit(1)
@@ -377,7 +377,7 @@ struct BootView: View {
             summaryChip(icon: "moon.circle", title: "无任务", value: "\(idleCount)", accent: AppTheme.sidebarText(dark))
             summaryChip(icon: "arrow.triangle.2.circlepath", title: "执行中", value: "\(execSum)", accent: AppTheme.orange)
             Spacer(minLength: 0)
-            Text("快捷：启动 · 停止 · 详情 · 更多")
+            Text(L("快捷：启动 · 停止 · 详情 · 更多"))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.sidebarText(dark).opacity(0.85))
         }
@@ -396,10 +396,10 @@ struct BootView: View {
                     .foregroundColor(accent)
             }
             VStack(alignment: .leading, spacing: 1) {
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(AppTheme.sidebarText(dark))
-                Text(value)
+                Text(L(value))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
             }
@@ -419,9 +419,9 @@ struct BootView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 12))
+            Text(L(text)).font(.system(size: 12))
             Spacer()
-            Button("重试") { Task { await model.reload() } }
+            Button(L("重试")) { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
                 .font(.system(size: 12, weight: .semibold))
         }
@@ -482,7 +482,7 @@ struct BootView: View {
                         VStack(spacing: 10) {
                             Spacer()
                             ProgressView()
-                            Text("正在加载开机任务…")
+                            Text(L("正在加载开机任务…"))
                                 .font(.system(size: 12))
                                 .foregroundColor(AppTheme.sidebarText(dark))
                             Spacer()
@@ -524,7 +524,7 @@ struct BootView: View {
                         VStack(spacing: 8) {
                             ProgressView()
                                 .scaleEffect(0.9)
-                            Text("更新中…")
+                            Text(L("更新中…"))
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(AppTheme.sidebarText(dark))
                         }
@@ -676,7 +676,7 @@ struct BootView: View {
     // MARK: - Cells
 
     private func colHeader(_ title: String, _ width: CGFloat, align: Alignment = .center) -> some View {
-        Text(title)
+        Text(L(title))
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(AppTheme.sidebarText(dark))
             .lineLimit(1)
@@ -685,7 +685,7 @@ struct BootView: View {
     }
 
     private func cellText(_ text: String, _ width: CGFloat, muted: Bool = false, cyan: Bool = false, danger: Bool = false) -> some View {
-        Text(text)
+        Text(L(text))
             .font(.system(size: 12))
             .foregroundColor(
                 cyan ? Color(hex: "00b6be")
@@ -698,7 +698,7 @@ struct BootView: View {
             .truncationMode(.tail)
             .frame(width: width, alignment: .center)
             .clipped()
-            .help(text)
+            .help(L(text))
     }
 
     /// Web 任务状态徽章：running=accent-soft+脉冲圆点「运行中」，idle=bg-3 灰「无任务」
@@ -707,7 +707,7 @@ struct BootView: View {
             if item.openBootFlag {
                 BootPulseDot(color: AppTheme.sidebarActive)
             }
-            Text(item.openBootFlag ? "运行中" : "无任务")
+            Text(L(item.openBootFlag ? "运行中" : "无任务"))
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(item.openBootFlag ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
                 .lineLimit(1)
@@ -722,7 +722,7 @@ struct BootView: View {
     }
 
     private func numCell(_ n: Int64, _ width: CGFloat, accent: Color? = nil) -> some View {
-        Text(formatNum(n))
+        Text(L(formatNum(n)))
             .font(.system(size: 12, weight: accent != nil ? .semibold : .regular, design: .monospaced))
             .foregroundColor(
                 accent ?? (dark ? Color.white.opacity(0.88) : Color.primary)
@@ -733,7 +733,7 @@ struct BootView: View {
     }
 
     private func successCell(_ n: Int, _ width: CGFloat) -> some View {
-        Text(formatNum(Int64(n)))
+        Text(L(formatNum(Int64(n))))
             .font(.system(size: 12, weight: n > 0 ? .semibold : .regular, design: .monospaced))
             .foregroundColor(n > 0 ? AppTheme.sidebarActive : (dark ? Color.white.opacity(0.88) : Color.primary))
             .lineLimit(1)
@@ -745,7 +745,7 @@ struct BootView: View {
         Button(action: {
             withAnimation(.easeInOut(duration: 0.15)) { model.namesHidden.toggle() }
         }) {
-            Text(model.namesHidden ? item.maskedTenant : item.displayTenant)
+            Text(L(model.namesHidden ? item.maskedTenant : item.displayTenant))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
                 .lineLimit(1)
@@ -755,7 +755,7 @@ struct BootView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
-        .help(item.displayTenant)
+        .help(L(item.displayTenant))
     }
 
     private func archChip(_ text: String, item: BootTaskItem) -> some View {
@@ -774,7 +774,7 @@ struct BootView: View {
             memoryGb: max(1, item.memory),
             bootVolumeGb: max(50, item.disk)
         )
-        return Text(t)
+        return Text(L(t))
             .font(.system(size: 10, weight: .semibold, design: .monospaced))
             .foregroundColor(t == "—" ? AppTheme.sidebarText(dark) : fg)
             .padding(.horizontal, t == "—" ? 0 : 6)
@@ -789,9 +789,9 @@ struct BootView: View {
                     }
                 }
             )
-            .help(item.ocpu > 0
+            .help(L(item.ocpu > 0
                   ? "\(shape) · \(item.ocpu)C \(item.memory)G / \(max(50, item.disk))GB · \(est.tierBadge) ($\(String(format: "%.2f", est.totalMonthlyUsd))/mo)"
-                  : t)
+                  : t))
     }
 
     private var violetArch: Color { dark ? Color(hex: "a78bfa") : Color(hex: "7c3aed") }
@@ -877,7 +877,7 @@ enum BootActionPanel {
 // MARK: - 窗内操作菜单（对齐实例列表，扁平两列 + 悬停）
 
 private enum BootActionMenuLayout {
-    static let width: CGFloat = 280
+    static var width: CGFloat { AppI18n.shared.isEnglish ? 360 : 280 }
     static let vPad: CGFloat = 8
     static let titleH: CGFloat = 20
     static let gridGap: CGFloat = 1
@@ -1091,7 +1091,7 @@ struct BootActionMenuContent: View {
             HStack(spacing: 6) {
                 // 运行中：任务状态同款脉冲动效原点；非运行：静态弱灰（统一 PulseDot，对齐 Web StatusDot pulse）
                 MenuPulseDot(color: running ? AppTheme.sidebarActive : AppTheme.sidebarText(dark), pulse: running)
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                     .lineLimit(1)
@@ -1127,7 +1127,7 @@ struct BootActionMenuContent: View {
                 Image(systemName: act.systemImage)
                     .font(.system(size: 11, weight: .semibold))
                     .frame(width: 14)
-                Text(act.title)
+                Text(L(act.title))
                     .font(.system(size: 12, weight: .medium))
                     .lineLimit(1)
                 Spacer(minLength: 0)
@@ -1161,7 +1161,7 @@ struct BootActionMenuContent: View {
                 hoveredId = inside ? act.id : (hoveredId == act.id ? nil : hoveredId)
             }
         }
-        .help(disabledHelp(act))
+        .help(L(disabledHelp(act)))
     }
 
     /// 禁用项 hover 提示原因（非禁用返回空）

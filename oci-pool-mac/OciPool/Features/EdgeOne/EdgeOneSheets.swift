@@ -177,7 +177,7 @@ struct EdgeOneConfigSheet: View {
                 if model.configForm != nil {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack {
-                            Text("启用 EdgeOne")
+                            Text(L("启用 EdgeOne"))
                                 .font(.system(size: 13, weight: .medium))
                             Spacer()
                             Toggle("", isOn: Binding(
@@ -207,7 +207,7 @@ struct EdgeOneConfigSheet: View {
                                 leadingSystemImage: "person"
                             )
                         }
-                        Text("访问管理 → API 密钥管理")
+                        Text(L("访问管理 → API 密钥管理"))
                             .font(.system(size: 11))
                             .foregroundColor(AppTheme.sidebarText(dark))
 

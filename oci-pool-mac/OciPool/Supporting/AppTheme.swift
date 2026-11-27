@@ -109,11 +109,11 @@ enum AccentPreset: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .coral: return "Claude Coral"
-        case .green: return "活力绿"
-        case .cyan: return "海洋青"
-        case .violet: return "幽紫"
-        case .orange: return "琥珀橙"
-        case .blue: return "经典蓝"
+        case .green: return L("活力绿")
+        case .cyan: return L("海洋青")
+        case .violet: return L("幽紫")
+        case .orange: return L("琥珀橙")
+        case .blue: return L("经典蓝")
         }
     }
 
@@ -176,8 +176,8 @@ enum DensityMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .compact: return "紧凑"
-        case .comfortable: return "舒适"
+        case .compact: return L("紧凑")
+        case .comfortable: return L("舒适")
         }
     }
 
@@ -215,9 +215,9 @@ enum AppAppearanceMode: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .system: return "跟随系统"
-        case .dark: return "深色"
-        case .light: return "浅色"
+        case .system: return L("跟随系统")
+        case .dark: return L("深色")
+        case .light: return L("浅色")
         }
     }
 

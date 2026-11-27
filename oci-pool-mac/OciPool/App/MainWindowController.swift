@@ -156,6 +156,15 @@ final class MainWindowController: NSWindowController {
                 self.window?.backgroundColor = NSColor(AppTheme.pageBg(self.appearance.isDarkEffective))
             }
             .store(in: &cancellables)
+        NotificationCenter.default.publisher(for: .ociLocaleDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                if !self.session.isLoggedIn {
+                    self.window?.title = "OCI-POOL — \(L("登录"))"
+                }
+            }
+            .store(in: &cancellables)
         session.$isLoggedIn
             .dropFirst() // init already rebuildContent()'d once
             .removeDuplicates()
@@ -185,7 +194,7 @@ final class MainWindowController: NSWindowController {
                 .environmentObject(backend)
                 .environmentObject(appearance)
             root.setSwiftUI(login)
-            window?.title = "OCI-POOL — 登录"
+            window?.title = "OCI-POOL — \(L("登录"))"
         }
         // Single delayed pin after content swap — do NOT spam forceDefaultFrame (causes constraint storms).
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in

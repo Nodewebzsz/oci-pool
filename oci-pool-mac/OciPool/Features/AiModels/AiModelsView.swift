@@ -30,11 +30,11 @@ struct AiModelsView: View {
                     .foregroundColor(color)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(label)
+                Text(L(label))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(AppTheme.textTertiary(dark))
                     .lineLimit(1)
-                Text(value)
+                Text(L(value))
                     .font(.system(size: 22, weight: .bold))
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                     .lineLimit(1)
@@ -58,7 +58,7 @@ struct AiModelsView: View {
             if n.contains("vision") || n.contains("图像") { return ("视觉", Color(hex: "00b6be")) }
             return ("对话", AppTheme.info)
         }()
-        return Text(label)
+        return Text(L(label))
             .font(.system(size: 10, weight: .semibold))
             .padding(.horizontal, 6)
             .padding(.vertical, 1)
@@ -102,7 +102,7 @@ struct AiModelsView: View {
                     filterBar
                         .padding(.bottom, 12)
                     if let err = model.errorText, !err.isEmpty {
-                        Text(err)
+                        Text(L(err))
                             .font(.system(size: 12))
                             .foregroundColor(AppTheme.danger)
                             .padding(.bottom, 12)
@@ -125,7 +125,7 @@ struct AiModelsView: View {
 
     private var filterBar: some View {
         HStack(spacing: 12) {
-            Text("租户")
+            Text(L("租户"))
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(AppTheme.sidebarText(dark))
             SelectMenu(
@@ -142,7 +142,7 @@ struct AiModelsView: View {
             )
             Spacer()
             Toggle(isOn: $model.linkTenantFilter) {
-                Text("仅显示当前租户配置")
+                Text(L("仅显示当前租户配置"))
                     .font(.system(size: 12))
             }
             .toggleStyle(SwitchToggleStyle(tint: AppTheme.sidebarActive))
@@ -207,19 +207,19 @@ struct AiModelsView: View {
         return HStack(alignment: .center, spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    Text(m.name.isEmpty ? m.id : m.name)
+                    Text(L(m.name.isEmpty ? m.id : m.name))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
                         .lineLimit(1)
                     categoryBadge(m.name)
                 }
-                Text(m.provider.isEmpty ? "OCI" : m.provider)
+                Text(L(m.provider.isEmpty ? "OCI" : m.provider))
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.sidebarText(dark))
             }
             Spacer(minLength: 0)
             if added {
-                Text("已添加")
+                Text(L("已添加"))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(AppTheme.sidebarActive)
                     .padding(.horizontal, 10)
@@ -250,11 +250,11 @@ struct AiModelsView: View {
                 .frame(width: 3, height: 44)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text(c.modelName.isEmpty ? c.modelId : c.modelName)
+                    Text(L(c.modelName.isEmpty ? c.modelId : c.modelName))
                         .font(.system(size: 13, weight: .semibold))
                         .lineLimit(1)
                     // Web 徽章：已启用=accent-soft / 已禁用=bg-3
-                    Text(c.enabled ? "已启用" : "已禁用")
+                    Text(L(c.enabled ? "已启用" : "已禁用"))
                         .font(.system(size: 10, weight: .semibold))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 1)
@@ -263,7 +263,7 @@ struct AiModelsView: View {
                         .foregroundColor(c.enabled ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
                 }
                 // 归属租户（对齐租户下拉显示：租户名 · 中文区域），多租户混排时辨明归属
-                Text(configTenantLabel(c.tenantId))
+                Text(L(configTenantLabel(c.tenantId)))
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.sidebarText(dark))
                     .lineLimit(1)
@@ -286,7 +286,7 @@ struct AiModelsView: View {
             HStack(spacing: 8) {
                 Image(systemName: icon)
                     .foregroundColor(AppTheme.sidebarActive)
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 13, weight: .semibold))
                 Spacer()
             }

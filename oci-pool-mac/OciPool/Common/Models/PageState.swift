@@ -15,6 +15,10 @@ struct PageState: Equatable {
 
     var rangeText: String {
         // 对齐 Web 分页：「共 n 条」+「page/totalPages」
+        if AppI18n.shared.isEnglish {
+            guard totalElements > 0 else { return "Total 0 · 0/0" }
+            return "Total \(totalElements) · \(displayPage)/\(totalPages)"
+        }
         guard totalElements > 0 else { return "共 0 条 0/0" }
         return "共 \(totalElements) 条 \(displayPage)/\(totalPages)"
     }

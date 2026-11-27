@@ -2,6 +2,7 @@ package com.nodewebzsz.ociserver.controller.login;
 
 import com.nodewebzsz.dao.entity.LoginUser;
 import com.nodewebzsz.ocicommon.enums.LoginTypeEnum;
+import com.nodewebzsz.ociserver.config.AuthSessionHelper;
 import com.nodewebzsz.ociserver.config.task.VersionCheckTask;
 import com.nodewebzsz.ociserver.controller.BaseController;
 import com.nodewebzsz.ociserver.pojo.request.GoogleConfig;
@@ -140,7 +141,7 @@ public class GoogleLoginController extends BaseController {
             );
 
             boolean isRememberMe = state.endsWith("_true") || state.endsWith("_on");
-            StpUtil.login(localUser.getUsername(), isRememberMe);
+            AuthSessionHelper.login(localUser.getUsername(), isRememberMe);
             log.info("Google login success, user={}, rememberMe={}", localUser.getUsername(), isRememberMe);
 
             String redirectUrl = isMobileRequest(request) ? "/m/tenants" : "/index";

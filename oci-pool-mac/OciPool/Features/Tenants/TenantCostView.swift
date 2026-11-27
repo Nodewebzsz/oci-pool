@@ -91,7 +91,7 @@ struct TenantCostView: View {
     private var filterControls: some View {
         HStack(alignment: .center, spacing: 14) {
             HStack(spacing: 8) {
-                Text("时间范围：")
+                Text(L("时间范围："))
                     .font(.system(size: 13))
                     .foregroundColor(secondaryText)
                 presetBtn("今天", value: "today")
@@ -102,13 +102,13 @@ struct TenantCostView: View {
             if model.costTimePreset == "custom" {
                 HStack(spacing: 8) {
                     dateField(text: $model.costStart)
-                    Text("至")
+                    Text(L("至"))
                         .font(.system(size: 12))
                         .foregroundColor(secondaryText)
                     dateField(text: $model.costEnd)
                 }
             } else {
-                Text("\(model.costStart)  ~  \(model.costEnd)")
+                Text(L("\(model.costStart)  ~  \(model.costEnd)"))
                     .font(.system(size: 12))
                     .foregroundColor(secondaryText)
             }
@@ -120,7 +120,7 @@ struct TenantCostView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 11, weight: .semibold))
-                    Text("查询")
+                    Text(L("查询"))
                         .font(.system(size: 13, weight: .medium))
                 }
                 .foregroundColor(.white)
@@ -142,7 +142,7 @@ struct TenantCostView: View {
     private func presetBtn(_ title: String, value: String) -> some View {
         let active = model.costTimePreset == value
         return Button(action: { model.applyCostPreset(value) }) {
-            Text(title)
+            Text(L(title))
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(active ? .white : accentGreen)
                 .padding(.horizontal, 12)
@@ -165,9 +165,9 @@ struct TenantCostView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack {
             Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 12))
+            Text(L(text)).font(.system(size: 12))
             Spacer()
-            Button("重试") {
+            Button(L("重试")) {
                 guard let t = tenant else { return }
                 Task { await model.queryCost(t) }
             }
@@ -193,10 +193,10 @@ struct TenantCostView: View {
 
     private func statCard(title: String, value: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
+            Text(L(title))
                 .font(.system(size: 13))
                 .foregroundColor(secondaryText)
-            Text(value)
+            Text(L(value))
                 .font(.system(size: 18, weight: .semibold, design: .rounded))
                 .foregroundColor(primaryText)
                 .lineLimit(1)
@@ -219,7 +219,7 @@ struct TenantCostView: View {
         let series = model.costTrendSeries
         return VStack(spacing: 0) {
             HStack {
-                Text("每日费用趋势")
+                Text(L("每日费用趋势"))
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(primaryText)
                 Spacer()
@@ -241,7 +241,7 @@ struct TenantCostView: View {
                     HStack {
                         Spacer()
                         ProgressView()
-                        Text("加载费用趋势…")
+                        Text(L("加载费用趋势…"))
                             .font(.system(size: 12))
                             .foregroundColor(secondaryText)
                             .padding(.leading, 8)
@@ -250,7 +250,7 @@ struct TenantCostView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 220)
                 } else if series.days.isEmpty {
-                    Text(model.costItems.isEmpty ? "暂无费用趋势数据，请选择时间范围后查询" : "该分类暂无趋势数据")
+                    Text(L(model.costItems.isEmpty ? "暂无费用趋势数据，请选择时间范围后查询" : "该分类暂无趋势数据"))
                         .font(.system(size: 13))
                         .foregroundColor(secondaryText)
                         .frame(maxWidth: .infinity)
@@ -292,7 +292,7 @@ struct TenantCostView: View {
     private func chartSwitch(_ title: String, _ value: String) -> some View {
         let active = model.costChartType == value
         return Button(action: { model.costChartType = value }) {
-            Text(title)
+            Text(L(title))
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(active ? .white : accentGreen)
                 .padding(.horizontal, 10)
@@ -335,7 +335,7 @@ struct TenantCostView: View {
     private func legendDot(_ color: Color, _ text: String) -> some View {
         HStack(spacing: 5) {
             Circle().fill(color).frame(width: 8, height: 8)
-            Text(text)
+            Text(L(text))
                 .font(.system(size: 11))
                 .foregroundColor(secondaryText)
         }
@@ -346,7 +346,7 @@ struct TenantCostView: View {
     private var detailTable: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("费用明细")
+                Text(L("费用明细"))
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(primaryText)
                 Spacer()
@@ -354,7 +354,7 @@ struct TenantCostView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "line.horizontal.3.decrease.circle")
                             .font(.system(size: 12))
-                        Text(model.costFilterPositiveOnly ? "显示全部" : "仅显示 > 0")
+                        Text(L(model.costFilterPositiveOnly ? "显示全部" : "仅显示 > 0"))
                             .font(.system(size: 12, weight: .medium))
                     }
                     .foregroundColor(accentGreen)
@@ -375,7 +375,7 @@ struct TenantCostView: View {
                 HStack {
                     Spacer()
                     ProgressView()
-                    Text("加载费用明细…")
+                    Text(L("加载费用明细…"))
                         .font(.system(size: 12))
                         .foregroundColor(secondaryText)
                         .padding(.leading, 8)
@@ -383,7 +383,7 @@ struct TenantCostView: View {
                 }
                 .frame(height: 120)
             } else if model.filteredCostItems.isEmpty {
-                Text(model.costItems.isEmpty ? "暂无费用明细数据，请选择时间范围后查询" : "筛选后无明细数据")
+                Text(L(model.costItems.isEmpty ? "暂无费用明细数据，请选择时间范围后查询" : "筛选后无明细数据"))
                     .font(.system(size: 13))
                     .foregroundColor(secondaryText)
                     .frame(maxWidth: .infinity)
@@ -461,14 +461,14 @@ struct TenantCostView: View {
             cell(item.resourceType.isEmpty ? "—" : item.resourceType, wType)
             cell(item.skuName.isEmpty ? "—" : item.skuName, wSku, muted: true)
             cell(item.resourceId.isEmpty ? "—" : item.resourceId, wRes, muted: true, mono: true)
-            Text(money6(item.cost))
+            Text(L(money6(item.cost)))
                 .font(.system(size: 12, weight: positive ? .semibold : .regular, design: .monospaced))
                 .foregroundColor(positive ? accentGreen : secondaryText)
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(width: wCost, alignment: .center)
                 .clipped()
-                .help(money6(item.cost))
+                .help(L(money6(item.cost)))
         }
         .padding(.horizontal, hPad)
         .padding(.vertical, appearance.density.rowPadding)
@@ -492,7 +492,7 @@ struct TenantCostView: View {
     }
 
     private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .center) -> some View {
-        Text(title)
+        Text(L(title))
             .font(.system(size: 11, weight: .semibold))
             .foregroundColor(AppTheme.sidebarText(dark))
             .lineLimit(1)
@@ -501,14 +501,14 @@ struct TenantCostView: View {
     }
 
     private func cell(_ text: String, _ w: CGFloat, muted: Bool = false, mono: Bool = false) -> some View {
-        Text(text)
+        Text(L(text))
             .font(mono ? .system(size: 11, design: .monospaced) : .system(size: 12))
             .foregroundColor(muted ? secondaryText : primaryText)
             .lineLimit(1)
             .truncationMode(.tail)
             .frame(width: w, alignment: .center)
             .clipped()
-            .help(text)
+            .help(L(text))
     }
 
     private func money(_ v: Double) -> String {
@@ -531,6 +531,7 @@ private struct CostTableWidthKey: PreferenceKey {
 // MARK: - Line chart（对齐流量页 TrafficLineChart，独立副本避免耦合）
 
 private struct CostLineChart: View {
+    @ObservedObject private var i18n = AppI18n.shared
     let days: [String]
     let series: [(values: [Double], color: Color)]
     let dark: Bool
@@ -560,7 +561,7 @@ private struct CostLineChart: View {
                         p.addLine(to: CGPoint(x: padL + w, y: y))
                     }
                     .stroke(gridColor, lineWidth: 1)
-                    Text(formatY(maxY * Double(g) / 4))
+                    Text(L(formatY(maxY * Double(g) / 4)))
                         .font(.system(size: 9))
                         .foregroundColor(labelColor)
                         .position(x: padL - 24, y: y)
@@ -597,7 +598,7 @@ private struct CostLineChart: View {
         let step = max(1, n / 8)
         ForEach(Array(stride(from: 0, to: n, by: step)), id: \.self) { i in
             let x = padL + (n > 1 ? CGFloat(i) / CGFloat(n - 1) * w : w / 2)
-            Text(shortDay(days[i]))
+            Text(L(shortDay(days[i])))
                 .font(.system(size: 9))
                 .foregroundColor(labelColor)
                 .position(x: x, y: padT + h + 14)

@@ -82,10 +82,10 @@ struct BootDetailView: View {
     private var detailSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Text("子任务")
+                Text(L("子任务"))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(primaryText)
-                Text("\(model.detailItems.count)")
+                Text(L("\(model.detailItems.count)"))
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(mutedText)
                     .padding(.horizontal, 7)
@@ -93,7 +93,7 @@ struct BootDetailView: View {
                     .background(AppTheme.sidebarHover(dark).opacity(0.65))
                     .cornerRadius(6)
                 Spacer(minLength: 0)
-                Text("启动 · 日志 · 修改 · 删除")
+                Text(L("启动 · 日志 · 修改 · 删除"))
                     .font(.system(size: 11))
                     .foregroundColor(mutedText)
             }
@@ -102,7 +102,7 @@ struct BootDetailView: View {
                 HStack {
                     Spacer()
                     ProgressView().scaleEffect(0.8)
-                    Text("加载中…")
+                    Text(L("加载中…"))
                         .font(.system(size: 12))
                         .foregroundColor(mutedText)
                     Spacer()
@@ -147,7 +147,7 @@ struct BootDetailView: View {
                 Image(systemName: "text.alignleft")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(AppTheme.sidebarActive)
-                Text(bootLogHeaderTitle)
+                Text(L(bootLogHeaderTitle))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(primaryText)
                     .lineLimit(1)
@@ -158,12 +158,12 @@ struct BootDetailView: View {
                         tone: model.bootLogConnection == .connected ? .success
                             : (model.bootLogConnection == .connecting ? .warning : .neutral)
                     )
-                    Text("TaskId = \(model.bootLogTaskId)")
+                    Text(L("TaskId = \(model.bootLogTaskId)"))
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(mutedText)
                     if model.bootLogLoadingHistory {
                         ProgressView().scaleEffect(0.55)
-                        Text("加载历史…")
+                        Text(L("加载历史…"))
                             .font(.system(size: 11))
                             .foregroundColor(mutedText)
                     }
@@ -173,7 +173,7 @@ struct BootDetailView: View {
 
                 if model.bootLogTaskId > 0 {
                     Toggle(isOn: $model.bootLogAutoScroll) {
-                        Text("自动滚动")
+                        Text(L("自动滚动"))
                             .font(.system(size: 11))
                     }
                     .toggleStyle(SwitchToggleStyle())
@@ -202,7 +202,7 @@ struct BootDetailView: View {
                                 Image(systemName: "text.alignleft")
                                     .font(.system(size: 22, weight: .light))
                                     .foregroundColor(mutedText.opacity(0.7))
-                                Text("点击子任务的「开机日志」在此查看实时日志")
+                                Text(L("点击子任务的「开机日志」在此查看实时日志"))
                                     .font(.system(size: 12))
                                     .foregroundColor(mutedText)
                             }
@@ -213,7 +213,7 @@ struct BootDetailView: View {
                                 Image(systemName: "hourglass")
                                     .font(.system(size: 22, weight: .light))
                                     .foregroundColor(mutedText.opacity(0.7))
-                                Text("暂无日志，等待 TaskId=\(model.bootLogTaskId) 的推送…")
+                                Text(L("暂无日志，等待 TaskId=\(model.bootLogTaskId) 的推送…"))
                                     .font(.system(size: 12))
                                     .foregroundColor(mutedText)
                             }
@@ -221,7 +221,7 @@ struct BootDetailView: View {
                             .padding(.vertical, 36)
                         } else {
                             ForEach(model.bootLogLines) { line in
-                                Text(line.text)
+                                Text(L(line.text))
                                     .font(.system(size: 11, design: .monospaced))
                                     .foregroundColor(bootLogColor(line.tone))
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -282,7 +282,7 @@ struct BootDetailView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(AppTheme.orange)
-            Text(text)
+            Text(L(text))
                 .font(.system(size: 12))
                 .foregroundColor(primaryText)
                 .lineLimit(2)
@@ -311,11 +311,11 @@ struct BootDetailCardView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 10) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(detail.osText)
+                    Text(L(detail.osText))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(primaryText)
                         .lineLimit(1)
-                    Text(detail.configText)
+                    Text(L(detail.configText))
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(mutedText)
                         .lineLimit(1)
@@ -356,7 +356,7 @@ struct BootDetailCardView: View {
                 ) {
                     model.toggleDetailStatus(detail, start: detail.status != 1)
                 }
-                .help(detail.status == 2 ? "该任务已开机成功，无需重复启动" : "仅未开机任务可启动，运行中任务可停止")
+                .help(L(detail.status == 2 ? "该任务已开机成功，无需重复启动" : "仅未开机任务可启动，运行中任务可停止"))
                 AppButton(
                     title: logActive ? "日志中" : "开机日志",
                     systemImage: "text.alignleft",
@@ -387,11 +387,11 @@ struct BootDetailCardView: View {
 
     private var passwordChip: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("密码")
+            Text(L("密码"))
                 .font(.system(size: 10, weight: .medium))
                 .foregroundColor(mutedText)
             HStack(spacing: 4) {
-                Text(passwordDisplay)
+                Text(L(passwordDisplay))
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     .foregroundColor(primaryText)
                     .lineLimit(1)
@@ -404,14 +404,14 @@ struct BootDetailCardView: View {
                             .foregroundColor(AppTheme.sidebarActive)
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .help(showPassword ? "隐藏密码" : "显示密码")
+                    .help(L(showPassword ? "隐藏密码" : "显示密码"))
                     Button(action: { model.copyPassword(detail.rootPassword) }) {
                         Image(systemName: "doc.on.doc")
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundColor(AppTheme.sidebarActive)
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .help("复制密码")
+                    .help(L("复制密码"))
                 }
             }
         }
@@ -429,10 +429,10 @@ struct BootDetailCardView: View {
 
     private func metricChip(_ label: String, _ value: String, accent: Color? = nil) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(label)
+            Text(L(label))
                 .font(.system(size: 10, weight: .medium))
                 .foregroundColor(mutedText)
-            Text(value)
+            Text(L(value))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(accent ?? primaryText)
                 .lineLimit(1)

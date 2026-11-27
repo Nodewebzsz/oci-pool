@@ -632,7 +632,7 @@ final class TenantsViewModel: ObservableObject {
         savePanel.nameFieldStringValue = fileName
         savePanel.canCreateDirectories = true
         savePanel.allowedFileTypes = ["pem", "txt"]
-        savePanel.message = "请选择保存原管理员私钥文件的位置"
+        savePanel.message = L("请选择保存原管理员私钥文件的位置")
         if savePanel.runModal() == .OK, let dest = savePanel.url {
             do {
                 try content.write(to: dest, atomically: true, encoding: .utf8)
@@ -652,7 +652,7 @@ final class TenantsViewModel: ObservableObject {
         savePanel.nameFieldStringValue = fileName
         savePanel.canCreateDirectories = true
         savePanel.allowedFileTypes = ["config", "txt", "conf"]
-        savePanel.message = "请选择保存 OCI 配置文件的位置"
+        savePanel.message = L("请选择保存 OCI 配置文件的位置")
         if savePanel.runModal() == .OK, let dest = savePanel.url {
             do {
                 try content.write(to: dest, atomically: true, encoding: .utf8)
@@ -1024,7 +1024,7 @@ final class TenantsViewModel: ObservableObject {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
-        panel.message = "选择 OCI API 私钥（.pem）"
+        panel.message = L("选择 OCI API 私钥（.pem）")
         panel.allowedFileTypes = ["pem", "key", "txt", "json"]
         if panel.runModal() == .OK { addKeyFileURL = panel.url }
     }
@@ -3252,7 +3252,7 @@ final class TenantsViewModel: ObservableObject {
         panel.nameFieldStringValue = suggested
         panel.canCreateDirectories = true
         panel.allowedFileTypes = ["json"]
-        panel.message = "导出租户 JSON（含 API 私钥内容，请妥善保管）"
+        panel.message = L("导出租户 JSON（含 API 私钥内容，请妥善保管）")
         if panel.runModal() == .OK, let dest = panel.url {
             do {
                 try data.write(to: dest, options: .atomic)

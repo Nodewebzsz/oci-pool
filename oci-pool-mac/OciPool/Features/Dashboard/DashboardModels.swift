@@ -281,8 +281,10 @@ struct OpenLogLinesEnvelope: Decodable {
 
 struct TenantPortraitData: Decodable, Equatable {
     var totalMainTenants: Int64 = 0
+    var inactiveCount: Int64 = 0
     var upgradedCount: Int64 = 0
     var freeCount: Int64 = 0
+    var unknownPlanCount: Int64 = 0
     var corporateCount: Int64 = 0
     var personalCount: Int64 = 0
     var unknownEntityCount: Int64 = 0
@@ -293,7 +295,7 @@ struct TenantPortraitData: Decodable, Equatable {
     var regionCountBuckets: [String: Int64] = [:]
 
     enum CodingKeys: String, CodingKey {
-        case totalMainTenants, upgradedCount, freeCount
+        case totalMainTenants, inactiveCount, upgradedCount, freeCount, unknownPlanCount
         case corporateCount, personalCount, unknownEntityCount
         case overHalfYearCount, overOneYearCount, multiRegionCount
         case ageBuckets, regionCountBuckets
@@ -304,8 +306,10 @@ struct TenantPortraitData: Decodable, Equatable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         totalMainTenants = Self.decodeInt64(c, forKey: .totalMainTenants)
+        inactiveCount = Self.decodeInt64(c, forKey: .inactiveCount)
         upgradedCount = Self.decodeInt64(c, forKey: .upgradedCount)
         freeCount = Self.decodeInt64(c, forKey: .freeCount)
+        unknownPlanCount = Self.decodeInt64(c, forKey: .unknownPlanCount)
         corporateCount = Self.decodeInt64(c, forKey: .corporateCount)
         personalCount = Self.decodeInt64(c, forKey: .personalCount)
         unknownEntityCount = Self.decodeInt64(c, forKey: .unknownEntityCount)

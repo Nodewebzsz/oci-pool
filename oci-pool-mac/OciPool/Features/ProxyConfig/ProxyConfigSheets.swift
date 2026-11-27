@@ -192,11 +192,11 @@ struct ProxyConfigSheet: View {
                             ? AppTheme.orange
                             : AppTheme.sidebarActive
                     )
-                Text(
+                Text(L(
                     (model.activeForm?.forceProxy == 1)
                         ? "已开启强制：代理不通时拒绝向云厂商发起请求"
                         : "非强制：代理不通时切换到代理池其他节点，不会直连"
-                )
+                ))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.sidebarText(dark))
                 .fixedSize(horizontal: false, vertical: true)
@@ -228,10 +228,10 @@ struct ProxyConfigSheet: View {
                 Image(systemName: form.tenantIds.isEmpty ? "globe" : "person.2")
                     .foregroundColor(AppTheme.sidebarActive)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("当前绑定")
+                    Text(L("当前绑定"))
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(AppTheme.sidebarText(dark))
-                    Text(model.selectedTenantLabel())
+                    Text(L(model.selectedTenantLabel()))
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
                         .lineLimit(2)
@@ -265,7 +265,7 @@ struct ProxyConfigSheet: View {
                         selected: form.tenantIds.isEmpty
                     )
                     if model.pagedTenants.isEmpty {
-                        Text("无匹配租户")
+                        Text(L("无匹配租户"))
                             .font(.system(size: 11))
                             .foregroundColor(AppTheme.sidebarText(dark))
                             .padding(.vertical, 12)
@@ -301,7 +301,7 @@ struct ProxyConfigSheet: View {
                 .buttonStyle(PlainButtonStyle())
                 .disabled(model.tenantPageIndex <= 0)
                 Spacer()
-                Text("\(model.tenantPageIndex + 1) / \(model.tenantTotalPages) · 共 \(model.filteredTenants.count) 个")
+                Text(L("\(model.tenantPageIndex + 1) / \(model.tenantTotalPages) · 共 \(model.filteredTenants.count) 个"))
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.sidebarText(dark))
                 Spacer()
@@ -334,11 +334,11 @@ struct ProxyConfigSheet: View {
                     .background(Circle().fill(selected ? AppTheme.sidebarActive : Color.clear))
                     .frame(width: 12, height: 12)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
+                    Text(L(title))
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
                         .lineLimit(1)
-                    Text(meta)
+                    Text(L(meta))
                         .font(.system(size: 10))
                         .foregroundColor(AppTheme.sidebarText(dark))
                         .lineLimit(1)
@@ -361,10 +361,10 @@ struct ProxyConfigSheet: View {
             Image(systemName: icon)
                 .foregroundColor(AppTheme.sidebarActive)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
-                Text(desc)
+                Text(L(desc))
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.sidebarText(dark))
             }

@@ -355,6 +355,7 @@ final class RegionsViewModel: ObservableObject {
             let matchQ = q.isEmpty
                 || row.regionCode.lowercased().contains(q)
                 || row.name.lowercased().contains(q)
+                || L(row.name).lowercased().contains(q)
             let matchC = continent == .all || row.continent == continent.rawValue
             let matchS: Bool = {
                 switch statusFilter {

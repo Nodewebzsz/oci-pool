@@ -239,7 +239,7 @@ final class ApiTokensViewModel: ObservableObject {
             return
         }
         let panel = NSSavePanel()
-        panel.title = "导出 OpenAPI 3.0.3 规范"
+        panel.title = L("导出 OpenAPI 3.0.3 规范")
         panel.nameFieldStringValue = "oci-pool-openapi-3.0.3.json"
         panel.canCreateDirectories = true
         panel.allowedContentTypes = [.json]

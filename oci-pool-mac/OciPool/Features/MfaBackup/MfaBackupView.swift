@@ -90,7 +90,7 @@ struct MfaBackupView: View {
                                     VStack(spacing: 12) {
                                         Spacer()
                                         ProgressView().scaleEffect(0.95)
-                                        Text("正在加载 MFA 密钥…")
+                                        Text(L("正在加载 MFA 密钥…"))
                                             .font(.system(size: 12))
                                             .foregroundColor(AppTheme.sidebarText(dark))
                                         Spacer()
@@ -103,7 +103,7 @@ struct MfaBackupView: View {
                                         Image(systemName: "key")
                                             .font(.system(size: 34))
                                             .foregroundColor(AppTheme.textTertiary(dark).opacity(0.5))
-                                        Text(model.searchText.isEmpty ? "暂无 MFA 密钥 · 点右上「添加密钥」开始" : "无匹配结果")
+                                        Text(L(model.searchText.isEmpty ? "暂无 MFA 密钥 · 点右上「添加密钥」开始" : "无匹配结果"))
                                             .font(.system(size: 12.5))
                                             .foregroundColor(AppTheme.textTertiary(dark))
                                         Spacer()
@@ -180,7 +180,7 @@ struct MfaBackupView: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 12))
                     .foregroundColor(AppTheme.textTertiary(dark))
-                TextField("按名称或发行方搜索...", text: $model.searchText)
+                TextField(L("按名称或发行方搜索..."), text: $model.searchText)
                     .textFieldStyle(PlainTextFieldStyle())
                     .font(.system(size: 12))
                 if !model.searchText.isEmpty {
@@ -211,7 +211,7 @@ struct MfaBackupView: View {
                 Image(systemName: "clock")
                     .font(.system(size: 11))
                     .foregroundColor(model.countdown <= 5 ? AppTheme.danger : AppTheme.info)
-                Text("动态码刷新")
+                Text(L("动态码刷新"))
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundColor(dark ? Color.white.opacity(0.85) : Color(hex: "1a202c"))
 
@@ -228,7 +228,7 @@ struct MfaBackupView: View {
                 }
 
                 // 倒计时微胶囊
-                Text("\(model.countdown)s")
+                Text(L("\(model.countdown)s"))
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 1.5)
@@ -266,12 +266,12 @@ struct MfaBackupView: View {
             // 1. 账号 (keyName) - 规范 1.3: 居中对齐，适度分配宽度，单行打点截断 + .help 提示
             HStack {
                 Spacer(minLength: 0)
-                Text(item.keyName)
+                Text(L(item.keyName))
                     .font(.system(size: 12.5, weight: .semibold))
                     .foregroundColor(dark ? Color.white.opacity(0.92) : Color(hex: "1a202c"))
                     .lineLimit(1)
                     .truncationMode(.tail)
-                    .help(item.keyName)
+                    .help(L(item.keyName))
                 Spacer(minLength: 0)
             }
             .frame(width: cols.account, alignment: .center)
@@ -279,7 +279,7 @@ struct MfaBackupView: View {
             // 2. 发行方 (issuer) - 颜色跟随主题色，居中对齐
             HStack {
                 Spacer()
-                Text(item.issuer.isEmpty ? "mfa-oci-pool" : item.issuer)
+                Text(L(item.issuer.isEmpty ? "mfa-oci-pool" : item.issuer))
                     .font(.system(size: 11, weight: .medium))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2.5)
@@ -287,7 +287,7 @@ struct MfaBackupView: View {
                     .foregroundColor(AppTheme.sidebarActive)
                     .cornerRadius(4)
                     .lineLimit(1)
-                    .help(item.issuer.isEmpty ? "mfa-oci-pool" : item.issuer)
+                    .help(L(item.issuer.isEmpty ? "mfa-oci-pool" : item.issuer))
                 Spacer()
             }
             .frame(width: cols.issuer, alignment: .center)
@@ -301,16 +301,16 @@ struct MfaBackupView: View {
                         .frame(width: 26, height: 26)
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help(item.revealSecret ? "隐藏密钥" : "显示密钥")
+                .help(L(item.revealSecret ? "隐藏密钥" : "显示密钥"))
 
-                Text(item.revealSecret ? item.secretKey : "••••••••••••••••")
+                Text(L(item.revealSecret ? item.secretKey : "••••••••••••••••"))
                     .font(.system(size: 11.5, design: .monospaced))
                     .foregroundColor(item.revealSecret ? (dark ? Color.white : Color(hex: "1a202c")) : AppTheme.sidebarText(dark))
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.horizontal, 6)
-                    .help(item.secretKey)
+                    .help(L(item.secretKey))
 
                 Button(action: {
                     NSPasteboard.general.clearContents()
@@ -323,7 +323,7 @@ struct MfaBackupView: View {
                         .frame(width: 26, height: 26)
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help("复制密钥")
+                .help(L("复制密钥"))
             }
             .padding(.horizontal, 4)
             .frame(width: max(220, cols.secret - 16), height: 28)
@@ -363,7 +363,7 @@ struct MfaBackupView: View {
                     }
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help("点击放大二维码扫码")
+                .help(L("点击放大二维码扫码"))
                 Spacer()
             }
             .frame(width: cols.qr, alignment: .center)
@@ -380,11 +380,11 @@ struct MfaBackupView: View {
                     }
                 }) {
                     HStack(spacing: 8) {
-                        Text(formatOtp(item.otpCode))
+                        Text(L(formatOtp(item.otpCode)))
                             .font(.system(size: 16, weight: .bold, design: .monospaced))
                             .foregroundColor(copiedItemId == item.id ? AppTheme.sidebarActive : (dark ? Color.white : Color(hex: "1a202c")))
 
-                        Text("\(model.countdown)s")
+                        Text(L("\(model.countdown)s"))
                             .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1.5)
@@ -406,7 +406,7 @@ struct MfaBackupView: View {
                     )
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help("点击复制动态码")
+                .help(L("点击复制动态码"))
                 Spacer()
             }
             .frame(width: cols.otp, alignment: .center)
@@ -425,7 +425,7 @@ struct MfaBackupView: View {
                         )
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help("删除密钥")
+                .help(L("删除密钥"))
                 Spacer()
             }
             .frame(width: cols.action, alignment: .center)
@@ -447,9 +447,9 @@ struct MfaBackupView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(AppTheme.danger)
-            Text(text).font(.system(size: 12))
+            Text(L(text)).font(.system(size: 12))
             Spacer()
-            Button("重试") { Task { await model.reload() } }
+            Button(L("重试")) { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
         }
         .foregroundColor(AppTheme.danger)
@@ -515,17 +515,17 @@ private struct MfaQrPreviewSheet: View {
                     }
 
                     VStack(spacing: 3) {
-                        Text(item.keyName)
+                        Text(L(item.keyName))
                             .font(.system(size: 14.5, weight: .bold))
                             .foregroundColor(dark ? .white : Color(hex: "1a202c"))
                             .lineLimit(1)
-                        Text("发行方：" + item.issuer)
+                        Text(L("发行方：" + item.issuer))
                             .font(.system(size: 11.5))
                             .foregroundColor(AppTheme.textSecondary(dark))
                             .lineLimit(1)
                     }
 
-                    Text("请使用手机 Authenticator App 对准屏幕扫描")
+                    Text(L("请使用手机 Authenticator App 对准屏幕扫描"))
                         .font(.system(size: 11))
                         .foregroundColor(AppTheme.textTertiary(dark))
                 }
@@ -622,7 +622,7 @@ private struct MfaAddSheet: View {
                         )
                     }
 
-                    Text("支持输入 16 位或 32 位 Base32 密钥，系统将自动去除空格并校验。")
+                    Text(L("支持输入 16 位或 32 位 Base32 密钥，系统将自动去除空格并校验。"))
                         .font(.system(size: 11))
                         .foregroundColor(AppTheme.textTertiary(dark))
                 }

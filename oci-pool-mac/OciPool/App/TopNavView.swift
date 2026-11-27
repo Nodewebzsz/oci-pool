@@ -105,17 +105,17 @@ struct TopNavView: View {
                 .background(circleBg(highlight: navigation.sidebarCollapsed))
         }
         .buttonStyle(PlainButtonStyle())
-        .help(navigation.sidebarCollapsed ? "展开侧栏（⌘⌥S）" : "收起侧栏（⌘⌥S）")
+        .help(L(navigation.sidebarCollapsed ? "展开侧栏（⌘⌥S）" : "收起侧栏（⌘⌥S）"))
     }
 
     // Web topbar 引擎状态 pill:运行点(pulse) + 引擎 + 运行中
     private var engineStatus: some View {
         HStack(spacing: 8) {
             PulseDotView(color: AppTheme.success)
-            Text("抢机引擎")
+            Text(L("抢机引擎"))
                 .font(.system(size: 11))
                 .foregroundColor(AppTheme.navIcon(dark))
-            Text("运行中")
+            Text(L("运行中"))
                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
                 .foregroundColor(AppTheme.success)
         }
@@ -153,7 +153,7 @@ struct TopNavView: View {
             Image(systemName: "clock")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(AppTheme.navIcon(dark).opacity(0.75))
-            Text(nowText)
+            Text(L(nowText))
                 .font(.system(size: 11.5, design: .monospaced))
                 .foregroundColor(AppTheme.navIcon(dark))
         }
@@ -170,7 +170,7 @@ struct TopNavView: View {
                 LanguagesGlyph()
                     .stroke(style: StrokeStyle(lineWidth: 1.75, lineCap: .round, lineJoin: .round))
                     .frame(width: 14, height: 14)
-                Text(langShortTitle)
+                Text(L(langShortTitle))
                     .font(.system(size: 11.5, weight: .medium, design: .monospaced))
                     .tracking(0.3)
             }
@@ -187,7 +187,7 @@ struct TopNavView: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
-        .help("语言")
+        .help(L("语言"))
     }
 
     private var themeMenuButton: some View {
@@ -211,7 +211,7 @@ struct TopNavView: View {
         }
         .buttonStyle(PlainButtonStyle())
         .fixedSize()
-        .help("主题")
+        .help(L("主题"))
     }
 
     // Web topbar: 强调色 5 点切换 · 调色板按钮 + popover 色板
@@ -241,7 +241,7 @@ struct TopNavView: View {
             .frame(width: 30, height: 30)
         }
         .buttonStyle(PlainButtonStyle())
-        .help("强调色")
+        .help(L("强调色"))
     }
 
     // Web topbar: 信息密度 紧凑/舒适 一键切换
@@ -263,7 +263,7 @@ struct TopNavView: View {
                 )
         }
         .buttonStyle(PlainButtonStyle())
-        .help("信息密度: \(appearance.density.title) · 点击切换到 \(appearance.density == .compact ? DensityMode.comfortable.title : DensityMode.compact.title)")
+        .help(L("信息密度: \(appearance.density.title) · 点击切换到 \(appearance.density == .compact ? DensityMode.comfortable.title : DensityMode.compact.title)"))
     }
 
     private var messageButton: some View {
@@ -300,7 +300,7 @@ struct TopNavView: View {
             .frame(width: 30, height: 30)
         }
         .buttonStyle(PlainButtonStyle())
-        .help(header.unreadCount > 0 ? "通知 · \(header.unreadCount) 条未读" : "通知")
+        .help(L(header.unreadCount > 0 ? "通知 · \(header.unreadCount) 条未读" : "通知"))
     }
 
     private var userButton: some View {
@@ -320,7 +320,7 @@ struct TopNavView: View {
                             startPoint: .topLeading, endPoint: .bottomTrailing
                         ))
                         .frame(width: 26, height: 26)
-                    Text(avatarLetter)
+                    Text(L(avatarLetter))
                         .font(.system(size: 10.5, weight: .bold))
                         .foregroundColor(AppTheme.isClaude ? .white : Color(hex: "0e2a22"))
                         .tracking(-0.2)
@@ -339,7 +339,7 @@ struct TopNavView: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
-        .help("账号菜单")
+        .help(L("账号菜单"))
     }
 
     private var themeIcon: String {
@@ -415,7 +415,7 @@ struct UserDropdownPanel: View {
                     action: onAsset
                 )
                 divider
-                Text("切换云厂商")
+                Text(L("切换云厂商"))
                     .font(.system(size: 10.5, weight: .semibold))
                     .foregroundColor(textMuted)
                     .padding(.horizontal, 10)
@@ -457,19 +457,19 @@ struct UserDropdownPanel: View {
                 Circle()
                     .fill(AppTheme.sidebarActive.opacity(0.25))
                     .frame(width: 36, height: 36)
-                Text(avatarLetters)
+                Text(L(avatarLetters))
                     .font(.system(size: 11, weight: .bold))
                     .foregroundColor(AppTheme.sidebarActive)
             }
             VStack(alignment: .leading, spacing: 4) {
-                Text("欢迎，\(username.isEmpty ? "Admin" : username)")
+                Text(L("欢迎，\(username.isEmpty ? "Admin" : username)"))
                     .font(.system(size: 12.5, weight: .semibold))
                     .foregroundColor(textPrimary)
                     .lineLimit(1)
                 HStack(spacing: 4) {
                     Image(systemName: "checkmark.shield.fill")
                         .font(.system(size: 9, weight: .semibold))
-                    Text("超级管理员")
+                    Text(L("超级管理员"))
                         .font(.system(size: 9.5, weight: .semibold))
                 }
                 .foregroundColor(AppTheme.sidebarActive)
@@ -517,12 +517,12 @@ struct UserDropdownPanel: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(danger ? AppTheme.danger : (selected ? AppTheme.sidebarActive : textMuted))
                     .frame(width: 14)
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(danger ? AppTheme.danger : textPrimary)
                 Spacer(minLength: 0)
                 if let trailing = trailing {
-                    Text(trailing)
+                    Text(L(trailing))
                         .font(.system(size: 9.5, weight: .bold, design: .monospaced))
                         .foregroundColor(trailingColor ?? AppTheme.sidebarActive)
                         .padding(.horizontal, 6)
@@ -565,7 +565,7 @@ private struct AssetAnalysisSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("云资产报告")
+                Text(L("云资产报告"))
                     .font(.system(size: 16, weight: .bold))
                 Spacer()
                 Button(action: { presentationMode.wrappedValue.dismiss() }) {
@@ -577,12 +577,12 @@ private struct AssetAnalysisSheet: View {
 
             if header.assetLoading {
                 Spacer()
-                HStack { Spacer(); ProgressView("加载中…"); Spacer() }
+                HStack { Spacer(); ProgressView(L("加载中…")); Spacer() }
                 Spacer()
             } else if let err = header.assetError {
                 Spacer()
-                Text(err).foregroundColor(.red).padding()
-                Button("重试") { Task { await header.loadAsset() } }
+                Text(L(err)).foregroundColor(.red).padding()
+                Button(L("重试")) { Task { await header.loadAsset() } }
                     .padding()
                 Spacer()
             } else if let a = header.asset {
@@ -595,13 +595,13 @@ private struct AssetAnalysisSheet: View {
                             .foregroundColor(AppTheme.sidebarText(dark))
                         HStack(spacing: 6) {
                             Image(systemName: cfg.icon)
-                            Text(a.levelTitle.isEmpty ? cfg.name : a.levelTitle)
+                            Text(L(a.levelTitle.isEmpty ? cfg.name : a.levelTitle))
                                 .font(.system(size: 13, weight: .bold))
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(Capsule().fill(AppTheme.sidebarActive.opacity(0.16)))
-                        Text("Scale: Lvl.\(lvl)")
+                        Text(L("Scale: Lvl.\(lvl)"))
                             .font(.system(size: 11))
                             .foregroundColor(AppTheme.sidebarText(dark))
                     }
@@ -627,7 +627,7 @@ private struct AssetAnalysisSheet: View {
                 Spacer()
                 HStack {
                     Spacer()
-                    Button("关闭报告") { presentationMode.wrappedValue.dismiss() }
+                    Button(L("关闭报告")) { presentationMode.wrappedValue.dismiss() }
                         .buttonStyle(PlainButtonStyle())
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
@@ -637,7 +637,7 @@ private struct AssetAnalysisSheet: View {
                 .padding(16)
             } else {
                 Spacer()
-                Text("暂无数据").padding()
+                Text(L("暂无数据")).padding()
                 Spacer()
             }
         }
@@ -647,10 +647,10 @@ private struct AssetAnalysisSheet: View {
 
     private func metric(_ title: String, _ value: String, _ color: Color?) -> some View {
         VStack(spacing: 8) {
-            Text(title)
+            Text(L(title))
                 .font(.system(size: 12))
                 .foregroundColor(AppTheme.sidebarText(dark))
-            Text(value)
+            Text(L(value))
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundColor(color ?? (dark ? Color.white.opacity(0.9) : Color.primary))
         }
@@ -718,7 +718,7 @@ private struct AboutSheet: View {
                             .background(Circle().fill(dark ? Color(hex: "2a3144") : Color(hex: "f1f5f9")))
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .help("关闭")
+                    .help(L("关闭"))
                     .padding(16)
                 }
                 Spacer()
@@ -734,7 +734,7 @@ private struct AboutSheet: View {
                     .frame(maxWidth: 420, maxHeight: 420)
                     .cornerRadius(12)
                     .onTapGesture { zoomImage = nil }
-                    .help("点击关闭预览")
+                    .help(L("点击关闭预览"))
             }
         }
         .frame(width: 720, height: 510)
@@ -804,7 +804,7 @@ private struct AboutSheet: View {
                         HStack(spacing: 6) {
                             Image(systemName: "arrow.down.circle.fill")
                                 .font(.system(size: 11, weight: .semibold))
-                            Text("下载 Mac 安装包")
+                            Text(L("下载 Mac 安装包"))
                                 .font(.system(size: 12, weight: .semibold))
                         }
                         .foregroundColor(.white)
@@ -814,7 +814,7 @@ private struct AboutSheet: View {
                     }
                     .buttonStyle(PlainButtonStyle())
                     .disabled(header.updatePhase.isActive)
-                    .help("下载 macOS 安装包（DMG），替换应用程序后重启")
+                    .help(L("下载 macOS 安装包（DMG），替换应用程序后重启"))
                 }
             }
         }
@@ -825,15 +825,15 @@ private struct AboutSheet: View {
 
     private func versionItem(label: String, value: String, showTag: Bool) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(label)
+            Text(L(label))
                 .font(.system(size: 10, weight: .bold))
                 .foregroundColor(textMuted)
             HStack(spacing: 6) {
-                Text(value)
+                Text(L(value))
                     .font(.system(size: 15, weight: .heavy, design: .monospaced))
                     .foregroundColor(textPrimary)
                 if showTag {
-                    Text(header.version.needUpdate ? "可更新" : "最新")
+                    Text(L(header.version.needUpdate ? "可更新" : "最新"))
                         .font(.system(size: 9, weight: .bold))
                         .foregroundColor(header.version.needUpdate
                             ? (dark ? Color(hex: "fbbf24") : Color(hex: "854d0e"))
@@ -870,7 +870,7 @@ private struct AboutSheet: View {
             HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 12, weight: .semibold))
-                Text(title)
+                Text(L(title))
                     .font(.system(size: 12, weight: .medium))
             }
             .foregroundColor(textSecondary)
@@ -894,7 +894,7 @@ private struct AboutSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 HStack(spacing: 6) {
-                    Text("请作者喝杯咖啡")
+                    Text(L("请作者喝杯咖啡"))
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(dark ? Color(hex: "cbd5e1") : Color(hex: "334155"))
                     Image(systemName: "heart.fill")
@@ -902,7 +902,7 @@ private struct AboutSheet: View {
                         .foregroundColor(Color(hex: "f43f5e"))
                 }
                 Spacer()
-                Text("点击二维码可放大预览")
+                Text(L("点击二维码可放大预览"))
                     .font(.system(size: 11))
                     .foregroundColor(textMuted)
             }
@@ -961,12 +961,12 @@ private struct AboutSheet: View {
                 HStack(spacing: 6) {
                     Image(systemName: titleIcon)
                         .foregroundColor(titleColor)
-                    Text(title)
+                    Text(L(title))
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(textPrimary)
                 }
                 if let subtitle = subtitle {
-                    Text(subtitle)
+                    Text(L(subtitle))
                         .font(.system(size: 11))
                         .foregroundColor(textMuted)
                 }
@@ -975,7 +975,7 @@ private struct AboutSheet: View {
                         HStack(spacing: 5) {
                             Image(systemName: copied ? "checkmark" : "doc.on.doc")
                                 .font(.system(size: 10, weight: .semibold))
-                            Text(copied ? "已复制" : "BSC 复制地址")
+                            Text(L(copied ? "已复制" : "BSC 复制地址"))
                                 .font(.system(size: 11, weight: .medium))
                         }
                         .foregroundColor(copied ? AppTheme.sidebarActive : textSecondary)
@@ -987,7 +987,7 @@ private struct AboutSheet: View {
                         )
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .help(trc20)
+                    .help(L(trc20))
                 }
             }
             Spacer(minLength: 0)
@@ -1137,11 +1137,11 @@ private struct VersionUpdateProgressSheet: View {
                                  ? AppTheme.orange
                                  : (finished ? AppTheme.sidebarActive : AppTheme.info))
 
-            Text(title)
+            Text(L(title))
                 .font(.system(size: 16, weight: .bold))
                 .foregroundColor(dark ? Color.white.opacity(0.92) : Color(hex: "0f172a"))
 
-            Text(detail)
+            Text(L(detail))
                 .font(.system(size: 13))
                 .multilineTextAlignment(.center)
                 .foregroundColor(dark ? Color.white.opacity(0.55) : Color(hex: "64748b"))
@@ -1158,7 +1158,7 @@ private struct VersionUpdateProgressSheet: View {
             }
 
             if finished {
-                Button("完成") {
+                Button(L("完成")) {
                     header.dismissUpdateProgress()
                 }
                 .buttonStyle(PlainButtonStyle())

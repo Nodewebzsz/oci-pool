@@ -74,7 +74,7 @@ struct TenantDetailView: View {
                 HStack(spacing: 5) {
                     Image(systemName: "arrow.left")
                         .font(.system(size: 11, weight: .bold))
-                    Text("返回")
+                    Text(L("返回"))
                         .font(.system(size: 12))
                 }
                 .foregroundColor(primaryText)
@@ -91,7 +91,7 @@ struct TenantDetailView: View {
 
             HStack(spacing: 6) {
                 Button(action: { model.closeDetail() }) {
-                    Text("租户管理")
+                    Text(L("租户管理"))
                         .font(.system(size: 12))
                         .foregroundColor(mutedText)
                 }
@@ -102,12 +102,12 @@ struct TenantDetailView: View {
                     .foregroundColor(mutedText.opacity(0.6))
 
                 HStack(spacing: 4) {
-                    Text("租户详情")
+                    Text(L("租户详情"))
                         .font(.system(size: 12))
                         .foregroundColor(mutedText)
                     Text("·")
                         .foregroundColor(mutedText)
-                    Text(displayName)
+                    Text(L(displayName))
                         .font(.system(size: 12, weight: .semibold, design: .monospaced))
                         .foregroundColor(primaryText)
                 }
@@ -137,16 +137,16 @@ struct TenantDetailView: View {
                             model.detailNamesHidden.toggle()
                         }
                     }) {
-                        Text(displayName)
+                        Text(L(displayName))
                             .font(.system(size: 18, weight: .bold))
                             .foregroundColor(primaryText)
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .help(model.detailNamesHidden ? "点击显示完整名称" : "点击脱敏隐藏名称")
+                    .help(L(model.detailNamesHidden ? "点击显示完整名称" : "点击脱敏隐藏名称"))
 
                     // 自定义别名徽章：只有设置了别名且与租户名不同时才展示
                     if let alias = parent?.customAlias, !alias.isEmpty, alias != parent?.displayName {
-                        Text(alias)
+                        Text(L(alias))
                             .font(.system(size: 11, weight: .medium, design: .monospaced))
                             .foregroundColor(primaryText)
                             .padding(.horizontal, 8)
@@ -165,12 +165,12 @@ struct TenantDetailView: View {
                 // 副标题：多区域/单区域 · 账号类型 · 运行天数
                 HStack(spacing: 8) {
                     let isMulti = (parent?.isMultiRegion == true || model.detailRows.count > 1)
-                    Text(isMulti ? "多区域账号" : "单区域账号")
+                    Text(L(isMulti ? "多区域账号" : "单区域账号"))
                     Text("·")
                     let type = (parent?.accountTypeName.isEmpty == false) ? parent!.accountTypeName : "未知"
-                    Text(type)
+                    Text(L(type))
                     Text("·")
-                    Text("已运行 \(parent?.activeDaysText ?? "0") 天")
+                    Text(L("已运行 \(parent?.activeDaysText ?? "0") 天"))
                 }
                 .font(.system(size: 12))
                 .foregroundColor(mutedText)
@@ -203,7 +203,7 @@ struct TenantDetailView: View {
                     }
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help(model.detailNamesHidden ? "显示名称" : "隐藏名称")
+                .help(L(model.detailNamesHidden ? "显示名称" : "隐藏名称"))
 
                 // API 导入按钮
                 AppButton(title: "API 导入", systemImage: "bolt.fill", kind: .primary) {
@@ -227,7 +227,7 @@ struct TenantDetailView: View {
                     let regionSuffix = (cn != row.region) ? " (\(row.region))" : ""
                     let homeTag = row.isHomeRegion ? " [主区域]" : ""
                     let check = (row.id == model.selectedRegionId) ? "✓ " : ""
-                    Text("\(check)\(flag) \(cn)\(regionSuffix)\(homeTag)")
+                    Text(L("\(check)\(flag) \(cn)\(regionSuffix)\(homeTag)"))
                 }
             }
         } label: {
@@ -235,13 +235,13 @@ struct TenantDetailView: View {
                 Image(systemName: "globe")
                     .font(.system(size: 12))
                     .foregroundColor(mutedText)
-                Text("区域")
+                Text(L("区域"))
                     .font(.system(size: 11))
                     .foregroundColor(mutedText)
 
                 let curCode = activeRow?.region ?? ""
                 let curCn = RegionCnName.table[curCode] ?? curCode
-                Text(curCn)
+                Text(L(curCn))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(primaryText)
 
@@ -268,7 +268,7 @@ struct TenantDetailView: View {
             HStack(spacing: 6) {
                 Image(systemName: "gearshape.2")
                     .font(.system(size: 12, weight: .semibold))
-                Text("区域操作")
+                Text(L("区域操作"))
                     .font(.system(size: 11, weight: .bold))
             }
             .foregroundColor(mutedText)
@@ -349,7 +349,7 @@ struct TenantDetailView: View {
             if model.detailRows.isEmpty {
                 VStack(spacing: 8) {
                     Spacer()
-                    Text("暂无区域数据")
+                    Text(L("暂无区域数据"))
                         .font(.system(size: 12))
                         .foregroundColor(mutedText)
                     Spacer()
@@ -368,7 +368,7 @@ struct TenantDetailView: View {
     }
 
     private func headerCol(_ text: String, width: CGFloat) -> some View {
-        Text(text)
+        Text(L(text))
             .font(.system(size: 11, weight: .bold))
             .foregroundColor(mutedText)
             .frame(width: width, alignment: .leading)
@@ -383,7 +383,7 @@ struct TenantDetailView: View {
         }) {
             HStack(spacing: 0) {
                 // #
-                Text("\(index + 1)")
+                Text(L("\(index + 1)"))
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(mutedText)
                     .frame(width: 44, alignment: .leading)
@@ -391,7 +391,7 @@ struct TenantDetailView: View {
                 // 租户名标签
                 let nameShown = !model.detailNamesHidden
                 let tName = nameShown ? item.displayName : item.maskedName
-                Text(tName)
+                Text(L(tName))
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
                     .foregroundColor(primaryText)
                     .lineLimit(1)
@@ -403,7 +403,7 @@ struct TenantDetailView: View {
                     .frame(width: 140, alignment: .leading)
 
                 // 自定义名称
-                Text(item.defNameText)
+                Text(L(item.defNameText))
                     .font(.system(size: 12))
                     .foregroundColor(primaryText)
                     .lineLimit(1)
@@ -414,7 +414,7 @@ struct TenantDetailView: View {
                 HStack {
                     let taskCount = isSelected ? model.detailBootTaskCount : (item.openBootFlag ? 1 : 0)
                     if taskCount > 0 {
-                        Text("\(taskCount)项进行中")
+                        Text(L("\(taskCount)项进行中"))
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(AppTheme.info)
                             .padding(.horizontal, 6)
@@ -422,7 +422,7 @@ struct TenantDetailView: View {
                             .background(AppTheme.info.opacity(0.14))
                             .cornerRadius(4)
                     } else {
-                        Text("无任务")
+                        Text(L("无任务"))
                             .font(.system(size: 11))
                             .foregroundColor(mutedText.opacity(0.8))
                     }
@@ -431,7 +431,7 @@ struct TenantDetailView: View {
 
                 // 区域（仅展示区域名称，去掉地球图标与括号重复项）
                 let cn = RegionCnName.table[item.region] ?? item.region
-                Text(cn)
+                Text(L(cn))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(primaryText)
                     .lineLimit(1)
@@ -443,7 +443,7 @@ struct TenantDetailView: View {
                         HStack(spacing: 3) {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 9, weight: .bold))
-                            Text("是")
+                            Text(L("是"))
                                 .font(.system(size: 11, weight: .semibold))
                         }
                         .foregroundColor(AppTheme.sidebarActive)
@@ -452,7 +452,7 @@ struct TenantDetailView: View {
                         .background(AppTheme.sidebarActive.opacity(0.14))
                         .cornerRadius(4)
                     } else {
-                        Text("否")
+                        Text(L("否"))
                             .font(.system(size: 11))
                             .foregroundColor(mutedText.opacity(0.8))
                     }
@@ -466,7 +466,7 @@ struct TenantDetailView: View {
                             Circle()
                                 .fill(AppTheme.sidebarActive)
                                 .frame(width: 5, height: 5)
-                            Text("已同步")
+                            Text(L("已同步"))
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(AppTheme.sidebarActive)
                         }
@@ -475,7 +475,7 @@ struct TenantDetailView: View {
                         .background(AppTheme.sidebarActive.opacity(0.12))
                         .cornerRadius(4)
                     } else {
-                        Text("未同步")
+                        Text(L("未同步"))
                             .font(.system(size: 11))
                             .foregroundColor(mutedText)
                             .padding(.horizontal, 6)
@@ -487,7 +487,7 @@ struct TenantDetailView: View {
                 .frame(width: 96, alignment: .leading)
 
                 // 创建时间
-                Text(item.createdAt.isEmpty ? "—" : item.createdAt)
+                Text(L(item.createdAt.isEmpty ? "—" : item.createdAt))
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(mutedText)
                     .lineLimit(1)
@@ -559,10 +559,10 @@ struct TenantDetailView: View {
                     .foregroundColor(color)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(label)
+                Text(L(label))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(mutedText)
-                Text(value)
+                Text(L(value))
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(primaryText)
             }
@@ -585,9 +585,9 @@ struct TenantDetailView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 12))
+            Text(L(text)).font(.system(size: 12))
             Spacer()
-            Button("重试") { Task { await model.reloadDetail() } }
+            Button(L("重试")) { Task { await model.reloadDetail() } }
                 .buttonStyle(PlainButtonStyle())
                 .font(.system(size: 12, weight: .semibold))
         }
