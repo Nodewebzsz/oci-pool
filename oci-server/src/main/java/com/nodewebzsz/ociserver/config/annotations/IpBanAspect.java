@@ -3,6 +3,7 @@ package com.nodewebzsz.ociserver.config.annotations;
 import com.nodewebzsz.dao.entity.BanRecord;
 import com.nodewebzsz.dao.repository.BanRecordRepository;
 import com.nodewebzsz.ociserver.config.exception.IpBannedException;
+import com.nodewebzsz.ociserver.service.security.LoginIpTransactions;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -37,7 +38,8 @@ public class IpBanAspect {
             throw new IpBannedException("无法识别IP来源，拒绝访问。");
         }
 
-        BanRecord record = banRecordRepository.findTopByIpAddress(clientIp);
+        String normalizedIp = LoginIpTransactions.normalizeIp(clientIp);
+        BanRecord record = banRecordRepository.findTopByIpAddressAndStatusOrderByIdDesc(normalizedIp, 1);
         if (record != null && record.getStatus() == 1) {
             MethodSignature signature = (MethodSignature) joinPoint.getSignature();
             Method method = signature.getMethod();
@@ -47,7 +49,7 @@ public class IpBanAspect {
             }
 
             String message = annotation != null ? annotation.message() : "您的IP已被封禁";
-            log.warn("封禁IP：IP={}", clientIp);
+            log.warn("封禁IP：IP={}", normalizedIp);
             throw new IpBannedException(message);
         }
 

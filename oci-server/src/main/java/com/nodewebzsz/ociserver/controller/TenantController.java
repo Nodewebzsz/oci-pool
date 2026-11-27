@@ -40,6 +40,7 @@ import com.nodewebzsz.ociserver.service.SecurityRuleService;
 import com.nodewebzsz.ociserver.service.TenantService;
 import com.nodewebzsz.ociserver.service.TrafficAlertService;
 import com.nodewebzsz.ociserver.service.permissions.OciPermissionDeniedException;
+import com.nodewebzsz.ociserver.service.security.ExportVerificationGuard;
 import com.nodewebzsz.ociserver.utils.PageUtils;
 import com.nodewebzsz.ociserver.utils.oracle.MFAUtils;
 import com.nodewebzsz.ociserver.utils.oracle.OciLimitsUtils;
@@ -969,6 +970,10 @@ public class TenantController extends BaseController{
         try {
             verifyService.sendVerifyCodeForExport(username, request);
             return ResponseEntity.ok().build();
+        } catch (ExportVerificationGuard.ExportVerificationException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
         }

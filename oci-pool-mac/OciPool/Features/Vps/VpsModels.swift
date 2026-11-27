@@ -24,8 +24,39 @@ struct VpsCardItem: Identifiable, Equatable {
     var latencyMs: Int? = nil
     var isLatencyTesting: Bool = false
     var monitorWarning: Bool = false
+    var qualityAgent: NetworkQualityAgent? = nil
+    var qualitySummaries: [VpsQualitySummary] = []
 
     var id: String { item.id }
+
+    var qualityStatus: String {
+        if let status = qualityAgent?.qualityStatus, !status.isEmpty {
+            return status
+        }
+        return item.monitorInstalled ? "upgrade_required" : "not_installed"
+    }
+
+    var qualityStatusLabel: String {
+        switch qualityStatus {
+        case "online": return "探针在线"
+        case "offline": return "探针离线"
+        case "upgrade_required": return "待升级"
+        default: return "未安装"
+        }
+    }
+
+    var qualityStatusTone: StatusTone {
+        switch qualityStatus {
+        case "online": return .success
+        case "offline": return .danger
+        case "upgrade_required": return .warning
+        default: return .neutral
+        }
+    }
+
+    var needsProbeUpgrade: Bool {
+        qualityStatus == "upgrade_required"
+    }
 
     var isOnline: Bool { item.isPingOnline }
 
@@ -63,6 +94,13 @@ struct VpsCardItem: Identifiable, Equatable {
         let ip = item.publicIps.trimmingCharacters(in: .whitespacesAndNewlines)
         return ip.isEmpty ? "无 IP" : ip
     }
+}
+
+struct VpsQualitySummary: Identifiable, Equatable {
+    var task: NetworkQualityTask
+    var sample: NetworkQualitySample?
+
+    var id: String { task.id }
 }
 
 enum VpsFormat {

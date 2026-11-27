@@ -3,14 +3,17 @@ package com.nodewebzsz.ociserver.controller;
 import cn.dev33.satoken.stp.StpUtil;
 import com.nodewebzsz.ocicommon.utils.IpUtils;
 import com.nodewebzsz.ocicommon.utils.RsaUtils;
+import com.nodewebzsz.ociserver.config.exception.IpBannedException;
 import com.nodewebzsz.ociserver.controller.BaseController.MessageResolver;
 import com.nodewebzsz.ociserver.pojo.request.MfaConfig;
 import com.nodewebzsz.ociserver.pojo.request.TurnstileConfig;
 import com.nodewebzsz.ociserver.service.VerifyService;
 import com.nodewebzsz.ociserver.service.impl.system.SystemConfigService;
 import com.nodewebzsz.ociserver.service.login.AuthSecurityService;
+import com.nodewebzsz.ociserver.service.login.LoginFailureGuard;
 import com.nodewebzsz.ociserver.service.login.LoginUserService;
 import com.nodewebzsz.ociserver.service.mfa.OTPService;
+import com.nodewebzsz.ociserver.service.security.ExportVerificationGuard;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Lazy;
@@ -51,6 +54,12 @@ public class LoginController {
     private AuthSecurityService authSecurityService;
 
     @Resource
+    private LoginFailureGuard loginFailureGuard;
+
+    @Resource
+    private ExportVerificationGuard exportVerificationGuard;
+
+    @Resource
     private SystemConfigService systemConfigService;
 
     @Resource
@@ -81,6 +90,8 @@ public class LoginController {
         String clientIp = IpUtils.getClientIpAddress(request);
 
         try {
+            clientIp = loginFailureGuard.assertAllowed(request);
+
             // 检查 IP / 用户名 是否处于锁定状态
             authSecurityService.checkLoginLock(clientIp, username);
 
@@ -90,16 +101,27 @@ public class LoginController {
             }
 
             // 验证用户名密码
-            com.nodewebzsz.dao.entity.LoginUser user;
-            try {
-                user = loginUserService.validateCredentials(username, password);
-            } catch (Exception e) {
-                // 密码错误记录惩罚，满5次触发15分钟锁定
+            LoginUserService.CredentialCheckResult credentialResult = loginUserService.checkCredentials(username, password);
+            if (credentialResult.getStatus() == LoginUserService.CredentialCheckStatus.UNKNOWN_USERNAME) {
+                loginFailureGuard.failed(clientIp, username, true);
                 String failMsg = authSecurityService.recordLoginFailure(clientIp, username);
-                log.warn("用户 [{}] IP [{}] 登录失败：{}", username, clientIp, failMsg);
+                log.warn("用户 [{}] IP [{}] 登录失败（未知用户名）：{}", username, clientIp, failMsg);
+                redirectError(response, request, isAjax, mobile, "用户名或密码错误");
+                return;
+            }
+            if (credentialResult.getStatus() == LoginUserService.CredentialCheckStatus.WRONG_PASSWORD) {
+                try {
+                    exportVerificationGuard.recordPasswordFailure(username);
+                } catch (Exception ex) {
+                    log.warn("记录用户 [{}] 密码失败计数到导出校验守卫时发生异常：{}", username, ex.getMessage());
+                }
+                loginFailureGuard.failed(clientIp, username, false);
+                String failMsg = authSecurityService.recordLoginFailure(clientIp, username);
+                log.warn("用户 [{}] IP [{}] 登录失败（密码错误）：{}", username, clientIp, failMsg);
                 redirectError(response, request, isAjax, mobile, failMsg);
                 return;
             }
+            com.nodewebzsz.dao.entity.LoginUser user = credentialResult.getUser();
 
             // 验证额外因子（MFA / 消息验证码）
             String factorError = validateAdditionalFactors(request, username);
@@ -108,11 +130,12 @@ public class LoginController {
                 return;
             }
 
-            // 登录成功，清除失败计数与锁定状态
-            authSecurityService.clearLoginFailure(clientIp, username);
-
-            // 登录成功，写入 Sa-Token session
-            StpUtil.login(user.getUsername(), rememberMe);
+            final String resolvedIp = clientIp;
+            loginFailureGuard.withLoginLock(resolvedIp, () -> {
+                loginFailureGuard.loginSucceeded(resolvedIp);
+                authSecurityService.clearLoginFailure(resolvedIp, username);
+                StpUtil.login(user.getUsername(), rememberMe);
+            });
             log.info("用户 [{}] 登录成功，rememberMe={}", username, rememberMe);
 
             // 登录成功后清除 RSA 密钥，防止重复使用
@@ -129,6 +152,9 @@ public class LoginController {
             } else {
                 response.sendRedirect(targetUrl);
             }
+        } catch (IpBannedException e) {
+            log.warn("用户 [{}] IP [{}] 触发 IP 封禁拦截：{}", username, clientIp, e.getMessage());
+            redirectBanned(response, isAjax, mobile, e.getMessage());
         } catch (IllegalStateException e) {
             log.warn("用户 [{}] IP [{}] 登录被安全拦截：{}", username, clientIp, e.getMessage());
             redirectError(response, request, isAjax, mobile, e.getMessage());
@@ -215,6 +241,21 @@ public class LoginController {
         } else {
             String loginUrl = mobile ? "/m/login" : "/login";
             String encoded = URLEncoder.encode(message == null ? "" : message, StandardCharsets.UTF_8.name());
+            response.sendRedirect(loginUrl + "?error=" + encoded);
+        }
+    }
+
+    private void redirectBanned(HttpServletResponse response,
+                                boolean isAjax, boolean mobile, String message) throws IOException {
+        String safeMessage = StringUtils.hasText(message) ? message : "IP 已被封禁，请联系管理员解封。";
+        if (isAjax) {
+            response.setContentType("application/json;charset=utf-8");
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            String escaped = safeMessage.replace("\\", "\\\\").replace("\"", "\\\"");
+            response.getWriter().write("{\"success\":false,\"code\":403,\"banned\":true,\"message\":\"" + escaped + "\"}");
+        } else {
+            String loginUrl = mobile ? "/m/login" : "/login";
+            String encoded = URLEncoder.encode(safeMessage, StandardCharsets.UTF_8.name());
             response.sendRedirect(loginUrl + "?error=" + encoded);
         }
     }

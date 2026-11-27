@@ -145,6 +145,16 @@ public class AuthSecurityService {
     }
 
     /**
+     * 清除指定 IP 的失败计数和临时锁定（用于手动解封同步）
+     */
+    public void clearIpFailure(String ip) {
+        if (StringUtils.isNotBlank(ip)) {
+            loginFailCountCache.invalidate("ip:" + ip);
+            loginLockCache.invalidate("ip:" + ip);
+        }
+    }
+
+    /**
      * 密码重置成功后，解除该账号及登录失败锁定状态，确保用户可立即使用新密码登录
      */
     public void clearLoginLockAfterPasswordReset(String username) {

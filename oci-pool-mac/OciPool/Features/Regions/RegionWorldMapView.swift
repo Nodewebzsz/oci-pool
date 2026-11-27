@@ -136,21 +136,6 @@ struct RegionMapNode: Identifiable, Equatable {
     var position: CGPoint { WorldMapData.project(lon: lng, lat: lat) }
 }
 
-/// 45° 旋转菱形标记（用于 `unlinkedReleased` 官方已放货但尚未关联账号覆盖区域）。
-struct DiamondMarkerShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var p = Path()
-        let midX = rect.midX
-        let midY = rect.midY
-        p.move(to: CGPoint(x: midX, y: rect.minY))
-        p.addLine(to: CGPoint(x: rect.maxX, y: midY))
-        p.addLine(to: CGPoint(x: midX, y: rect.maxY))
-        p.addLine(to: CGPoint(x: rect.minX, y: midY))
-        p.closeSubpath()
-        return p
-    }
-}
-
 // MARK: - TopoJSON 解码 + d3 geoNaturalEarth1 投影
 
 /// 加载后端 `/modern-ui/vendor/countries-110m.json`（与 Web 同一份 world-atlas 110m），
@@ -518,17 +503,15 @@ struct RegionWorldMapView: View {
                     .frame(width: max(5, r * 2), height: max(5, r * 2))
 
             case .unlinkedReleased:
-                let diamondColor = node.todayGrabs > 0 ? AppTheme.orange : AppTheme.cyan
-                let side = max(8, (r * 2 + 2.5) * scale)
+                let color = node.todayGrabs > 0 ? AppTheme.orange : AppTheme.cyan
+                let diameter = max(6, 6.8 * scale)
                 if node.todayGrabs > 0 {
-                    PulseHaloCircle(color: diamondColor, baseRadius: side * 0.85)
+                    PulseHaloCircle(color: color, baseRadius: 8 * scale)
                 }
-                DiamondMarkerShape()
-                    .fill(diamondColor.opacity(dark ? 0.28 : 0.20))
-                    .frame(width: side, height: side)
-                DiamondMarkerShape()
-                    .stroke(diamondColor, lineWidth: 1.4)
-                    .frame(width: side, height: side)
+                Circle()
+                    .fill(bg2)
+                    .frame(width: diameter, height: diameter)
+                    .overlay(Circle().stroke(color, lineWidth: 1.4))
 
             case .unlinkedUnreleased:
                 Circle()
@@ -605,7 +588,7 @@ struct RegionWorldMapView: View {
                 }
             case .unlinkedReleased:
                 HStack(spacing: 4) {
-                    DiamondMarkerShape()
+                    Circle()
                         .stroke(AppTheme.cyan, lineWidth: 1.2)
                         .frame(width: 6, height: 6)
                     Text("官方曾放货 · 尚未关联覆盖（可订阅开拓）")

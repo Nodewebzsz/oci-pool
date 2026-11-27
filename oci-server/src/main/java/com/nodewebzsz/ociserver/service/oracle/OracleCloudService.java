@@ -208,6 +208,7 @@ public class OracleCloudService {
             Instance instance = null;
             //Instance instanceFromBootVolume = null;
             BootVolume bootVolume = null;
+            boolean skippedDueToNoCapacity = false;
 
             for (AvailabilityDomain availablityDomain : availabilityDomains) {
                 if (instanceCreated){
@@ -226,8 +227,9 @@ public class OracleCloudService {
                         // 开机前容量检查：若 OCI 明确返回无可用容量，跳过创建 VCN/子网等开销，避免抛异常打断节奏
                         if (!OciUtils.hasComputeCapacity(computeClient, compartmentId, availablityDomain.getName(),
                                 shape.getShape(), user.getOcpus(), user.getMemory())) {
-                            log.info("[开机容量检查] 用户:[{}] AD:{} shape:{} 暂无可用主机容量，跳过尝试",
-                                    user.getUserName(), availablityDomain.getName(), shape.getShape());
+                            skippedDueToNoCapacity = true;
+                            log.debug("[TaskId={}] 用户:[{}] AD:{} shape:{} 暂无可用主机容量，跳过尝试",
+                                    user.getBootId(), user.getUserName(), availablityDomain.getName(), shape.getShape());
                             continue;
                         }
 
@@ -282,6 +284,11 @@ public class OracleCloudService {
                     return ociLogBuilder.buildOpenBootException(count,availablityDomain.getName(),size,user,instanceCreated,e,oracleInstanceDetail);
                 }
             }
+            if (!instanceCreated && skippedDueToNoCapacity) {
+                log.info("[TaskId={}] 用户:[{}]的区域:[{}]的架构:[{}]未完成开机,已执行抢机次数为:[{}],原因为:{},将在:[{}]秒后重试...",
+                        user.getBootId(), user.getUserName(), user.getRegion(), user.getArchitecture(),
+                        count, CAPACITY.getMessage(), user.getInterval());
+            }
         }
         return oracleInstanceDetail;
     }
@@ -310,15 +317,24 @@ public class OracleCloudService {
                      .configuration(ClientConfiguration.builder().build())
                      .build(provider)){
              size = dbInstanceDetails.size();
+             if (StringUtils.isNotBlank(user.getRegion())) {
+                 computeClient.setRegion(user.getRegion());
+                 workRequestClient.setRegion(user.getRegion());
+                 virtualNetworkClient.setRegion(user.getRegion());
+             }
              ComputeWaiters computeWaiters = computeClient.newWaiters(workRequestClient);
+             boolean skippedDueToNoCapacity = false;
              for (LaunchInstanceDetails launchInstanceDetails : dbInstanceDetails) {
                  size --;
                  availabilityDomain = launchInstanceDetails.getAvailabilityDomain();
-                 // 开机前容量检查：若 OCI 明确返回无可用容量，跳过当前尝试
-                 if (!OciUtils.hasComputeCapacity(computeClient, launchInstanceDetails.getCompartmentId(),
-                         availabilityDomain, launchInstanceDetails.getShape(), user.getOcpus(), user.getMemory())) {
-                     log.info("[开机容量检查] 用户:[{}] AD:{} shape:{} 暂无可用主机容量，跳过尝试",
-                             user.getUserName(), availabilityDomain, launchInstanceDetails.getShape());
+                 String compartmentId = resolveCapacityCompartmentId(ociComputerDto, launchInstanceDetails);
+                 Float ocpus = resolveCapacityOcpus(launchInstanceDetails, user);
+                 Float memory = resolveCapacityMemory(launchInstanceDetails, user);
+                 if (!OciUtils.hasComputeCapacity(computeClient, compartmentId,
+                         availabilityDomain, launchInstanceDetails.getShape(), ocpus, memory)) {
+                     skippedDueToNoCapacity = true;
+                     log.debug("[TaskId={}] 用户:[{}] AD:{} shape:{} 暂无可用主机容量，跳过尝试",
+                             user.getBootId(), user.getUserName(), availabilityDomain, launchInstanceDetails.getShape());
                      continue;
                  }
                  Instance instance = null;
@@ -331,9 +347,37 @@ public class OracleCloudService {
                  instanceCreated = true;
                  printInstance(user,computeClient, virtualNetworkClient, instance, oracleInstanceDetail,billingType,provider);
              }
+             if (!instanceCreated && skippedDueToNoCapacity) {
+                 log.info("[TaskId={}] 用户:[{}]的区域:[{}]的架构:[{}]未完成开机,已执行抢机次数为:[{}],原因为:{},将在:[{}]秒后重试...",
+                         user.getBootId(), user.getUserName(), user.getRegion(), user.getArchitecture(),
+                         count, CAPACITY.getMessage(), user.getInterval());
+             }
          }catch (Exception e){
              ociLogBuilder.buildOpenBootException(count,availabilityDomain,size,user,instanceCreated,e,oracleInstanceDetail);
          }
+    }
+
+    static String resolveCapacityCompartmentId(OciComputerDto ociComputerDto,
+                                               LaunchInstanceDetails launchInstanceDetails) {
+        String rootCompartmentId = ociComputerDto != null ? ociComputerDto.getCompartmentIdRoot() : null;
+        String detailsCompartmentId = launchInstanceDetails != null ? launchInstanceDetails.getCompartmentId() : null;
+        return StringUtils.defaultIfBlank(rootCompartmentId, detailsCompartmentId);
+    }
+
+    static Float resolveCapacityOcpus(LaunchInstanceDetails launchInstanceDetails, User user) {
+        if (launchInstanceDetails != null && launchInstanceDetails.getShapeConfig() != null
+                && launchInstanceDetails.getShapeConfig().getOcpus() != null) {
+            return launchInstanceDetails.getShapeConfig().getOcpus();
+        }
+        return user != null ? user.getOcpus() : null;
+    }
+
+    static Float resolveCapacityMemory(LaunchInstanceDetails launchInstanceDetails, User user) {
+        if (launchInstanceDetails != null && launchInstanceDetails.getShapeConfig() != null
+                && launchInstanceDetails.getShapeConfig().getMemoryInGBs() != null) {
+            return launchInstanceDetails.getShapeConfig().getMemoryInGBs();
+        }
+        return user != null ? user.getMemory() : null;
     }
 
     public static List<AvailabilityDomain> getAvailabilityDomains(

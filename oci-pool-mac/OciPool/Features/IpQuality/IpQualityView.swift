@@ -7,29 +7,54 @@ import SwiftUI
 struct IpQualityView: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appearance: AppearanceController
+    @Environment(\.colorScheme) private var colorScheme
     @StateObject private var model = IpQualityViewModel()
+    @StateObject private var probeModel = NetworkQualityViewModel()
+    @State private var mode: QualityViewMode = .probe
 
-    private var dark: Bool { appearance.isDarkEffective }
+    private enum QualityViewMode: String, CaseIterable, Identifiable {
+        case probe
+        case legacy
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .probe: return "探针网络质量"
+            case .legacy: return "旧版三网中转"
+            }
+        }
+    }
+
+    private var dark: Bool { appearance.mode == .system ? colorScheme == .dark : (appearance.mode == .dark) }
+    private var controlRadius: CGFloat { AppTheme.isClaude ? 8 : 5 }
+    private var segmentRadius: CGFloat { AppTheme.isClaude ? 6 : 4 }
 
     private let cardMinHeight: CGFloat = 380
 
     var body: some View {
         PageScaffold(
             title: "IP 质量管理",
-            subtitle: "IP 质量检测与运营商链路配置 · 保障新分配 IP 的可用性",
+            subtitle: mode == .probe
+                ? "独立远端探针网络质量监测 · 支持 ICMP / TCP / HTTP 延迟与丢包趋势"
+                : "旧版三网中转检测配置 · 保障新分配 IP 的可用性",
             systemImage: "shield",
             iconColor: AppTheme.info,
             toolbar: { toolbar },
             content: {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
-                        if let err = model.errorText, !err.isEmpty {
-                            errorBanner(err)
-                                .padding(.bottom, 4)
+                        if mode == .probe {
+                            NetworkQualityWorkbenchView(model: probeModel)
+                        } else {
+                            if let err = model.errorText, !err.isEmpty {
+                                errorBanner(err)
+                                    .padding(.bottom, 4)
+                            }
+                            // 1 + 3 优雅排版：顶部通栏策略配置 + 底部三大运营商探针并排
+                            ipCheckCard
+                            carriersRow
                         }
-                        // 1 + 3 优雅排版：顶部通栏策略配置 + 底部三大运营商探针并排
-                        ipCheckCard
-                        carriersRow
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -37,9 +62,18 @@ struct IpQualityView: View {
             }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-        .onAppear { model.start() }
+        .onAppear {
+            probeModel.start()
+            model.start()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .ociReloadCurrentPage)) { _ in
-            Task { await model.reload() }
+            Task {
+                if mode == .probe {
+                    await probeModel.reload()
+                } else {
+                    await model.reload()
+                }
+            }
         }
         .environmentObject(appearance)
     }
@@ -47,13 +81,54 @@ struct IpQualityView: View {
     // MARK: - Toolbar
 
     private var toolbar: some View {
-        AppButton(
-            title: "刷新",
-            systemImage: "arrow.clockwise",
-            kind: .secondary,
-            isLoading: model.isLoading
-        ) {
-            Task { await model.reload() }
+        AdaptivePageToolbar {
+            HStack(spacing: 4) {
+                ForEach(QualityViewMode.allCases) { item in
+                    let active = mode == item
+                    Button(action: {
+                        mode = item
+                        Task {
+                            if item == .probe {
+                                await probeModel.reload()
+                            } else {
+                                await model.reload()
+                            }
+                        }
+                    }) {
+                        Text(item.label)
+                            .font(.system(size: 11.5, weight: active ? .semibold : .medium))
+                            .foregroundColor(active ? appearance.accent.accentFg(dark) : AppTheme.textSecondary(dark))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(
+                                RoundedRectangle(cornerRadius: segmentRadius)
+                                    .fill(active ? AppTheme.sidebarActive : Color.clear)
+                            )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+            .padding(3)
+            .background(RoundedRectangle(cornerRadius: controlRadius).fill(AppTheme.sidebarHover(dark)))
+            .overlay(
+                RoundedRectangle(cornerRadius: controlRadius)
+                    .stroke(AppTheme.border(dark), lineWidth: 1)
+            )
+
+            AppButton(
+                title: "刷新",
+                systemImage: "arrow.clockwise",
+                kind: .secondary,
+                isLoading: mode == .probe ? probeModel.isLoading : model.isLoading
+            ) {
+                Task {
+                    if mode == .probe {
+                        await probeModel.reload()
+                    } else {
+                        await model.reload()
+                    }
+                }
+            }
         }
     }
 

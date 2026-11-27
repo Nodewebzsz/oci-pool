@@ -1,0 +1,53 @@
+package com.nodewebzsz.ociserver.service.security;
+
+import com.nodewebzsz.dao.entity.BanRecord;
+import com.nodewebzsz.dao.repository.BanRecordRepository;
+import com.nodewebzsz.ociserver.config.exception.IpBannedException;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import javax.annotation.PostConstruct;
+
+@Slf4j
+@Component
+@Lazy(false)
+public class BanRecordAddressMigration {
+
+    private final BanRecordRepository repository;
+    private final TransactionTemplate transaction;
+
+    public BanRecordAddressMigration(BanRecordRepository repository,
+                                     PlatformTransactionManager transactionManager) {
+        this.repository = repository;
+        this.transaction = new TransactionTemplate(transactionManager);
+        this.transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    }
+
+    @PostConstruct
+    public void normalizeExistingAddresses() {
+        Integer updated = transaction.execute(status -> {
+            int changed = 0;
+            for (BanRecord record : repository.findAll()) {
+                String normalized;
+                try {
+                    normalized = LoginIpTransactions.normalizeIp(record.getIpAddress());
+                } catch (IpBannedException invalidAddress) {
+                    log.warn("保留无效 IP 的历史封禁记录，记录ID={}", record.getId());
+                    continue;
+                }
+                if (!normalized.equals(record.getIpAddress())) {
+                    record.setIpAddress(normalized);
+                    changed++;
+                }
+            }
+            return changed;
+        });
+        if (updated != null && updated > 0) {
+            log.info("已规范化历史封禁记录的 IP 地址，记录数={}", updated);
+        }
+    }
+}

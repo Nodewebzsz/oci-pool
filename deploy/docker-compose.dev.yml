@@ -21,6 +21,7 @@ services:
       DB_PASSWORD: "${DEV_DB_PASSWORD:-oci-dev-db-password}"
       ADMIN_USERNAME: "${DEV_ADMIN_USERNAME:-admin}"
       ADMIN_PASSWORD: "${DEV_ADMIN_PASSWORD:-Dev@123456}"
+      CLIENT_IP_TRUSTED_PROXIES: "${CLIENT_IP_TRUSTED_PROXIES:-127.0.0.1,172.16.0.0/12,10.0.0.0/8,192.168.0.0/16}"
     volumes:
       - ./dev/data:/oci-pool/data
       - ./dev/logs:/oci-pool/logs

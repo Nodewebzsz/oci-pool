@@ -15,6 +15,7 @@ import com.nodewebzsz.ociserver.pojo.request.MfaConfigRequest;
 import com.nodewebzsz.ociserver.service.login.AuthSecurityService;
 import com.nodewebzsz.ociserver.service.login.LoginUserService;
 import com.nodewebzsz.ociserver.service.message.factory.MessageFactory;
+import com.nodewebzsz.ociserver.service.security.ExportVerificationGuard;
 import com.nodewebzsz.ociserver.pojo.request.DingTalkConfig;
 import com.nodewebzsz.ociserver.pojo.request.TelegramConfig;
 import com.nodewebzsz.ociserver.service.VerifyService;
@@ -28,6 +29,7 @@ import org.springframework.stereotype.Service;
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.security.SecureRandom;
 import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
@@ -58,6 +60,9 @@ public class VerifyServiceImpl implements VerifyService {
     private static final String RESET_TOKEN_PREFIX = "reset_token_";
 
     private static final String VERIFICATION_CODE_EXPORT_PREFIX = "export_verify_";
+    private static final String EXPORT_CODE_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    private static final int EXPORT_CODE_LENGTH = 8;
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private static final int CODE_EXPIRE_MINUTES = 5;
     // 重置token过期时间（5分钟）
@@ -90,6 +95,9 @@ public class VerifyServiceImpl implements VerifyService {
 
     @Resource
     private AuthSecurityService authSecurityService;
+
+    @Resource
+    private ExportVerificationGuard exportVerificationGuard;
 
     @PostConstruct
     public void init() {
@@ -485,12 +493,12 @@ public class VerifyServiceImpl implements VerifyService {
 
         log.info("用户:{} 请求导出数据验证码", username);
 
-        // 2. 生成6位随机验证码
-        String verificationCode = generateVerificationCode();
-
-        // 3. 将验证码存入 Guava Cache (复用已有的 5分钟过期配置)
-        String cacheKey = VERIFICATION_CODE_EXPORT_PREFIX + username;
-        verificationCodeCache.put(cacheKey, verificationCode);
+        // 2. 通过导出验证码守卫检查每日失败次数并签发 8 位大写字母+数字验证码
+        String verificationCode = exportVerificationGuard.issueCode(username, userId -> {
+            String code = generateExportVerificationCode();
+            verificationCodeCache.put(exportCacheKey(userId), code);
+            return code;
+        });
 
         // 4. 发送通知
         try {
@@ -498,7 +506,7 @@ public class VerifyServiceImpl implements VerifyService {
             String message = String.format(MESSAGE_DATA_EXPORT_CODE_TEMPLATE, username, verificationCode);
             messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplateText(message,Boolean.FALSE);
 
-            log.info("用户:{} 导出验证码已发送: {}", username, verificationCode);
+            log.info("用户:{} 导出验证码已发送", username);
         } catch (Exception e) {
             log.error("导出验证码发送失败: {}", e.getMessage(), e);
             throw new IllegalStateException("验证码发送失败，请稍后重试");
@@ -507,22 +515,25 @@ public class VerifyServiceImpl implements VerifyService {
 
     @Override
     public void checkCodeForExport(String username, String verificationCode) {
-        // 1. 从缓存获取
-        String cacheKey = VERIFICATION_CODE_EXPORT_PREFIX + username;
-        String savedCode = verificationCodeCache.getIfPresent(cacheKey);
-
-        if (savedCode == null) {
-            throw new IllegalStateException("验证码已过期，请重新获取");
-        }
-
-        // 2. 校验
-        if (!savedCode.equals(verificationCode)) {
-            throw new IllegalStateException("验证码错误");
-        }
-
-        // 3. 验证成功后立即作废，防止验证码被二次使用
-        verificationCodeCache.invalidate(cacheKey);
+        exportVerificationGuard.verify(
+                username,
+                verificationCode,
+                userId -> verificationCodeCache.getIfPresent(exportCacheKey(userId)),
+                (userId, expectedCode) -> verificationCodeCache.asMap().remove(exportCacheKey(userId), expectedCode)
+        );
         log.info("用户:{} 导出验证码校验通过", username);
+    }
+
+    private static String exportCacheKey(Long userId) {
+        return VERIFICATION_CODE_EXPORT_PREFIX + userId;
+    }
+
+    private static String generateExportVerificationCode() {
+        StringBuilder builder = new StringBuilder(EXPORT_CODE_LENGTH);
+        for (int i = 0; i < EXPORT_CODE_LENGTH; i++) {
+            builder.append(EXPORT_CODE_ALPHABET.charAt(SECURE_RANDOM.nextInt(EXPORT_CODE_ALPHABET.length())));
+        }
+        return builder.toString();
     }
 
     /**

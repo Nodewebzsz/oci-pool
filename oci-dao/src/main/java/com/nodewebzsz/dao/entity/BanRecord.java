@@ -78,6 +78,18 @@ public class BanRecord {
     private LocalDateTime unbanTime;
 
     /**
+     * 解封原因独立保存，保留原封禁原因。
+     */
+    @Column(name = "unban_reason", length = 255)
+    private String unbanReason;
+
+    /**
+     * 执行解封的用户，与最初封禁操作人分开记录。
+     */
+    @Column(name = "unban_operator_name", length = 64)
+    private String unbanOperatorName;
+
+    /**
      * 备注信息
      */
     @Column(name = "remark", length = 255)
